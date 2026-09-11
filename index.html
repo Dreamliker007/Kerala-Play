@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V25 Realistic Mobile</title>
+<title>Kerala Play • Open World V26 Realistic Human + Animation</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -34,14 +34,14 @@
   🌤️ Kerala • Day • V25
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V25 Realistic Mobile • Kerala Village</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V26 Realistic Human + Animation • Kerala Village</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you<br><span style="opacity:.85">🌐 Shared world • friends can join</span><br><span id="worldTip" style="opacity:.75">📍 Explore the village</span></div>
 <div id="status">👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br><span id="mpStatus"><span id="mpDot"></span>Connecting…</span></div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
 <div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V25 — realistic Kerala village polish + multiplayer + mobile optimization: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room + vehicles + houses enabled</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V26 — realistic human asset + proper animation state machine + pet follow AI: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room + vehicles + houses enabled</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -76,6 +76,8 @@ const mpId=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).sli
 let mpReady=false;
 let driving=false,activeCar=null,carSpeed=0,carSteer=0;
 let player=null;
+let playerAnim={mixer:null,actions:{},state:'idle'};
+let dogAnim={mixer:null,actions:{},state:'idle'};
 
 const remotePlayers=new Map();
 let playerTemplate=null;
@@ -102,20 +104,35 @@ function fallbackRemoteHuman(){
   return g;
 }
 
+function pickClip(clips, names){
+  return clips.find(a=>names.some(n=>new RegExp(n,'i').test(a.name))) || null;
+}
 function createRemoteHuman(r){
   if(!playerTemplate) return fallbackRemoteHuman();
   const g=skeletonClone(playerTemplate);
   g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;}});
   if(playerAnimations.length){
     const mixer=new THREE.AnimationMixer(g);
-    const clip=playerAnimations.find(a=>/walk|run|locomotion/i.test(a.name)) || playerAnimations[0];
-    const action=mixer.clipAction(clip);
-    action.play();
-    g.userData.remoteMixer=mixer;
-    g.userData.remoteAction=action;
+    const idle=pickClip(playerAnimations,['idle','stand','breath']) || playerAnimations[0];
+    const walk=pickClip(playerAnimations,['walk','locomotion']) || idle;
+    const run=pickClip(playerAnimations,['run','jog','sprint']) || walk;
+    const actions={idle:mixer.clipAction(idle),walk:mixer.clipAction(walk),run:mixer.clipAction(run)};
+    Object.values(actions).forEach(a=>{a.enabled=true;a.setLoop(THREE.LoopRepeat,Infinity);});
+    actions.idle.play();
+    g.userData.remoteMixer=mixer; g.userData.remoteActions=actions; g.userData.remoteState='idle';
     mixers.push(mixer);
   }
   return g;
+}
+function setRemoteAnim(r,state){
+  const acts=r.visual?.userData?.remoteActions; if(!acts) return;
+  state=acts[state]?state:'idle';
+  if(r.visual.userData.remoteState===state)return;
+  const from=acts[r.visual.userData.remoteState]||null, to=acts[state];
+  if(from && from!==to) from.fadeOut(.16);
+  to.reset().fadeIn(.16).play();
+  r.visual.userData.remoteState=state;
+  to.timeScale=state==='run'?1.18:state==='walk'?1:0.95;
 }
 
 function createRemoteCar(){
@@ -165,8 +182,7 @@ function addOrUpdateRemote(data){
   if(!r){
     const g=new THREE.Group();
     const tag=makeRemoteTag(data.name||'Player');
-    r={group:g,tag,last:performance.now(),targetPos:new THREE.Vector3(),
-       targetRot:data.ry||0,visual:null,vehicle:false,name:data.name||'Player'};
+    r={group:g,tag,last:performance.now(),targetPos:new THREE.Vector3(),targetRot:data.ry||0,visual:null,vehicle:false,name:data.name||'Player',anim:data.anim||'idle'};
     g.userData.tag=tag;
     remotePlayers.set(data.id,r);
     scene.add(g);
@@ -204,7 +220,7 @@ function sendMpState(){
     payload:{
       type:'state',id:mpId,name:'Player '+mpId.slice(0,4),
       x:o.position.x,y:o.position.y,z:o.position.z,ry:o.rotation.y,
-      vehicle:!!drivingNow,seq:++mpSeq,t:Date.now()
+      vehicle:!!drivingNow,anim:(drivingNow?'idle':(playerAnim.state||'idle')),seq:++mpSeq,t:Date.now()
     }
   });
 }
@@ -681,35 +697,55 @@ loadGLB(dogAssetUrl,g=>{
   model.scale.setScalar(1.0);
   model.position.set(0,0,0);
   pet.add(model);
+  const clips=g.animations||[];
+  if(clips.length){
+    dogAnim.mixer=new THREE.AnimationMixer(model);
+    const idle=pickClip(clips,['idle','stand','sit','rest'])||clips[0];
+    const walk=pickClip(clips,['walk','trot','move'])||idle;
+    const run=pickClip(clips,['run','gallop'])||walk;
+    dogAnim.actions={idle:dogAnim.mixer.clipAction(idle),walk:dogAnim.mixer.clipAction(walk),run:dogAnim.mixer.clipAction(run)};
+    Object.values(dogAnim.actions).forEach(a=>a.setLoop(THREE.LoopRepeat,Infinity));
+    dogAnim.actions.idle.play(); dogAnim.state='idle'; mixers.push(dogAnim.mixer);
+  }
 });
 
 
 player=new THREE.Group();
 scene.add(player);
 
-// Real human GLB (CC0 source) as the first asset-based player pass.
-// The gameplay rig remains on the player root so controls stay unchanged.
-const playerModelUrl='https://static.poly.pizza/3746be88-6799-4817-929b-6bc067c47caa.glb';
+// Higher-quality rigged third-person human with authored idle/walk/run clips.
+// Source: 3DAssets.dev CC0 character, 74-joint skeleton.
+const playerModelUrl='https://cdn.3dassets.dev/assets/32901/v1/model.glb';
 loadGLB(playerModelUrl,g=>{
   const model=g.scene;
-  playerTemplate=model;
-  playerAnimations=g.animations || [];
+  playerTemplate=model; playerAnimations=g.animations||[];
   enableShadows(model);
   model.scale.setScalar(1.0);
   model.position.set(0,0,0);
   player.add(model);
-  if(g.animations?.length){
-    const mixer=new THREE.AnimationMixer(model);
-    mixers.push(mixer);
-    const walkClip=g.animations.find(a=>/walk|run|locomotion/i.test(a.name)) || g.animations[0];
-    const action=mixer.clipAction(walkClip); action.play();
-    window.playerMixer=mixer; window.playerAction=action;
+  if(playerAnimations.length){
+    playerAnim.mixer=new THREE.AnimationMixer(model);
+    const idle=pickClip(playerAnimations,['idle','stand','breath'])||playerAnimations[0];
+    const walk=pickClip(playerAnimations,['walk','locomotion'])||idle;
+    const run=pickClip(playerAnimations,['run','jog','sprint'])||walk;
+    playerAnim.actions={idle:playerAnim.mixer.clipAction(idle),walk:playerAnim.mixer.clipAction(walk),run:playerAnim.mixer.clipAction(run)};
+    Object.values(playerAnim.actions).forEach(a=>{a.enabled=true;a.setLoop(THREE.LoopRepeat,Infinity);});
+    playerAnim.actions.idle.play(); playerAnim.state='idle'; mixers.push(playerAnim.mixer);
   }
-  // Upgrade any remote players that joined before the human asset finished loading.
-  for(const r of remotePlayers.values()){
-    if(!r.vehicle) buildRemoteVisual(r,false);
-  }
+  for(const r of remotePlayers.values()){ if(!r.vehicle) buildRemoteVisual(r,false); }
 });
+function setPlayerAnim(state){
+  if(!playerAnim.mixer || !playerAnim.actions[state]) return;
+  if(playerAnim.state===state) return;
+  const from=playerAnim.actions[playerAnim.state],to=playerAnim.actions[state];
+  from?.fadeOut(.14); to.reset().fadeIn(.14).play();
+  playerAnim.state=state;
+  to.timeScale=state==='run'?1.18:state==='walk'?1:.95;
+}
+function setDogAnim(state){
+  const a=dogAnim.actions; if(!a || !a[state] || dogAnim.state===state)return;
+  a[dogAnim.state]?.fadeOut(.14); a[state].reset().fadeIn(.14).play(); dogAnim.state=state;
+}
 
 let moveX=0,moveY=0,targetMoveX=0,targetMoveY=0,yaw=0,targetYaw=0,pitch=.34,targetPitch=.34,jump=false,vy=0;
 const joy=document.getElementById('joy'),knob=document.getElementById('knob');let jid=null;
@@ -812,7 +848,7 @@ const camSmooth=1-Math.exp(-dt*(mobile?10:12));yaw+=(targetYaw-yaw)*camSmooth;pi
 let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z);if(l>1){x/=l;z/=l;l=1}
 const moving=l>.08;
 if(!driving){
-  const speed=(mobile?5.2:7.8)*(moving?.92+.08*l:0);if(window.playerAction)window.playerAction.timeScale=moving?Math.min(1.15,.75+.35*l):0;
+  const speed=(mobile?5.2:7.8)*(moving?.92+.08*l:0); setPlayerAnim(moving?(l>.72?'run':'walk'):'idle');
   player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
   if(insideHouse){player.position.x=Math.max(294,Math.min(306,player.position.x));player.position.z=Math.max(295.2,Math.min(304.8,player.position.z));}else{player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));}
   if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));player.rotation.y+=diff*(1-Math.exp(-dt*10));}
@@ -834,16 +870,22 @@ for(const r of remotePlayers.values()){
   r.group.position.lerp(r.targetPos,k);
   let rd=Math.atan2(Math.sin(r.targetRot-r.group.rotation.y),Math.cos(r.targetRot-r.group.rotation.y));
   r.group.rotation.y += rd*k;
-  // Keep remote human animation readable while moving; cars do not need a walk cycle.
-  if(r.visual && !r.vehicle && r.visual.userData.remoteAction){
-    const speed=r.group.position.distanceTo(r.targetPos);
-    r.visual.userData.remoteAction.timeScale=speed>.002?1:0;
-  }
+  // Remote human animation follows the state sent by the owner.
+  if(r.visual && !r.vehicle) setRemoteAnim(r,r.anim||'idle');
 }
 if(!driving){
-  const petX=player.position.x+Math.sin(t*.0018)*2.7;pet.position.x+=(petX-pet.position.x)*Math.min(1,dt*4);
-  const petZ=player.position.z+Math.cos(t*.0015)*2.7;pet.position.z+=(petZ-pet.position.z)*Math.min(1,dt*4);
-  if(Math.abs(petX-pet.position.x)+Math.abs(petZ-pet.position.z)>.02)pet.rotation.y=Math.atan2(petX-player.position.x,petZ-player.position.z);
+  // Stable dog follow: no orbiting/circular path. The dog targets a point behind and slightly left of the player.
+  const back=3.0, side=1.35;
+  const dogTargetX=player.position.x - Math.sin(yaw)*back - Math.cos(yaw)*side;
+  const dogTargetZ=player.position.z - Math.cos(yaw)*back + Math.sin(yaw)*side;
+  const dx=dogTargetX-pet.position.x,dz=dogTargetZ-pet.position.z,dist=Math.hypot(dx,dz);
+  const dogSpeed=dist>8?7.0:dist>3.0?4.0:0;
+  if(dogSpeed>0){
+    const step=Math.min(dist,dogSpeed*dt); pet.position.x+=dx/dist*step; pet.position.z+=dz/dist*step;
+    const desiredDogYaw=Math.atan2(dx,dz); let dd=Math.atan2(Math.sin(desiredDogYaw-pet.rotation.y),Math.cos(desiredDogYaw-pet.rotation.y));
+    pet.rotation.y+=dd*(1-Math.exp(-dt*9));
+  }
+  setDogAnim(dist>8?'run':dist>3?'walk':'idle');
   const near=getNearestCar();if(!insideHouse && near.car&&near.dist<6)setCarButton(true,'🚗');else if(!driving)setCarButton(false); if(!driving&&!insideHouse){const nh=getNearestHouse();if(nh.pos&&nh.dist<18)setHouseButton(true,'🏠 Enter');else setHouseButton(false);}
 }
 let follow=driving&&activeCar?activeCar:player;
