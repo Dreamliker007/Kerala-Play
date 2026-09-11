@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • V28 Living Kerala World</title>
+<title>Kerala Play • V30 Control + Realism Fix</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
-.top{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px}.pill{background:#10251de8;padding:10px 14px;border-radius:15px;font-weight:800;font-size:13px;backdrop-filter:blur(8px)}
-#mission{position:absolute;top:64px;left:14px;background:#10251de8;border-radius:15px;padding:12px 15px;font-size:12px;line-height:1.4}
-#status{position:absolute;right:14px;top:64px;background:#10251de8;border-radius:15px;padding:10px 13px;font-size:12px}
-#joy{position:absolute;left:20px;bottom:20px;width:158px;height:158px;border-radius:50%;background:#ffffff29;border:2px solid #ffffff66;pointer-events:auto;touch-action:none}
-#houseBtn,#carBtn{position:fixed;right:18px;bottom:102px;z-index:40;width:94px !important;height:58px !important;border-radius:18px;font-size:17px}#knob{position:absolute;left:45px;top:45px;width:65px;height:65px;border-radius:50%;background:#fff;box-shadow:0 5px 18px #0006}
+.top{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px}.pill{background:#10251de8;padding:8px 11px;border-radius:13px;font-weight:800;font-size:10px;backdrop-filter:blur(8px)}
+#mission{position:absolute;top:60px;left:12px;max-width:44vw;background:#10251de8;border-radius:13px;padding:8px 10px;font-size:9px;line-height:1.4}
+#status{position:absolute;right:12px;top:60px;max-width:42vw;background:#10251de8;border-radius:13px;padding:8px 10px;font-size:9px}
+#joy{position:absolute;left:18px;bottom:18px;width:146px;height:146px;border-radius:50%;background:#ffffff29;border:2px solid #ffffff66;pointer-events:auto;touch-action:none}
+#houseBtn,#carBtn{position:fixed;right:18px;bottom:102px;z-index:40;width:94px !important;height:58px !important;border-radius:18px;font-size:17px}#knob{position:absolute;left:40px;top:40px;width:64px;height:64px;border-radius:50%;background:#fff;box-shadow:0 5px 18px #0006}
 .actions{position:absolute;right:18px;bottom:22px;display:flex;gap:9px;align-items:center;pointer-events:auto}.btn{width:60px;height:60px;border:0;border-radius:50%;background:#10251de8;color:#fff;font-size:21px;box-shadow:0 5px 16px #0005}
 #start{position:fixed;inset:0;z-index:1000;background:#06140bbb;display:flex;align-items:center;justify-content:center;pointer-events:auto}
 .card{position:relative;z-index:1001;width:min(92%,480px);background:#fff;color:#182033;border-radius:28px;padding:30px;text-align:center;box-shadow:0 25px 75px #000a}.card h1{margin:0 0 8px;font-size:32px}.card p{color:#555;line-height:1.5}.play{position:relative;z-index:1002;cursor:pointer;touch-action:manipulation;border:0;background:#087f45;color:#fff;font-size:18px;font-weight:800;padding:14px 25px;border-radius:14px}.small{font-size:12px;color:#777;margin-top:12px}
@@ -22,8 +22,8 @@
 #mpDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#53d769;margin-right:5px} .remoteTag{position:absolute;pointer-events:none;color:#fff;font:700 11px Arial;background:#10251dcc;padding:4px 7px;border-radius:8px;transform:translate(-50%,-100%);white-space:nowrap;display:none}
 
 #quick{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:45;display:flex;gap:8px;pointer-events:auto}
-.qbtn{border:0;background:#10251de8;color:#fff;border-radius:14px;padding:9px 12px;font-weight:800;font-size:12px;box-shadow:0 5px 16px #0005;backdrop-filter:blur(8px)}
-#prompt{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:46;background:#10251df0;color:#fff;padding:10px 15px;border-radius:14px;font-weight:800;font-size:13px;display:none;pointer-events:none}
+.qbtn{border:0;background:#10251de8;color:#fff;border-radius:12px;padding:7px 9px;font-weight:800;font-size:10px;box-shadow:0 5px 16px #0005;backdrop-filter:blur(8px)}
+#prompt{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:46;background:#10251df0;color:#fff;padding:7px 11px;border-radius:11px;font-weight:800;font-size:10px;display:none;pointer-events:none}
 #mini{position:fixed;right:14px;bottom:14px;width:116px;height:116px;border-radius:18px;background:#10251dcc;border:1px solid #ffffff44;z-index:31;overflow:hidden}
 #mini canvas{width:100%;height:100%}
 @media(max-width:700px){#mini{width:92px;height:92px}.top .pill:last-child{display:none}.qbtn{padding:8px 10px}.quick{bottom:12px}}
@@ -31,7 +31,7 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V28
+  🌤️ Kerala • Day • V30
 </div>
 <div id="vignette"></div><div id="ui">
 <div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V26 Realistic Human + Animation • Kerala Village</div></div>
@@ -41,7 +41,7 @@
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
 <div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V28 — Living Kerala World: realistic animation, birds, railway + train, school, playground, wells, gardens, buses, traffic and walking people.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Living Kerala world + multiplayer + vehicles + houses</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V30 — Control + Realism Fix: realistic animation, birds, railway + train, school, playground, wells, gardens, buses, traffic and walking people.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Living Kerala world + multiplayer + vehicles + houses</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded',function(){
 import * as THREE from 'three';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 import { clone as skeletonClone } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/SkeletonUtils.js';
+import { Sky } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/objects/Sky.js';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x9bc3b7);
@@ -490,12 +491,12 @@ function busStop(x,z,rot=0){
 }
 busStop(-38,9,.05);busStop(38,11,-.05);
 
-const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.08,850);
-const renderer=new THREE.WebGLRenderer({antialias:!mobile,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.45:1.9));renderer.setSize(innerWidth,innerHeight);
+const camera=new THREE.PerspectiveCamera(66,innerWidth/innerHeight,.08,900);
+const renderer=new THREE.WebGLRenderer({antialias:!mobile,powerPreference:'high-performance',precision:mobile?'mediump':'highp'});
+renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.25:1.85));renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.06;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-scene.fog=new THREE.FogExp2(0x9fc4bb,mobile?0.0027:0.0021);
+scene.fog=new THREE.FogExp2(0x9fc4bb,mobile?0.00225:0.00175);
 renderer.domElement.style.touchAction='none';document.getElementById('game').appendChild(renderer.domElement);
 const loader=new GLTFLoader();const mixers=[];
 const ASSET_BASE='https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
@@ -507,8 +508,11 @@ function enableShadows(root){root.traverse(o=>{if(o.isMesh){
         mats.forEach(mat=>{ if('roughness' in mat) mat.roughness=Math.min(mat.roughness??.78,.88); if('metalness' in mat) mat.metalness=Math.min(mat.metalness??0,.25); });
       }} });}
 const hemi=new THREE.HemisphereLight(0xe6f7ff,0x274b31,1.35);scene.add(hemi);
-const sun=new THREE.DirectionalLight(0xfff0d2,3.15);sun.position.set(-85,150,65);sun.castShadow=true;sun.shadow.mapSize.set(mobile?768:1536,mobile?768:1536);sun.shadow.camera.left=-110;sun.shadow.camera.right=110;sun.shadow.camera.top=110;sun.shadow.camera.bottom=-110;sun.shadow.bias=-0.00025;scene.add(sun);
+const sun=new THREE.DirectionalLight(0xfff0d2,3.15);sun.position.set(-85,150,65);sun.castShadow=true;sun.shadow.mapSize.set(mobile?512:1536,mobile?512:1536);sun.shadow.camera.left=-110;sun.shadow.camera.right=110;sun.shadow.camera.top=110;sun.shadow.camera.bottom=-110;sun.shadow.bias=-0.00025;scene.add(sun);
 const fill=new THREE.DirectionalLight(0xaed6ff,.55);fill.position.set(90,55,-80);scene.add(fill);
+// V30 procedural Kerala sky: softer horizon gradient, sun halo and natural daylight.
+const skyDome=new Sky(); skyDome.scale.setScalar(520); scene.add(skyDome);
+const skyUniforms=skyDome.material.uniforms; skyUniforms.turbidity.value=7.2; skyUniforms.rayleigh.value=1.65; skyUniforms.mieCoefficient.value=0.004; skyUniforms.mieDirectionalG.value=0.78;
 
 function add(g,m,x=0,y=0,z=0){let o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=!mobile;o.receiveShadow=!mobile;scene.add(o);return o}
 function box(w,h,d,c,x,y,z,r=0){let o=add(new THREE.BoxGeometry(w,h,d),M(c),x,y,z);o.rotation.y=r;return o}
@@ -602,10 +606,19 @@ function flowerBed(x,z){
   }
 }
 flowerBed(-17,-10); flowerBed(18,-10);
+// V30 static collision: solid house/wall volumes keep the player and vehicles out of walls.
+const staticColliders=[];
+function addRectCollider(x,z,hx,hz,rot=0){staticColliders.push({x,z,hx,hz,rot});}
+function rectHit(x,z,c,pad=0){const dx=x-c.x,dz=z-c.z,co=Math.cos(c.rot),si=Math.sin(c.rot);const lx=dx*co+dz*si,lz=-dx*si+dz*co;return Math.abs(lx)<=c.hx+pad && Math.abs(lz)<=c.hz+pad;}
+function blockedAt(x,z,r=.55){for(const c of staticColliders) if(rectHit(x,z,c,r)) return true; return false;}
+
 house(-27,-22,0xffd1a0,0x8e3b2d);house(28,24,0xffc8a0,0x71372c);house(-32,30,0xe8efbf,0x85352b);house(33,-27,0xffe1aa,0x703a2b);house(-76,-18,0xefc39b,0x793b2e);house(76,20,0xffd4a4,0x69382c);house(-75,67,0xe2edbf,0x8d382c);house(74,-68,0xf1d0aa,0x79392d);
+[[-27,-22,4.6,3.6,0],[28,24,4.6,3.6,0],[-32,30,4.6,3.6,0],[33,-27,4.6,3.6,0],[-76,-18,4.6,3.6,0],[76,20,4.6,3.6,0],[-75,67,4.6,3.6,0],[74,-68,4.6,3.6,0]].forEach(v=>addRectCollider(...v));
+// Boundary/compound walls.
+[[-92,-36,14,.18,.05],[92,-38,14,.18,-.05],[-92,44,12,.18,.12],[92,48,12,.18,-.12],[-82,-65,14,6.8,0]].forEach(v=>addRectCollider(...v));
 
 function palm(x,z,s=1){cyl(.38*s,8.5*s,0x65452a,x,4.25*s,z);for(let i=0;i<8;i++){let a=i*Math.PI*2/8;let l=add(new THREE.ConeGeometry(.43*s,5.8*s,6),M(0x166b38),x+Math.cos(a)*2*s,8.5*s,z+Math.sin(a)*2*s);l.rotation.z=Math.PI/2;l.rotation.y=-a}}
-[[-12,-12],[-18,12],[-8,35],[13,13],[20,-11],[40,6],[-41,-4],[7,-35],[-86,0],[87,0],[-67,60],[66,-62],[-45,80],[48,75],[-100,45],[105,-35]].forEach(p=>palm(...p));
+[[-18,-20],[-24,18],[-8,35],[18,18],[24,-20],[42,18],[-45,-18],[12,-35],[-86,-22],[87,-22],[-67,60],[66,-62],[-45,80],[48,75],[-100,45],[105,-35]].forEach(p=>palm(...p));
 
 // V17 vegetation variety: mango, rubber and arecanut, with randomized scale/rotation.
 function mango(x,z,s=1){
@@ -624,7 +637,7 @@ function areca(x,z,s=1){cyl(.11*s,7*s,0x6d4d2e,x,3.5*s,z,9);for(let i=0;i<6;i++)
 [[-100,-5],[-96,8],[-94,20],[96,-5],[99,8],[101,20],[-52,70],[54,70]].forEach(p=>areca(...p,.85));
 
 function banana(x,z){cyl(.55,3,0x54772d,x,1.5,z);for(let i=0;i<6;i++){let a=i*Math.PI*2/6;let l=add(new THREE.ConeGeometry(.48,4.4,6),M(0x25843b),x+Math.cos(a),2.8,z+Math.sin(a));l.rotation.z=Math.PI/2;l.rotation.y=-a}}
-[[-22,-5],[-35,5],[-8,23],[20,4],[34,-7],[-50,42],[51,45],[-80,38]].forEach(p=>banana(...p));
+[[-22,-18],[-35,15],[-8,24],[20,18],[34,-18],[-50,42],[51,45],[-80,38]].forEach(p=>banana(...p));
 
 function shrub(x,z,s=1){
   for(let i=0;i<5;i++){
@@ -681,6 +694,9 @@ function loadRealCar(x,z,scale=1,colorize=null){
 }
 loadRealCar(-5,-8,1.18,0xb52d2d);
 loadRealCar(48,-3,1.18,0x245d9c);
+// Upgrade background traffic to the same realistic GLB car instead of primitive boxes.
+function upgradeTrafficCars(){if(!carTemplate)return; const entries=traffic.filter(q=>q.type==='car'); entries.forEach((q,i)=>{const old=q.obj; const g=skeletonClone(carTemplate); g.scale.setScalar(.88+(i%2)*.08); g.position.copy(old.position); g.rotation.y=old.rotation.y; g.traverse(o=>{if(o.isMesh&&o.material&&o.material.color&&o.material.name&&/body|paint/i.test(o.material.name))o.material.color.setHex([0xf0eee7,0x4d6fbe,0xb63a32][i%3]);}); scene.remove(old);q.obj=g;scene.add(g);});}
+setTimeout(upgradeTrafficCars,1800);
 
 // V14 vehicle gameplay: use loaded cars when available, with a lightweight fallback if an asset is unavailable.
 function fallbackCar(x,z,color){
@@ -694,7 +710,7 @@ let fallback1=null,fallback2=null;
 setTimeout(()=>{ if(!c1) fallback1=fallbackCar(-5,-8,0xb52d2d); if(!c2) fallback2=fallbackCar(48,-3,0x245d9c); },1800);
 
 function person(x,z,shirt){let g=new THREE.Group();let b=new THREE.Mesh(new THREE.CapsuleGeometry(.48,1.05,6,10),M(shirt));b.position.y=1.4;g.add(b);let h=new THREE.Mesh(new THREE.SphereGeometry(.38,18,16),M(0xc88b64));h.position.y=2.5;g.add(h);for(let s of [-1,1]){let l=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.72,5,8),M(0x27364a));l.position.set(s*.23,.62,0);g.add(l)}g.position.set(x,0,z);scene.add(g);return g}
-const npcs=[person(18,15,0x7a3d95),person(-20,18,0x1e6fae),person(28,-18,0xe07b32),person(-30,-8,0x2d7c4d)];
+const npcs=[];
 
 let pet=new THREE.Group();scene.add(pet);
 const dogAssetUrl='https://cdn.3dassets.dev/assets/29204/v1/model.glb';
@@ -760,12 +776,12 @@ function setDogAnim(state){
   const speed=state==='run'?1.18:state==='walk'?0.92:0.72; if(a[state]) a[state].timeScale=speed;
 }
 
-let moveX=0,moveY=0,targetMoveX=0,targetMoveY=0,yaw=0,targetYaw=0,pitch=.34,targetPitch=.34,jump=false,vy=0; player.userData.turnLean=0;
+let moveX=0,moveY=0,targetMoveX=0,targetMoveY=0,yaw=0,targetYaw=0,pitch=.18,targetPitch=.18,jump=false,vy=0; player.userData.turnLean=0;
 const joy=document.getElementById('joy'),knob=document.getElementById('knob');let jid=null;
-function jm(e){let r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=49,l=Math.hypot(dx,dy);if(l>max){dx=dx/l*max;dy=dy/l*max}let nx=dx/max,ny=dy/max;const dead=.10;if(Math.hypot(nx,ny)<dead){nx=ny=0}else{const m=Math.hypot(nx,ny);nx*=Math.min(1,(m-dead)/(1-dead))/m;ny*=Math.min(1,(m-dead)/(1-dead))/m}knob.style.transform=`translate(${dx}px,${dy}px)`;targetMoveX=nx;targetMoveY=ny}
+function jm(e){let r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=43,l=Math.hypot(dx,dy);if(l>max){dx=dx/l*max;dy=dy/l*max}let nx=dx/max,ny=dy/max;const dead=.10;if(Math.hypot(nx,ny)<dead){nx=ny=0}else{const m=Math.hypot(nx,ny);nx*=Math.min(1,(m-dead)/(1-dead))/m;ny*=Math.min(1,(m-dead)/(1-dead))/m}knob.style.transform=`translate(${dx}px,${dy}px)`;targetMoveX=nx;targetMoveY=ny}
 function releaseJoy(){targetMoveX=targetMoveY=0;knob.style.transform='translate(0,0)'}
 joy.addEventListener('pointerdown',e=>{jid=e.pointerId;joy.setPointerCapture(jid);jm(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)jm(e)});['pointerup','pointercancel'].forEach(v=>joy.addEventListener(v,releaseJoy));
-let cid=null,lx=0,ly=0;renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<190)return;cid=e.pointerId;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(cid)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==cid)return;targetYaw-=(e.clientX-lx)*(mobile? .0048 : .007);targetPitch=Math.max(-.08,Math.min(.92,targetPitch+(e.clientY-ly)*.0035));lx=e.clientX;ly=e.clientY});renderer.domElement.addEventListener('pointerup',()=>cid=null);
+let cid=null,lx=0,ly=0;renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<190)return;cid=e.pointerId;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(cid)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==cid)return;targetYaw-=(e.clientX-lx)*(mobile? .0038 : .006);targetPitch=Math.max(.02,Math.min(.55,targetPitch+(e.clientY-ly)*.0026));lx=e.clientX;ly=e.clientY});renderer.domElement.addEventListener('pointerup',()=>cid=null);
 const carBtn=document.getElementById('carBtn');
 function setCarButton(show,label){carBtn.style.display=show?'block':'none';carBtn.textContent=label||'🚗'}
 function getNearestCar(){const list=[c1,c2,fallback1,fallback2].filter(Boolean);let best=null,bd=999;for(const c of list){const d=Math.hypot(player.position.x-c.position.x,player.position.z-c.position.z);if(d<bd){bd=d;best=c}}return {car:best,dist:bd}}
@@ -803,7 +819,7 @@ function enterHouse(){if(insideHouse||driving)return;const n=getNearestHouse();i
 function exitHouse(){if(!insideHouse)return;insideHouse=false;interior.visible=false;player.position.copy(outsideHousePos);yaw=targetYaw=0;setHouseButton(false);document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you';}
 houseBtn.addEventListener('click',()=>insideHouse?exitHouse():enterHouse());
 
-document.getElementById('jump').onclick=()=>{if(!driving&&!jump){jump=true;vy=8}};document.getElementById('reset').onclick=()=>{if(driving&&activeCar){activeCar.position.set(0,0,0);carSpeed=0}else{player.position.set(0,0,0);yaw=0;targetYaw=0}};
+document.getElementById('jump').onclick=()=>{if(!driving&&!jump){jump=true;vy=8}};document.getElementById('reset').onclick=()=>{if(driving&&activeCar){activeCar.position.set(0,0,0);carSpeed=0}else{player.position.set(0,0,0);yaw=0;targetYaw=0;pitch=.18;targetPitch=.18}};
 document.getElementById('pet').onclick=()=>{if(driving)return;document.getElementById('mission').innerHTML='<b>🐾 Pet interaction</b><br>Your dog is happy ❤️';setTimeout(()=>document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you',1800)};
 const playBtn=document.getElementById('play');
 function enterWorld(e){if(e){e.preventDefault();e.stopPropagation();}document.getElementById('start').style.display='none'}
@@ -824,8 +840,13 @@ function applyWorldLight(){
   sun.position.set(-70,35+110*daylight,55);
   const sky=new THREE.Color().setHSL(0.56,0.55,0.32+0.32*daylight);
   scene.background.copy(sky); scene.fog.color.copy(sky);
-  sunDisc.visible=daylight>.16; sunDisc.position.set(-110,45+100*daylight,-170);
-  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V28';
+  const phi=THREE.MathUtils.degToRad(90-(12+70*daylight));
+  const theta=THREE.MathUtils.degToRad(150);
+  const skySun=new THREE.Vector3().setFromSphericalCoords(1,phi,theta);
+  skyUniforms.sunPosition.value.copy(skySun);
+  sun.position.copy(skySun).multiplyScalar(170);
+  sunDisc.visible=daylight>.16; sunDisc.position.copy(skySun).multiplyScalar(170);
+  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V30';
 }
 dayBtn.addEventListener('click',()=>{autoTime=false;worldClock=worldClock<17?19:9.5;applyWorldLight();dayBtn.textContent=worldClock>17?'🌙 Night':'🌤️ Day'});
 qualityBtn.addEventListener('click',()=>{
@@ -855,7 +876,7 @@ function updateInteractionPrompt(){
   p.style.display='none';
 }
 
-// V28 Living Kerala World: railway, train, school, playground, well, seating, gardens,
+// V30 Control + Realism Fix: railway, train, school, playground, well, seating, gardens,
 // moving buses/cars/bikes, fruit trees, flying birds and fully animated walking NPCs.
 const walkingNPCs=[];
 const traffic=[];
@@ -949,6 +970,23 @@ makeBusStand(38,-47);makeLabel('BUS STOP',-38,6,7,1.1,0x1e5c43);makeLabel('BUS S
 
 function simpleBus(x,z,color=0xd4b23e){const g=new THREE.Group();gbox(g,3.0,2.7,8.2,color,0,2.0,0);gbox(g,3.05,.28,8.3,0x27363a,0,3.45,0);for(const sx of [-1.52,1.52])for(let zz=-2.8;zz<=2.8;zz+=2.0)gbox(g,.06,1.0,1.25,0x24434a,sx,2.55,zz);for(const sx of [-1.35,1.35])for(const zz of [-2.6,2.6]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,.25,16),M(0x151515));w.rotation.z=Math.PI/2;w.position.set(sx,.55,zz);g.add(w)}g.position.set(x,0,z);scene.add(g);return g}
 const bus1=simpleBus(-115,4,0xe1bd35),bus2=simpleBus(115,-4,0x2f78a9);bus1.rotation.y=Math.PI/2;bus2.rotation.y=-Math.PI/2;traffic.push({obj:bus1,type:'bus',axis:'x',speed:4.8,base:4});traffic.push({obj:bus2,type:'bus',axis:'x',speed:-4.2,base:-4});
+// V30: replace primitive buses with a realistic CC0 road minibus when available.
+const realisticFleetUrl='https://cdn.3dassets.dev/assets/32562/v1/model.glb';
+let busTemplate=null;
+function findBusTemplate(root){let hit=null;root.traverse(o=>{if(hit)return; if(o.name && /sixteen.?seat|minibus|bus/i.test(o.name) && (o.isGroup||o.isObject3D)) hit=o;});return hit;}
+function fitVehicle(obj, targetLength){const b=new THREE.Box3().setFromObject(obj),sz=b.getSize(new THREE.Vector3());const len=Math.max(sz.z,sz.x);if(len>0)obj.scale.multiplyScalar(targetLength/len);}
+function upgradeBuses(){
+  loadGLB(realisticFleetUrl,g=>{
+    const found=findBusTemplate(g.scene);
+    if(!found)return;
+    busTemplate=found.clone(true);
+    busTemplate.visible=true;
+    fitVehicle(busTemplate,8.8);
+    const entries=traffic.filter(q=>q.type==='bus');
+    entries.forEach((q,i)=>{const old=q.obj;const b=skeletonClone(busTemplate);b.position.copy(old.position);b.rotation.y=q.speed>0?Math.PI/2:-Math.PI/2;b.traverse(o=>{if(o.isMesh){o.castShadow=!mobile;o.receiveShadow=!mobile;}});scene.remove(old);q.obj=b;scene.add(b);});
+  });
+}
+setTimeout(upgradeBuses,900);
 function addTrafficCar(x,z,color,r=0){const g=new THREE.Group();gbox(g,2.1,.85,4.2,color,0,1.0,0);gbox(g,1.65,.75,1.8,0x283238,0,1.65,.25);for(const sx of [-.95,.95])for(const zz of [-1.35,1.35]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.22,14),M(0x171717));w.rotation.z=Math.PI/2;w.position.set(sx,.45,zz);g.add(w)}g.position.set(x,0,z);g.rotation.y=r;scene.add(g);return g}
 const tc1=addTrafficCar(-105,-7,0xeff0e8),tc2=addTrafficCar(105,7,0x5a73d0),tc3=addTrafficCar(-105,7,0x9b352d);traffic.push({obj:tc1,type:'car',axis:'x',speed:7.2,base:-7});traffic.push({obj:tc2,type:'car',axis:'x',speed:-6.3,base:7});traffic.push({obj:tc3,type:'car',axis:'x',speed:5.4,base:7});
 function movingBike(x,z,r=0){const g=new THREE.Group();for(const zz of [-.65,.65]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.27,.27,.11,14),M(0x151515));w.rotation.x=Math.PI/2;w.position.set(0,.3,zz);g.add(w)}gbox(g,.8,.15,.2,0x2e6fba,0,.65,0);gbox(g,.45,.12,.55,0x202020,0,.85,.05);g.position.set(x,0,z);g.rotation.y=r;scene.add(g);return g}
@@ -963,9 +1001,9 @@ for(const [x,z] of [[-86,-58],[86,-60]])for(let i=0;i<4;i++)fruit(x+Math.cos(i*M
 
 function createWalkingNPCsFromTemplate(template,clips){
   if(walkingNPCs.length) return;
-  const spots=[[-58,-18],[52,-18],[-66,14],[66,16],[-92,-30],[90,-30],[-12,28],[15,30]];
+  const spots=[[-58,-18],[52,-18],[-66,14],[66,16],[-92,-30],[90,-30],[-12,28],[15,30],[-40,-42],[42,-42],[-18,52],[20,52]];
   spots.forEach((p,i)=>{
-    const root=new THREE.Group();const model=skeletonClone(template);model.scale.setScalar(.96+(i%3)*.04);root.add(model);root.position.set(p[0],0,p[1]);root.userData={path:i%2?1:-1,phase:Math.random()*10, speed:1.05+(i%3)*.25};
+    const root=new THREE.Group();const model=skeletonClone(template);model.scale.setScalar(.96+(i%3)*.04);root.add(model);root.position.set(p[0],0,p[1]);root.userData={path:i%2?1:-1,phase:Math.random()*10, speed:1.0+(i%4)*.22, pause:0, pauseSeed:Math.random()*6.28};
     const mixer=new THREE.AnimationMixer(model), acts={};const idle=pickClip(clips,['idle','stand','breath'])||clips[0],walk=pickClip(clips,['walk','locomotion'])||idle,run=pickClip(clips,['run','jog'])||walk;
     acts.idle=mixer.clipAction(idle);acts.walk=mixer.clipAction(walk);acts.run=mixer.clipAction(run);Object.values(acts).forEach(a=>{a.setLoop(THREE.LoopRepeat,Infinity);a.clampWhenFinished=false});acts.walk.play();root.userData.mixer=mixer;root.userData.actions=acts;root.userData.state='walk';root.userData.baseX=p[0];root.userData.baseZ=p[1];walkingNPCs.push(root);scene.add(root);mixers.push(mixer);
   });
@@ -985,6 +1023,31 @@ function updateBirds(dt,t){for(const b of birds){b.g.position.x+=b.speed*dt;b.g.
 function updateTrain(dt){if(!trainGroup)return;trainGroup.position.x+=18*dt;if(trainGroup.position.x>155)trainGroup.position.x=-155;trainGroup.rotation.y=0}
 function updateTraffic(dt){for(const q of traffic){const o=q.obj;o.position.x+=q.speed*dt;if(o.position.x>175)o.position.x=-175;if(o.position.x<-175)o.position.x=175;o.position.z=q.base;if(q.speed>0)o.rotation.y=Math.PI/2;else o.rotation.y=-Math.PI/2}}
 
+// V29 visual realism layer: natural ground breakup, Kerala roadside details, seating,
+// richer vegetation and animated ambience without heavy post-processing.
+const realismGroup=new THREE.Group();scene.add(realismGroup);
+function rMat(color,rough=.9){return new THREE.MeshStandardMaterial({color,roughness:rough,metalness:0});}
+function rbox(w,h,d,c,x,y,z,r=0){const q=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),rMat(c));q.position.set(x,y,z);q.rotation.y=r;q.castShadow=!mobile;q.receiveShadow=!mobile;realismGroup.add(q);return q;}
+function rcyl(r,h,c,x,y,z,seg=10){const q=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg),rMat(c));q.position.set(x,y,z);q.castShadow=!mobile;q.receiveShadow=!mobile;realismGroup.add(q);return q;}
+function addBench(x,z,r=0){
+  const g=new THREE.Group(),wood=rMat(0x7a5130,.82),metal=rMat(0x303637,.72);
+  for(const zz of [-.48,0,.48]){const seat=new THREE.Mesh(new THREE.BoxGeometry(2.5,.13,.34),wood);seat.position.set(0,1.0,zz);g.add(seat);}
+  for(const sx of [-.95,.95]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.12,.95,.9),metal);leg.position.set(sx,.48,0);g.add(leg);}
+  const back=new THREE.Mesh(new THREE.BoxGeometry(2.5,.7,.12),wood);back.position.set(0,1.48,.52);g.add(back);
+  g.position.set(x,0,z);g.rotation.y=r;realismGroup.add(g);
+}
+[[-54,26,0.1],[-48,26,0.1],[25,-48,1.4],[30,-48,1.4],[55,-38,.2],[-78,-54,0]].forEach(v=>addBench(...v));
+for(const z of [-7,7]){rbox(170,.10,1.25,0x77736b,0,.10,z);rbox(170,.09,.18,0x4a4b47,0,.12,z+1.0);rbox(170,.09,.18,0x4a4b47,0,.12,z-1.0);}
+for(const x of [-62,62]){rbox(1.25,.10,170,0x77736b,x,.10,0);}
+for(let i=0;i<(mobile?45:90);i++){const x=-165+Math.random()*330,z=-165+Math.random()*330;if(Math.abs(z)<11||Math.abs(x)<11)continue;const w=.4+Math.random()*1.6,d=.3+Math.random()*1.2;rbox(w,.012,d,Math.random()<.65?0x6f944f:0x856f55,x,.105,z,Math.random()*Math.PI);}
+const grassGeo=new THREE.ConeGeometry(.055,.42,5),grassMat=rMat(0x3f7f3b,.95),grassCount=mobile?180:320;
+for(let i=0;i<grassCount;i++){const x=-168+Math.random()*336,z=-168+Math.random()*336;if(Math.abs(x)<14||Math.abs(z)<14)continue;const g=new THREE.Mesh(grassGeo,grassMat);g.position.set(x,.30,z);g.scale.y=.6+Math.random()*1.4;g.rotation.y=Math.random()*Math.PI;realismGroup.add(g);}
+function gardenBed(x,z,w=7,d=4){rbox(w,.14,d,0x5e6d43,x,.12,z);for(let i=0;i<18;i++){const px=x-w/2+.35+Math.random()*(w-.7),pz=z-d/2+.35+Math.random()*(d-.7);rcyl(.18,.35,0x2e7139,px,.35,pz,8);if(i%3===0){const fl=new THREE.Mesh(new THREE.SphereGeometry(.10,8,6),rMat([0xd44a55,0xf0c05a,0xf2d7df][i%3],.72));fl.position.set(px,.62,pz);realismGroup.add(fl);}}}
+gardenBed(-72,5,9,4);gardenBed(72,5,9,4);gardenBed(-95,-58,10,5);
+function addWell(x,z){const stone=rMat(0x817b70,.95),dark=rMat(0x2e3130,.98),wood=rMat(0x5b3c25,.88),g=new THREE.Group();const ring=new THREE.Mesh(new THREE.TorusGeometry(1.35,.22,10,28),stone);ring.rotation.x=Math.PI/2;ring.position.y=.72;g.add(ring);const hole=new THREE.Mesh(new THREE.CylinderGeometry(1.12,1.12,.12,28),dark);hole.position.y=.62;g.add(hole);for(const sx of [-1.05,1.05]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,2.3,8),wood);p.position.set(sx,1.65,0);g.add(p);}const beam=new THREE.Mesh(new THREE.BoxGeometry(2.35,.12,.12),wood);beam.position.y=2.62;g.add(beam);const wheel=new THREE.Mesh(new THREE.TorusGeometry(.34,.06,8,18),wood);wheel.rotation.y=Math.PI/2;wheel.position.set(0,1.95,0);g.add(wheel);g.position.set(x,0,z);realismGroup.add(g);}
+addWell(-42,34);addWell(48,-31);
+const oldBirdUpdate=updateBirds;updateBirds=function(dt,t){oldBirdUpdate(dt,t);for(const b of birds){b.g.children.forEach((w,j)=>{if(j>0)w.rotation.z=(j%2?1:-1)*(Math.PI/2-.3)+Math.sin(t*.012+b.phase)*.22;});}};
+const vignette=document.createElement('div');vignette.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:4;background:radial-gradient(circle at 50% 42%,transparent 48%,rgba(0,0,0,.16) 100%);mix-blend-mode:multiply;';document.body.appendChild(vignette);
 applyWorldLight();
 function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;mixers.forEach(m=>m.update(dt)); updateWalkingNPCs(dt,t); updateBirds(dt,t); updateTrain(dt); updateTraffic(dt); if(autoTime){worldClock=(worldClock+dt*0.055)%24;applyWorldLight();} updateInteractionPrompt(); drawMini();
 const smooth=1-Math.exp(-dt*14);moveX+=(targetMoveX-moveX)*smooth;moveY+=(targetMoveY-moveY)*smooth;
@@ -993,7 +1056,8 @@ let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.h
 const moving=l>.08;
 if(!driving){
   const speed=(mobile?5.2:7.8)*(moving?.92+.08*l:0); setPlayerAnim(moving?(l>.72?'run':'walk'):'idle');
-  player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
+  const nx=player.position.x+(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt; const nz=player.position.z+(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
+  if(insideHouse){player.position.x=nx;player.position.z=nz;} else if(!blockedAt(nx,nz,.62)){player.position.x=nx;player.position.z=nz;}
   if(insideHouse){player.position.x=Math.max(294,Math.min(306,player.position.x));player.position.z=Math.max(295.2,Math.min(304.8,player.position.z));}else{player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));}
   if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));const turnK=1-Math.exp(-dt*(l>.72?11:8));player.rotation.y+=diff*turnK;
   const turnAmount=Math.max(-1,Math.min(1,diff/0.9)); player.userData.turnLean+=(turnAmount-(player.userData.turnLean||0))*(1-Math.exp(-dt*8));
@@ -1005,12 +1069,12 @@ if(!driving){
   const desiredSpeed=(throttle*13-reverse*6); carSpeed += (desiredSpeed-carSpeed)*(1-Math.exp(-dt*4));
   if(Math.abs(carSpeed)<.15)carSpeed=0;
   activeCar.rotation.y -= steer*dt*1.05*Math.min(1,Math.abs(carSpeed)/3+0.15);
-  activeCar.position.x += Math.sin(activeCar.rotation.y)*carSpeed*dt;
-  activeCar.position.z += Math.cos(activeCar.rotation.y)*carSpeed*dt;
+  const cnx=activeCar.position.x+Math.sin(activeCar.rotation.y)*carSpeed*dt; const cnz=activeCar.position.z+Math.cos(activeCar.rotation.y)*carSpeed*dt;
+  if(!blockedAt(cnx,cnz,1.55)){activeCar.position.x=cnx;activeCar.position.z=cnz;} else {carSpeed*=.18;}
   activeCar.position.x=Math.max(-172,Math.min(172,activeCar.position.x));activeCar.position.z=Math.max(-172,Math.min(172,activeCar.position.z));
   if(Math.abs(carSpeed)<.05 && Math.hypot(targetMoveX,targetMoveY)<.08) carSpeed=0;
 }
-if((t|0)%3===0)npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
+
 // Smooth remote replication: interpolate instead of snapping at each network packet.
 for(const r of remotePlayers.values()){
   const k=1-Math.exp(-dt*12);
@@ -1045,14 +1109,14 @@ if(!driving){
 let follow=driving&&activeCar?activeCar:player;
 const movingSpeed=Math.abs(carSpeed||0);
 let followYaw=driving&&activeCar?activeCar.rotation.y:yaw;
-const desiredDistance=driving?9.2:(moving?8.0:7.35);
-const height=driving?2.0:1.72;
+const desiredDistance=driving?8.2:(moving?6.8:6.25);
+const height=driving?1.75:1.52;
 const target=new THREE.Vector3(follow.position.x,follow.position.y+height,follow.position.z);
 // Camera look-ahead reduces the feeling of steering through a fixed tripod.
-const lookAhead=driving?2.1:(moving?1.15:0.45);
-const lookTarget=new THREE.Vector3(target.x+Math.sin(followYaw)*lookAhead,target.y+0.15,target.z+Math.cos(followYaw)*lookAhead);
+const lookAhead=driving?2.6:(moving?1.0:0.35);
+const lookTarget=new THREE.Vector3(target.x+Math.sin(followYaw)*lookAhead,target.y+0.30,target.z+Math.cos(followYaw)*lookAhead);
 const cp=new THREE.Vector3(target.x+Math.sin(followYaw)*desiredDistance*Math.cos(pitch),target.y+Math.sin(pitch)*desiredDistance,target.z+Math.cos(followYaw)*desiredDistance*Math.cos(pitch));
-const cameraFollow=1-Math.exp(-dt*(mobile?7.5:10));camera.position.lerp(cp,cameraFollow);camera.lookAt(lookTarget);
+const cameraFollow=1-Math.exp(-dt*(mobile?9.5:12));camera.position.lerp(cp,cameraFollow);camera.lookAt(lookTarget);
   for(const r of remotePlayers.values()){
   const p=r.group.position.clone();
   p.y+=r.vehicle?1.8:2.7;
@@ -1063,7 +1127,7 @@ const cameraFollow=1-Math.exp(-dt*(mobile?7.5:10));camera.position.lerp(cp,camer
   tag.style.display=(p.z<1?'block':'none');
 }
   renderer.render(scene,camera)}
-let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br>🎥 Smooth Camera • '+fps+' FPS • '+(driving?'🚗 Driving':'Mobile')+'<br><span id="mpStatus"><span id="mpDot"></span>'+(mpReady?'Online • '+(remotePlayers.size+1)+' players':'Connecting…')+'</span>'},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.45:1.9));renderer.setSize(innerWidth,innerHeight)};
+let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br>🎥 Smooth Camera • '+fps+' FPS • '+(driving?'🚗 Driving':'Mobile')+'<br><span id="mpStatus"><span id="mpDot"></span>'+(mpReady?'Online • '+(remotePlayers.size+1)+' players':'Connecting…')+'</span>'},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.25:1.85));renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
 3D scene failed to start. Please reload once.
 </div>
