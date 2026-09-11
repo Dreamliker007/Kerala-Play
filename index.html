@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V9</title>
+<title>Kerala Play • Open World V10</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -16,20 +16,23 @@
 .card{position:relative;z-index:1001;width:min(92%,480px);background:#fff;color:#182033;border-radius:28px;padding:30px;text-align:center;box-shadow:0 25px 75px #000a}.card h1{margin:0 0 8px;font-size:32px}.card p{color:#555;line-height:1.5}.play{position:relative;z-index:1002;cursor:pointer;touch-action:manipulation;border:0;background:#087f45;color:#fff;font-size:18px;font-weight:800;padding:14px 25px;border-radius:14px}.small{font-size:12px;color:#777;margin-top:12px}
 
 #vignette{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 120px rgba(0,0,0,.24)}
+#cinematic{position:fixed;inset:0;pointer-events:none;z-index:4;
+      background:radial-gradient(circle at 70% 18%,rgba(255,220,160,.12),transparent 34%),
+                 linear-gradient(to bottom,rgba(255,255,255,.02),rgba(20,55,35,.10));}
 </style></head>
 <body>
-<div id="game"></div>
+<div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
   🌤️ Kerala • Day
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V8 • V9 • Kerala Village</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V8 • V10 • Kerala Village</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you</div>
 <div id="status">👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1</div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button></div>
 </div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V9 — a more cinematic Kerala-inspired open world with richer lighting, terrain details, village life, vehicles, pets, NPCs and smoother third-person controls.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V10 — a more cinematic Kerala-inspired open world with richer lighting, terrain details, village life, vehicles, pets, NPCs and smoother third-person controls.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -106,12 +109,12 @@ const sunDisc=new THREE.Mesh(
 sunDisc.position.set(-110,115,-170); scene.add(sunDisc);
 scene.background=new THREE.Color(0x86cbed);scene.fog=new THREE.Fog(0x86cbed,95,300);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,700);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
 const loader=new GLTFLoader();const mixers=[];
 const ASSET_BASE='https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
 function loadGLB(url,onLoad){loader.load(url,onLoad,undefined,e=>console.warn('3D asset unavailable',url,e));}
 function enableShadows(root){root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material.roughness=Math.min(o.material.roughness??.8,.9);}}});}
-scene.add(new THREE.HemisphereLight(0xd9f4ff,0x274d31,2.35));const sun=new THREE.DirectionalLight(0xffe7bd,3.2);sun.position.set(70,125,40);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xd9f4ff,0x21452c,1.75));const sun=new THREE.DirectionalLight(0xffe7bd,3.6);sun.position.set(-70,135,55);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
 const M=(c,r=.82)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
 function add(g,m,x=0,y=0,z=0){let o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;scene.add(o);return o}
 function box(w,h,d,c,x,y,z,r=0){let o=add(new THREE.BoxGeometry(w,h,d),M(c),x,y,z);o.rotation.y=r;return o}
@@ -135,7 +138,7 @@ box(9,.2,170,0x565b5e,62,.03,0);box(170,.2,8,0x565b5e,-62,.03,0);
 
 function house(x,z,w,r){box(12,5.7,9.8,w,x,2.85,z);let rt=add(new THREE.ConeGeometry(8,4.7,4),M(r),x,7.2,z);rt.rotation.y=Math.PI/4;box(2.2,3.2,.25,0x704521,x,1.6,z-5);for(let sx of [-3,3])box(2.5,1.55,.2,0x9fdcf0,x+sx,3.05,z-5);box(12.5,.35,1.4,0x73462c,x,5.25,z-5.4)}
 
-// V9 street scene: homes and small shops line the main Kerala road.
+// V10 street scene: homes and small shops line the main Kerala road.
 function sign(x,z,text,rot=0){
   const g=new THREE.Group();
   const post=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,2.3,10),M(0x4b3525));
@@ -220,36 +223,60 @@ boat(-49,55,.2); boat(-62,61,-.35);
 function temple(x,z){cyl(4.8,5.8,0xffd17c,x,2.9,z);let r=add(new THREE.ConeGeometry(6.3,5.3,4),M(0xc65a28),x,8.1,z);r.rotation.y=Math.PI/4;box(1.7,3,.45,0x814421,x,1.5,z-4.8)}temple(43,42);
 function shop(x,z){box(9,4.8,6.5,0xa1d3a7,x,2.4,z);box(9.5,1.5,7,0x167a4d,x,5.5,z);box(7.7,.55,.4,0x114e35,x,4.45,z-3.35);for(let i=-2;i<=2;i++)box(1.1,1.1,.45,[0xe34a3a,0xffd34d,0x3d80cf,0x8d55c7,0x58b96b][i+2],x+i*1.35,3.15,z-3.55)}shop(0,-35);
 
-function car(x,z,c){let g=new THREE.Group();let b=new THREE.Mesh(new THREE.BoxGeometry(4.7,1.05,2.2),M(c));b.position.y=1.1;g.add(b);let t=new THREE.Mesh(new THREE.BoxGeometry(2.6,.85,1.8),M(0xe8eef0));t.position.y=1.85;g.add(t);for(let sx of [-1.55,1.55])for(let sz of [-1.1,1.1]){let w=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.3,16),M(0x1d1d1d));w.rotation.z=Math.PI/2;w.position.set(sx,.55,sz);g.add(w)}g.position.set(x,0,z);scene.add(g);return g}
-const c1=car(-5,-8,0xc93835),c2=car(48,-3,0x1f72c8);
+const carAssetUrl='https://cdn.3dassets.dev/assets/32487/v1/model.glb';
+let c1=null,c2=null;
+function loadRealCar(x,z,scale=1,colorize=null){
+  loadGLB(carAssetUrl,g=>{
+    const model=g.scene;
+    enableShadows(model);
+    model.scale.setScalar(scale);
+    model.position.set(x,0,z);
+    if(colorize){
+      model.traverse(o=>{
+        if(o.isMesh && o.material && o.material.color && o.material.name && /body|paint/i.test(o.material.name)){
+          o.material.color.setHex(colorize);
+        }
+      });
+    }
+    scene.add(model);
+    if(!c1)c1=model; else if(!c2)c2=model;
+  });
+}
+loadRealCar(-5,-8,1.18,0xb52d2d);
+loadRealCar(48,-3,1.18,0x245d9c);
 
 function person(x,z,shirt){let g=new THREE.Group();let b=new THREE.Mesh(new THREE.CapsuleGeometry(.48,1.05,6,10),M(shirt));b.position.y=1.4;g.add(b);let h=new THREE.Mesh(new THREE.SphereGeometry(.38,18,16),M(0xc88b64));h.position.y=2.5;g.add(h);for(let s of [-1,1]){let l=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.72,5,8),M(0x27364a));l.position.set(s*.23,.62,0);g.add(l)}g.position.set(x,0,z);scene.add(g);return g}
 const npcs=[person(18,15,0x7a3d95),person(-20,18,0x1e6fae),person(28,-18,0xe07b32),person(-30,-8,0x2d7c4d)];
 
-function dog(){let g=new THREE.Group();let b=new THREE.Mesh(new THREE.SphereGeometry(.72,20,16),M(0xb36a32));b.scale.set(1.35,.78,.8);b.position.y=.75;g.add(b);let h=new THREE.Mesh(new THREE.SphereGeometry(.47,18,14),M(0xb36a32));h.position.set(0,1.03,-.72);g.add(h);for(let sx of [-.45,.45])for(let sz of [-.32,.32]){let l=new THREE.Mesh(new THREE.CapsuleGeometry(.12,.55,5,8),M(0x74411f));l.position.set(sx,.38,sz);g.add(l)}for(let sx of [-.28,.28]){let e=new THREE.Mesh(new THREE.ConeGeometry(.16,.43,8),M(0x6e3d1f));e.position.set(sx,1.36,-.72);g.add(e)}scene.add(g);return g}const pet=dog();
-for(const c of [...pet.children]) c.visible=false;
-loadGLB(ASSET_BASE+'Fox/glTF-Binary/Fox.glb',g=>{
-  const model=g.scene; enableShadows(model); model.scale.setScalar(.018); model.rotation.y=Math.PI; pet.add(model);
-  if(g.animations?.length){const m=new THREE.AnimationMixer(model);mixers.push(m);const a=m.clipAction(g.animations.find(x=>/walk/i.test(x.name))||g.animations[0]);a.play();}
+let pet=new THREE.Group();scene.add(pet);
+const dogAssetUrl='https://cdn.3dassets.dev/assets/29204/v1/model.glb';
+loadGLB(dogAssetUrl,g=>{
+  const model=g.scene;
+  enableShadows(model);
+  model.scale.setScalar(1.0);
+  model.position.set(0,0,0);
+  pet.add(model);
 });
 
 
-
 const player=new THREE.Group();
-// V9 player: human street outfit closer to the reference video.
-const skin=M(0xb97855,.9), shirt=M(0x263b55,.85), jeans=M(0x234d79,.9), shoe=M(0x202020,1);
-let torso=new THREE.Mesh(new THREE.CapsuleGeometry(.47,.95,8,16),shirt);torso.position.y=1.45;player.add(torso);
-let neck=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.22,12),skin);neck.position.y=2.05;player.add(neck);
-let head=new THREE.Mesh(new THREE.SphereGeometry(.38,24,20),skin);head.position.y=2.38;player.add(head);
-let hair=new THREE.Mesh(new THREE.SphereGeometry(.4,24,14,0,Math.PI*2,0,Math.PI*.55),M(0x17120f,1));hair.position.y=2.58;player.add(hair);
-for(const s of [-1,1]){
-  const arm=new THREE.Mesh(new THREE.CapsuleGeometry(.13,.62,6,10),skin);arm.position.set(s*.56,1.42,0);arm.rotation.z=s*.16;player.add(arm);
-  const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.16,.78,6,10),jeans);leg.position.set(s*.22,.62,0);player.add(leg);
-  const foot=new THREE.Mesh(new THREE.BoxGeometry(.28,.16,.55),shoe);foot.position.set(s*.22,.16,.13);player.add(foot);
-}
-const bag=new THREE.Mesh(new THREE.BoxGeometry(.38,.58,.18),M(0x62452e));
-bag.position.set(-.5,1.35,.22);player.add(bag);
 scene.add(player);
+
+// Real human GLB (CC0 source) as the first asset-based player pass.
+// The gameplay rig remains on the player root so controls stay unchanged.
+const playerModelUrl='https://static.poly.pizza/3746be88-6799-4817-929b-6bc067c47caa.glb';
+loadGLB(playerModelUrl,g=>{
+  const model=g.scene;
+  enableShadows(model);
+  model.scale.setScalar(1.0);
+  model.position.set(0,0,0);
+  player.add(model);
+  if(g.animations?.length){
+    const mixer=new THREE.AnimationMixer(model);
+    mixers.push(mixer);
+    mixer.clipAction(g.animations[0]).play();
+  }
+});
 
 let moveX=0,moveY=0,yaw=0,pitch=.34,jump=false,vy=0;const joy=document.getElementById('joy'),knob=document.getElementById('knob');let jid=null;
 function jm(e){let r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=49,l=Math.hypot(dx,dy);if(l>max){dx=dx/l*max;dy=dy/l*max}knob.style.transform=`translate(${dx}px,${dy}px)`;moveX=dx/max;moveY=dy/max}
@@ -272,8 +299,12 @@ let speed=7.8;player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;play
 player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));if(l>.08){player.rotation.y=Math.atan2(x,z)+yaw; torso.rotation.z=Math.sin(t*.012)*.025; player.position.y += Math.sin(t*.012)*.006;}
 player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
 npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
-pet.position.x=player.position.x+Math.sin(t*.0018)*2.5;pet.position.z=player.position.z+Math.cos(t*.0015)*2.5;
-c1.position.x=-5+Math.sin(t*.00015)*45;c2.position.z=-3+Math.cos(t*.00013)*47;
+const petX=player.position.x+Math.sin(t*.0018)*2.7;
+pet.position.x += (petX-pet.position.x)*Math.min(1,dt*4);
+const petZ=player.position.z+Math.cos(t*.0015)*2.7;
+pet.position.z += (petZ-pet.position.z)*Math.min(1,dt*4);
+if(Math.abs(petX-pet.position.x)+Math.abs(petZ-pet.position.z)>.02) pet.rotation.y=Math.atan2(petX-player.position.x,petZ-player.position.z);
+
 let target=new THREE.Vector3(player.position.x,player.position.y+1.7,player.position.z),cp=new THREE.Vector3(target.x+Math.sin(yaw)*8.2*Math.cos(pitch),target.y+Math.sin(pitch)*8.2,target.z+Math.cos(yaw)*8.2*Math.cos(pitch));
 camera.position.lerp(cp,.14);camera.lookAt(target);renderer.render(scene,camera)}
 animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
