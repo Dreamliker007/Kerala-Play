@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V26 Realistic Human + Animation</title>
+<title>Kerala Play • V28 Living Kerala World</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -31,7 +31,7 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V25
+  🌤️ Kerala • Day • V28
 </div>
 <div id="vignette"></div><div id="ui">
 <div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V26 Realistic Human + Animation • Kerala Village</div></div>
@@ -41,7 +41,7 @@
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
 <div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V26 — realistic human asset + proper animation state machine + pet follow AI: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room + vehicles + houses enabled</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V28 — Living Kerala World: realistic animation, birds, railway + train, school, playground, wells, gardens, buses, traffic and walking people.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Living Kerala world + multiplayer + vehicles + houses</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -65,7 +65,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/
 import { clone as skeletonClone } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/SkeletonUtils.js';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
-const scene=new THREE.Scene();
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x9bc3b7);
 // V17 multiplayer: lightweight Supabase Realtime Broadcast room.
 // This uses the public publishable key; no service-role/secret key is included.
 const SUPABASE_URL='https://rxywllmflxuovhlbkext.supabase.co';
@@ -490,18 +490,25 @@ function busStop(x,z,rot=0){
 }
 busStop(-38,9,.05);busStop(38,11,-.05);
 
-const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,700);
-const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
-renderer.setPixelRatio(deviceQuality);renderer.setSize(innerWidth,innerHeight);
-renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.08,850);
+const renderer=new THREE.WebGLRenderer({antialias:!mobile,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.45:1.9));renderer.setSize(innerWidth,innerHeight);
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.06;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+scene.fog=new THREE.FogExp2(0x9fc4bb,mobile?0.0027:0.0021);
+renderer.domElement.style.touchAction='none';document.getElementById('game').appendChild(renderer.domElement);
 const loader=new GLTFLoader();const mixers=[];
 const ASSET_BASE='https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
 function loadGLB(url,onLoad){loader.load(url,onLoad,undefined,e=>console.warn('3D asset unavailable',url,e));}
 function enableShadows(root){root.traverse(o=>{if(o.isMesh){
-      const keepShadow=!mobile || o.geometry?.type==='BoxGeometry' || o.geometry?.type==='SphereGeometry';
-      o.castShadow=keepShadow;o.receiveShadow=!mobile;if(o.material){o.material.roughness=Math.min(o.material.roughness??.8,.9);}}});}
-scene.add(new THREE.HemisphereLight(0xd9f4ff,0x21452c,1.75));const sun=new THREE.DirectionalLight(0xffe7bd,3.6);sun.position.set(-70,135,55);sun.castShadow=true;sun.shadow.mapSize.set(mobile?768:1024,mobile?768:1024);sun.shadow.camera.left=-90;sun.shadow.camera.right=90;sun.shadow.camera.top=90;sun.shadow.camera.bottom=-90;scene.add(sun);
+      const keepShadow=!mobile || o.geometry?.type==='BoxGeometry' || o.geometry?.type==='SphereGeometry' || o.geometry?.type==='CylinderGeometry';
+      o.castShadow=keepShadow;o.receiveShadow=!mobile;if(o.material){
+        const mats=Array.isArray(o.material)?o.material:[o.material];
+        mats.forEach(mat=>{ if('roughness' in mat) mat.roughness=Math.min(mat.roughness??.78,.88); if('metalness' in mat) mat.metalness=Math.min(mat.metalness??0,.25); });
+      }} });}
+const hemi=new THREE.HemisphereLight(0xe6f7ff,0x274b31,1.35);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff0d2,3.15);sun.position.set(-85,150,65);sun.castShadow=true;sun.shadow.mapSize.set(mobile?768:1536,mobile?768:1536);sun.shadow.camera.left=-110;sun.shadow.camera.right=110;sun.shadow.camera.top=110;sun.shadow.camera.bottom=-110;sun.shadow.bias=-0.00025;scene.add(sun);
+const fill=new THREE.DirectionalLight(0xaed6ff,.55);fill.position.set(90,55,-80);scene.add(fill);
 
 function add(g,m,x=0,y=0,z=0){let o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=!mobile;o.receiveShadow=!mobile;scene.add(o);return o}
 function box(w,h,d,c,x,y,z,r=0){let o=add(new THREE.BoxGeometry(w,h,d),M(c),x,y,z);o.rotation.y=r;return o}
@@ -707,6 +714,8 @@ loadGLB(dogAssetUrl,g=>{
     Object.values(dogAnim.actions).forEach(a=>a.setLoop(THREE.LoopRepeat,Infinity));
     dogAnim.actions.idle.play(); dogAnim.state='idle'; mixers.push(dogAnim.mixer);
   }
+  model.userData.baseY=model.position.y; model.userData.walkPhase=0; model.userData.tailBones=[];
+  model.traverse(o=>{ if(o.isBone && /(tail|spine|neck|ear)/i.test(o.name)) model.userData.tailBones.push(o); });
 });
 
 
@@ -723,6 +732,9 @@ loadGLB(playerModelUrl,g=>{
   model.scale.setScalar(1.0);
   model.position.set(0,0,0);
   player.add(model);
+  createWalkingNPCsFromTemplate(model,g.animations||[]);
+  model.userData.baseY=0; model.userData.turnBones=[];
+  model.traverse(o=>{ if(o.isBone && /(spine|chest|upperarm|shoulder)/i.test(o.name)) model.userData.turnBones.push(o); });
   if(playerAnimations.length){
     playerAnim.mixer=new THREE.AnimationMixer(model);
     const idle=pickClip(playerAnimations,['idle','stand','breath'])||playerAnimations[0];
@@ -743,11 +755,12 @@ function setPlayerAnim(state){
   to.timeScale=state==='run'?1.18:state==='walk'?1:.95;
 }
 function setDogAnim(state){
-  const a=dogAnim.actions; if(!a || !a[state] || dogAnim.state===state)return;
-  a[dogAnim.state]?.fadeOut(.14); a[state].reset().fadeIn(.14).play(); dogAnim.state=state;
+  const a=dogAnim.actions; if(!a || !a[state])return;
+  if(dogAnim.state!==state){ a[dogAnim.state]?.fadeOut(.18); a[state].reset().fadeIn(.18).play(); dogAnim.state=state; }
+  const speed=state==='run'?1.18:state==='walk'?0.92:0.72; if(a[state]) a[state].timeScale=speed;
 }
 
-let moveX=0,moveY=0,targetMoveX=0,targetMoveY=0,yaw=0,targetYaw=0,pitch=.34,targetPitch=.34,jump=false,vy=0;
+let moveX=0,moveY=0,targetMoveX=0,targetMoveY=0,yaw=0,targetYaw=0,pitch=.34,targetPitch=.34,jump=false,vy=0; player.userData.turnLean=0;
 const joy=document.getElementById('joy'),knob=document.getElementById('knob');let jid=null;
 function jm(e){let r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=49,l=Math.hypot(dx,dy);if(l>max){dx=dx/l*max;dy=dy/l*max}let nx=dx/max,ny=dy/max;const dead=.10;if(Math.hypot(nx,ny)<dead){nx=ny=0}else{const m=Math.hypot(nx,ny);nx*=Math.min(1,(m-dead)/(1-dead))/m;ny*=Math.min(1,(m-dead)/(1-dead))/m}knob.style.transform=`translate(${dx}px,${dy}px)`;targetMoveX=nx;targetMoveY=ny}
 function releaseJoy(){targetMoveX=targetMoveY=0;knob.style.transform='translate(0,0)'}
@@ -812,7 +825,7 @@ function applyWorldLight(){
   const sky=new THREE.Color().setHSL(0.56,0.55,0.32+0.32*daylight);
   scene.background.copy(sky); scene.fog.color.copy(sky);
   sunDisc.visible=daylight>.16; sunDisc.position.set(-110,45+100*daylight,-170);
-  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V25';
+  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V28';
 }
 dayBtn.addEventListener('click',()=>{autoTime=false;worldClock=worldClock<17?19:9.5;applyWorldLight();dayBtn.textContent=worldClock>17?'🌙 Night':'🌤️ Day'});
 qualityBtn.addEventListener('click',()=>{
@@ -841,8 +854,139 @@ function updateInteractionPrompt(){
   const h=getNearestHouse(); if(h.pos&&h.dist<18){p.textContent='🏠 At the door • tap ENTER';p.style.display='block';return;}
   p.style.display='none';
 }
+
+// V28 Living Kerala World: railway, train, school, playground, well, seating, gardens,
+// moving buses/cars/bikes, fruit trees, flying birds and fully animated walking NPCs.
+const walkingNPCs=[];
+const traffic=[];
+const birds=[];
+let trainGroup=null;
+
+function makeLabel(text,x,z,w=8,h=1.4,bg=0x1d5f45){
+  const g=new THREE.Group();
+  const board=new THREE.Mesh(new THREE.BoxGeometry(w,h,.14),M(bg,.78)); board.position.y=2.5; g.add(board);
+  const c=document.createElement('canvas'); c.width=768;c.height=160; const ctx=c.getContext('2d');
+  ctx.fillStyle='#173d2e';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#fff2c7';ctx.font='bold 62px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,c.width/2,c.height/2);
+  board.material=new THREE.MeshStandardMaterial({map:new THREE.CanvasTexture(c),roughness:.8});
+  const post1=new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,2.2,8),M(0x4b3525));post1.position.set(-w*.35,1.1,0);g.add(post1);
+  const post2=post1.clone();post2.position.x=w*.35;g.add(post2);g.position.set(x,0,z);scene.add(g);return g;
+}
+
+function addRailway(){
+  const z=103, railMat=M(0x4b4d4b,.55), sleeperMat=M(0x4c3528,.95), ballastMat=M(0x77746b,1);
+  box(14,.08,150,0x77746b,0,.02,z);
+  for(const x of [-2.15,2.15]){const rail=box(.13,.18,170,0x565958, x,.22,z);rail.material=railMat;}
+  for(let zz=z-82;zz<=z+82;zz+=2.3) box(5.4,.16,.28,0x5a4030,0,.14,zz);
+  for(const x of [-3.4,3.4]) for(let zz=z-82;zz<=z+82;zz+=9){cyl(.06,3.2,0x5b554a,x,1.6,zz,8)}
+  // crossing road and warning boards
+  box(16,.04,5.5,0x44484a,0,.11,z);makeLabel('RAILWAY CROSSING',0,z-6,10,1.2,0x8a241f);
+}
+function gbox(g,w,h,d,c,x,y,z,r=0){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.position.set(x,y,z);m.rotation.y=r;g.add(m);return m}
+function makeTrain(){
+  const g=new THREE.Group();
+  function coach(offset){
+    const c=new THREE.Group();
+    gbox(c,4.0,3.3,11.5,0x9a1d2f,0,2.2,offset);
+    gbox(c,4.25,.35,11.8,0x303437,0,4.0,offset);
+    for(const sx of [-2.03,2.03]) for(let zz=-3.7;zz<=3.7;zz+=2.5) gbox(c,.08,1.0,1.45,0x17333b,sx,2.7,offset+zz);
+    g.add(c); return c;
+  }
+  coach(0);coach(12.5);coach(25);
+  const loco=new THREE.Group();
+  gbox(loco,4.2,3.8,7.0,0x7b1726,0,2.35,33);
+  gbox(loco,4.4,.35,7.3,0x303437,0,4.3,33);
+  gbox(loco,3.6,1.25,.25,0x17262b,0,2.9,29.5);
+  for(const sx of [-1.8,1.8]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.58,.58,.4,16),M(0x191919));w.rotation.z=Math.PI/2;w.position.set(sx,.65,31.3);loco.add(w)}
+  g.add(loco);g.position.set(-145,.1,103);scene.add(g);return g;
+}
+addRailway();trainGroup=makeTrain();
+
+function makeWell(x,z){
+  const g=new THREE.Group();const stone=M(0x9b9689,.98),wood=M(0x62442b,.9),dark=M(0x163f45,.18);
+  for(let i=0;i<12;i++){const a=i*Math.PI*2/12;const b=new THREE.Mesh(new THREE.CylinderGeometry(.72,.72,.55,8),stone);b.position.set(Math.cos(a)*1.25,.28,Math.sin(a)*1.25);g.add(b)}
+  const water=new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,.08,24),dark);water.position.y=.58;g.add(water);
+  for(const sx of [-1.2,1.2]){const post=new THREE.Mesh(new THREE.BoxGeometry(.18,2.5,.18),wood);post.position.set(sx,1.5,0);g.add(post)}
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(1.9,.9,4),M(0x7e382d,.88));roof.position.y=2.8;roof.rotation.y=Math.PI/4;g.add(roof);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,2.2,10),wood);beam.rotation.z=Math.PI/2;beam.position.y=1.95;g.add(beam);
+  g.position.set(x,0,z);scene.add(g);makeLabel('കിണർ • WELL',x,z+3.3,5.4,1.0,0x315a45);
+}
+makeWell(-58,-38);
+
+function makeBench(x,z,r=0){const g=new THREE.Group(),wood=M(0x6a482f,.88),metal=M(0x3e4744,.65);box(2.7,.22,.65,0x6a482f,0,1.0,0,r);for(const sx of [-1.05,1.05]){box(.16,1.0,.16,0x3e4744,sx,.5,0,r)}box(2.7,.16,.12,0x6a482f,0,1.55,.27,r);g.position.set(x,0,z);scene.add(g);return g}
+[[-48,-34,0],[-43,-34,.2],[-3,40,Math.PI/2],[3,40,Math.PI/2],[55,43,.2],[60,43,-.2]].forEach(v=>makeBench(...v));
+
+function makeGarden(x,z,w=18,d=12){
+  box(w,.12,d,0x65764a,x,.07,z);for(let ix=-w/2+1;ix<w/2;ix+=2.2)for(let iz=-d/2+1;iz<d/2;iz+=2.2){
+    const flower=new THREE.Mesh(new THREE.SphereGeometry(.13,8,6),M(Math.random()>.5?0xf0c24d:0xe45d66));flower.position.set(x+ix,.5,z+iz);scene.add(flower);
+  }
+  for(let a=0;a<Math.PI*2;a+=Math.PI/4){const px=x+Math.cos(a)*(w*.42),pz=z+Math.sin(a)*(d*.42);cyl(.09,.9,0x3e6c3c,px,.45,pz,8)}
+  makeLabel('GARDEN',x,z-d/2-1.8,6,1.0,0x28734b);
+}
+makeGarden(55,39,20,12);makeGarden(-48,39,18,11);
+
+function makePlayArea(x,z){
+  box(22,.10,16,0x8d9b68,x,.05,z);const metal=M(0x3c6c68,.6),red=M(0xc3483e,.65);
+  // swings
+  for(const sx of [-5,0,5]){box(.12,3.2,.12,0x3c6c68,x+sx,.1,z-4);box(.12,3.2,.12,0x3c6c68,x+sx,.1,z+4);box(.12,.14,8.1,0x3c6c68,x+sx,3.15,z);}
+  for(const sx of [-5,0,5]){box(.08,1.6,.08,0x3c6c68,x+sx-.45,1.45,z);box(.08,1.6,.08,0x3c6c68,x+sx+.45,1.45,z);box(.9,.08,.3,0xc3483e,x+sx,1.0,z)}
+  // slide + sandbox
+  box(3.0,.12,3.0,0xd8bd75,x+7,.1,z+4);box(2.0,2.5,.12,0xc3483e,x+5.7,1.3,z-3);box(3.5,.12,.12,0xc3483e,x+7.2,2.5,z-3);
+  makeLabel('PLAY AREA',x,z-9,8,1.1,0x246b49);
+}
+makePlayArea(-78,-43);
+
+function makeSchool(x,z){
+  box(28,6.5,13,0xe7dfc9,x,3.25,z);const roof=M(0x8d342e,.82);box(29,.45,14,0x8d342e,x,6.7,z);box(4,3.8,.3,0x624329,x,1.9,z-6.65);
+  for(const sx of [-10,-5,0,5,10]){box(3.0,2.2,.18,0x79b7c6,x+sx,3.4,z-6.6);box(.12,2.35,.3,0x624329,x+sx,3.4,z-6.72)}
+  box(8,.4,1.0,0xf1e7ce,x,7.0,z-7.0);makeLabel('GOVT. SCHOOL',x,z-8.4,12,1.4,0x1f5d45);
+}
+makeSchool(-82,-65);
+
+function makeBusStand(x,z){
+  box(24,.12,12,0x777d7a,x,.06,z);box(22,4.5,.18,0x8fa39b,x,2.25,z+5.5);for(const sx of [-9,-3,3,9])cyl(.12,4.5,0x68776e,x+sx,2.25,z+5.5,10);box(20,.2,4,0x7d3e2c,x,4.65,z+5.2);makeLabel('BUS STAND',x,z-7,10,1.3,0x1e5c43);
+}
+makeBusStand(38,-47);makeLabel('BUS STOP',-38,6,7,1.1,0x1e5c43);makeLabel('BUS STOP',38,8,7,1.1,0x1e5c43);
+
+function simpleBus(x,z,color=0xd4b23e){const g=new THREE.Group();gbox(g,3.0,2.7,8.2,color,0,2.0,0);gbox(g,3.05,.28,8.3,0x27363a,0,3.45,0);for(const sx of [-1.52,1.52])for(let zz=-2.8;zz<=2.8;zz+=2.0)gbox(g,.06,1.0,1.25,0x24434a,sx,2.55,zz);for(const sx of [-1.35,1.35])for(const zz of [-2.6,2.6]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,.25,16),M(0x151515));w.rotation.z=Math.PI/2;w.position.set(sx,.55,zz);g.add(w)}g.position.set(x,0,z);scene.add(g);return g}
+const bus1=simpleBus(-115,4,0xe1bd35),bus2=simpleBus(115,-4,0x2f78a9);bus1.rotation.y=Math.PI/2;bus2.rotation.y=-Math.PI/2;traffic.push({obj:bus1,type:'bus',axis:'x',speed:4.8,base:4});traffic.push({obj:bus2,type:'bus',axis:'x',speed:-4.2,base:-4});
+function addTrafficCar(x,z,color,r=0){const g=new THREE.Group();gbox(g,2.1,.85,4.2,color,0,1.0,0);gbox(g,1.65,.75,1.8,0x283238,0,1.65,.25);for(const sx of [-.95,.95])for(const zz of [-1.35,1.35]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.22,14),M(0x171717));w.rotation.z=Math.PI/2;w.position.set(sx,.45,zz);g.add(w)}g.position.set(x,0,z);g.rotation.y=r;scene.add(g);return g}
+const tc1=addTrafficCar(-105,-7,0xeff0e8),tc2=addTrafficCar(105,7,0x5a73d0),tc3=addTrafficCar(-105,7,0x9b352d);traffic.push({obj:tc1,type:'car',axis:'x',speed:7.2,base:-7});traffic.push({obj:tc2,type:'car',axis:'x',speed:-6.3,base:7});traffic.push({obj:tc3,type:'car',axis:'x',speed:5.4,base:7});
+function movingBike(x,z,r=0){const g=new THREE.Group();for(const zz of [-.65,.65]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.27,.27,.11,14),M(0x151515));w.rotation.x=Math.PI/2;w.position.set(0,.3,zz);g.add(w)}gbox(g,.8,.15,.2,0x2e6fba,0,.65,0);gbox(g,.45,.12,.55,0x202020,0,.85,.05);g.position.set(x,0,z);g.rotation.y=r;scene.add(g);return g}
+const mb1=movingBike(-70,-7),mb2=movingBike(70,7,Math.PI);traffic.push({obj:mb1,type:'bike',axis:'x',speed:4.3,base:-7});traffic.push({obj:mb2,type:'bike',axis:'x',speed:-4.0,base:7});
+
+// Fruit-bearing trees: mango, jackfruit and coconut fruit clusters.
+function fruit(x,y,z,c=0xf0b52c,s=.18){const f=new THREE.Mesh(new THREE.SphereGeometry(s,10,8),M(c,.72));f.position.set(x,y,z);scene.add(f);return f}
+function fruitMangoTree(x,z,s=1){mango(x,z,s);for(let i=0;i<8;i++){const a=i*2.399;fruit(x+Math.cos(a)*1.6*s,5.0*s+(i%3)*.35*s,z+Math.sin(a)*1.6*s,0xf0ad28,.22*s)}}
+function jackfruitTree(x,z,s=1){const g=new THREE.Group();const tr=new THREE.Mesh(new THREE.CylinderGeometry(.42*s,.62*s,5*s,12),M(0x5a432e));tr.position.y=2.5*s;g.add(tr);for(let i=0;i<8;i++){const a=i*Math.PI/4;const l=new THREE.Mesh(new THREE.SphereGeometry(1.15*s,12,9),M(0x2d7138));l.position.set(Math.cos(a)*1.3*s,5.2*s+(i%2)*.4*s,Math.sin(a)*1.3*s);g.add(l)}g.position.set(x,0,z);scene.add(g);for(let i=0;i<5;i++)fruit(x+(i-2)*.45*s,2.4*s+(i%2)*1.2*s,z+Math.sin(i)*.35*s,0x87a52d,.3*s)}
+fruitMangoTree(-110,-58,1.1);fruitMangoTree(108,58,.95);jackfruitTree(-68,-92,1.05);jackfruitTree(68,92,1.0);
+for(const [x,z] of [[-86,-58],[86,-60]])for(let i=0;i<4;i++)fruit(x+Math.cos(i*Math.PI/2)*.55,8.0+(i%2)*.25,z+Math.sin(i*Math.PI/2)*.55,0x55a83c,.16);
+
+function createWalkingNPCsFromTemplate(template,clips){
+  if(walkingNPCs.length) return;
+  const spots=[[-58,-18],[52,-18],[-66,14],[66,16],[-92,-30],[90,-30],[-12,28],[15,30]];
+  spots.forEach((p,i)=>{
+    const root=new THREE.Group();const model=skeletonClone(template);model.scale.setScalar(.96+(i%3)*.04);root.add(model);root.position.set(p[0],0,p[1]);root.userData={path:i%2?1:-1,phase:Math.random()*10, speed:1.05+(i%3)*.25};
+    const mixer=new THREE.AnimationMixer(model), acts={};const idle=pickClip(clips,['idle','stand','breath'])||clips[0],walk=pickClip(clips,['walk','locomotion'])||idle,run=pickClip(clips,['run','jog'])||walk;
+    acts.idle=mixer.clipAction(idle);acts.walk=mixer.clipAction(walk);acts.run=mixer.clipAction(run);Object.values(acts).forEach(a=>{a.setLoop(THREE.LoopRepeat,Infinity);a.clampWhenFinished=false});acts.walk.play();root.userData.mixer=mixer;root.userData.actions=acts;root.userData.state='walk';root.userData.baseX=p[0];root.userData.baseZ=p[1];walkingNPCs.push(root);scene.add(root);mixers.push(mixer);
+  });
+}
+function updateWalkingNPCs(dt,t){
+  for(const n of walkingNPCs){const u=n.userData;const s=u.speed;u.phase+=dt*s*.35;const dir=u.path;const nx=n.position.x+dir*s*dt;const limit=dir>0?Math.abs(u.baseX)+7:Math.abs(u.baseX)-7;
+    n.position.x=nx;if((dir>0&&n.position.x>limit)||(dir<0&&n.position.x<limit)){u.path*=-1;n.rotation.y=u.path>0?Math.PI/2:-Math.PI/2}
+    // occasional natural route wobble, never circles around the player
+    n.position.z=u.baseZ+Math.sin(u.phase)*.7;
+    if(u.actions&&u.state!=='walk'){u.actions[u.state].fadeOut(.18);u.actions.walk.reset().fadeIn(.18).play();u.state='walk'}
+  }
+}
+
+function addBird(x,y,z,s=1){const g=new THREE.Group();const mat=M(0x34383a,.85);const body=new THREE.Mesh(new THREE.SphereGeometry(.28*s,10,8),mat);body.scale.set(1.35,.65,.7);g.add(body);for(const side of [-1,1]){const wing=new THREE.Mesh(new THREE.ConeGeometry(.12*s,.9*s,5),mat);wing.rotation.z=side*(Math.PI/2-.3);wing.rotation.y=side*.25;wing.position.set(side*.42*s,.08,0);g.add(wing)}g.position.set(x,y,z);scene.add(g);birds.push({g,baseY:y,phase:Math.random()*6.28,speed:5+Math.random()*3,spread:45+Math.random()*35});}
+for(let i=0;i<12;i++)addBird(-110+Math.random()*220,22+Math.random()*18,-95+Math.random()*190,.7+Math.random()*.35);
+function updateBirds(dt,t){for(const b of birds){b.g.position.x+=b.speed*dt;b.g.position.z+=Math.sin(t*.0007+b.phase)*.9*dt;b.g.position.y=b.baseY+Math.sin(t*.004+b.phase)*1.2;b.g.rotation.y=Math.PI/2;b.g.rotation.z=Math.sin(t*.004+b.phase)*.06;if(b.g.position.x>155)b.g.position.x=-155}}
+function updateTrain(dt){if(!trainGroup)return;trainGroup.position.x+=18*dt;if(trainGroup.position.x>155)trainGroup.position.x=-155;trainGroup.rotation.y=0}
+function updateTraffic(dt){for(const q of traffic){const o=q.obj;o.position.x+=q.speed*dt;if(o.position.x>175)o.position.x=-175;if(o.position.x<-175)o.position.x=175;o.position.z=q.base;if(q.speed>0)o.rotation.y=Math.PI/2;else o.rotation.y=-Math.PI/2}}
+
 applyWorldLight();
-function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;mixers.forEach(m=>m.update(dt)); if(autoTime){worldClock=(worldClock+dt*0.055)%24;applyWorldLight();} updateInteractionPrompt(); drawMini();
+function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;mixers.forEach(m=>m.update(dt)); updateWalkingNPCs(dt,t); updateBirds(dt,t); updateTrain(dt); updateTraffic(dt); if(autoTime){worldClock=(worldClock+dt*0.055)%24;applyWorldLight();} updateInteractionPrompt(); drawMini();
 const smooth=1-Math.exp(-dt*14);moveX+=(targetMoveX-moveX)*smooth;moveY+=(targetMoveY-moveY)*smooth;
 const camSmooth=1-Math.exp(-dt*(mobile?10:12));yaw+=(targetYaw-yaw)*camSmooth;pitch+=(targetPitch-pitch)*camSmooth;
 let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z);if(l>1){x/=l;z/=l;l=1}
@@ -851,7 +995,10 @@ if(!driving){
   const speed=(mobile?5.2:7.8)*(moving?.92+.08*l:0); setPlayerAnim(moving?(l>.72?'run':'walk'):'idle');
   player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
   if(insideHouse){player.position.x=Math.max(294,Math.min(306,player.position.x));player.position.z=Math.max(295.2,Math.min(304.8,player.position.z));}else{player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));}
-  if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));player.rotation.y+=diff*(1-Math.exp(-dt*10));}
+  if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));const turnK=1-Math.exp(-dt*(l>.72?11:8));player.rotation.y+=diff*turnK;
+  const turnAmount=Math.max(-1,Math.min(1,diff/0.9)); player.userData.turnLean+=(turnAmount-(player.userData.turnLean||0))*(1-Math.exp(-dt*8));
+  if(playerTemplate){ playerTemplate.rotation.z=-0.045*(player.userData.turnLean||0); }
+} else if(playerTemplate){ playerTemplate.rotation.z+=(0-playerTemplate.rotation.z)*(1-Math.exp(-dt*8));}
   player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
 } else if(activeCar){
   const throttle=Math.max(0,-moveY); const reverse=Math.max(0,moveY); const steer=moveX+(keys.d?1:0)-(keys.a?1:0);
@@ -874,25 +1021,38 @@ for(const r of remotePlayers.values()){
   if(r.visual && !r.vehicle) setRemoteAnim(r,r.anim||'idle');
 }
 if(!driving){
-  // Stable dog follow: no orbiting/circular path. The dog targets a point behind and slightly left of the player.
-  const back=3.0, side=1.35;
+  // Natural dog follow: spring-like acceleration, dead-zone, smooth turns and no orbiting.
+  const back=3.25, side=1.15;
   const dogTargetX=player.position.x - Math.sin(yaw)*back - Math.cos(yaw)*side;
   const dogTargetZ=player.position.z - Math.cos(yaw)*back + Math.sin(yaw)*side;
   const dx=dogTargetX-pet.position.x,dz=dogTargetZ-pet.position.z,dist=Math.hypot(dx,dz);
-  const dogSpeed=dist>8?7.0:dist>3.0?4.0:0;
-  if(dogSpeed>0){
-    const step=Math.min(dist,dogSpeed*dt); pet.position.x+=dx/dist*step; pet.position.z+=dz/dist*step;
+  const dogState=dist>9?'run':dist>3.1?'walk':'idle'; setDogAnim(dogState);
+  const desiredSpeed=dogState==='run'?7.8:dogState==='walk'?4.1:0;
+  pet.userData.dogVel=(pet.userData.dogVel||0)+(desiredSpeed-(pet.userData.dogVel||0))*(1-Math.exp(-dt*5));
+  if(dist>.75 && pet.userData.dogVel>.02){
+    const inv=1/Math.max(dist,.001); const step=Math.min(dist-.55,pet.userData.dogVel*dt);
+    pet.position.x+=dx*inv*step; pet.position.z+=dz*inv*step;
     const desiredDogYaw=Math.atan2(dx,dz); let dd=Math.atan2(Math.sin(desiredDogYaw-pet.rotation.y),Math.cos(desiredDogYaw-pet.rotation.y));
-    pet.rotation.y+=dd*(1-Math.exp(-dt*9));
+    pet.rotation.y+=dd*(1-Math.exp(-dt*(dogState==='run'?8:11)));
   }
-  setDogAnim(dist>8?'run':dist>3?'walk':'idle');
+  // Subtle body/tail motion keeps the pet alive even when its clip is simple.
+  const dogRoot=pet.children.find(o=>o.userData && o.userData.walkPhase!==undefined)||pet;
+  dogRoot.userData.walkPhase=(dogRoot.userData.walkPhase||0)+(pet.userData.dogVel||0)*dt*1.5;
+  if(dogState!=='idle') dogRoot.position.y=(dogRoot.userData.baseY||0)+Math.abs(Math.sin(dogRoot.userData.walkPhase))*0.035;
+  else dogRoot.position.y+=((dogRoot.userData.baseY||0)-dogRoot.position.y)*(1-Math.exp(-dt*6));
   const near=getNearestCar();if(!insideHouse && near.car&&near.dist<6)setCarButton(true,'🚗');else if(!driving)setCarButton(false); if(!driving&&!insideHouse){const nh=getNearestHouse();if(nh.pos&&nh.dist<18)setHouseButton(true,'🏠 Enter');else setHouseButton(false);}
 }
 let follow=driving&&activeCar?activeCar:player;
-let target=new THREE.Vector3(follow.position.x,follow.position.y+(driving?1.2:1.7),follow.position.z);
+const movingSpeed=Math.abs(carSpeed||0);
 let followYaw=driving&&activeCar?activeCar.rotation.y:yaw;
-let cp=new THREE.Vector3(target.x+Math.sin(followYaw)*7.6*Math.cos(pitch),target.y+Math.sin(pitch)*7.6,target.z+Math.cos(followYaw)*7.6*Math.cos(pitch));
-const cameraFollow=1-Math.exp(-dt*(mobile?8:10));camera.position.lerp(cp,cameraFollow);camera.lookAt(target);
+const desiredDistance=driving?9.2:(moving?8.0:7.35);
+const height=driving?2.0:1.72;
+const target=new THREE.Vector3(follow.position.x,follow.position.y+height,follow.position.z);
+// Camera look-ahead reduces the feeling of steering through a fixed tripod.
+const lookAhead=driving?2.1:(moving?1.15:0.45);
+const lookTarget=new THREE.Vector3(target.x+Math.sin(followYaw)*lookAhead,target.y+0.15,target.z+Math.cos(followYaw)*lookAhead);
+const cp=new THREE.Vector3(target.x+Math.sin(followYaw)*desiredDistance*Math.cos(pitch),target.y+Math.sin(pitch)*desiredDistance,target.z+Math.cos(followYaw)*desiredDistance*Math.cos(pitch));
+const cameraFollow=1-Math.exp(-dt*(mobile?7.5:10));camera.position.lerp(cp,cameraFollow);camera.lookAt(lookTarget);
   for(const r of remotePlayers.values()){
   const p=r.group.position.clone();
   p.y+=r.vehicle?1.8:2.7;
@@ -903,7 +1063,7 @@ const cameraFollow=1-Math.exp(-dt*(mobile?8:10));camera.position.lerp(cp,cameraF
   tag.style.display=(p.z<1?'block':'none');
 }
   renderer.render(scene,camera)}
-let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br>📱 '+fps+' FPS • '+(driving?'🚗 Driving':'Mobile')+'<br><span id="mpStatus"><span id="mpDot"></span>'+(mpReady?'Online • '+(remotePlayers.size+1)+' players':'Connecting…')+'</span>'},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
+let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br>🎥 Smooth Camera • '+fps+' FPS • '+(driving?'🚗 Driving':'Mobile')+'<br><span id="mpStatus"><span id="mpDot"></span>'+(mpReady?'Online • '+(remotePlayers.size+1)+' players':'Connecting…')+'</span>'},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.45:1.9));renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
 3D scene failed to start. Please reload once.
 </div>
