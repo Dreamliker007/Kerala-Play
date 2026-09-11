@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V21 Complete Mobile</title>
+<title>Kerala Play • Open World V22 Realistic Mobile</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -10,8 +10,8 @@
 #mission{position:absolute;top:64px;left:14px;background:#10251de8;border-radius:15px;padding:12px 15px;font-size:12px;line-height:1.4}
 #status{position:absolute;right:14px;top:64px;background:#10251de8;border-radius:15px;padding:10px 13px;font-size:12px}
 #joy{position:absolute;left:20px;bottom:20px;width:158px;height:158px;border-radius:50%;background:#ffffff29;border:2px solid #ffffff66;pointer-events:auto;touch-action:none}
-#houseBtn,#carBtn{position:fixed;right:18px;bottom:96px;z-index:40;width:94px !important;height:58px !important;border-radius:18px;font-size:17px}#knob{position:absolute;left:45px;top:45px;width:65px;height:65px;border-radius:50%;background:#fff;box-shadow:0 5px 18px #0006}
-.actions{position:absolute;right:18px;bottom:22px;display:flex;gap:9px;pointer-events:auto}.btn{width:60px;height:60px;border:0;border-radius:50%;background:#10251de8;color:#fff;font-size:21px;box-shadow:0 5px 16px #0005}
+#houseBtn,#carBtn{position:fixed;right:18px;bottom:102px;z-index:40;width:94px !important;height:58px !important;border-radius:18px;font-size:17px}#knob{position:absolute;left:45px;top:45px;width:65px;height:65px;border-radius:50%;background:#fff;box-shadow:0 5px 18px #0006}
+.actions{position:absolute;right:18px;bottom:22px;display:flex;gap:9px;align-items:center;pointer-events:auto}.btn{width:60px;height:60px;border:0;border-radius:50%;background:#10251de8;color:#fff;font-size:21px;box-shadow:0 5px 16px #0005}
 #start{position:fixed;inset:0;z-index:1000;background:#06140bbb;display:flex;align-items:center;justify-content:center;pointer-events:auto}
 .card{position:relative;z-index:1001;width:min(92%,480px);background:#fff;color:#182033;border-radius:28px;padding:30px;text-align:center;box-shadow:0 25px 75px #000a}.card h1{margin:0 0 8px;font-size:32px}.card p{color:#555;line-height:1.5}.play{position:relative;z-index:1002;cursor:pointer;touch-action:manipulation;border:0;background:#087f45;color:#fff;font-size:18px;font-weight:800;padding:14px 25px;border-radius:14px}.small{font-size:12px;color:#777;margin-top:12px}
 
@@ -31,17 +31,17 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V21
+  🌤️ Kerala • Day • V22
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V21 Complete Mobile • Kerala Village</div></div>
-<div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you<br><span style="opacity:.85">🌐 Shared world • friends can join</span></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V22 Realistic Mobile • Kerala Village</div></div>
+<div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you<br><span style="opacity:.85">🌐 Shared world • friends can join</span><br><span id="worldTip" style="opacity:.75">📍 Explore the village</span></div>
 <div id="status">👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br><span id="mpStatus"><span id="mpDot"></span>Connecting…</span></div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
 <div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V21 — realistic multiplayer replication + mobile optimization: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room is enabled in this build</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V22 — realistic Kerala village polish + multiplayer + mobile optimization: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room + vehicles + houses enabled</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -351,11 +351,130 @@ const sunDisc=new THREE.Mesh(
   new THREE.MeshBasicMaterial({color:0xffd78a})
 );
 sunDisc.position.set(-110,115,-170); scene.add(sunDisc);
-scene.background=new THREE.Color(0x8fd4ee);scene.fog=new THREE.Fog(0x8fd4ee,115,330);
-const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,700);
+scene.background=new THREE.Color(0x8fd4ee);scene.fog=new THREE.Fog(0x8fd4ee,105,310);
+
+// V22 Realistic Kerala Village Pass — lightweight geometry only.
+// These details are intentionally instanced/reused where possible to preserve mobile FPS.
+const curbMat = new THREE.MeshStandardMaterial({color:0x9b9a8c,roughness:.98});
+const asphaltEdgeMat = new THREE.MeshStandardMaterial({color:0x2d3031,roughness:.95});
+const concreteMat = new THREE.MeshStandardMaterial({color:0xb9b4a5,roughness:1});
+const wireMat = new THREE.LineBasicMaterial({color:0x202522,transparent:true,opacity:.82});
+
+function curbLine(x,z,w,d,rot=0){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,.18,d),curbMat);
+  m.position.set(x,.12,z);m.rotation.y=rot;scene.add(m);
+}
+curbLine(0,-6.15,380,.28); curbLine(0,6.15,380,.28);
+curbLine(-6.15,0,.28,380); curbLine(6.15,0,.28,380);
+
+function roadShoulder(x,z,w,d,rot=0){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,.035,d),asphaltEdgeMat);
+  m.position.set(x,.125,z);m.rotation.y=rot;scene.add(m);
+}
+roadShoulder(0,-7.0,380,.55);roadShoulder(0,7.0,380,.55);
+roadShoulder(-7.0,0,.55,380);roadShoulder(7.0,0,.55,380);
+
+function wallSegment(x,z,w,h=.9,rot=0){
+  const g=new THREE.Group();
+  const wall=new THREE.Mesh(new THREE.BoxGeometry(w,h,.22),concreteMat);
+  wall.position.y=h/2;g.add(wall);
+  for(let i=-w/2+1.5;i<w/2;i+=3){
+    const cap=new THREE.Mesh(new THREE.BoxGeometry(.10,h+.08,.28),concreteMat);
+    cap.position.set(i,h/2+.04,0);g.add(cap);
+  }
+  g.position.set(x,0,z);g.rotation.y=rot;scene.add(g);return g;
+}
+wallSegment(-92,-36,28,.8,.05); wallSegment(92,-38,28,.8,-.05);
+wallSegment(-92,44,24,.8,.12); wallSegment(92,48,24,.8,-.12);
+
+function gate(x,z,rot=0){
+  const g=new THREE.Group();
+  const postMat=new THREE.MeshStandardMaterial({color:0xddd5c4,roughness:.9});
+  const metalMat=new THREE.MeshStandardMaterial({color:0x4d554f,roughness:.55,metalness:.25});
+  for(const sx of [-2.2,2.2]){
+    const p=new THREE.Mesh(new THREE.BoxGeometry(.28,1.8,.28),postMat);p.position.set(sx,.9,0);g.add(p);
+  }
+  const door=new THREE.Mesh(new THREE.BoxGeometry(4.2,1.45,.12),metalMat);door.position.y=.82;g.add(door);
+  g.position.set(x,0,z);g.rotation.y=rot;scene.add(g);
+}
+gate(-92,-36.8,.05);gate(92,-38.8,-.05);gate(-92,43.2,.12);gate(92,47.2,-.12);
+
+function wireBetween(x1,z1,x2,z2,y=7.6){
+  const curve=new THREE.CatmullRomCurve3([
+    new THREE.Vector3(x1,y,z1),
+    new THREE.Vector3((x1+x2)/2,y-.7,(z1+z2)/2),
+    new THREE.Vector3(x2,y,z2)
+  ]);
+  const geo=new THREE.BufferGeometry().setFromPoints(curve.getPoints(12));
+  const line=new THREE.Line(geo,wireMat);scene.add(line);
+}
+wireBetween(-7,-15,7,-15); wireBetween(-30,4,30,4);
+wireBetween(-58,28,-30,4); wireBetween(30,4,58,28);
+
+function bananaClump(x,z,s=1){
+  const g=new THREE.Group();
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.22*s,.3*s,2.2*s,8),
+    new THREE.MeshStandardMaterial({color:0x5b6d2f,roughness:1}));
+  trunk.position.y=1.1*s;g.add(trunk);
+  for(let i=0;i<7;i++){
+    const a=i*Math.PI*2/7;
+    const leaf=new THREE.Mesh(new THREE.SphereGeometry(.48*s,9,7),
+      new THREE.MeshStandardMaterial({color:i%2?0x2c7d3e:0x3d8d47,roughness:1}));
+    leaf.scale.set(1.8,.18,.65);
+    leaf.position.set(Math.cos(a)*.65*s,2.35*s+Math.sin(a)*.18*s,Math.sin(a)*.65*s);
+    leaf.rotation.y=a;g.add(leaf);
+  }
+  g.position.set(x,0,z);scene.add(g);
+}
+[[-30,-12],[-24,-14],[25,-15],[31,-13],[-48,31],[49,34]].forEach((p,i)=>bananaClump(p[0],p[1],.8+(i%2)*.12));
+
+function coconutCluster(x,z,s=1){
+  for(let i=0;i<3;i++){
+    const a=i*Math.PI*2/3;
+    palm(x+Math.cos(a)*2.2*s,z+Math.sin(a)*2.2*s,.78*s);
+  }
+}
+coconutCluster(-86,-58,.8);coconutCluster(88,-60,.85);coconutCluster(-82,83,.78);coconutCluster(82,84,.82);
+
+function paverWalk(x,z,w,d,rot=0){
+  const g=new THREE.Group();
+  const pmat=new THREE.MeshStandardMaterial({color:0xc8c2b2,roughness:.96});
+  for(let ix=-w/2+1;ix<w/2;ix+=2){
+    for(let iz=-d/2+1;iz<d/2;iz+=2){
+      const tile=new THREE.Mesh(new THREE.BoxGeometry(1.8,.08,1.7),pmat);
+      tile.position.set(ix+(Math.random()-.5)*.08,.08,iz+(Math.random()-.5)*.08);g.add(tile);
+    }
+  }
+  g.position.set(x,0,z);g.rotation.y=rot;scene.add(g);
+}
+paverWalk(-66,-51,10,5,.18);paverWalk(67,-53,10,5,-.22);
+paverWalk(-76,64,9,4,.45);paverWalk(76,67,9,4,-.3);
+
+function roadsideRock(x,z,s=.7){
+  const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0),
+    new THREE.MeshStandardMaterial({color:0x77766c,roughness:1}));
+  rock.scale.y=.55;rock.position.set(x,s*.35,z);scene.add(rock);
+}
+[[-20,-25],[19,-26],[-42,-15],[42,-16],[-90,6],[90,12],[-60,55],[62,55]].forEach((p,i)=>roadsideRock(p[0],p[1],.45+(i%3)*.12));
+
+// Small roadside signboards / bus-stop style shelter for Kerala village feel.
+function busStop(x,z,rot=0){
+  const g=new THREE.Group();
+  const m=new THREE.MeshStandardMaterial({color:0x68766e,roughness:.85});
+  for(const sx of [-2.1,2.1]){
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,2.8,8),m);post.position.set(sx,1.4,0);g.add(post);
+  }
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(5,.18,1.9),
+    new THREE.MeshStandardMaterial({color:0x8e4c32,roughness:.9}));roof.position.y=3;g.add(roof);
+  const back=new THREE.Mesh(new THREE.BoxGeometry(4.5,1.8,.10),m);back.position.set(0,1.2,.75);g.add(back);
+  g.position.set(x,0,z);g.rotation.y=rot;scene.add(g);
+}
+busStop(-38,9,.05);busStop(38,11,-.05);
+
+const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,700);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
 renderer.setPixelRatio(deviceQuality);renderer.setSize(innerWidth,innerHeight);
-renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
 const loader=new GLTFLoader();const mixers=[];
 const ASSET_BASE='https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
@@ -656,7 +775,7 @@ function applyWorldLight(){
   const sky=new THREE.Color().setHSL(0.56,0.55,0.32+0.32*daylight);
   scene.background.copy(sky); scene.fog.color.copy(sky);
   sunDisc.visible=daylight>.16; sunDisc.position.set(-110,45+100*daylight,-170);
-  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V21';
+  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V22';
 }
 dayBtn.addEventListener('click',()=>{autoTime=false;worldClock=worldClock<17?19:9.5;applyWorldLight();dayBtn.textContent=worldClock>17?'🌙 Night':'🌤️ Day'});
 qualityBtn.addEventListener('click',()=>{
@@ -681,8 +800,8 @@ function updateInteractionPrompt(){
   const p=document.getElementById('prompt'); if(!p)return;
   if(insideHouse){p.textContent='🚪 Tap EXIT to leave the house';p.style.display='block';return;}
   if(driving){p.textContent='🚗 Driving • joystick to steer';p.style.display='block';return;}
-  const car=getNearestCar(); if(car.car&&car.dist<6){p.textContent='🚗 Walk closer • tap the car button to enter';p.style.display='block';return;}
-  const h=getNearestHouse(); if(h.pos&&h.dist<18){p.textContent='🏠 Walk to the entrance • tap ENTER';p.style.display='block';return;}
+  const car=getNearestCar(); if(car.car&&car.dist<6){p.textContent='🚗 Walk closer • tap ENTER';p.style.display='block';return;}
+  const h=getNearestHouse(); if(h.pos&&h.dist<18){p.textContent='🏠 At the door • tap ENTER';p.style.display='block';return;}
   p.style.display='none';
 }
 applyWorldLight();
