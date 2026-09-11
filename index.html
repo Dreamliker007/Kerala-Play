@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V12 Mobile</title>
+<title>Kerala Play • Open World V14 Mobile</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -23,16 +23,16 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V13
+  🌤️ Kerala • Day • V14
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V13 Mobile • Kerala Village</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V14 Mobile • Kerala Village</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you</div>
 <div id="status">👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1</div>
 <div id="joy"><div id="knob"></div></div>
-<div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button></div>
+<div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button></div>
 </div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V13 — mobile-first movement & camera build: smoother camera, optimized rendering, proper walk/run animation handling and lightweight Kerala world streaming foundation.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V14 — mobile-first gameplay build: smooth movement, camera, and vehicle enter/drive/exit foundation.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -57,7 +57,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/
 const scene=new THREE.Scene();
 const mobile=matchMedia('(pointer:coarse)').matches || innerWidth<900;
 const deviceQuality=Math.min(devicePixelRatio || 1, mobile ? 1.15 : 1.6);
-// V13 — mobile-first movement & camera build
+// V14 — mobile-first gameplay build
 const woodMat = new THREE.MeshStandardMaterial({color:0x5a3928,roughness:.82,metalness:0});
 const wallMat = new THREE.MeshStandardMaterial({color:0xd7c6a5,roughness:.92});
 const roofMat = new THREE.MeshStandardMaterial({color:0x873f32,roughness:.88});
@@ -339,6 +339,19 @@ function loadRealCar(x,z,scale=1,colorize=null){
 loadRealCar(-5,-8,1.18,0xb52d2d);
 loadRealCar(48,-3,1.18,0x245d9c);
 
+// V14 vehicle gameplay: use loaded cars when available, with a lightweight fallback if an asset is unavailable.
+function fallbackCar(x,z,color){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(3.8,1.05,6.2),M(color)); body.position.y=.9; g.add(body);
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(3.1,.9,3.0),M(0x263238)); roof.position.set(0,1.65,.2); g.add(roof);
+  for(const sx of [-1.65,1.65]) for(const sz of [-2.0,2.0]) { const w=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.28,14),M(0x111111)); w.rotation.z=Math.PI/2; w.position.set(sx,.5,sz); g.add(w); }
+  g.position.set(x,0,z); scene.add(g); return g;
+}
+let fallback1=null,fallback2=null;
+setTimeout(()=>{ if(!c1) fallback1=fallbackCar(-5,-8,0xb52d2d); if(!c2) fallback2=fallbackCar(48,-3,0x245d9c); },1800);
+let driving=false,activeCar=null,carSpeed=0,carSteer=0;
+
+
 function person(x,z,shirt){let g=new THREE.Group();let b=new THREE.Mesh(new THREE.CapsuleGeometry(.48,1.05,6,10),M(shirt));b.position.y=1.4;g.add(b);let h=new THREE.Mesh(new THREE.SphereGeometry(.38,18,16),M(0xc88b64));h.position.y=2.5;g.add(h);for(let s of [-1,1]){let l=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.72,5,8),M(0x27364a));l.position.set(s*.23,.62,0);g.add(l)}g.position.set(x,0,z);scene.add(g);return g}
 const npcs=[person(18,15,0x7a3d95),person(-20,18,0x1e6fae),person(28,-18,0xe07b32),person(-30,-8,0x2d7c4d)];
 
@@ -379,36 +392,54 @@ const joy=document.getElementById('joy'),knob=document.getElementById('knob');le
 function jm(e){let r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=49,l=Math.hypot(dx,dy);if(l>max){dx=dx/l*max;dy=dy/l*max}let nx=dx/max,ny=dy/max;const dead=.10;if(Math.hypot(nx,ny)<dead){nx=ny=0}else{const m=Math.hypot(nx,ny);nx*=Math.min(1,(m-dead)/(1-dead))/m;ny*=Math.min(1,(m-dead)/(1-dead))/m}knob.style.transform=`translate(${dx}px,${dy}px)`;targetMoveX=nx;targetMoveY=ny}
 function releaseJoy(){targetMoveX=targetMoveY=0;knob.style.transform='translate(0,0)'}
 joy.addEventListener('pointerdown',e=>{jid=e.pointerId;joy.setPointerCapture(jid);jm(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)jm(e)});['pointerup','pointercancel'].forEach(v=>joy.addEventListener(v,releaseJoy));
-let cid=null,lx=0,ly=0;renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<190)return;cid=e.pointerId;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(cid)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==cid)return;targetYaw-=(e.clientX-lx)*(mobile?.0048:.007);targetPitch=Math.max(-.08,Math.min(.92,targetPitch+(e.clientY-ly)*.0035));lx=e.clientX;ly=e.clientY});renderer.domElement.addEventListener('pointerup',()=>cid=null);
-document.getElementById('jump').onclick=()=>{if(!jump){jump=true;vy=8}};document.getElementById('reset').onclick=()=>{player.position.set(0,0,0);yaw=0};
-document.getElementById('pet').onclick=()=>{document.getElementById('mission').innerHTML='<b>🐾 Pet interaction</b><br>Your dog is happy ❤️';setTimeout(()=>document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you',1800)};
+let cid=null,lx=0,ly=0;renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<190)return;cid=e.pointerId;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(cid)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==cid)return;targetYaw-=(e.clientX-lx)*(mobile? .0048 : .007);targetPitch=Math.max(-.08,Math.min(.92,targetPitch+(e.clientY-ly)*.0035));lx=e.clientX;ly=e.clientY});renderer.domElement.addEventListener('pointerup',()=>cid=null);
+const carBtn=document.getElementById('carBtn');
+function setCarButton(show,label){carBtn.style.display=show?'block':'none';carBtn.textContent=label||'🚗'}
+function getNearestCar(){const list=[c1,c2,fallback1,fallback2].filter(Boolean);let best=null,bd=999;for(const c of list){const d=Math.hypot(player.position.x-c.position.x,player.position.z-c.position.z);if(d<bd){bd=d;best=c}}return {car:best,dist:bd}}
+function enterCar(car){if(!car||driving)return;driving=true;activeCar=car;carSpeed=0;player.visible=false;setCarButton(true,'🚪');document.getElementById('mission').innerHTML='<b>🚗 Driving</b><br>Joystick ↑ accelerate • ← → steer<br>Tap 🚪 to exit';}
+function exitCar(){if(!driving||!activeCar)return;const c=activeCar;driving=false;carSpeed=0;player.visible=true;player.position.set(c.position.x+3,0,c.position.z);yaw=c.rotation.y;targetYaw=yaw;setCarButton(false);document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you';activeCar=null;}
+carBtn.addEventListener('click',()=>{if(driving)exitCar();else {const n=getNearestCar();if(n.dist<6)enterCar(n.car)}});
+document.getElementById('jump').onclick=()=>{if(!driving&&!jump){jump=true;vy=8}};document.getElementById('reset').onclick=()=>{if(driving&&activeCar){activeCar.position.set(0,0,0);carSpeed=0}else{player.position.set(0,0,0);yaw=0;targetYaw=0}};
+document.getElementById('pet').onclick=()=>{if(driving)return;document.getElementById('mission').innerHTML='<b>🐾 Pet interaction</b><br>Your dog is happy ❤️';setTimeout(()=>document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you',1800)};
 const playBtn=document.getElementById('play');
-function enterWorld(e){
-  if(e){e.preventDefault();e.stopPropagation();}
-  document.getElementById('start').style.display='none';
-}
-playBtn.addEventListener('click',enterWorld);
-playBtn.addEventListener('pointerup',enterWorld);
+function enterWorld(e){if(e){e.preventDefault();e.stopPropagation();}document.getElementById('start').style.display='none'}
+playBtn.addEventListener('click',enterWorld);playBtn.addEventListener('pointerup',enterWorld);
 const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-
-let last=performance.now();function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;mixers.forEach(m=>m.update(dt));
+let last=performance.now();
+function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;mixers.forEach(m=>m.update(dt));
 const smooth=1-Math.exp(-dt*14);moveX+=(targetMoveX-moveX)*smooth;moveY+=(targetMoveY-moveY)*smooth;
 const camSmooth=1-Math.exp(-dt*(mobile?10:12));yaw+=(targetYaw-yaw)*camSmooth;pitch+=(targetPitch-pitch)*camSmooth;
 let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z);if(l>1){x/=l;z/=l;l=1}
-const moving=l>.08;const speed=(mobile?5.2:7.8)*(moving?.92+.08*l:0);if(window.playerAction) window.playerAction.timeScale=moving?Math.min(1.15,.75+.35*l):0.0;
-player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
-player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));player.rotation.y+=diff*(1-Math.exp(-dt*10));}
-player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
-if((t|0)%3===0) npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
-const petX=player.position.x+Math.sin(t*.0018)*2.7;
-pet.position.x += (petX-pet.position.x)*Math.min(1,dt*4);
-const petZ=player.position.z+Math.cos(t*.0015)*2.7;
-pet.position.z += (petZ-pet.position.z)*Math.min(1,dt*4);
-if(Math.abs(petX-pet.position.x)+Math.abs(petZ-pet.position.z)>.02) pet.rotation.y=Math.atan2(petX-player.position.x,petZ-player.position.z);
-
-let target=new THREE.Vector3(player.position.x,player.position.y+1.7,player.position.z),cp=new THREE.Vector3(target.x+Math.sin(yaw)*7.6*Math.cos(pitch),target.y+Math.sin(pitch)*7.6,target.z+Math.cos(yaw)*7.6*Math.cos(pitch));
+const moving=l>.08;
+if(!driving){
+  const speed=(mobile?5.2:7.8)*(moving?.92+.08*l:0);if(window.playerAction)window.playerAction.timeScale=moving?Math.min(1.15,.75+.35*l):0;
+  player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
+  player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));
+  if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));player.rotation.y+=diff*(1-Math.exp(-dt*10));}
+  player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
+} else if(activeCar){
+  const throttle=Math.max(0,-moveY); const reverse=Math.max(0,moveY); const steer=moveX+(keys.d?1:0)-(keys.a?1:0);
+  const desiredSpeed=(throttle*13-reverse*6); carSpeed += (desiredSpeed-carSpeed)*(1-Math.exp(-dt*4));
+  if(Math.abs(carSpeed)<.15)carSpeed=0;
+  activeCar.rotation.y -= steer*dt*1.05*Math.min(1,Math.abs(carSpeed)/3+0.15);
+  activeCar.position.x += Math.sin(activeCar.rotation.y)*carSpeed*dt;
+  activeCar.position.z += Math.cos(activeCar.rotation.y)*carSpeed*dt;
+  activeCar.position.x=Math.max(-172,Math.min(172,activeCar.position.x));activeCar.position.z=Math.max(-172,Math.min(172,activeCar.position.z));
+  if(Math.abs(carSpeed)<.05 && Math.hypot(targetMoveX,targetMoveY)<.08) carSpeed=0;
+}
+if((t|0)%3===0)npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
+if(!driving){
+  const petX=player.position.x+Math.sin(t*.0018)*2.7;pet.position.x+=(petX-pet.position.x)*Math.min(1,dt*4);
+  const petZ=player.position.z+Math.cos(t*.0015)*2.7;pet.position.z+=(petZ-pet.position.z)*Math.min(1,dt*4);
+  if(Math.abs(petX-pet.position.x)+Math.abs(petZ-pet.position.z)>.02)pet.rotation.y=Math.atan2(petX-player.position.x,petZ-player.position.z);
+  const near=getNearestCar();if(near.car&&near.dist<6)setCarButton(true,'🚗');else setCarButton(false);
+}
+let follow=driving&&activeCar?activeCar:player;
+let target=new THREE.Vector3(follow.position.x,follow.position.y+(driving?1.2:1.7),follow.position.z);
+let followYaw=driving&&activeCar?activeCar.rotation.y:yaw;
+let cp=new THREE.Vector3(target.x+Math.sin(followYaw)*7.6*Math.cos(pitch),target.y+Math.sin(pitch)*7.6,target.z+Math.cos(followYaw)*7.6*Math.cos(pitch));
 const cameraFollow=1-Math.exp(-dt*(mobile?8:10));camera.position.lerp(cp,cameraFollow);camera.lookAt(target);renderer.render(scene,camera)}
-let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1<br>📱 '+fps+' FPS • '+(mobile?'Mobile':'Desktop');},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
+let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1<br>📱 '+fps+' FPS • '+(driving?'🚗 Driving':'Mobile')},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
 3D scene failed to start. Please reload once.
 </div>
