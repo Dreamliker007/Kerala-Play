@@ -1,12 +1,163 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kerala Play</title><style>
-body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#eef8ff,#f5fff5);color:#172033}
-header{display:flex;justify-content:space-between;align-items:center;padding:18px 6%;background:#fff;border-bottom:1px solid #e5e7eb}.logo{font-size:26px;font-weight:900}.logo span{color:#159447}
-nav a{margin-left:18px;color:#172033;text-decoration:none;font-weight:700}.hero{text-align:center;padding:70px 20px}.hero h1{font-size:48px;margin:0 0 10px}.hero p{color:#667085}.btn{display:inline-block;background:#159447;color:#fff;padding:13px 20px;border-radius:12px;text-decoration:none;font-weight:800}.card{max-width:330px;margin:20px auto;background:#fff;padding:28px;border-radius:20px;box-shadow:0 10px 30px #0001;text-align:center}.card .icon{font-size:55px}
-</style></head><body>
-<header><div class="logo">Kerala <span>Play</span></div><nav><a href="#home">Home</a><a href="#games">Games</a><a href="#about">About</a></nav></header>
-<section class="hero" id="home"><h1>WELCOME TO KERALA PLAY</h1><h2>Play. Enjoy. Win.</h2><p>കേരള പ്ലേ — നിങ്ങളുടെ ഗെയിംസ്, റിസൾട്ടുകൾ, വിവരങ്ങൾ ഒരിടത്ത്.</p></section>
-<section id="games"><div class="card"><div class="icon">🎲</div><h2>Ludo</h2><p>Play online with friends, invite them and chat live.</p><a class="btn" href="ludo.html">Play Ludo</a></div></section>
-<section id="about" style="text-align:center;padding:30px"><h2>About Kerala Play</h2><p>Games and entertainment in one place.</p></section>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Kerala Play • Open World</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;background:#9bd6ff}
+#game{position:fixed;inset:0}
+#ui{position:fixed;inset:0;pointer-events:none}
+.top{position:absolute;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;align-items:center}
+.brand{background:rgba(0,0,0,.48);color:white;padding:10px 14px;border-radius:14px;font-weight:800}
+.badge{background:rgba(0,0,0,.48);color:#fff;padding:10px 13px;border-radius:14px;font-size:13px}
+#hint{position:absolute;top:72px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.42);color:#fff;padding:9px 13px;border-radius:12px;font-size:13px;text-align:center}
+#joy{position:absolute;left:22px;bottom:25px;width:145px;height:145px;border-radius:50%;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none}
+#knob{position:absolute;width:62px;height:62px;left:41px;top:41px;border-radius:50%;background:rgba(255,255,255,.72);box-shadow:0 4px 15px #0004}
+.actions{position:absolute;right:20px;bottom:28px;display:flex;gap:12px;pointer-events:auto}
+.btn{width:62px;height:62px;border:0;border-radius:50%;background:rgba(0,0,0,.52);color:#fff;font-size:24px;box-shadow:0 4px 15px #0004}
+#start{position:absolute;inset:0;background:linear-gradient(#0007,#0009);display:flex;align-items:center;justify-content:center;pointer-events:auto}
+.card{width:min(90%,430px);padding:28px;border-radius:24px;background:#fff;text-align:center;box-shadow:0 20px 60px #0008}
+.card h1{margin:0 0 8px;font-size:32px}.card p{color:#555;line-height:1.5}
+.play{margin-top:12px;border:0;border-radius:14px;padding:14px 25px;background:#087f45;color:#fff;font-size:18px;font-weight:800}
+.small{font-size:12px;color:#777;margin-top:12px}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="ui">
+  <div class="top"><div class="brand">🌴 Kerala Play</div><div class="badge">🌐 Open World • V1</div></div>
+  <div id="hint">Joystick: move • Swipe: camera • 🔘: jump</div>
+  <div id="joy"><div id="knob"></div></div>
+  <div class="actions"><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button></div>
+</div>
+<div id="start">
+ <div class="card">
+  <h1>🌴 Kerala Open World</h1>
+  <p>Explore a small Kerala village prototype with roads, houses, coconut trees, a pond and a temple.</p>
+  <button class="play" id="play">▶ Enter World</button>
+  <div class="small">Prototype V1 • Multiplayer will be added next</div>
+ </div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fd3ff);
+scene.fog = new THREE.Fog(0x8fd3ff, 80, 260);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, .1, 500);
+camera.position.set(0,7,10);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+document.getElementById('game').appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xbfeaff,0x52704b,2.2));
+const sun = new THREE.DirectionalLight(0xffffff,2.2);
+sun.position.set(60,100,40); sun.castShadow=true; scene.add(sun);
+
+const mat = c => new THREE.MeshStandardMaterial({color:c,roughness:.9});
+const box=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;scene.add(m);return m};
+const cyl=(r,h,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,12),mat(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;scene.add(m);return m};
+
+box(260,.5,260,0x4e9b50,0,-.25,0);
+box(12,.18,260,0x4b4b4b,0,.02,0);
+box(260,.18,10,0x4b4b4b,0,.02,0);
+
+function house(x,z,wall,roof){
+ box(10,5,8,wall,x,2.5,z);
+ const r=new THREE.Mesh(new THREE.ConeGeometry(7.2,4,4),mat(roof)); r.rotation.y=Math.PI/4;r.position.set(x,7,z);r.castShadow=true;scene.add(r);
+ box(2.1,3.1,0.2,0x6b3e20,x,1.55,z-4.1);
+ box(2.2,1.5,0.2,0x9dd9ff,x-2.5,3,z-4.1);
+}
+house(-25,-22,0xffd7a0,0x9b3f2f); house(25,22,0xffc9a9,0x6f3b2a);
+house(-30,25,0xe6f0bd,0x8b3429); house(31,-23,0xffe0a8,0x743b27);
+
+function coconut(x,z){
+ cyl(.35,7,0x76502c,x,3.5,z);
+ for(let i=0;i<7;i++){
+  const a=i*Math.PI*2/7;
+  const leaf=new THREE.Mesh(new THREE.ConeGeometry(.38,5,5),mat(0x19723c));
+  leaf.position.set(x+Math.cos(a)*1.7,7.1,z+Math.sin(a)*1.7);
+  leaf.rotation.z=Math.PI/2; leaf.rotation.y=-a; leaf.castShadow=true;scene.add(leaf);
+ }
+}
+for(const p of [[-12,-12],[-18,10],[-6,28],[12,12],[20,-10],[38,4],[-38,-4],[5,-30]]) coconut(...p);
+
+const pond=new THREE.Mesh(new THREE.CylinderGeometry(10,10,.25,48),new THREE.MeshStandardMaterial({color:0x2d9bc2,roughness:.2,metalness:.1}));
+pond.scale.z=.65;pond.position.set(-38,0.15,38);scene.add(pond);
+box(5,3,3,0xd7a86e,0,1.5,-16); // small shop
+box(5,2.2,3,0x3d2a1e,0,3.9,-16);
+
+function temple(x,z){
+ cyl(4,5,0xffd48a,x,2.5,z);
+ const roof=new THREE.Mesh(new THREE.ConeGeometry(5.5,5,4),mat(0xc65a28));roof.position.set(x,7,z);roof.rotation.y=Math.PI/4;scene.add(roof);
+}
+temple(35,35);
+
+const player = new THREE.Group();
+const body=new THREE.Mesh(new THREE.CapsuleGeometry(.65,1.4,5,10),mat(0x1f7a4c)); body.position.y=1.25; body.castShadow=true;player.add(body);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.48,16,16),mat(0xc98d67));head.position.y=2.55;head.castShadow=true;player.add(head);
+const shirt=new THREE.Mesh(new THREE.BoxGeometry(1.1,.5,.25),mat(0xffffff));shirt.position.set(0,1.65,.58);player.add(shirt);
+player.position.set(0,0,0);scene.add(player);
+
+let moveX=0,moveY=0,yaw=0, pitch=.35, jumping=false, vy=0;
+const joy=document.getElementById('joy'), knob=document.getElementById('knob');
+let joyId=null;
+function joyMove(e){
+ const r=joy.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+ let dx=e.clientX-cx,dy=e.clientY-cy, max=48, len=Math.hypot(dx,dy);
+ if(len>max){dx=dx/len*max;dy=dy/len*max}
+ knob.style.transform=`translate(${dx}px,${dy}px)`;
+ moveX=dx/max; moveY=dy/max;
+}
+joy.addEventListener('pointerdown',e=>{joyId=e.pointerId;joy.setPointerCapture(joyId);joyMove(e)});
+joy.addEventListener('pointermove',e=>{if(e.pointerId===joyId)joyMove(e)});
+joy.addEventListener('pointerup',()=>{moveX=moveY=0;knob.style.transform='translate(0,0)'});
+joy.addEventListener('pointercancel',()=>{moveX=moveY=0;knob.style.transform='translate(0,0)'});
+
+let camId=null,lastX=0,lastY=0;
+renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<180)return;camId=e.pointerId;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture(camId)});
+renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==camId)return;yaw-=(e.clientX-lastX)*.008;pitch=Math.max(-.05,Math.min(1.15,pitch+(e.clientY-lastY)*.005));lastX=e.clientX;lastY=e.clientY});
+renderer.domElement.addEventListener('pointerup',()=>camId=null);
+
+document.getElementById('jump').onclick=()=>{if(!jumping){jumping=true;vy=8}};
+document.getElementById('reset').onclick=()=>{player.position.set(0,0,0);yaw=0};
+document.getElementById('play').onclick=()=>document.getElementById('start').style.display='none';
+
+const keys={};
+addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+let last=performance.now();
+function animate(t){
+ requestAnimationFrame(animate);
+ const dt=Math.min((t-last)/1000,.04);last=t;
+ let x=moveX+(keys.d?1:0)-(keys.a?1:0), z=moveY+(keys.s?1:0)-(keys.w?1:0);
+ const l=Math.hypot(x,z); if(l>1){x/=l;z/=l}
+ const speed=10;
+ player.position.x += x*Math.cos(yaw)-z*Math.sin(yaw);
+ player.position.z += x*Math.sin(yaw)+z*Math.cos(yaw);
+ player.position.x += 0; // keep calculation explicit
+ player.position.y += vy*dt;
+ if(jumping){vy-=20*dt;if(player.position.y<=0){player.position.y=0;jumping=false;vy=0}}
+ if(l>.1) player.rotation.y=Math.atan2(x,z)+yaw;
+
+ const dist=11;
+ const target=new THREE.Vector3(player.position.x,player.position.y+2,player.position.z);
+ const cp=new THREE.Vector3(
+  target.x+Math.sin(yaw)*dist*Math.cos(pitch),
+  target.y+Math.sin(pitch)*dist,
+  target.z+Math.cos(yaw)*dist*Math.cos(pitch)
+ );
+ camera.position.lerp(cp,.12); camera.lookAt(target);
+ renderer.render(scene,camera);
+}
+animate(performance.now());
+
+onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
+</script>
 </body></html>
