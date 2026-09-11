@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V7</title>
+<title>Kerala Play • Open World V8</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -18,14 +18,18 @@
 #vignette{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 120px rgba(0,0,0,.24)}
 </style></head>
 <body>
-<div id="game"></div><div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V7 • 3D Assets</div></div>
+<div id="game"></div>
+<div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
+  🌤️ Kerala • Day
+</div>
+<div id="vignette"></div><div id="ui">
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V8 • 3D Assets</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you</div>
 <div id="status">👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1</div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button></div>
 </div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V7 — a more cinematic Kerala-inspired open world with richer lighting, terrain details, village life, vehicles, pets, NPCs and smoother third-person controls.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V8 — a more cinematic Kerala-inspired open world with richer lighting, terrain details, village life, vehicles, pets, NPCs and smoother third-person controls.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -47,7 +51,56 @@ document.addEventListener('DOMContentLoaded',function(){
 import * as THREE from 'three';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x86cbed);scene.fog=new THREE.Fog(0x86cbed,95,300);
+const scene=new THREE.Scene();
+// V8 Kerala terrain dressing
+const terrainMat = new THREE.MeshStandardMaterial({
+  color: 0x527f45, roughness: 0.96, metalness: 0.0
+});
+const soilMat = new THREE.MeshStandardMaterial({
+  color: 0x806043, roughness: 1.0
+});
+function terrainPatch(x,z,w,d,rot=0){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),terrainMat);
+  m.rotation.x=-Math.PI/2; m.rotation.z=rot; m.position.set(x,.015,z);
+  scene.add(m);
+}
+function soilPatch(x,z,w,d,rot=0){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),soilMat);
+  m.rotation.x=-Math.PI/2; m.rotation.z=rot; m.position.set(x,.02,z);
+  scene.add(m);
+}
+terrainPatch(-95,-85,55,42,.15); terrainPatch(95,-70,62,48,-.12);
+terrainPatch(-100,92,65,48,-.18); terrainPatch(95,100,55,45,.2);
+soilPatch(-20,-105,85,3,.02); soilPatch(35,105,80,3,-.01);
+
+// More natural foliage clusters
+function foliageCluster(x,z,s=1){
+  for(let i=0;i<7;i++){
+    const a=i*Math.PI*2/7, r=(1.5+Math.random()*2)*s;
+    sph((.35+Math.random()*.25)*s,0x356f39,
+        x+Math.cos(a)*r,.35*s,z+Math.sin(a)*r);
+  }
+}
+for(let i=0;i<26;i++){
+  const x=-150+Math.random()*300, z=-150+Math.random()*300;
+  if(Math.abs(x)<13 || Math.abs(z)<13) continue;
+  foliageCluster(x,z,.7+Math.random()*.8);
+}
+
+// Warm village lights for evening/cinematic feel
+function warmLight(x,z){
+  const l=new THREE.PointLight(0xffc978,1.2,15,2);
+  l.position.set(x,3.2,z); scene.add(l);
+}
+[[-16,-8],[16,-8],[-48,18],[48,18],[-72,-35],[72,-35]].forEach(p=>warmLight(p[0],p[1]));
+
+// Atmospheric sun disc
+const sunDisc=new THREE.Mesh(
+  new THREE.SphereGeometry(3.5,24,16),
+  new THREE.MeshBasicMaterial({color:0xffd78a})
+);
+sunDisc.position.set(-110,115,-170); scene.add(sunDisc);
+scene.background=new THREE.Color(0x86cbed);scene.fog=new THREE.Fog(0x86cbed,95,300);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,700);
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
 const loader=new GLTFLoader();const mixers=[];
@@ -142,7 +195,7 @@ for(let s of [-1,1]){let a=new THREE.Mesh(new THREE.CapsuleGeometry(.16,.67,5,8)
 let bag=new THREE.Mesh(new THREE.BoxGeometry(.48,.72,.22),M(0x5b3f2d));
 bag.position.set(-.58,1.35,.22);player.add(bag);
 scene.add(player);
-// V7: use a rigged, textured GLB human when the network asset is available.
+// V8: use a rigged, textured GLB human when the network asset is available.
 for(const c of [...player.children]) c.visible=false;
 loadGLB(ASSET_BASE+'CesiumMan/glTF-Binary/CesiumMan.glb',g=>{
   const model=g.scene; enableShadows(model); model.scale.setScalar(2.15); model.position.set(0,0,0);
