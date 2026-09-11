@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V22 Realistic Mobile</title>
+<title>Kerala Play • Open World V23 Realistic Mobile</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -31,17 +31,17 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V22
+  🌤️ Kerala • Day • V23
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V22 Realistic Mobile • Kerala Village</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V23 Realistic Mobile • Kerala Village</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you<br><span style="opacity:.85">🌐 Shared world • friends can join</span><br><span id="worldTip" style="opacity:.75">📍 Explore the village</span></div>
 <div id="status">👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br><span id="mpStatus"><span id="mpDot"></span>Connecting…</span></div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
 <div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V22 — realistic Kerala village polish + multiplayer + mobile optimization: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room + vehicles + houses enabled</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V23 — realistic Kerala village polish + multiplayer + mobile optimization: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room + vehicles + houses enabled</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -74,6 +74,7 @@ const supabase=createClient(SUPABASE_URL,SUPABASE_KEY,{realtime:{params:{eventsP
 const roomName='kerala-play-open-world';
 const mpId=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now());
 let mpReady=false;
+let driving=false,activeCar=null,carSpeed=0,carSteer=0;
 
 const remotePlayers=new Map();
 let playerTemplate=null;
@@ -195,7 +196,7 @@ async function setupMultiplayer(){
 let mpSeq=0;
 function sendMpState(){
   if(!window.mpChannel||!mpReady)return;
-  const drivingNow=typeof driving!=='undefined'&&driving&&activeCar;
+  const drivingNow=driving&&activeCar;
   const o=drivingNow?activeCar:player;
   window.mpChannel.send({
     type:'broadcast',event:'player',
@@ -666,8 +667,6 @@ function fallbackCar(x,z,color){
 }
 let fallback1=null,fallback2=null;
 setTimeout(()=>{ if(!c1) fallback1=fallbackCar(-5,-8,0xb52d2d); if(!c2) fallback2=fallbackCar(48,-3,0x245d9c); },1800);
-let driving=false,activeCar=null,carSpeed=0,carSteer=0;
-
 
 function person(x,z,shirt){let g=new THREE.Group();let b=new THREE.Mesh(new THREE.CapsuleGeometry(.48,1.05,6,10),M(shirt));b.position.y=1.4;g.add(b);let h=new THREE.Mesh(new THREE.SphereGeometry(.38,18,16),M(0xc88b64));h.position.y=2.5;g.add(h);for(let s of [-1,1]){let l=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.72,5,8),M(0x27364a));l.position.set(s*.23,.62,0);g.add(l)}g.position.set(x,0,z);scene.add(g);return g}
 const npcs=[person(18,15,0x7a3d95),person(-20,18,0x1e6fae),person(28,-18,0xe07b32),person(-30,-8,0x2d7c4d)];
@@ -775,7 +774,7 @@ function applyWorldLight(){
   const sky=new THREE.Color().setHSL(0.56,0.55,0.32+0.32*daylight);
   scene.background.copy(sky); scene.fog.color.copy(sky);
   sunDisc.visible=daylight>.16; sunDisc.position.set(-110,45+100*daylight,-170);
-  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V22';
+  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V23';
 }
 dayBtn.addEventListener('click',()=>{autoTime=false;worldClock=worldClock<17?19:9.5;applyWorldLight();dayBtn.textContent=worldClock>17?'🌙 Night':'🌤️ Day'});
 qualityBtn.addEventListener('click',()=>{
