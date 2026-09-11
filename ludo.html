@@ -1,168 +1,46 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kerala Play • Ludo</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kerala Play • Online Ludo</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#eef7ff,#f8fff4);color:#172033}
-.top{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;background:#fff;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:5}
-.logo{font-size:24px;font-weight:800}.logo span{color:#159447}.back{color:#159447;text-decoration:none;font-weight:700}
-.wrap{max-width:1050px;margin:20px auto;padding:0 14px}.title{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
-h1{margin:0 0 6px}.sub{margin:0;color:#667085}.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-button,select{border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer}
-.primary{background:#159447;color:white}.secondary{background:#e9eef5;color:#172033}
-.game{display:grid;grid-template-columns:minmax(300px,700px) 280px;gap:18px;align-items:start;margin-top:18px}
-.board{position:relative;width:min(92vw,680px);aspect-ratio:1;background:#fff;border:8px solid #172033;border-radius:18px;box-shadow:0 12px 30px #0002;overflow:hidden}
-.quad{position:absolute;width:40%;height:40%;padding:5%;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:8%;border:1px solid #ffffff99}
-.qr{left:0;top:0;background:#f8d7d7}.qg{right:0;top:0;background:#d9f2df}.qy{left:0;bottom:0;background:#fff0bd}.qb{right:0;bottom:0;background:#d9e8ff}
-.yard{background:#fff;border-radius:16px;padding:9%;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:10%;box-shadow:inset 0 0 0 2px #ffffff}
-.homeDot{border-radius:50%;background:#fff;border:3px solid #aaa;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}
-.track{position:absolute;left:20%;top:20%;width:60%;height:60%;display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr)}
-.cell{border:1px solid #d7dce3;background:#fff;position:relative}
-.r{background:#ef6b6b}.g{background:#65c77c}.y{background:#f4d35e}.b{background:#5d91e8}
-.center{position:absolute;left:40%;top:40%;width:20%;height:20%;background:conic-gradient(#65c77c 0 25%,#5d91e8 25% 50%,#f4d35e 50% 75%,#ef6b6b 75%);clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}
-.token{position:absolute;width:72%;height:72%;left:14%;top:14%;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 5px #0004;color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer}
-.tr{background:#c94141}.tg{background:#258c42}.ty{background:#c59b00}.tb{background:#2d65bd}
-.panel{background:#fff;border-radius:16px;padding:18px;box-shadow:0 8px 24px #0001;border:1px solid #e1e5ea}
-.turn{font-size:20px;font-weight:800;margin-bottom:10px}.dice{font-size:52px;text-align:center;padding:10px}.msg{min-height:45px;background:#f5f7fa;border-radius:10px;padding:10px;margin:10px 0}
-.players{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.p{padding:9px;border-radius:10px;background:#f4f6f8;font-weight:700}.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:7px}
-.rules{margin-top:18px;font-size:14px;color:#596579}.rules li{margin:6px 0}
-.overlay{position:absolute;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:10}.modal{background:#fff;padding:22px;border-radius:18px;width:min(92%,360px);text-align:center}.modal h2{margin-top:0}.choice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:15px 0}.choice button{border:2px solid #ddd;background:#fff}.choice button.active{border-color:#159447;background:#eaf8ef}
-@media(max-width:850px){.game{grid-template-columns:1fr}.panel{width:min(92vw,680px)}.board{margin:auto}}
-</style>
-</head>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#eef8ff,#f7fff7);color:#172033}.top{padding:15px 20px;background:#fff;border-bottom:1px solid #ddd;display:flex;justify-content:space-between}.logo{font-size:24px;font-weight:900}.logo span{color:#159447}.top a{color:#159447;text-decoration:none;font-weight:800}.wrap{max-width:1200px;margin:auto;padding:18px}.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}.actions{display:flex;gap:8px;flex-wrap:wrap}button,input{border:0;border-radius:11px;padding:11px 13px;font-weight:700}button{cursor:pointer;background:#e9eef5;color:#172033}.primary{background:#159447;color:#fff}.layout{display:grid;grid-template-columns:minmax(320px,650px) minmax(280px,1fr);gap:18px;margin-top:18px}.board{position:relative;width:100%;aspect-ratio:1;border:8px solid #172033;border-radius:20px;background:#fff;overflow:hidden;box-shadow:0 15px 35px #0002}.q{position:absolute;width:40%;height:40%;padding:7%;display:grid;grid-template-columns:1fr 1fr;gap:12%;background:#eee}.qr{left:0;top:0;background:#f8dede}.qg{right:0;top:0;background:#ddf5e4}.qy{left:0;bottom:0;background:#fff1bd}.qb{right:0;bottom:0;background:#dceaff}.yard{width:100%;height:100%;background:#fff;border-radius:15px;padding:10%;display:grid;grid-template-columns:1fr 1fr;gap:12%}.spot{border:3px solid #aaa;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#777;font-weight:900}.path{position:absolute;left:20%;top:20%;width:60%;height:60%;background:repeating-conic-gradient(#fff 0 6.92deg,#d7dce3 6.92deg 7.05deg);clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}.cross{position:absolute;left:40%;top:40%;width:20%;height:20%;background:conic-gradient(#65c77c 0 25%,#5d91e8 25% 50%,#f4d35e 50% 75%,#ef6b6b 75%);z-index:2}.panel{background:#fff;border:1px solid #e2e6eb;border-radius:18px;padding:16px;box-shadow:0 10px 28px #0001}.roomline{display:flex;gap:8px;align-items:center}.roomcode{font-size:22px;letter-spacing:2px;background:#f1f5f9;padding:8px 12px;border-radius:10px}.status{font-weight:800;margin:10px 0}.players{display:grid;grid-template-columns:1fr 1fr;gap:8px}.player{padding:9px;border-radius:10px;background:#f4f6f8}.dot{width:11px;height:11px;border-radius:50%;display:inline-block;margin-right:6px}.chat{margin-top:15px}.messages{height:260px;overflow:auto;background:#f6f8fa;border-radius:12px;padding:10px}.bubble{max-width:85%;background:#fff;padding:8px 10px;border-radius:12px;margin:7px 0;box-shadow:0 1px 4px #0001}.me{margin-left:auto;background:#e5f7eb}.small{font-size:12px;color:#667085}.chatrow{display:flex;gap:7px;margin-top:8px}.chatrow input{flex:1;border:1px solid #ddd}.emoji{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.emoji button{padding:7px;background:#f3f4f6}.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:10}.modalbox{width:min(92%,390px);background:#fff;border-radius:20px;padding:22px}.modalbox h2{margin-top:0}.modalbox input,.modalbox select{width:100%;margin:7px 0;border:1px solid #ddd}.modalbox button{width:100%;margin-top:8px}.hidden{display:none!important}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.board{max-width:650px;margin:auto}}
+</style></head>
 <body>
-<header class="top"><div class="logo">Kerala <span>Play</span></div><a class="back" href="index.html">← Games</a></header>
+<header class="top"><div class="logo">Kerala <span>Play</span></div><a href="index.html">← Games</a></header>
 <main class="wrap">
-<div class="title"><div><h1>🎲 Ludo</h1><p class="sub">Local pass-and-play • 2–4 players</p></div><div class="controls"><button class="secondary" id="newBtn">New Game</button></div></div>
-<div class="game">
-<div class="board" id="board">
-  <div class="quad qr"><div class="yard"><div class="homeDot">1</div><div class="homeDot">2</div><div class="homeDot">3</div><div class="homeDot">4</div></div></div>
-  <div class="quad qg"><div class="yard"><div class="homeDot">1</div><div class="homeDot">2</div><div class="homeDot">3</div><div class="homeDot">4</div></div></div>
-  <div class="quad qy"><div class="yard"><div class="homeDot">1</div><div class="homeDot">2</div><div class="homeDot">3</div><div class="homeDot">4</div></div></div>
-  <div class="quad qb"><div class="yard"><div class="homeDot">1</div><div class="homeDot">2</div><div class="homeDot">3</div><div class="homeDot">4</div></div></div>
-  <div class="track" id="track"></div><div class="center"></div>
-  <div class="overlay" id="overlay"><div class="modal"><h2>Choose Players</h2><p>How many people are playing?</p><div class="choice" id="choices"><button data-n="2">2 Players</button><button data-n="3">3 Players</button><button data-n="4" class="active">4 Players</button></div><button class="primary" id="startBtn">Start Game</button></div></div>
-</div>
-<aside class="panel">
-<div class="turn" id="turn">Red's turn</div>
-<div class="dice" id="dice">⚀</div>
-<button class="primary" id="roll" style="width:100%">Roll Dice</button>
-<div class="msg" id="msg">Roll the dice to begin.</div>
-<div class="players" id="players"></div>
-<ul class="rules">
-<li>Roll <b>6</b> to bring a token out.</li>
-<li>Click a highlighted token to move it.</li>
-<li>Landing on an opponent sends it home.</li>
-<li>Exact roll is needed to finish.</li>
-<li>Rolling 6 gives another turn.</li>
-</ul>
-</aside>
-</div></main>
-<script>
-const COLORS=[
- {name:"Red",cls:"tr",yard:"qr",start:0},
- {name:"Green",cls:"tg",yard:"qg",start:13},
- {name:"Yellow",cls:"ty",yard:"qy",start:26},
- {name:"Blue",cls:"tb",yard:"qb",start:39}
-];
-const DICE=["⚀","⚁","⚂","⚃","⚄","⚅"];
-const track=document.getElementById("track"), board=document.getElementById("board");
-const rollBtn=document.getElementById("roll"), msg=document.getElementById("msg"), turnEl=document.getElementById("turn"), diceEl=document.getElementById("dice"), playersEl=document.getElementById("players");
-let nPlayers=4,current=0,dice=0,gameOver=false,waitingChoice=false;
-let state=[];
+<div class="bar"><div><h1 style="margin:0">🎲 Online Ludo</h1><div class="small">Play with friends • invite • live chat</div></div>
+<div class="actions"><button id="invite" class="primary">🔗 Invite Friends</button><button id="newRoom">➕ New Room</button></div></div>
+<div class="layout">
+<section><div class="board"><div class="q qr"><div class="yard"><div class="spot">1</div><div class="spot">2</div><div class="spot">3</div><div class="spot">4</div></div></div><div class="q qg"><div class="yard"><div class="spot">1</div><div class="spot">2</div><div class="spot">3</div><div class="spot">4</div></div></div><div class="q qy"><div class="yard"><div class="spot">1</div><div class="spot">2</div><div class="spot">3</div><div class="spot">4</div></div></div><div class="q qb"><div class="yard"><div class="spot">1</div><div class="spot">2</div><div class="spot">3</div><div class="spot">4</div></div></div><div class="path"></div><div class="cross"></div></div>
+<div class="panel" style="margin-top:14px"><div class="roomline"><b>Room:</b><span id="code" class="roomcode">----</span><span id="status" class="status">Waiting</span></div><div style="display:flex;gap:10px;align-items:center;margin-top:8px"><b id="turn">Waiting for players…</b><span id="dice" style="font-size:35px">⚀</span><button id="roll" class="primary" disabled>Roll Dice</button></div></div>
+</section>
+<aside>
+<div class="panel"><h2 style="margin-top:0">👥 Players</h2><div id="players" class="players"></div></div>
+<div class="panel chat"><h2 style="margin-top:0">💬 Friends Chat</h2><div id="messages" class="messages"></div><div class="emoji"><button>😀</button><button>😂</button><button>❤️</button><button>🔥</button><button>👍</button><button>🎉</button><button>😎</button><button>👏</button></div><div class="chatrow"><input id="chatInput" maxlength="300" placeholder="Type a message…"><button id="send" class="primary">Send</button></div></div>
+</aside></div></main>
 
-function buildTrack(){
- track.innerHTML="";
- for(let i=0;i<225;i++){
-   const c=document.createElement("div"); c.className="cell";
-   const x=i%15,y=Math.floor(i/15);
-   // Create a visible cross-shaped path.
-   const path=(x>=6&&x<=8)||(y>=6&&y<=8);
-   if(path){
-     if(y===7&&x>=6&&x<=8)c.classList.add("g");
-     if(x===7&&y>=6&&y<=8)c.classList.add("r");
-     if((x===6&&y>=0&&y<6)||(x===8&&y>8&&y<15))c.classList.add("y");
-     if((y===6&&x>8&&x<15)||(y===8&&x<6&&x>=0))c.classList.add("b");
-   } else c.style.background="transparent";
-   track.appendChild(c);
- }
+<div id="modal" class="modal"><div class="modalbox"><h2>🎲 Join Kerala Play Ludo</h2><input id="name" maxlength="24" placeholder="Your name"><select id="count"><option value="2">2 Players</option><option value="3">3 Players</option><option value="4" selected>4 Players</option></select><input id="roomInput" maxlength="8" placeholder="Room code (leave empty to create)"><button id="join" class="primary">Create / Join Room</button><div class="small" style="margin-top:10px">A friend can join using the room code or invite link.</div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script>
+<script>
+const sb=supabase.createClient(window.SUPABASE_URL,window.SUPABASE_PUBLISHABLE_KEY);
+const colors=[["Red","#c94141"],["Green","#258c42"],["Yellow","#c59b00"],["Blue","#2d65bd"]];
+let me=null,room=null,player=null,channel=null;
+const $=id=>document.getElementById(id);
+function code(){return Math.random().toString(36).slice(2,8).toUpperCase()}
+function escape(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+async function boot(){let {data,error}=await sb.auth.getSession();if(!data.session){let r=await sb.auth.signInAnonymously();if(r.error){alert("Supabase Anonymous Sign-in is not enabled yet. Please enable it in Supabase.");return}};me=(await sb.auth.getUser()).data.user}
+async function enter(){
+ const name=$("name").value.trim()||"Player";const wanted=+$("count").value;let rc=$("roomInput").value.trim().toUpperCase();
+ if(!rc){rc=code();let g={players:{},turn:0,dice:0,started:false};let r=await sb.from("ludo_rooms").insert({code:rc,host_id:me.id,max_players:wanted,game:g}).select().single();if(r.error){alert(r.error.message);return}room=r.data}else{let r=await sb.from("ludo_rooms").select("*").eq("code",rc).single();if(r.error){alert("Room not found");return}room=r.data}
+ let {data:ps}=await sb.from("ludo_players").select("*").eq("room_id",room.id).order("seat");let seat=ps?.findIndex(p=>p.user_id===me.id);if(seat<0||seat===undefined){if((ps?.length||0)>=room.max_players){alert("Room is full");return}seat=ps?.length||0;let p=await sb.from("ludo_players").insert({room_id:room.id,user_id:me.id,name,color:colors[seat][0],seat}).select().single();if(p.error){alert(p.error.message);return}player=p.data}else player=ps[seat];
+ $("modal").classList.add("hidden");$("code").textContent=room.code;await refresh();subscribe();let url=location.origin+location.pathname+"?room="+room.code;history.replaceState({},'',url);$("status").textContent="Online";$("invite").onclick=()=>navigator.clipboard?.writeText(url).then(()=>alert("Invite link copied!"))||alert(url)
 }
-function resetState(){
- state=Array.from({length:4},()=>Array(4).fill(-1)); current=0; dice=0; gameOver=false; waitingChoice=false;
- update();
-}
-function activeColors(){return COLORS.slice(0,nPlayers)}
-function update(){
- turnEl.textContent=gameOver?msg.textContent:`${COLORS[current].name}'s turn`;
- diceEl.textContent=dice?DICE[dice-1]:"⚀";
- playersEl.innerHTML=activeColors().map((p,i)=>`<div class="p"><span class="dot" style="background:${p.cls==='tr'?'#c94141':p.cls==='tg'?'#258c42':p.cls==='ty'?'#c59b00':'#2d65bd'}"></span>${p.name}: ${state[i].filter(v=>v===57).length}/4</div>`).join("");
- renderTokens();
-}
-function renderTokens(){
- document.querySelectorAll(".token").forEach(e=>e.remove());
- activeColors().forEach((p,pi)=>{
-   state[pi].forEach((pos,ti)=>{
-     const el=document.createElement("div"); el.className=`token ${p.cls}`; el.textContent=ti+1;
-     const homePositions=[[-18,-18],[18,-18],[-18,18],[18,18]];
-     if(pos<0){
-       const q=board.querySelector(`.${p.yard}`), rect=q.getBoundingClientRect(), br=board.getBoundingClientRect();
-       const hp=homePositions[ti]; el.style.left=(50+hp[0])+"%"; el.style.top=(50+hp[1])+"%"; q.appendChild(el);
-     } else {
-       // Approximate track movement around a 52-cell perimeter. Visual board is decorative; rules/state are exact.
-       const a=(p.start+Math.max(0,pos))%52, ang=(a/52)*Math.PI*2-Math.PI/2, cx=50+30*Math.cos(ang), cy=50+30*Math.sin(ang);
-       el.style.left=`${cx-2}%`;el.style.top=`${cy-2}%`; board.appendChild(el);
-     }
-     const can=canMove(pi,ti);
-     if(can){el.style.outline="3px solid #159447";el.addEventListener("click",()=>move(pi,ti))}
-   });
- });
-}
-function canMove(pi,ti){
- if(gameOver||pi!==current||!dice)return false;
- const pos=state[pi][ti];
- if(pos<0)return dice===6;
- return pos+dice<=57;
-}
-function roll(){
- if(gameOver||waitingChoice||dice)return;
- dice=Math.floor(Math.random()*6)+1; msg.textContent=`${COLORS[current].name} rolled ${dice}.`;
- const moves=state[current].some((_,ti)=>canMove(current,ti));
- if(!moves){
-   msg.textContent+=` No move available.`;
-   setTimeout(()=>nextTurn(dice===6),650);
- } else update();
-}
-function move(pi,ti){
- if(!canMove(pi,ti))return;
- let pos=state[pi][ti];
- if(pos<0)pos=0;else pos+=dice;
- state[pi][ti]=pos;
- // Capture on shared track.
- if(pos>=0&&pos<52){
-   const landing=(COLORS[pi].start+pos)%52;
-   activeColors().forEach((p,oi)=>{
-     if(oi===pi)return;
-     state[oi].forEach((v,k)=>{
-       if(v>=0&&v<52&&(p.start+v)%52===landing)state[oi][k]=-1;
-     });
-   });
- }
- if(state[pi].every(v=>v===57)){gameOver=true;msg.textContent=`🏆 ${COLORS[pi].name} wins!`;update();return}
- const six=dice===6; dice=0; msg.textContent=six?`${COLORS[pi].name} gets another turn!`:`${COLORS[(pi+1)%nPlayers].name}'s turn.`;
- if(!six)current=(current+1)%nPlayers; update();
-}
-function nextTurn(extra){
- dice=0;if(!extra)current=(current+1)%nPlayers;update();
-}
-document.getElementById("roll").onclick=roll;
-document.getElementById("newBtn").onclick=()=>{document.getElementById("overlay").style.display="flex"};
-document.querySelectorAll("#choices button").forEach(b=>b.onclick=()=>{
- document.querySelectorAll("#choices button").forEach(x=>x.classList.remove("active"));b.classList.add("active");nPlayers=+b.dataset.n;
-});
-document.getElementById("startBtn").onclick=()=>{document.getElementById("overlay").style.display="none";resetState();};
-buildTrack(); resetState(); document.getElementById("overlay").style.display="flex";
-</script>
-</body>
-</html>
+async function refresh(){let {data}=await sb.from("ludo_players").select("*").eq("room_id",room.id).order("seat");$("players").innerHTML=(data||[]).map(p=>`<div class="player"><span class="dot" style="background:${colors[p.seat][1]}"></span>${escape(p.name)}${p.user_id===me.id?" (You)":""}</div>`).join("");let g=room.game||{};$("turn").textContent=data?.length<2?"Waiting for friends…":(data[g.turn]?.name||"Player")+"'s turn";$("roll").disabled=!(data?.[g.turn]?.user_id===me.id&&data.length>=2);$("dice").textContent=g.dice?["⚀","⚁","⚂","⚃","⚄","⚅"][g.dice-1]:"⚀";await loadChat()}
+function subscribe(){if(channel)sb.removeChannel(channel);channel=sb.channel("room-"+room.id).on("postgres_changes",{event:"*",schema:"public",table:"ludo_players",filter:"room_id=eq."+room.id},async()=>{let r=await sb.from("ludo_rooms").select("*").eq("id",room.id).single();room=r.data;refresh()}).on("postgres_changes",{event:"*",schema:"public",table:"ludo_rooms",filter:"id=eq."+room.id},async p=>{room=p.new;refresh()}).on("postgres_changes",{event:"INSERT",schema:"public",table:"ludo_messages",filter:"room_id=eq."+room.id},p=>addMessage(p.new)).subscribe()}
+async function roll(){let g={...(room.game||{})};g.dice=Math.floor(Math.random()*6)+1;g.turn=((g.turn||0)+1)%room.max_players;let r=await sb.from("ludo_rooms").update({game:g,status:"playing"}).eq("id",room.id);if(r.error)alert(r.error.message)}
+async function loadChat(){let r=await sb.from("ludo_messages").select("*").eq("room_id",room.id).order("created_at",{ascending:true}).limit(100);$("messages").innerHTML="";(r.data||[]).forEach(addMessage)}
+function addMessage(m){let el=document.createElement("div");el.className="bubble "+(m.user_id===me.id?"me":"");el.innerHTML=`<div class="small"><b>${escape(m.name)}</b></div>${escape(m.text)}`;$("messages").appendChild(el);$("messages").scrollTop=$("messages").scrollHeight}
+async function send(){let text=$("chatInput").value.trim();if(!text||!room)return;let r=await sb.from("ludo_messages").insert({room_id:room.id,user_id:me.id,name:player.name,text});if(!r.error)$("chatInput").value=""}
+$("join").onclick=enter;$("roll").onclick=roll;$("send").onclick=send;$("chatInput").addEventListener("keydown",e=>{if(e.key==="Enter")send()});document.querySelectorAll(".emoji button").forEach(b=>b.onclick=()=>{$("chatInput").value+=b.textContent;$("chatInput").focus()});$("newRoom").onclick=()=>$("modal").classList.remove("hidden");
+(async()=>{await boot();let q=new URLSearchParams(location.search).get("room");if(q)$("roomInput").value=q})()
+</script></body></html>
