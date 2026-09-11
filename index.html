@@ -296,7 +296,7 @@ const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addE
 let last=performance.now();function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;mixers.forEach(m=>m.update(dt));
 let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z);if(l>1){x/=l;z/=l}
 let speed=7.8;player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
-player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));if(l>.08){player.rotation.y=Math.atan2(x,z)+yaw; torso.rotation.z=Math.sin(t*.012)*.025; player.position.y += Math.sin(t*.012)*.006;}
+player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));if(l>.08){player.rotation.y=Math.atan2(x,z)+yaw; player.position.y += Math.sin(t*.012)*.006;}
 player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
 npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
 const petX=player.position.x+Math.sin(t*.0018)*2.7;
@@ -309,7 +309,7 @@ let target=new THREE.Vector3(player.position.x,player.position.y+1.7,player.posi
 camera.position.lerp(cp,.14);camera.lookAt(target);renderer.render(scene,camera)}
 animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
-Game loading error. Please refresh once.
+Some 3D assets are still loading. Please wait a moment.
 </div>
 <script>
 window.addEventListener('error',function(e){
