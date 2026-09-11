@@ -26,8 +26,25 @@
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button></div>
 </div>
 <div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V7 — a more cinematic Kerala-inspired open world with richer lighting, terrain details, village life, vehicles, pets, NPCs and smoother third-person controls.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const b=document.getElementById('play');
+  if(b){
+    const go=function(e){
+      if(e){e.preventDefault();e.stopPropagation();}
+      const s=document.getElementById('start');
+      if(s) s.style.display='none';
+    };
+    b.addEventListener('click',go,{passive:false});
+    b.addEventListener('touchend',go,{passive:false});
+  }
+});
+</script>
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+import * as THREE from 'three';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x86cbed);scene.fog=new THREE.Fog(0x86cbed,95,300);
