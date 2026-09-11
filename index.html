@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V10</title>
+<title>Kerala Play • Open World V11</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -23,16 +23,16 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day
+  🌤️ Kerala • Day • V11
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V8 • V10 • Kerala Village</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V8 • V11 • Kerala Village</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you</div>
 <div id="status">👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1</div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button></div>
 </div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V10 — a more cinematic Kerala-inspired open world with richer lighting, terrain details, village life, vehicles, pets, NPCs and smoother third-person controls.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V11 — a more cinematic Kerala-inspired open world with richer lighting, terrain details, village life, vehicles, pets, NPCs and smoother third-person controls.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -55,6 +55,93 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 
 const scene=new THREE.Scene();
+// V11 — detailed Kerala environment pass
+const woodMat = new THREE.MeshStandardMaterial({color:0x5a3928,roughness:.82,metalness:0});
+const wallMat = new THREE.MeshStandardMaterial({color:0xd7c6a5,roughness:.92});
+const roofMat = new THREE.MeshStandardMaterial({color:0x873f32,roughness:.88});
+const darkRoofMat = new THREE.MeshStandardMaterial({color:0x63302a,roughness:.9});
+const glassMat = new THREE.MeshStandardMaterial({color:0x75a7a7,roughness:.22,metalness:.05,transparent:true,opacity:.72});
+
+function detailedHouse(x,z,s=1,rot=0){
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(new THREE.BoxGeometry(8*s,3.8*s,6*s),wallMat);
+  base.position.y=1.9*s; g.add(base);
+
+  // tiled pitched roof, veranda and columns
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(5.8*s,2.7*s,4),roofMat);
+  roof.rotation.y=Math.PI/4; roof.position.y=5.05*s; g.add(roof);
+  const veranda=new THREE.Mesh(new THREE.BoxGeometry(9*s,.22*s,1.5*s),woodMat);
+  veranda.position.set(0,.25*s,3.5*s); g.add(veranda);
+
+  for(const xx of [-3.2,3.2]){
+    const col=new THREE.Mesh(new THREE.CylinderGeometry(.13*s,.16*s,3*s,12),woodMat);
+    col.position.set(xx*s,1.75*s,3.55*s); g.add(col);
+  }
+
+  // dark wooden door
+  const door=new THREE.Mesh(new THREE.BoxGeometry(1.25*s,2.3*s,.12*s),woodMat);
+  door.position.set(0,1.35*s,3.06*s); g.add(door);
+
+  // windows with frames
+  for(const xx of [-2.25,2.25]){
+    const win=new THREE.Mesh(new THREE.BoxGeometry(1.45*s,1.2*s,.10*s),glassMat);
+    win.position.set(xx*s,2.0*s,3.06*s); g.add(win);
+    const frame1=new THREE.Mesh(new THREE.BoxGeometry(1.55*s,.08*s,.15*s),woodMat);
+    frame1.position.set(xx*s,2.0*s,3.0*s); g.add(frame1);
+    const frame2=frame1.clone(); frame2.rotation.z=Math.PI/2; g.add(frame2);
+  }
+
+  g.position.set(x,0,z);g.rotation.y=rot;scene.add(g);
+  return g;
+}
+
+detailedHouse(-68,-38,1.05,.18);
+detailedHouse(68,-40,.95,-.22);
+detailedHouse(-78,70,.9,.45);
+detailedHouse(76,72,1.0,-.3);
+
+// Kerala-style boundary walls and gates.
+function boundary(x,z,w,rot=0){
+  const g=new THREE.Group();
+  const wall=new THREE.Mesh(new THREE.BoxGeometry(w,.8,.18),wallMat);
+  wall.position.y=.4;g.add(wall);
+  for(let i=0;i<=w;i+=3.5){
+    const p=new THREE.Mesh(new THREE.BoxGeometry(.16,1.35,.28),woodMat);
+    p.position.set(-w/2+i,.67,0);g.add(p);
+  }
+  g.position.set(x,0,z);g.rotation.y=rot;scene.add(g);
+}
+boundary(-68,-44,15,.18);
+boundary(68,-46,16,-.22);
+
+// Roadside drainage channels.
+function drain(x,z,w,rot=0){
+  const m=new THREE.Mesh(
+    new THREE.BoxGeometry(w,.16,.42),
+    new THREE.MeshStandardMaterial({color:0x46504a,roughness:.95})
+  );
+  m.position.set(x,.08,z);m.rotation.y=rot;scene.add(m);
+}
+drain(0,-7,330,0); drain(0,7,330,0);
+drain(-7,0,330,Math.PI/2); drain(7,0,330,Math.PI/2);
+
+// Small coconut leaf shadows/ground accents around houses.
+function groundLeaf(x,z,r=.9){
+  const g=new THREE.Group();
+  for(let i=0;i<6;i++){
+    const a=i*Math.PI*2/6;
+    const leaf=new THREE.Mesh(
+      new THREE.CapsuleGeometry(.055,r*.75,4,8),
+      new THREE.MeshStandardMaterial({color:0x2e6336,roughness:1})
+    );
+    leaf.rotation.z=.85; leaf.rotation.y=a;
+    leaf.position.set(Math.cos(a)*r*.35,.08,Math.sin(a)*r*.35);
+    g.add(leaf);
+  }
+  g.position.set(x,0,z);scene.add(g);
+}
+[[-68,-48],[68,-50],[-78,67],[76,69],[-18,-12],[18,-12]].forEach(p=>groundLeaf(...p,.75));
+
 // V8 Kerala terrain dressing
 const terrainMat = new THREE.MeshStandardMaterial({
   color: 0x527f45, roughness: 0.96, metalness: 0.0
@@ -109,7 +196,7 @@ const sunDisc=new THREE.Mesh(
 sunDisc.position.set(-110,115,-170); scene.add(sunDisc);
 scene.background=new THREE.Color(0x86cbed);scene.fog=new THREE.Fog(0x86cbed,95,300);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,700);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
 const loader=new GLTFLoader();const mixers=[];
 const ASSET_BASE='https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
 function loadGLB(url,onLoad){loader.load(url,onLoad,undefined,e=>console.warn('3D asset unavailable',url,e));}
@@ -138,7 +225,7 @@ box(9,.2,170,0x565b5e,62,.03,0);box(170,.2,8,0x565b5e,-62,.03,0);
 
 function house(x,z,w,r){box(12,5.7,9.8,w,x,2.85,z);let rt=add(new THREE.ConeGeometry(8,4.7,4),M(r),x,7.2,z);rt.rotation.y=Math.PI/4;box(2.2,3.2,.25,0x704521,x,1.6,z-5);for(let sx of [-3,3])box(2.5,1.55,.2,0x9fdcf0,x+sx,3.05,z-5);box(12.5,.35,1.4,0x73462c,x,5.25,z-5.4)}
 
-// V10 street scene: homes and small shops line the main Kerala road.
+// V11 street scene: homes and small shops line the main Kerala road.
 function sign(x,z,text,rot=0){
   const g=new THREE.Group();
   const post=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,2.3,10),M(0x4b3525));
@@ -309,7 +396,7 @@ let target=new THREE.Vector3(player.position.x,player.position.y+1.7,player.posi
 camera.position.lerp(cp,.14);camera.lookAt(target);renderer.render(scene,camera)}
 animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
-Some 3D assets are still loading. Please wait a moment.
+3D scene is loading. Please wait a moment.
 </div>
 <script>
 window.addEventListener('error',function(e){
