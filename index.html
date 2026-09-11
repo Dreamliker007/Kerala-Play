@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V17 Realistic Mobile</title>
+<title>Kerala Play • Open World V19 Multiplayer Realistic Mobile</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -24,16 +24,16 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V17
+  🌤️ Kerala • Day • V19
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V17 Realistic Mobile • Kerala Village</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V19 Multiplayer Realistic Mobile • Kerala Village</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you<br><span style="opacity:.85">🌐 Shared world • friends can join</span></div>
 <div id="status">👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br><span id="mpStatus"><span id="mpDot"></span>Connecting…</span></div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V17 — realistic mobile visual foundation + multiplayer: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room is enabled in this build</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V19 — realistic multiplayer replication + mobile optimization: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room is enabled in this build</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
+import { SkeletonUtils } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/SkeletonUtils.js';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 const scene=new THREE.Scene();
@@ -64,18 +65,112 @@ const SUPABASE_KEY='sb_publishable_SP1Pj9hoY3z_8lKBU4jIbg_pAC1x8Ih';
 const supabase=createClient(SUPABASE_URL,SUPABASE_KEY,{realtime:{params:{eventsPerSecond:30}}});
 const roomName='kerala-play-open-world';
 const mpId=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now());
+
 const remotePlayers=new Map();
-let mpReady=false;
-function remoteAvatar(name){
+let playerTemplate=null;
+let playerAnimations=[];
+let carTemplate=null;
+const pendingRemoteBuilds=[];
+
+function makeRemoteTag(name){
+  const tag=document.createElement('div');
+  tag.className='remoteTag';
+  tag.textContent=name||'Player';
+  document.body.appendChild(tag);
+  return tag;
+}
+
+function fallbackRemoteHuman(){
   const g=new THREE.Group();
-  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.34,.9,4,8),new THREE.MeshStandardMaterial({color:0x356b55,roughness:.9}));body.position.y=1.05;g.add(body);
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.25,10,8),new THREE.MeshStandardMaterial({color:0xd5a06c,roughness:.9}));head.position.y=1.82;g.add(head);
-  const tag=document.createElement('div');tag.className='remoteTag';tag.textContent=name||'Player';document.body.appendChild(tag);g.userData.tag=tag;
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.34,.9,5,8),
+    new THREE.MeshStandardMaterial({color:0x356b55,roughness:.9}));
+  body.position.y=1.05; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.25,12,10),
+    new THREE.MeshStandardMaterial({color:0xd5a06c,roughness:.9}));
+  head.position.y=1.82; g.add(head);
   return g;
 }
-function updateMpStatus(){const el=document.getElementById('mpStatus');if(el)el.innerHTML='<span id="mpDot"></span>'+(mpReady?('Online • '+(remotePlayers.size+1)+' players'):'Connecting…')}
-function removeRemote(id){const r=remotePlayers.get(id);if(!r)return;scene.remove(r.group);r.tag.remove();remotePlayers.delete(id);updateMpStatus()}
-function addOrUpdateRemote(data){if(!data||data.id===mpId)return;let r=remotePlayers.get(data.id);if(!r){const g=remoteAvatar(data.name||'Player');r={group:g,tag:g.userData.tag,last:performance.now()};remotePlayers.set(data.id,r);scene.add(g)}r.group.position.set(data.x||0,data.y||0,data.z||0);r.group.rotation.y=data.ry||0;r.last=performance.now();updateMpStatus()}
+
+function createRemoteHuman(r){
+  if(!playerTemplate) return fallbackRemoteHuman();
+  const g=SkeletonUtils.clone(playerTemplate);
+  g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;}});
+  if(playerAnimations.length){
+    const mixer=new THREE.AnimationMixer(g);
+    const clip=playerAnimations.find(a=>/walk|run|locomotion/i.test(a.name)) || playerAnimations[0];
+    const action=mixer.clipAction(clip);
+    action.play();
+    g.userData.remoteMixer=mixer;
+    g.userData.remoteAction=action;
+    mixers.push(mixer);
+  }
+  return g;
+}
+
+function createRemoteCar(){
+  if(!carTemplate) return null;
+  const g=SkeletonUtils.clone(carTemplate);
+  g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;}});
+  return g;
+}
+
+function buildRemoteVisual(r, vehicle){
+  if(r.visual) scene.remove(r.visual);
+  r.visual = vehicle ? (createRemoteCar() || fallbackRemoteHuman()) : createRemoteHuman(r);
+  r.visual.position.set(0,0,0);
+  r.visual.rotation.y=0;
+  r.group.add(r.visual);
+  r.vehicle=vehicle;
+}
+
+function remoteAvatar(name, vehicle=false){
+  const g=new THREE.Group();
+  const tag=makeRemoteTag(name);
+  g.userData.tag=tag;
+  g.userData.vehicle=vehicle;
+  buildRemoteVisual({group:g,visual:null}, vehicle);
+  return g;
+}
+
+function updateMpStatus(){
+  const el=document.getElementById('mpStatus');
+  if(el) el.innerHTML='<span id="mpDot"></span>'+
+    (mpReady?('Online • '+(remotePlayers.size+1)+' players'):'Connecting…');
+}
+
+function removeRemote(id){
+  const r=remotePlayers.get(id);
+  if(!r)return;
+  scene.remove(r.group);
+  r.tag.remove();
+  remotePlayers.delete(id);
+  updateMpStatus();
+}
+
+function addOrUpdateRemote(data){
+  if(!data || data.id===mpId)return;
+  let r=remotePlayers.get(data.id);
+  const wantVehicle=!!data.vehicle;
+  if(!r){
+    const g=new THREE.Group();
+    const tag=makeRemoteTag(data.name||'Player');
+    r={group:g,tag,last:performance.now(),targetPos:new THREE.Vector3(),
+       targetRot:data.ry||0,visual:null,vehicle:false,name:data.name||'Player'};
+    g.userData.tag=tag;
+    remotePlayers.set(data.id,r);
+    scene.add(g);
+    buildRemoteVisual(r,wantVehicle);
+  } else if(r.vehicle!==wantVehicle){
+    buildRemoteVisual(r,wantVehicle);
+  }
+
+  r.targetPos.set(Number(data.x)||0,Number(data.y)||0,Number(data.z)||0);
+  r.targetRot=Number(data.ry)||0;
+  r.last=performance.now();
+  r.vehicle=wantVehicle;
+  updateMpStatus();
+}
+
 async function setupMultiplayer(){
   try{
     const ch=supabase.channel(roomName,{config:{broadcast:{self:false}}});
@@ -88,7 +183,20 @@ async function setupMultiplayer(){
     });
   }catch(e){console.warn('Multiplayer unavailable',e);updateMpStatus()}
 }
-function sendMpState(){if(!window.mpChannel||!mpReady)return;const drivingNow=typeof driving!=='undefined'&&driving&&activeCar;const o=drivingNow?activeCar:player;window.mpChannel.send({type:'broadcast',event:'player',payload:{type:'state',id:mpId,name:'Player '+mpId.slice(0,4),x:o.position.x,y:o.position.y,z:o.position.z,ry:o.rotation.y,vehicle:!!drivingNow}})}
+let mpSeq=0;
+function sendMpState(){
+  if(!window.mpChannel||!mpReady)return;
+  const drivingNow=typeof driving!=='undefined'&&driving&&activeCar;
+  const o=drivingNow?activeCar:player;
+  window.mpChannel.send({
+    type:'broadcast',event:'player',
+    payload:{
+      type:'state',id:mpId,name:'Player '+mpId.slice(0,4),
+      x:o.position.x,y:o.position.y,z:o.position.z,ry:o.rotation.y,
+      vehicle:!!drivingNow,seq:++mpSeq,t:Date.now()
+    }
+  });
+}
 setInterval(sendMpState,100);
 setInterval(()=>{const now=performance.now();for(const [id,r] of remotePlayers){if(now-r.last>3500)removeRemote(id);}},1500);
 window.addEventListener('beforeunload',()=>{try{window.mpChannel?.send({type:'broadcast',event:'player',payload:{type:'leave',id:mpId}})}catch(e){}});
@@ -399,6 +507,7 @@ let c1=null,c2=null;
 function loadRealCar(x,z,scale=1,colorize=null){
   loadGLB(carAssetUrl,g=>{
     const model=g.scene;
+    if(!carTemplate) carTemplate=model.clone(true);
     enableShadows(model);
     model.scale.setScalar(scale);
     model.position.set(x,0,z);
@@ -451,6 +560,8 @@ scene.add(player);
 const playerModelUrl='https://static.poly.pizza/3746be88-6799-4817-929b-6bc067c47caa.glb';
 loadGLB(playerModelUrl,g=>{
   const model=g.scene;
+  playerTemplate=model;
+  playerAnimations=g.animations || [];
   enableShadows(model);
   model.scale.setScalar(1.0);
   model.position.set(0,0,0);
@@ -461,6 +572,10 @@ loadGLB(playerModelUrl,g=>{
     const walkClip=g.animations.find(a=>/walk|run|locomotion/i.test(a.name)) || g.animations[0];
     const action=mixer.clipAction(walkClip); action.play();
     window.playerMixer=mixer; window.playerAction=action;
+  }
+  // Upgrade any remote players that joined before the human asset finished loading.
+  for(const r of remotePlayers.values()){
+    if(!r.vehicle) buildRemoteVisual(r,false);
   }
 });
 
@@ -536,6 +651,18 @@ if(!driving){
   if(Math.abs(carSpeed)<.05 && Math.hypot(targetMoveX,targetMoveY)<.08) carSpeed=0;
 }
 if((t|0)%3===0)npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
+// Smooth remote replication: interpolate instead of snapping at each network packet.
+for(const r of remotePlayers.values()){
+  const k=1-Math.exp(-dt*12);
+  r.group.position.lerp(r.targetPos,k);
+  let rd=Math.atan2(Math.sin(r.targetRot-r.group.rotation.y),Math.cos(r.targetRot-r.group.rotation.y));
+  r.group.rotation.y += rd*k;
+  // Keep remote human animation readable while moving; cars do not need a walk cycle.
+  if(r.visual && !r.vehicle && r.visual.userData.remoteAction){
+    const speed=r.group.position.distanceTo(r.targetPos);
+    r.visual.userData.remoteAction.timeScale=speed>.002?1:0;
+  }
+}
 if(!driving){
   const petX=player.position.x+Math.sin(t*.0018)*2.7;pet.position.x+=(petX-pet.position.x)*Math.min(1,dt*4);
   const petZ=player.position.z+Math.cos(t*.0015)*2.7;pet.position.z+=(petZ-pet.position.z)*Math.min(1,dt*4);
@@ -547,7 +674,15 @@ let target=new THREE.Vector3(follow.position.x,follow.position.y+(driving?1.2:1.
 let followYaw=driving&&activeCar?activeCar.rotation.y:yaw;
 let cp=new THREE.Vector3(target.x+Math.sin(followYaw)*7.6*Math.cos(pitch),target.y+Math.sin(pitch)*7.6,target.z+Math.cos(followYaw)*7.6*Math.cos(pitch));
 const cameraFollow=1-Math.exp(-dt*(mobile?8:10));camera.position.lerp(cp,cameraFollow);camera.lookAt(target);
-  for(const r of remotePlayers.values()){const p=r.group.position.clone();p.y+=2.25;p.project(camera);const tag=r.tag;tag.style.left=((p.x*.5+.5)*innerWidth)+'px';tag.style.top=((-p.y*.5+.5)*innerHeight)+'px';tag.style.display=(p.z<1?'block':'none')}
+  for(const r of remotePlayers.values()){
+  const p=r.group.position.clone();
+  p.y+=r.vehicle?1.8:2.7;
+  p.project(camera);
+  const tag=r.tag;
+  tag.style.left=((p.x*.5+.5)*innerWidth)+'px';
+  tag.style.top=((-p.y*.5+.5)*innerHeight)+'px';
+  tag.style.display=(p.z<1?'block':'none');
+}
   renderer.render(scene,camera)}
 let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br>📱 '+fps+' FPS • '+(driving?'🚗 Driving':'Mobile')+'<br><span id="mpStatus"><span id="mpDot"></span>'+(mpReady?'Online • '+(remotePlayers.size+1)+' players':'Connecting…')+'</span>'},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
