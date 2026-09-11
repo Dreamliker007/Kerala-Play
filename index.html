@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V24 Realistic Mobile</title>
+<title>Kerala Play • Open World V25 Realistic Mobile</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -31,17 +31,17 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V24
+  🌤️ Kerala • Day • V25
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V24 Realistic Mobile • Kerala Village</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V25 Realistic Mobile • Kerala Village</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you<br><span style="opacity:.85">🌐 Shared world • friends can join</span><br><span id="worldTip" style="opacity:.75">📍 Explore the village</span></div>
 <div id="status">👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br><span id="mpStatus"><span id="mpDot"></span>Connecting…</span></div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
 <div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V24 — realistic Kerala village polish + multiplayer + mobile optimization: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room + vehicles + houses enabled</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V25 — realistic Kerala village polish + multiplayer + mobile optimization: join the same Kerala world, smooth movement, camera, vehicle and house systems.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer room + vehicles + houses enabled</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -355,6 +355,7 @@ const sunDisc=new THREE.Mesh(
 sunDisc.position.set(-110,115,-170); scene.add(sunDisc);
 scene.background=new THREE.Color(0x8fd4ee);scene.fog=new THREE.Fog(0x8fd4ee,105,310);
 
+const M=(c,r=.82)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
 // V22 Realistic Kerala Village Pass — lightweight geometry only.
 // These details are intentionally instanced/reused where possible to preserve mobile FPS.
 const curbMat = new THREE.MeshStandardMaterial({color:0x9b9a8c,roughness:.98});
@@ -485,7 +486,7 @@ function enableShadows(root){root.traverse(o=>{if(o.isMesh){
       const keepShadow=!mobile || o.geometry?.type==='BoxGeometry' || o.geometry?.type==='SphereGeometry';
       o.castShadow=keepShadow;o.receiveShadow=!mobile;if(o.material){o.material.roughness=Math.min(o.material.roughness??.8,.9);}}});}
 scene.add(new THREE.HemisphereLight(0xd9f4ff,0x21452c,1.75));const sun=new THREE.DirectionalLight(0xffe7bd,3.6);sun.position.set(-70,135,55);sun.castShadow=true;sun.shadow.mapSize.set(mobile?768:1024,mobile?768:1024);sun.shadow.camera.left=-90;sun.shadow.camera.right=90;sun.shadow.camera.top=90;sun.shadow.camera.bottom=-90;scene.add(sun);
-const M=(c,r=.82)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
+
 function add(g,m,x=0,y=0,z=0){let o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=!mobile;o.receiveShadow=!mobile;scene.add(o);return o}
 function box(w,h,d,c,x,y,z,r=0){let o=add(new THREE.BoxGeometry(w,h,d),M(c),x,y,z);o.rotation.y=r;return o}
 function cyl(r,h,c,x,y,z,s=18){return add(new THREE.CylinderGeometry(r,r,h,s),M(c),x,y,z)}
@@ -775,7 +776,7 @@ function applyWorldLight(){
   const sky=new THREE.Color().setHSL(0.56,0.55,0.32+0.32*daylight);
   scene.background.copy(sky); scene.fog.color.copy(sky);
   sunDisc.visible=daylight>.16; sunDisc.position.set(-110,45+100*daylight,-170);
-  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V24';
+  document.getElementById('weather').textContent=(daylight>.22?'🌤️ Kerala • Day':'🌙 Kerala • Night')+' • V25';
 }
 dayBtn.addEventListener('click',()=>{autoTime=false;worldClock=worldClock<17?19:9.5;applyWorldLight();dayBtn.textContent=worldClock>17?'🌙 Night':'🌤️ Day'});
 qualityBtn.addEventListener('click',()=>{
