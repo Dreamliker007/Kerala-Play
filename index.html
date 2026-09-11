@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V5</title>
+<title>Kerala Play • Open World V6</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -14,30 +14,42 @@
 .actions{position:absolute;right:18px;bottom:22px;display:flex;gap:9px;pointer-events:auto}.btn{width:60px;height:60px;border:0;border-radius:50%;background:#10251de8;color:#fff;font-size:21px;box-shadow:0 5px 16px #0005}
 #start{position:absolute;inset:0;background:#06140bbb;display:flex;align-items:center;justify-content:center;pointer-events:auto}
 .card{width:min(92%,480px);background:#fff;color:#182033;border-radius:28px;padding:30px;text-align:center;box-shadow:0 25px 75px #000a}.card h1{margin:0 0 8px;font-size:32px}.card p{color:#555;line-height:1.5}.play{border:0;background:#087f45;color:#fff;font-size:18px;font-weight:800;padding:14px 25px;border-radius:14px}.small{font-size:12px;color:#777;margin-top:12px}
+
+#vignette{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 120px rgba(0,0,0,.24)}
 </style></head>
 <body>
-<div id="game"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • Open World</div></div>
+<div id="game"></div><div id="vignette"></div><div id="ui">
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V6</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you</div>
 <div id="status">👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1</div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button></div>
 </div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V5 — a more polished third-person Kerala-inspired open world with a detailed avatar, homes, vegetation, pets, NPCs, vehicles, roads and backwaters.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V6 — a more cinematic Kerala-inspired open world with richer lighting, terrain details, village life, vehicles, pets, NPCs and smoother third-person controls.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x8bd9ff);scene.fog=new THREE.Fog(0x8bd9ff,105,320);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x86cbed);scene.fog=new THREE.Fog(0x86cbed,95,300);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,700);
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xd6f3ff,0x385b38,2.1));const sun=new THREE.DirectionalLight(0xfff1d6,3);sun.position.set(70,125,40);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xd9f4ff,0x274d31,2.35));const sun=new THREE.DirectionalLight(0xffe7bd,3.2);sun.position.set(70,125,40);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
 const M=(c,r=.82)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
 function add(g,m,x=0,y=0,z=0){let o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;scene.add(o);return o}
 function box(w,h,d,c,x,y,z,r=0){let o=add(new THREE.BoxGeometry(w,h,d),M(c),x,y,z);o.rotation.y=r;return o}
 function cyl(r,h,c,x,y,z,s=18){return add(new THREE.CylinderGeometry(r,r,h,s),M(c),x,y,z)}
 function sph(r,c,x,y,z){return add(new THREE.SphereGeometry(r,20,16),M(c),x,y,z)}
 
-box(380,.5,380,0x4d994c,0,-.25,0);box(12,.2,380,0x3e4449,0,.02,0);box(380,.2,11,0x3e4449,0,.02,0);
+box(380,.5,380,0x4b8f49,0,-.25,0);
+for(let i=0;i<18;i++){
+  let x=-150+(i%6)*58, z=-135+Math.floor(i/6)*82;
+  let p=box(42,.08,30, i%2?0x6fa44f:0x78ab55, x,.04,z, (i%3)*0.12);
+  p.material.roughness=1;
+}
+for(let i=0;i<32;i++){
+  let x=-150+Math.random()*300, z=-150+Math.random()*300;
+  if(Math.abs(x)<8 || Math.abs(z)<8) continue;
+  box(2.2,.13,Math.random()*8+5,0x8b744d,x,.09,z,Math.random()*Math.PI);
+}box(12,.2,380,0x3e4449,0,.02,0);box(380,.2,11,0x3e4449,0,.02,0);
 box(9,.2,170,0x565b5e,62,.03,0);box(170,.2,8,0x565b5e,-62,.03,0);
 
 function house(x,z,w,r){box(12,5.7,9.8,w,x,2.85,z);let rt=add(new THREE.ConeGeometry(8,4.7,4),M(r),x,7.2,z);rt.rotation.y=Math.PI/4;box(2.2,3.2,.25,0x704521,x,1.6,z-5);for(let sx of [-3,3])box(2.5,1.55,.2,0x9fdcf0,x+sx,3.05,z-5);box(12.5,.35,1.4,0x73462c,x,5.25,z-5.4)}
@@ -48,7 +60,31 @@ function palm(x,z,s=1){cyl(.38*s,8.5*s,0x65452a,x,4.25*s,z);for(let i=0;i<8;i++)
 function banana(x,z){cyl(.55,3,0x54772d,x,1.5,z);for(let i=0;i<6;i++){let a=i*Math.PI*2/6;let l=add(new THREE.ConeGeometry(.48,4.4,6),M(0x25843b),x+Math.cos(a),2.8,z+Math.sin(a));l.rotation.z=Math.PI/2;l.rotation.y=-a}}
 [[-22,-5],[-35,5],[-8,23],[20,4],[34,-7],[-50,42],[51,45],[-80,38]].forEach(p=>banana(...p));
 
+function shrub(x,z,s=1){
+  for(let i=0;i<5;i++){
+    let a=i*Math.PI*2/5;
+    sph(.7*s,0x2e7a3d,x+Math.cos(a)*.55*s,.65*s,z+Math.sin(a)*.55*s);
+  }
+}
+[[-14,8],[-40,-28],[14,29],[35,18],[-62,28],[60,48],[-92,-25],[91,35],
+ [-55,85],[58,-82],[-105,75],[108,65]].forEach(p=>shrub(...p,1.15));
+
+function lamp(x,z){
+  cyl(.10,3.5,0x303b37,x,1.75,z,10);
+  sph(.28,0xffdf9a,x,3.55,z);
+}
+[[-11,-7],[11,-7],[-40,-2],[40,-2],[-62,14],[62,14]].forEach(p=>lamp(...p));
+
 const water=add(new THREE.CylinderGeometry(17,17,.35,64),new THREE.MeshStandardMaterial({color:0x218caf,roughness:.1,metalness:.05}),-55,.16,55);water.scale.z=.75;box(19,.35,2.5,0x8c6945,-55,.4,43);
+
+function boat(x,z,r=0){
+  let g=new THREE.Group();
+  let hull=new THREE.Mesh(new THREE.CapsuleGeometry(1.2,.9,8,16),M(0x6a4025));
+  hull.scale.set(1.8,.45,.7); hull.rotation.y=Math.PI/2; hull.position.y=.45; g.add(hull);
+  let seat=box(1.5,.18,.5,0x9a6b3e,0,.78,0); g.add(seat);
+  g.position.set(x,.18,z); g.rotation.y=r; scene.add(g); return g;
+}
+boat(-49,55,.2); boat(-62,61,-.35);
 function temple(x,z){cyl(4.8,5.8,0xffd17c,x,2.9,z);let r=add(new THREE.ConeGeometry(6.3,5.3,4),M(0xc65a28),x,8.1,z);r.rotation.y=Math.PI/4;box(1.7,3,.45,0x814421,x,1.5,z-4.8)}temple(43,42);
 function shop(x,z){box(9,4.8,6.5,0xa1d3a7,x,2.4,z);box(9.5,1.5,7,0x167a4d,x,5.5,z);box(7.7,.55,.4,0x114e35,x,4.45,z-3.35);for(let i=-2;i<=2;i++)box(1.1,1.1,.45,[0xe34a3a,0xffd34d,0x3d80cf,0x8d55c7,0x58b96b][i+2],x+i*1.35,3.15,z-3.55)}shop(0,-35);
 
@@ -66,6 +102,8 @@ let head=new THREE.Mesh(new THREE.SphereGeometry(.5,24,20),M(0xc98b64));head.pos
 let hair=new THREE.Mesh(new THREE.SphereGeometry(.52,24,12,0,Math.PI*2,0,Math.PI*.53),M(0x151515));hair.position.y=2.8;player.add(hair);
 let pants=new THREE.Mesh(new THREE.BoxGeometry(.98,.85,.72),M(0x315c85));pants.position.y=.48;player.add(pants);
 for(let s of [-1,1]){let a=new THREE.Mesh(new THREE.CapsuleGeometry(.16,.67,5,8),M(0x172533));a.position.set(s*.56,1.4,0);player.add(a);let sh=new THREE.Mesh(new THREE.BoxGeometry(.39,.18,.66),M(0xf2f2f2));sh.position.set(s*.28,.05,.12);player.add(sh)}
+let bag=new THREE.Mesh(new THREE.BoxGeometry(.48,.72,.22),M(0x5b3f2d));
+bag.position.set(-.58,1.35,.22);player.add(bag);
 scene.add(player);
 
 let moveX=0,moveY=0,yaw=0,pitch=.34,jump=false,vy=0;const joy=document.getElementById('joy'),knob=document.getElementById('knob');let jid=null;
@@ -80,7 +118,7 @@ const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addE
 let last=performance.now();function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;
 let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z);if(l>1){x/=l;z/=l}
 let speed=8.7;player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
-player.position.x=Math.max(-155,Math.min(155,player.position.x));player.position.z=Math.max(-155,Math.min(155,player.position.z));if(l>.08)player.rotation.y=Math.atan2(x,z)+yaw;
+player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));if(l>.08){player.rotation.y=Math.atan2(x,z)+yaw; torso.rotation.z=Math.sin(t*.012)*.025; player.position.y += Math.sin(t*.012)*.006;}
 player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
 npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
 pet.position.x=player.position.x+Math.sin(t*.0018)*2.5;pet.position.z=player.position.z+Math.cos(t*.0015)*2.5;
