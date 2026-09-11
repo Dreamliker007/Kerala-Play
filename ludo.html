@@ -1,185 +1,168 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kerala Play - Ludo</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kerala Play • Ludo</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f5f7f8;color:#17202a}
-.top{position:sticky;top:0;z-index:10;background:#fff;box-shadow:0 2px 12px #0002;padding:14px 6%;display:flex;justify-content:space-between;align-items:center}
-.logo{font-size:24px;font-weight:800}.logo span{color:#087f5b}
-.back{color:#087f5b;text-decoration:none;font-weight:700}
-.wrap{max-width:1100px;margin:auto;padding:28px 16px 50px}
-h1{text-align:center;margin:8px 0}.sub{text-align:center;color:#68737d}
-.game-area{display:flex;gap:28px;justify-content:center;align-items:flex-start;flex-wrap:wrap;margin-top:24px}
-.board{width:min(90vw,600px);aspect-ratio:1;background:#fff;border:8px solid #17202a;border-radius:18px;display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr);overflow:hidden;box-shadow:0 10px 30px #0002}
-.cell{border:1px solid #dfe4e7;position:relative;background:#fff}
-.red{background:#ffdddd}.green{background:#dff7e8}.yellow{background:#fff4c9}.blue{background:#dfeaff}
-.track{background:#fff}.safe{background:#e9f7f2}
-.center{background:conic-gradient(#e74c3c 0 25%,#f1c40f 25% 50%,#2ecc71 50% 75%,#3498db 75% 100%)}
-.token{width:72%;height:72%;border-radius:50%;position:absolute;left:14%;top:14%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:clamp(9px,2vw,14px);font-weight:800;border:2px solid #fff;box-shadow:0 2px 5px #0005;cursor:pointer;z-index:3}
-.t-red{background:#e74c3c}.t-green{background:#16a085}.t-yellow{background:#e0a800}.t-blue{background:#2980b9}
-.panel{width:min(90vw,320px);background:#fff;border-radius:18px;padding:22px;box-shadow:0 8px 25px #0002}
-.turn{font-size:20px;font-weight:800;margin-bottom:12px}
-.dice{font-size:64px;text-align:center;margin:10px 0}
-.roll{width:100%;font-size:18px}
-.info{margin-top:16px;line-height:1.6;color:#5d6770}
-.players{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
-.player{padding:10px;border-radius:10px;font-weight:700}
-.p0{background:#ffe0e0}.p1{background:#ddf7ea}.p2{background:#fff1bd}.p3{background:#dce9ff}
-.status{margin-top:14px;padding:10px;border-radius:10px;background:#f1f3f5;font-size:14px}
-@media(max-width:650px){.wrap{padding-top:16px}.board{border-width:5px}.panel{width:min(90vw,600px)}}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#eef7ff,#f8fff4);color:#172033}
+.top{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;background:#fff;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:5}
+.logo{font-size:24px;font-weight:800}.logo span{color:#159447}.back{color:#159447;text-decoration:none;font-weight:700}
+.wrap{max-width:1050px;margin:20px auto;padding:0 14px}.title{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+h1{margin:0 0 6px}.sub{margin:0;color:#667085}.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,select{border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer}
+.primary{background:#159447;color:white}.secondary{background:#e9eef5;color:#172033}
+.game{display:grid;grid-template-columns:minmax(300px,700px) 280px;gap:18px;align-items:start;margin-top:18px}
+.board{position:relative;width:min(92vw,680px);aspect-ratio:1;background:#fff;border:8px solid #172033;border-radius:18px;box-shadow:0 12px 30px #0002;overflow:hidden}
+.quad{position:absolute;width:40%;height:40%;padding:5%;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:8%;border:1px solid #ffffff99}
+.qr{left:0;top:0;background:#f8d7d7}.qg{right:0;top:0;background:#d9f2df}.qy{left:0;bottom:0;background:#fff0bd}.qb{right:0;bottom:0;background:#d9e8ff}
+.yard{background:#fff;border-radius:16px;padding:9%;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:10%;box-shadow:inset 0 0 0 2px #ffffff}
+.homeDot{border-radius:50%;background:#fff;border:3px solid #aaa;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}
+.track{position:absolute;left:20%;top:20%;width:60%;height:60%;display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr)}
+.cell{border:1px solid #d7dce3;background:#fff;position:relative}
+.r{background:#ef6b6b}.g{background:#65c77c}.y{background:#f4d35e}.b{background:#5d91e8}
+.center{position:absolute;left:40%;top:40%;width:20%;height:20%;background:conic-gradient(#65c77c 0 25%,#5d91e8 25% 50%,#f4d35e 50% 75%,#ef6b6b 75%);clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}
+.token{position:absolute;width:72%;height:72%;left:14%;top:14%;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 5px #0004;color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer}
+.tr{background:#c94141}.tg{background:#258c42}.ty{background:#c59b00}.tb{background:#2d65bd}
+.panel{background:#fff;border-radius:16px;padding:18px;box-shadow:0 8px 24px #0001;border:1px solid #e1e5ea}
+.turn{font-size:20px;font-weight:800;margin-bottom:10px}.dice{font-size:52px;text-align:center;padding:10px}.msg{min-height:45px;background:#f5f7fa;border-radius:10px;padding:10px;margin:10px 0}
+.players{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.p{padding:9px;border-radius:10px;background:#f4f6f8;font-weight:700}.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:7px}
+.rules{margin-top:18px;font-size:14px;color:#596579}.rules li{margin:6px 0}
+.overlay{position:absolute;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:10}.modal{background:#fff;padding:22px;border-radius:18px;width:min(92%,360px);text-align:center}.modal h2{margin-top:0}.choice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:15px 0}.choice button{border:2px solid #ddd;background:#fff}.choice button.active{border-color:#159447;background:#eaf8ef}
+@media(max-width:850px){.game{grid-template-columns:1fr}.panel{width:min(92vw,680px)}.board{margin:auto}}
 </style>
 </head>
 <body>
-<header class="top">
-  <div class="logo">Kerala <span>Play</span></div>
-  <a class="back" href="index.html#games">← Games</a>
-</header>
-
-<div class="wrap">
-<h1>🎲 Ludo</h1>
-<p class="sub">2–4 players • Local pass-and-play</p>
-
-<div class="game-area">
-  <div id="board" class="board" aria-label="Ludo board"></div>
-
-  <div class="panel">
-    <div id="turn" class="turn">Red's turn</div>
-    <div id="dice" class="dice">⚀</div>
-    <button id="roll" class="roll">Roll Dice</button>
-    <div id="status" class="status">Roll the dice. A 6 brings a token out of home.</div>
-    <div class="players">
-      <div class="player p0">🔴 Red</div>
-      <div class="player p1">🟢 Green</div>
-      <div class="player p2">🟡 Yellow</div>
-      <div class="player p3">🔵 Blue</div>
-    </div>
-    <button id="reset" style="width:100%;margin-top:12px;background:#17202a">New Game</button>
-  </div>
+<header class="top"><div class="logo">Kerala <span>Play</span></div><a class="back" href="index.html">← Games</a></header>
+<main class="wrap">
+<div class="title"><div><h1>🎲 Ludo</h1><p class="sub">Local pass-and-play • 2–4 players</p></div><div class="controls"><button class="secondary" id="newBtn">New Game</button></div></div>
+<div class="game">
+<div class="board" id="board">
+  <div class="quad qr"><div class="yard"><div class="homeDot">1</div><div class="homeDot">2</div><div class="homeDot">3</div><div class="homeDot">4</div></div></div>
+  <div class="quad qg"><div class="yard"><div class="homeDot">1</div><div class="homeDot">2</div><div class="homeDot">3</div><div class="homeDot">4</div></div></div>
+  <div class="quad qy"><div class="yard"><div class="homeDot">1</div><div class="homeDot">2</div><div class="homeDot">3</div><div class="homeDot">4</div></div></div>
+  <div class="quad qb"><div class="yard"><div class="homeDot">1</div><div class="homeDot">2</div><div class="homeDot">3</div><div class="homeDot">4</div></div></div>
+  <div class="track" id="track"></div><div class="center"></div>
+  <div class="overlay" id="overlay"><div class="modal"><h2>Choose Players</h2><p>How many people are playing?</p><div class="choice" id="choices"><button data-n="2">2 Players</button><button data-n="3">3 Players</button><button data-n="4" class="active">4 Players</button></div><button class="primary" id="startBtn">Start Game</button></div></div>
 </div>
-</div>
-
+<aside class="panel">
+<div class="turn" id="turn">Red's turn</div>
+<div class="dice" id="dice">⚀</div>
+<button class="primary" id="roll" style="width:100%">Roll Dice</button>
+<div class="msg" id="msg">Roll the dice to begin.</div>
+<div class="players" id="players"></div>
+<ul class="rules">
+<li>Roll <b>6</b> to bring a token out.</li>
+<li>Click a highlighted token to move it.</li>
+<li>Landing on an opponent sends it home.</li>
+<li>Exact roll is needed to finish.</li>
+<li>Rolling 6 gives another turn.</li>
+</ul>
+</aside>
+</div></main>
 <script>
-const path=[
-[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],
-[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],
-[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],
-[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],
-[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]
+const COLORS=[
+ {name:"Red",cls:"tr",yard:"qr",start:0},
+ {name:"Green",cls:"tg",yard:"qg",start:13},
+ {name:"Yellow",cls:"ty",yard:"qy",start:26},
+ {name:"Blue",cls:"tb",yard:"qb",start:39}
 ];
+const DICE=["⚀","⚁","⚂","⚃","⚄","⚅"];
+const track=document.getElementById("track"), board=document.getElementById("board");
+const rollBtn=document.getElementById("roll"), msg=document.getElementById("msg"), turnEl=document.getElementById("turn"), diceEl=document.getElementById("dice"), playersEl=document.getElementById("players");
+let nPlayers=4,current=0,dice=0,gameOver=false,waitingChoice=false;
+let state=[];
 
-const starts=[0,13,26,39];
-const colors=['red','green','yellow','blue'];
-const names=['Red','Green','Yellow','Blue'];
-const diceFace=['⚀','⚁','⚂','⚃','⚄','⚅'];
-let players=4, current=0, rollValue=0, extra=false, winner=null;
-let tokens=Array.from({length:players},()=>[-1,-1,-1,-1]);
-
-const board=document.getElementById('board');
-const turn=document.getElementById('turn');
-const dice=document.getElementById('dice');
-const rollBtn=document.getElementById('roll');
-const statusEl=document.getElementById('status');
-const resetBtn=document.getElementById('reset');
-
-function key(r,c){return r+'-'+c}
-function buildBoard(){
-  board.innerHTML='';
-  for(let r=0;r<15;r++)for(let c=0;c<15;c++){
-    const cell=document.createElement('div'); cell.className='cell';
-    if(r<6&&c<6)cell.classList.add('red');
-    if(r<6&&c>8)cell.classList.add('green');
-    if(r>8&&c<6)cell.classList.add('blue');
-    if(r>8&&c>8)cell.classList.add('yellow');
-    if((r===6||r===8)&&c>=6&&c<=8 || (c===6||c===8)&&r>=6&&r<=8)cell.classList.add('track');
-    if(r>=6&&r<=8&&c>=6&&c<=8)cell.classList.add('center');
-    cell.id='c-'+key(r,c);
-    board.appendChild(cell);
-  }
-  renderTokens();
+function buildTrack(){
+ track.innerHTML="";
+ for(let i=0;i<225;i++){
+   const c=document.createElement("div"); c.className="cell";
+   const x=i%15,y=Math.floor(i/15);
+   // Create a visible cross-shaped path.
+   const path=(x>=6&&x<=8)||(y>=6&&y<=8);
+   if(path){
+     if(y===7&&x>=6&&x<=8)c.classList.add("g");
+     if(x===7&&y>=6&&y<=8)c.classList.add("r");
+     if((x===6&&y>=0&&y<6)||(x===8&&y>8&&y<15))c.classList.add("y");
+     if((y===6&&x>8&&x<15)||(y===8&&x<6&&x>=0))c.classList.add("b");
+   } else c.style.background="transparent";
+   track.appendChild(c);
+ }
+}
+function resetState(){
+ state=Array.from({length:4},()=>Array(4).fill(-1)); current=0; dice=0; gameOver=false; waitingChoice=false;
+ update();
+}
+function activeColors(){return COLORS.slice(0,nPlayers)}
+function update(){
+ turnEl.textContent=gameOver?msg.textContent:`${COLORS[current].name}'s turn`;
+ diceEl.textContent=dice?DICE[dice-1]:"⚀";
+ playersEl.innerHTML=activeColors().map((p,i)=>`<div class="p"><span class="dot" style="background:${p.cls==='tr'?'#c94141':p.cls==='tg'?'#258c42':p.cls==='ty'?'#c59b00':'#2d65bd'}"></span>${p.name}: ${state[i].filter(v=>v===57).length}/4</div>`).join("");
+ renderTokens();
 }
 function renderTokens(){
-  document.querySelectorAll('.token').forEach(x=>x.remove());
-  tokens.forEach((arr,p)=>{
-    arr.forEach((pos,t)=>{
-      let coord;
-      if(pos===-1){
-        const home=[[2,2],[2,3],[3,2],[3,3],[2,11],[2,12],[3,11],[3,12],
-                    [11,2],[11,3],[12,2],[12,3],[11,11],[11,12],[12,11],[12,12]];
-        coord=home[p*4+t];
-      }else if(pos>=0&&pos<52) coord=path[(starts[p]+pos)%52];
-      else coord=path[(starts[p]+51)%52];
-      const cell=document.getElementById('c-'+key(coord[0],coord[1]));
-      if(!cell)return;
-      const el=document.createElement('div');
-      el.className='token t-'+colors[p]; el.textContent=t+1;
-      el.title=names[p]+' token '+(t+1);
-      el.onclick=()=>moveToken(p,t);
-      cell.appendChild(el);
-    });
-  });
+ document.querySelectorAll(".token").forEach(e=>e.remove());
+ activeColors().forEach((p,pi)=>{
+   state[pi].forEach((pos,ti)=>{
+     const el=document.createElement("div"); el.className=`token ${p.cls}`; el.textContent=ti+1;
+     const homePositions=[[-18,-18],[18,-18],[-18,18],[18,18]];
+     if(pos<0){
+       const q=board.querySelector(`.${p.yard}`), rect=q.getBoundingClientRect(), br=board.getBoundingClientRect();
+       const hp=homePositions[ti]; el.style.left=(50+hp[0])+"%"; el.style.top=(50+hp[1])+"%"; q.appendChild(el);
+     } else {
+       // Approximate track movement around a 52-cell perimeter. Visual board is decorative; rules/state are exact.
+       const a=(p.start+Math.max(0,pos))%52, ang=(a/52)*Math.PI*2-Math.PI/2, cx=50+30*Math.cos(ang), cy=50+30*Math.sin(ang);
+       el.style.left=`${cx-2}%`;el.style.top=`${cy-2}%`; board.appendChild(el);
+     }
+     const can=canMove(pi,ti);
+     if(can){el.style.outline="3px solid #159447";el.addEventListener("click",()=>move(pi,ti))}
+   });
+ });
 }
-function canMove(p,t){
-  const pos=tokens[p][t];
-  if(pos===57)return false;
-  if(pos===-1)return rollValue===6;
-  return pos+rollValue<=57;
+function canMove(pi,ti){
+ if(gameOver||pi!==current||!dice)return false;
+ const pos=state[pi][ti];
+ if(pos<0)return dice===6;
+ return pos+dice<=57;
 }
-function moveToken(p,t){
-  if(winner!==null || p!==current || !rollValue || !canMove(p,t)){
-    return;
-  }
-  let pos=tokens[p][t];
-  tokens[p][t]=(pos===-1)?0:pos+rollValue;
-  const landed=tokens[p][t];
-  if(landed<52){
-    const global=(starts[p]+landed)%52;
-    tokens.forEach((arr,op)=>{
-      if(op===p)return;
-      arr.forEach((v,ot)=>{
-        if(v>=0&&v<52&&((starts[op]+v)%52)===global) tokens[op][ot]=-1;
-      });
-    });
-  }
-  const won=tokens[p].every(v=>v===57);
-  renderTokens();
-  if(won){winner=p;turn.textContent=names[p]+' wins! 🎉';statusEl.textContent='Congratulations! Start a new game to play again.';rollBtn.disabled=true;return}
-  const keep=rollValue===6;
-  rollValue=0; dice.textContent='⚀';
-  if(keep){statusEl.textContent=names[p]+' rolled a 6 — roll again!';}
-  else nextPlayer();
+function roll(){
+ if(gameOver||waitingChoice||dice)return;
+ dice=Math.floor(Math.random()*6)+1; msg.textContent=`${COLORS[current].name} rolled ${dice}.`;
+ const moves=state[current].some((_,ti)=>canMove(current,ti));
+ if(!moves){
+   msg.textContent+=` No move available.`;
+   setTimeout(()=>nextTurn(dice===6),650);
+ } else update();
 }
-function nextPlayer(){
-  current=(current+1)%players;
-  turn.textContent=names[current]+"'s turn";
-  statusEl.textContent='Roll the dice.';
-  rollBtn.disabled=false;
+function move(pi,ti){
+ if(!canMove(pi,ti))return;
+ let pos=state[pi][ti];
+ if(pos<0)pos=0;else pos+=dice;
+ state[pi][ti]=pos;
+ // Capture on shared track.
+ if(pos>=0&&pos<52){
+   const landing=(COLORS[pi].start+pos)%52;
+   activeColors().forEach((p,oi)=>{
+     if(oi===pi)return;
+     state[oi].forEach((v,k)=>{
+       if(v>=0&&v<52&&(p.start+v)%52===landing)state[oi][k]=-1;
+     });
+   });
+ }
+ if(state[pi].every(v=>v===57)){gameOver=true;msg.textContent=`🏆 ${COLORS[pi].name} wins!`;update();return}
+ const six=dice===6; dice=0; msg.textContent=six?`${COLORS[pi].name} gets another turn!`:`${COLORS[(pi+1)%nPlayers].name}'s turn.`;
+ if(!six)current=(current+1)%nPlayers; update();
 }
-rollBtn.onclick=()=>{
-  if(winner!==null)return;
-  rollValue=Math.floor(Math.random()*6)+1;
-  dice.textContent=diceFace[rollValue-1];
-  const moves=tokens[current].map((_,t)=>canMove(current,t)).some(Boolean);
-  if(!moves){
-    statusEl.textContent=rollValue===6?'No movable token. Roll again.':'No valid move. Turn passes.';
-    const keep=rollValue===6;
-    rollValue=0;
-    if(keep)setTimeout(()=>{dice.textContent='⚀';statusEl.textContent='Roll again.'},700);
-    else setTimeout(nextPlayer,700);
-  }else{
-    statusEl.textContent='Choose a highlighted/movable token by clicking it.';
-    rollBtn.disabled=true;
-  }
-};
-resetBtn.onclick=()=>{
-  tokens=Array.from({length:players},()=>[-1,-1,-1,-1]);
-  current=0;rollValue=0;winner=null;dice.textContent='⚀';
-  turn.textContent="Red's turn";statusEl.textContent='Roll the dice.';
-  rollBtn.disabled=false;buildBoard();
-};
-buildBoard();
+function nextTurn(extra){
+ dice=0;if(!extra)current=(current+1)%nPlayers;update();
+}
+document.getElementById("roll").onclick=roll;
+document.getElementById("newBtn").onclick=()=>{document.getElementById("overlay").style.display="flex"};
+document.querySelectorAll("#choices button").forEach(b=>b.onclick=()=>{
+ document.querySelectorAll("#choices button").forEach(x=>x.classList.remove("active"));b.classList.add("active");nPlayers=+b.dataset.n;
+});
+document.getElementById("startBtn").onclick=()=>{document.getElementById("overlay").style.display="none";resetState();};
+buildTrack(); resetState(); document.getElementById("overlay").style.display="flex";
 </script>
 </body>
 </html>
