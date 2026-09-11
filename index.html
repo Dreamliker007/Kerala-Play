@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
-import { SkeletonUtils } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/SkeletonUtils.js';
+import { clone as skeletonClone } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/SkeletonUtils.js';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 const scene=new THREE.Scene();
@@ -93,7 +93,7 @@ function fallbackRemoteHuman(){
 
 function createRemoteHuman(r){
   if(!playerTemplate) return fallbackRemoteHuman();
-  const g=SkeletonUtils.clone(playerTemplate);
+  const g=skeletonClone(playerTemplate);
   g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;}});
   if(playerAnimations.length){
     const mixer=new THREE.AnimationMixer(g);
@@ -109,7 +109,7 @@ function createRemoteHuman(r){
 
 function createRemoteCar(){
   if(!carTemplate) return null;
-  const g=SkeletonUtils.clone(carTemplate);
+  const g=skeletonClone(carTemplate);
   g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;}});
   return g;
 }
