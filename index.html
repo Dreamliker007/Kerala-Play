@@ -23,7 +23,7 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V11
+  🌤️ Kerala • Day • V12
 </div>
 <div id="vignette"></div><div id="ui">
 <div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V12 Mobile • Kerala Village</div></div>
@@ -55,7 +55,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 
 const scene=new THREE.Scene();
-// V11 — detailed Kerala environment pass
+const mobile=matchMedia('(pointer:coarse)').matches || innerWidth<900;
+const deviceQuality=Math.min(devicePixelRatio || 1, mobile ? 1.15 : 1.6);
+// V12 — mobile-first performance build
 const woodMat = new THREE.MeshStandardMaterial({color:0x5a3928,roughness:.82,metalness:0});
 const wallMat = new THREE.MeshStandardMaterial({color:0xd7c6a5,roughness:.92});
 const roofMat = new THREE.MeshStandardMaterial({color:0x873f32,roughness:.88});
@@ -197,9 +199,7 @@ sunDisc.position.set(-110,115,-170); scene.add(sunDisc);
 scene.background=new THREE.Color(0x86cbed);scene.fog=new THREE.Fog(0x86cbed,95,300);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,700);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
-const mobile=matchMedia('(pointer:coarse)').matches || innerWidth<900;
-const quality=mobile?Math.min(devicePixelRatio,1.25):Math.min(devicePixelRatio,1.6);
-renderer.setPixelRatio(quality);renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(deviceQuality);renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.04;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
 const loader=new GLTFLoader();const mixers=[];
@@ -405,12 +405,17 @@ let target=new THREE.Vector3(player.position.x,player.position.y+1.7,player.posi
 camera.position.lerp(cp,mobile?.18:.14);camera.lookAt(target);renderer.render(scene,camera)}
 let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1<br>📱 '+fps+' FPS • '+(mobile?'Mobile':'Desktop');},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
-3D scene is loading. Please wait a moment.
+3D scene failed to start. Please reload once.
 </div>
 <script>
 window.addEventListener('error',function(e){
   const b=document.getElementById('boot-error');
-  if(b && e.message) b.style.display='block';
+  if(b && e.message){ b.textContent='3D scene error: '+e.message; b.style.display='block'; }
+});
+window.addEventListener('unhandledrejection',function(e){
+  const b=document.getElementById('boot-error');
+  const msg=e && e.reason && (e.reason.message || String(e.reason));
+  if(b && msg){ b.textContent='3D scene error: '+msg; b.style.display='block'; }
 });
 </script>
 </body></html>
