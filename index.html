@@ -77,8 +77,12 @@ soilPatch(-20,-105,85,3,.02); soilPatch(35,105,80,3,-.01);
 function foliageCluster(x,z,s=1){
   for(let i=0;i<7;i++){
     const a=i*Math.PI*2/7, r=(1.5+Math.random()*2)*s;
-    sph((.35+Math.random()*.25)*s,0x356f39,
-        x+Math.cos(a)*r,.35*s,z+Math.sin(a)*r);
+    const leaf=new THREE.Mesh(
+      new THREE.SphereGeometry((.35+Math.random()*.25)*s,14,10),
+      new THREE.MeshStandardMaterial({color:0x356f39,roughness:.95})
+    );
+    leaf.position.set(x+Math.cos(a)*r,.35*s,z+Math.sin(a)*r);
+    leaf.castShadow=true; leaf.receiveShadow=true; scene.add(leaf);
   }
 }
 for(let i=0;i<26;i++){
@@ -228,4 +232,13 @@ c1.position.x=-5+Math.sin(t*.00015)*45;c2.position.z=-3+Math.cos(t*.00013)*47;
 let target=new THREE.Vector3(player.position.x,player.position.y+1.7,player.position.z),cp=new THREE.Vector3(target.x+Math.sin(yaw)*12*Math.cos(pitch),target.y+Math.sin(pitch)*12,target.z+Math.cos(yaw)*12*Math.cos(pitch));
 camera.position.lerp(cp,.11);camera.lookAt(target);renderer.render(scene,camera)}
 animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
-</script></body></html>
+</script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
+Game loading error. Please refresh once.
+</div>
+<script>
+window.addEventListener('error',function(e){
+  const b=document.getElementById('boot-error');
+  if(b && e.message) b.style.display='block';
+});
+</script>
+</body></html>
