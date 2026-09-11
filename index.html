@@ -65,6 +65,7 @@ const SUPABASE_KEY='sb_publishable_SP1Pj9hoY3z_8lKBU4jIbg_pAC1x8Ih';
 const supabase=createClient(SUPABASE_URL,SUPABASE_KEY,{realtime:{params:{eventsPerSecond:30}}});
 const roomName='kerala-play-open-world';
 const mpId=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now());
+let mpReady=false;
 
 const remotePlayers=new Map();
 let playerTemplate=null;
@@ -507,7 +508,10 @@ let c1=null,c2=null;
 function loadRealCar(x,z,scale=1,colorize=null){
   loadGLB(carAssetUrl,g=>{
     const model=g.scene;
-    if(!carTemplate) carTemplate=model.clone(true);
+    if(!carTemplate){
+      carTemplate=model.clone(true);
+      for(const r of remotePlayers.values()) if(r.vehicle) buildRemoteVisual(r,true);
+    }
     enableShadows(model);
     model.scale.setScalar(scale);
     model.position.set(x,0,z);
