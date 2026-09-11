@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kerala Play</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="logo">Kerala <span>Play</span></div><button onclick="menu()">☰</button>
+<nav id="nav"><a href="#home">Home</a><a href="#games">Games</a><a href="#results">Results</a><a href="#about">About</a></nav></header>
+<main>
+<section id="home" class="hero"><p>WELCOME TO KERALA PLAY</p><h1>Play. Enjoy. Win.</h1><div class="ml">കേരള പ്ലേ — നിങ്ങളുടെ ഗെയിംസ്, റിസൾട്ടുകൾ, വിവരങ്ങൾ ഒരിടത്ത്.</div><a href="#games" class="btn">Explore Games</a></section>
+<section id="games"><h2>Games</h2><div class="cards">
+<div class="card">🎮<h3>Game One</h3><p>Game information will appear here.</p><button onclick="openGame('Game One')">Open</button></div>
+<div class="card">🏆<h3>Game Two</h3><p>Check the latest game details.</p><button onclick="openGame('Game Two')">Open</button></div>
+<div class="card">⭐<h3>Game Three</h3><p>More games can be added easily.</p><button onclick="openGame('Game Three')">Open</button></div>
+</div></section>
+<section id="results"><h2>Latest Results</h2><div class="result"><span>Sample Result</span><b>Coming Soon</b></div><div class="result"><span>Next Result</span><b>Coming Soon</b></div></section>
+<section id="about"><h2>About Kerala Play</h2><p>Kerala Play is a simple web project. You can add your own games, results, database and other features.</p></section>
+</main>
+<footer>© <span id="year"></span> Kerala Play</footer>
+<script src="script.js"></script>
+</body>
+</html>
