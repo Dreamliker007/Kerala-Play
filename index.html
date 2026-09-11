@@ -23,16 +23,16 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V12
+  🌤️ Kerala • Day • V13
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V12 Mobile • Kerala Village</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V13 Mobile • Kerala Village</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you</div>
 <div id="status">👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1</div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button></div>
 </div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V12 — mobile-first performance build: smoother camera, optimized rendering, proper walk/run animation handling and lightweight Kerala world streaming foundation.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V13 — mobile-first movement & camera build: smoother camera, optimized rendering, proper walk/run animation handling and lightweight Kerala world streaming foundation.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -57,7 +57,7 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/
 const scene=new THREE.Scene();
 const mobile=matchMedia('(pointer:coarse)').matches || innerWidth<900;
 const deviceQuality=Math.min(devicePixelRatio || 1, mobile ? 1.15 : 1.6);
-// V12 — mobile-first performance build
+// V13 — mobile-first movement & camera build
 const woodMat = new THREE.MeshStandardMaterial({color:0x5a3928,roughness:.82,metalness:0});
 const wallMat = new THREE.MeshStandardMaterial({color:0xd7c6a5,roughness:.92});
 const roofMat = new THREE.MeshStandardMaterial({color:0x873f32,roughness:.88});
@@ -374,10 +374,12 @@ loadGLB(playerModelUrl,g=>{
   }
 });
 
-let moveX=0,moveY=0,yaw=0,pitch=.34,jump=false,vy=0;const joy=document.getElementById('joy'),knob=document.getElementById('knob');let jid=null;
-function jm(e){let r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=49,l=Math.hypot(dx,dy);if(l>max){dx=dx/l*max;dy=dy/l*max}knob.style.transform=`translate(${dx}px,${dy}px)`;moveX=dx/max;moveY=dy/max}
-joy.addEventListener('pointerdown',e=>{jid=e.pointerId;joy.setPointerCapture(jid);jm(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)jm(e)});['pointerup','pointercancel'].forEach(v=>joy.addEventListener(v,()=>{moveX=moveY=0;knob.style.transform='translate(0,0)'}));
-let cid=null,lx=0,ly=0;renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<190)return;cid=e.pointerId;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(cid)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==cid)return;yaw-=(e.clientX-lx)*(mobile?.0065:.008);pitch=Math.max(-.08,Math.min(1.1,pitch+(e.clientY-ly)*.005));lx=e.clientX;ly=e.clientY});renderer.domElement.addEventListener('pointerup',()=>cid=null);
+let moveX=0,moveY=0,targetMoveX=0,targetMoveY=0,yaw=0,targetYaw=0,pitch=.34,targetPitch=.34,jump=false,vy=0;
+const joy=document.getElementById('joy'),knob=document.getElementById('knob');let jid=null;
+function jm(e){let r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=49,l=Math.hypot(dx,dy);if(l>max){dx=dx/l*max;dy=dy/l*max}let nx=dx/max,ny=dy/max;const dead=.10;if(Math.hypot(nx,ny)<dead){nx=ny=0}else{const m=Math.hypot(nx,ny);nx*=Math.min(1,(m-dead)/(1-dead))/m;ny*=Math.min(1,(m-dead)/(1-dead))/m}knob.style.transform=`translate(${dx}px,${dy}px)`;targetMoveX=nx;targetMoveY=ny}
+function releaseJoy(){targetMoveX=targetMoveY=0;knob.style.transform='translate(0,0)'}
+joy.addEventListener('pointerdown',e=>{jid=e.pointerId;joy.setPointerCapture(jid);jm(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)jm(e)});['pointerup','pointercancel'].forEach(v=>joy.addEventListener(v,releaseJoy));
+let cid=null,lx=0,ly=0;renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<190)return;cid=e.pointerId;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(cid)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==cid)return;targetYaw-=(e.clientX-lx)*(mobile?.0048:.007);targetPitch=Math.max(-.08,Math.min(.92,targetPitch+(e.clientY-ly)*.0035));lx=e.clientX;ly=e.clientY});renderer.domElement.addEventListener('pointerup',()=>cid=null);
 document.getElementById('jump').onclick=()=>{if(!jump){jump=true;vy=8}};document.getElementById('reset').onclick=()=>{player.position.set(0,0,0);yaw=0};
 document.getElementById('pet').onclick=()=>{document.getElementById('mission').innerHTML='<b>🐾 Pet interaction</b><br>Your dog is happy ❤️';setTimeout(()=>document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you',1800)};
 const playBtn=document.getElementById('play');
@@ -390,9 +392,12 @@ playBtn.addEventListener('pointerup',enterWorld);
 const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 
 let last=performance.now();function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;mixers.forEach(m=>m.update(dt));
-let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z);if(l>1){x/=l;z/=l}
-let speed=mobile?5.4:7.8;if(window.playerAction) window.playerAction.timeScale=l>.08?1.0:0.0;player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
-player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));if(l>.08){player.rotation.y=Math.atan2(x,z)+yaw; }
+const smooth=1-Math.exp(-dt*14);moveX+=(targetMoveX-moveX)*smooth;moveY+=(targetMoveY-moveY)*smooth;
+const camSmooth=1-Math.exp(-dt*(mobile?10:12));yaw+=(targetYaw-yaw)*camSmooth;pitch+=(targetPitch-pitch)*camSmooth;
+let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z);if(l>1){x/=l;z/=l;l=1}
+const moving=l>.08;const speed=(mobile?5.2:7.8)*(moving?.92+.08*l:0);if(window.playerAction) window.playerAction.timeScale=moving?Math.min(1.15,.75+.35*l):0.0;
+player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
+player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));player.rotation.y+=diff*(1-Math.exp(-dt*10));}
 player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
 if((t|0)%3===0) npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
 const petX=player.position.x+Math.sin(t*.0018)*2.7;
@@ -401,8 +406,8 @@ const petZ=player.position.z+Math.cos(t*.0015)*2.7;
 pet.position.z += (petZ-pet.position.z)*Math.min(1,dt*4);
 if(Math.abs(petX-pet.position.x)+Math.abs(petZ-pet.position.z)>.02) pet.rotation.y=Math.atan2(petX-player.position.x,petZ-player.position.z);
 
-let target=new THREE.Vector3(player.position.x,player.position.y+1.7,player.position.z),cp=new THREE.Vector3(target.x+Math.sin(yaw)*8.2*Math.cos(pitch),target.y+Math.sin(pitch)*8.2,target.z+Math.cos(yaw)*8.2*Math.cos(pitch));
-camera.position.lerp(cp,mobile?.18:.14);camera.lookAt(target);renderer.render(scene,camera)}
+let target=new THREE.Vector3(player.position.x,player.position.y+1.7,player.position.z),cp=new THREE.Vector3(target.x+Math.sin(yaw)*7.6*Math.cos(pitch),target.y+Math.sin(pitch)*7.6,target.z+Math.cos(yaw)*7.6*Math.cos(pitch));
+const cameraFollow=1-Math.exp(-dt*(mobile?8:10));camera.position.lerp(cp,cameraFollow);camera.lookAt(target);renderer.render(scene,camera)}
 let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1<br>📱 '+fps+' FPS • '+(mobile?'Mobile':'Desktop');},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
 3D scene failed to start. Please reload once.
