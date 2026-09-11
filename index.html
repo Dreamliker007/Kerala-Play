@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • Open World V11</title>
+<title>Kerala Play • Open World V12 Mobile</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -26,13 +26,13 @@
   🌤️ Kerala • Day • V11
 </div>
 <div id="vignette"></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V8 • V11 • Kerala Village</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V12 Mobile • Kerala Village</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you</div>
 <div id="status">👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1</div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button></div>
 </div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V11 — a more cinematic Kerala-inspired open world with richer lighting, terrain details, village life, vehicles, pets, NPCs and smoother third-person controls.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><p>V12 — mobile-first performance build: smoother camera, optimized rendering, proper walk/run animation handling and lightweight Kerala world streaming foundation.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Multiplayer will be connected after the world layer is stable</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -172,10 +172,10 @@ function foliageCluster(x,z,s=1){
       new THREE.MeshStandardMaterial({color:0x356f39,roughness:.95})
     );
     leaf.position.set(x+Math.cos(a)*r,.35*s,z+Math.sin(a)*r);
-    leaf.castShadow=true; leaf.receiveShadow=true; scene.add(leaf);
+    leaf.castShadow=false; leaf.receiveShadow=false; scene.add(leaf);
   }
 }
-for(let i=0;i<26;i++){
+for(let i=0;i<(mobile?14:26);i++){
   const x=-150+Math.random()*300, z=-150+Math.random()*300;
   if(Math.abs(x)<13 || Math.abs(z)<13) continue;
   foliageCluster(x,z,.7+Math.random()*.8);
@@ -196,14 +196,21 @@ const sunDisc=new THREE.Mesh(
 sunDisc.position.set(-110,115,-170); scene.add(sunDisc);
 scene.background=new THREE.Color(0x86cbed);scene.fog=new THREE.Fog(0x86cbed,95,300);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,700);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
+const mobile=matchMedia('(pointer:coarse)').matches || innerWidth<900;
+const quality=mobile?Math.min(devicePixelRatio,1.25):Math.min(devicePixelRatio,1.6);
+renderer.setPixelRatio(quality);renderer.setSize(innerWidth,innerHeight);
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.04;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.getElementById('game').appendChild(renderer.domElement);
 const loader=new GLTFLoader();const mixers=[];
 const ASSET_BASE='https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
 function loadGLB(url,onLoad){loader.load(url,onLoad,undefined,e=>console.warn('3D asset unavailable',url,e));}
-function enableShadows(root){root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material.roughness=Math.min(o.material.roughness??.8,.9);}}});}
-scene.add(new THREE.HemisphereLight(0xd9f4ff,0x21452c,1.75));const sun=new THREE.DirectionalLight(0xffe7bd,3.6);sun.position.set(-70,135,55);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
+function enableShadows(root){root.traverse(o=>{if(o.isMesh){
+      const keepShadow=!mobile || o.geometry?.type==='BoxGeometry' || o.geometry?.type==='SphereGeometry';
+      o.castShadow=keepShadow;o.receiveShadow=!mobile;if(o.material){o.material.roughness=Math.min(o.material.roughness??.8,.9);}}});}
+scene.add(new THREE.HemisphereLight(0xd9f4ff,0x21452c,1.75));const sun=new THREE.DirectionalLight(0xffe7bd,3.6);sun.position.set(-70,135,55);sun.castShadow=true;sun.shadow.mapSize.set(mobile?768:1024,mobile?768:1024);sun.shadow.camera.left=-90;sun.shadow.camera.right=90;sun.shadow.camera.top=90;sun.shadow.camera.bottom=-90;scene.add(sun);
 const M=(c,r=.82)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
-function add(g,m,x=0,y=0,z=0){let o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;scene.add(o);return o}
+function add(g,m,x=0,y=0,z=0){let o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=!mobile;o.receiveShadow=!mobile;scene.add(o);return o}
 function box(w,h,d,c,x,y,z,r=0){let o=add(new THREE.BoxGeometry(w,h,d),M(c),x,y,z);o.rotation.y=r;return o}
 function cyl(r,h,c,x,y,z,s=18){return add(new THREE.CylinderGeometry(r,r,h,s),M(c),x,y,z)}
 function sph(r,c,x,y,z){return add(new THREE.SphereGeometry(r,20,16),M(c),x,y,z)}
@@ -214,7 +221,7 @@ for(let i=0;i<18;i++){
   let p=box(42,.08,30, i%2?0x6fa44f:0x78ab55, x,.04,z, (i%3)*0.12);
   p.material.roughness=1;
 }
-for(let i=0;i<32;i++){
+for(let i=0;i<(mobile?18:32);i++){
   let x=-150+Math.random()*300, z=-150+Math.random()*300;
   if(Math.abs(x)<8 || Math.abs(z)<8) continue;
   box(2.2,.13,Math.random()*8+5,0x8b744d,x,.09,z,Math.random()*Math.PI);
@@ -361,14 +368,16 @@ loadGLB(playerModelUrl,g=>{
   if(g.animations?.length){
     const mixer=new THREE.AnimationMixer(model);
     mixers.push(mixer);
-    mixer.clipAction(g.animations[0]).play();
+    const walkClip=g.animations.find(a=>/walk|run|locomotion/i.test(a.name)) || g.animations[0];
+    const action=mixer.clipAction(walkClip); action.play();
+    window.playerMixer=mixer; window.playerAction=action;
   }
 });
 
 let moveX=0,moveY=0,yaw=0,pitch=.34,jump=false,vy=0;const joy=document.getElementById('joy'),knob=document.getElementById('knob');let jid=null;
 function jm(e){let r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=49,l=Math.hypot(dx,dy);if(l>max){dx=dx/l*max;dy=dy/l*max}knob.style.transform=`translate(${dx}px,${dy}px)`;moveX=dx/max;moveY=dy/max}
 joy.addEventListener('pointerdown',e=>{jid=e.pointerId;joy.setPointerCapture(jid);jm(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)jm(e)});['pointerup','pointercancel'].forEach(v=>joy.addEventListener(v,()=>{moveX=moveY=0;knob.style.transform='translate(0,0)'}));
-let cid=null,lx=0,ly=0;renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<190)return;cid=e.pointerId;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(cid)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==cid)return;yaw-=(e.clientX-lx)*.008;pitch=Math.max(-.08,Math.min(1.1,pitch+(e.clientY-ly)*.005));lx=e.clientX;ly=e.clientY});renderer.domElement.addEventListener('pointerup',()=>cid=null);
+let cid=null,lx=0,ly=0;renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<190)return;cid=e.pointerId;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(cid)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==cid)return;yaw-=(e.clientX-lx)*(mobile?.0065:.008);pitch=Math.max(-.08,Math.min(1.1,pitch+(e.clientY-ly)*.005));lx=e.clientX;ly=e.clientY});renderer.domElement.addEventListener('pointerup',()=>cid=null);
 document.getElementById('jump').onclick=()=>{if(!jump){jump=true;vy=8}};document.getElementById('reset').onclick=()=>{player.position.set(0,0,0);yaw=0};
 document.getElementById('pet').onclick=()=>{document.getElementById('mission').innerHTML='<b>🐾 Pet interaction</b><br>Your dog is happy ❤️';setTimeout(()=>document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you',1800)};
 const playBtn=document.getElementById('play');
@@ -382,10 +391,10 @@ const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addE
 
 let last=performance.now();function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;mixers.forEach(m=>m.update(dt));
 let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z);if(l>1){x/=l;z/=l}
-let speed=7.8;player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
-player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));if(l>.08){player.rotation.y=Math.atan2(x,z)+yaw; player.position.y += Math.sin(t*.012)*.006;}
+let speed=mobile?5.4:7.8;if(window.playerAction) window.playerAction.timeScale=l>.08?1.0:0.0;player.position.x+=(x*Math.cos(yaw)-z*Math.sin(yaw))*speed*dt;player.position.z+=(x*Math.sin(yaw)+z*Math.cos(yaw))*speed*dt;
+player.position.x=Math.max(-172,Math.min(172,player.position.x));player.position.z=Math.max(-172,Math.min(172,player.position.z));if(l>.08){player.rotation.y=Math.atan2(x,z)+yaw; }
 player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
-npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
+if((t|0)%3===0) npcs.forEach((p,i)=>{let q=t*.00022+i*1.7;p.position.x+=Math.sin(q)*.018;p.position.z+=Math.cos(q)*.018;p.rotation.y=Math.sin(q)});
 const petX=player.position.x+Math.sin(t*.0018)*2.7;
 pet.position.x += (petX-pet.position.x)*Math.min(1,dt*4);
 const petZ=player.position.z+Math.cos(t*.0015)*2.7;
@@ -393,8 +402,8 @@ pet.position.z += (petZ-pet.position.z)*Math.min(1,dt*4);
 if(Math.abs(petX-pet.position.x)+Math.abs(petZ-pet.position.z)>.02) pet.rotation.y=Math.atan2(petX-player.position.x,petZ-player.position.z);
 
 let target=new THREE.Vector3(player.position.x,player.position.y+1.7,player.position.z),cp=new THREE.Vector3(target.x+Math.sin(yaw)*8.2*Math.cos(pitch),target.y+Math.sin(pitch)*8.2,target.z+Math.cos(yaw)*8.2*Math.cos(pitch));
-camera.position.lerp(cp,.14);camera.lookAt(target);renderer.render(scene,camera)}
-animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
+camera.position.lerp(cp,mobile?.18:.14);camera.lookAt(target);renderer.render(scene,camera)}
+let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 Player 1<br>💰 ₹1,250 • ⭐ Lv. 1<br>📱 '+fps+' FPS • '+(mobile?'Mobile':'Desktop');},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
 3D scene is loading. Please wait a moment.
 </div>
