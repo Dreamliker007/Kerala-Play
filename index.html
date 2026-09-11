@@ -10,7 +10,7 @@
 #mission{position:absolute;top:64px;left:14px;background:#10251de8;border-radius:15px;padding:12px 15px;font-size:12px;line-height:1.4}
 #status{position:absolute;right:14px;top:64px;background:#10251de8;border-radius:15px;padding:10px 13px;font-size:12px}
 #joy{position:absolute;left:20px;bottom:20px;width:158px;height:158px;border-radius:50%;background:#ffffff29;border:2px solid #ffffff66;pointer-events:auto;touch-action:none}
-#knob{position:absolute;left:45px;top:45px;width:65px;height:65px;border-radius:50%;background:#fff;box-shadow:0 5px 18px #0006}
+#houseBtn,#carBtn{position:fixed;right:18px;bottom:96px;z-index:40;width:94px !important;height:58px !important;border-radius:18px;font-size:17px}#knob{position:absolute;left:45px;top:45px;width:65px;height:65px;border-radius:50%;background:#fff;box-shadow:0 5px 18px #0006}
 .actions{position:absolute;right:18px;bottom:22px;display:flex;gap:9px;pointer-events:auto}.btn{width:60px;height:60px;border:0;border-radius:50%;background:#10251de8;color:#fff;font-size:21px;box-shadow:0 5px 16px #0005}
 #start{position:fixed;inset:0;z-index:1000;background:#06140bbb;display:flex;align-items:center;justify-content:center;pointer-events:auto}
 .card{position:relative;z-index:1001;width:min(92%,480px);background:#fff;color:#182033;border-radius:28px;padding:30px;text-align:center;box-shadow:0 25px 75px #000a}.card h1{margin:0 0 8px;font-size:32px}.card p{color:#555;line-height:1.5}.play{position:relative;z-index:1002;cursor:pointer;touch-action:manipulation;border:0;background:#087f45;color:#fff;font-size:18px;font-weight:800;padding:14px 25px;border-radius:14px}.small{font-size:12px;color:#777;margin-top:12px}
@@ -80,9 +80,12 @@ async function setupMultiplayer(){
   try{
     const ch=supabase.channel(roomName,{config:{broadcast:{self:false}}});
     ch.on('broadcast',{event:'player'},({payload})=>{if(payload.type==='state'||payload.type==='join')addOrUpdateRemote(payload);if(payload.type==='leave')removeRemote(payload.id);if(payload.type==='join'&&payload.id!==mpId)sendMpState()});
-    const sub=await ch.subscribe();
-    mpReady=sub==='SUBSCRIBED';window.mpChannel=ch;updateMpStatus();
-    if(mpReady){await ch.send({type:'broadcast',event:'player',payload:{type:'join',id:mpId,name:'Player '+mpId.slice(0,4),x:0,y:0,z:0,ry:0}})}
+    window.mpChannel=ch;
+    ch.subscribe((status)=>{
+      mpReady=status==='SUBSCRIBED';
+      updateMpStatus();
+      if(mpReady){ch.send({type:'broadcast',event:'player',payload:{type:'join',id:mpId,name:'Player '+mpId.slice(0,4),x:player.position.x,y:player.position.y,z:player.position.z,ry:player.rotation.y}})}
+    });
   }catch(e){console.warn('Multiplayer unavailable',e);updateMpStatus()}
 }
 function sendMpState(){if(!window.mpChannel||!mpReady)return;const drivingNow=typeof driving!=='undefined'&&driving&&activeCar;const o=drivingNow?activeCar:player;window.mpChannel.send({type:'broadcast',event:'player',payload:{type:'state',id:mpId,name:'Player '+mpId.slice(0,4),x:o.position.x,y:o.position.y,z:o.position.z,ry:o.rotation.y,vehicle:!!drivingNow}})}
@@ -497,10 +500,10 @@ function buildInterior(){
   const lamp=new THREE.Mesh(new THREE.SphereGeometry(.18,12,10),new THREE.MeshStandardMaterial({color:0xffe7a6,emissive:0x8a6b22,emissiveIntensity:1.2}));lamp.position.set(300,3.55,300);interior.add(lamp);
 }
 buildInterior();
-const houseEntrances=[[-27,-27], [28,19],[-32,25],[33,-32],[-76,-23],[76,15],[-75,62],[74,-73]];
+const houseEntrances=[[-27,-27],[28,19],[-32,25],[33,-32],[-76,-23],[76,15],[-75,62],[74,-73],[-68,-34.8],[68,-36.8],[-78,73],[76,75]];
 function getNearestHouse(){let best=null,bd=999;for(const p of houseEntrances){const d=Math.hypot(player.position.x-p[0],player.position.z-p[1]);if(d<bd){bd=d;best=p}}return {pos:best,dist:bd}}
 function setHouseButton(show,label){houseBtn.style.display=show?'block':'none';houseBtn.textContent=label||'🏠'}
-function enterHouse(){if(insideHouse||driving)return;const n=getNearestHouse();if(!n.pos||n.dist>12)return;outsideHousePos.copy(player.position);insideHouse=true;interior.visible=true;player.position.set(300,0,302.8);yaw=Math.PI;targetYaw=yaw;document.getElementById('mission').innerHTML='<b>🏠 House Interior</b><br>Walk inside the house<br>Tap 🚪 to exit';houseBtn.textContent='🚪';}
+function enterHouse(){if(insideHouse||driving)return;const n=getNearestHouse();if(!n.pos||n.dist>18)return;outsideHousePos.copy(player.position);insideHouse=true;interior.visible=true;player.position.set(300,0,302.8);yaw=Math.PI;targetYaw=yaw;document.getElementById('mission').innerHTML='<b>🏠 House Interior</b><br>Walk inside the house<br>Tap 🚪 to exit';houseBtn.textContent='🚪';}
 function exitHouse(){if(!insideHouse)return;insideHouse=false;interior.visible=false;player.position.copy(outsideHousePos);yaw=targetYaw=0;setHouseButton(false);document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you';}
 houseBtn.addEventListener('click',()=>insideHouse?exitHouse():enterHouse());
 
@@ -537,7 +540,7 @@ if(!driving){
   const petX=player.position.x+Math.sin(t*.0018)*2.7;pet.position.x+=(petX-pet.position.x)*Math.min(1,dt*4);
   const petZ=player.position.z+Math.cos(t*.0015)*2.7;pet.position.z+=(petZ-pet.position.z)*Math.min(1,dt*4);
   if(Math.abs(petX-pet.position.x)+Math.abs(petZ-pet.position.z)>.02)pet.rotation.y=Math.atan2(petX-player.position.x,petZ-player.position.z);
-  const near=getNearestCar();if(!insideHouse && near.car&&near.dist<6)setCarButton(true,'🚗');else if(!driving)setCarButton(false); if(!driving&&!insideHouse){const nh=getNearestHouse();if(nh.pos&&nh.dist<12)setHouseButton(true,'🏠 Enter');else setHouseButton(false);}
+  const near=getNearestCar();if(!insideHouse && near.car&&near.dist<6)setCarButton(true,'🚗');else if(!driving)setCarButton(false); if(!driving&&!insideHouse){const nh=getNearestHouse();if(nh.pos&&nh.dist<18)setHouseButton(true,'🏠 Enter');else setHouseButton(false);}
 }
 let follow=driving&&activeCar?activeCar:player;
 let target=new THREE.Vector3(follow.position.x,follow.position.y+(driving?1.2:1.7),follow.position.z);
