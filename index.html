@@ -308,7 +308,7 @@ function sendMpState(){
     }
   });
 }
-setInterval(sendMpState,100);
+let mpTimer=null; mpTimer=setInterval(sendMpState,200);
 setInterval(()=>{const now=performance.now();for(const [id,r] of remotePlayers){if(now-r.last>3500)removeRemote(id);}},1500);
 window.addEventListener('beforeunload',()=>{try{window.mpChannel?.send({type:'broadcast',event:'player',payload:{type:'leave',id:mpId}})}catch(e){}});
 setupMultiplayer();
@@ -659,13 +659,13 @@ function busStop(x,z,rot=0){
 }
 busStop(-38,9,.05);busStop(38,11,-.05);
 
-const camera=new THREE.PerspectiveCamera(66,innerWidth/innerHeight,.08,900);
+const camera=new THREE.PerspectiveCamera(66,innerWidth/innerHeight,.08,mobile?360:900);
 const renderer=new THREE.WebGLRenderer({antialias:!mobile,powerPreference:'high-performance',precision:mobile?'mediump':'highp'});
-renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.0:1.6));renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(deviceQuality,mobile?0.85:1.6));renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled=!mobile;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 scene.fog=new THREE.FogExp2(0x9fc4bb,mobile?0.0028:0.0019);
-renderer.domElement.style.touchAction='none';document.getElementById('game').appendChild(renderer.domElement);
+renderer.domElement.style.touchAction='none';document.getElementById('game').appendChild(renderer.domElement); renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();document.getElementById('boot-error')?.style.setProperty('display','block');});
 const loader=new GLTFLoader();const mixers=[];
 const ASSET_BASE='https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
 function loadGLB(url,onLoad){loader.load(url,onLoad,undefined,e=>console.warn('3D asset unavailable',url,e));}
@@ -1096,7 +1096,7 @@ function startAmbientAudio(){
 function enterWorld(e){if(e){e.preventDefault();e.stopPropagation();}playerName=(document.getElementById('name')?.value||'Player').trim().slice(0,18)||'Player';playerPlace=(document.getElementById('place')?.value||'Kerala').trim().slice(0,24)||'Kerala';playerGender=String(document.getElementById('gender')?.value||'male')==='female'?'female':'male';playerOutfit=Math.floor(Math.random()*4);document.getElementById('start').style.display='none';if(playerTemplate)applyAvatarStyle(playerTemplate,playerGender,playerOutfit);startAmbientAudio();if(localTag){localTag.innerHTML=playerName+'<br><span style=\"opacity:.82;font-size:9px\">'+playerPlace+'</span>';localTag.style.display='block';}if(window.mpChannel&&mpReady)sendMpState();}
 playBtn.addEventListener('click',enterWorld);playBtn.addEventListener('pointerup',enterWorld);
 const keys={};addEventListener('keydown',e=>{const k=String(e?.key??'').toLowerCase();if(k)keys[k]=true});addEventListener('keyup',e=>{const k=String(e?.key??'').toLowerCase();if(k)keys[k]=false});
-let last=performance.now();
+let last=performance.now(); let gamePaused=false; document.addEventListener('visibilitychange',()=>{gamePaused=document.hidden;last=performance.now();});
 
 // V21 polish: simple day/night cycle, quality toggle, interaction prompt and mobile minimap.
 let worldClock=9.5, autoTime=true, qualityMode='balanced';
@@ -1123,9 +1123,9 @@ dayBtn.addEventListener('click',()=>{autoTime=false;worldClock=worldClock<17?19:
 qualityBtn.addEventListener('click',()=>{
   qualityMode=qualityMode==='balanced'?'performance':qualityMode==='performance'?'quality':'balanced';
   qualityBtn.textContent=qualityMode==='performance'?'🚀 Performance':qualityMode==='quality'?'✨ Quality':'⚡ Balanced';
-  const pr=qualityMode==='performance'?Math.min(devicePixelRatio||1,0.9):qualityMode==='quality'?Math.min(devicePixelRatio||1,1.35):deviceQuality;
+  const pr=qualityMode==='performance'?Math.min(devicePixelRatio||1,0.72):qualityMode==='quality'?Math.min(devicePixelRatio||1,mobile?0.95:1.35):Math.min(deviceQuality,mobile?0.85:1.5);
   renderer.setPixelRatio(pr);
-  if(sun.shadow && sun.shadow.mapSize){const n=qualityMode==='quality'?1024:qualityMode==='performance'?512:(mobile?768:1024);sun.shadow.mapSize.set(n,n);sun.shadow.map?.dispose();}
+  if(!mobile && sun.shadow && sun.shadow.mapSize){const n=qualityMode==='quality'?1024:qualityMode==='performance'?512:1024;sun.shadow.mapSize.set(n,n);sun.shadow.map?.dispose();}
 });
 mapBtn.addEventListener('click',()=>{mapVisible=!mapVisible;mini.style.display=mapVisible?'block':'none'});
 function drawMini(){
@@ -1329,7 +1329,7 @@ addWell(-42,34);addWell(48,-31);
 const oldBirdUpdate=updateBirds;updateBirds=function(dt,t){oldBirdUpdate(dt,t);for(const b of birds){b.g.children.forEach((w,j)=>{if(j>0)w.rotation.z=(j%2?1:-1)*(Math.PI/2-.3)+Math.sin(t*.012+b.phase)*.22;});}};
 const vignette=document.createElement('div');vignette.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:4;background:radial-gradient(circle at 50% 42%,transparent 48%,rgba(0,0,0,.16) 100%);mix-blend-mode:multiply;';document.body.appendChild(vignette);
 applyWorldLight();
-function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;mixers.forEach(m=>m.update(dt)); updateWalkingNPCs(dt,t); updateBirds(dt,t); skyDecor.position.x=Math.sin(t*.00003)*8; updateTrain(dt); updateTraffic(dt); if(autoTime){worldClock=(worldClock+dt*0.055)%24;applyWorldLight();} updateInteractionPrompt(); drawMini();
+function animate(t){requestAnimationFrame(animate);if(gamePaused){last=t;return;}let dt=Math.min((t-last)/1000,.033);last=t;mixers.forEach(m=>m.update(dt)); updateWalkingNPCs(dt,t); updateBirds(dt,t); skyDecor.position.x=Math.sin(t*.00003)*8; updateTrain(dt); updateTraffic(dt); if(autoTime){worldClock=(worldClock+dt*0.055)%24;applyWorldLight();} updateInteractionPrompt(); drawMini();
 const smooth=1-Math.exp(-dt*14);moveX+=(targetMoveX-moveX)*smooth;moveY+=(targetMoveY-moveY)*smooth;
 const camSmooth=1-Math.exp(-dt*(mobile?10:12));yaw+=(targetYaw-yaw)*camSmooth;pitch+=(targetPitch-pitch)*camSmooth;
 let x=moveX+(keys.d?1:0)-(keys.a?1:0),z=moveY+(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z);if(l>1){x/=l;z/=l;l=1}
@@ -1342,7 +1342,7 @@ if(!driving && !ridingBus && !passengerRemote){
   if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));const turnK=1-Math.exp(-dt*(l>.72?11:8));player.rotation.y+=diff*turnK;
   const turnAmount=Math.max(-1,Math.min(1,diff/0.9)); player.userData.turnLean+=(turnAmount-(player.userData.turnLean||0))*(1-Math.exp(-dt*8));
   if(playerTemplate){ playerTemplate.rotation.z=-0.045*(player.userData.turnLean||0); }
-  targetYaw += Math.atan2(Math.sin(player.rotation.y-targetYaw),Math.cos(player.rotation.y-targetYaw))*(1-Math.exp(-dt*15));
+  targetYaw += Math.atan2(Math.sin(player.rotation.y-targetYaw),Math.cos(player.rotation.y-targetYaw))*(1-Math.exp(-dt*2.6));
 } else if(playerTemplate){ playerTemplate.rotation.z+=(0-playerTemplate.rotation.z)*(1-Math.exp(-dt*8));}
   player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
 } else if(activeCar){
@@ -1407,7 +1407,13 @@ if(vehicleMode && firstPersonView){
   const target=new THREE.Vector3(follow.position.x,follow.position.y+height,follow.position.z);
   const lookAhead=vehicleMode?3.0:(moving?1.45:.55);
   const lookTarget=new THREE.Vector3(target.x+Math.sin(followYaw)*lookAhead,target.y+0.28,target.z+Math.cos(followYaw)*lookAhead);
-  const cp=new THREE.Vector3(target.x+Math.sin(followYaw)*desiredDistance*Math.cos(pitch),target.y+Math.sin(pitch)*desiredDistance,target.z+Math.cos(followYaw)*desiredDistance*Math.cos(pitch));
+  let cp=new THREE.Vector3(target.x+Math.sin(followYaw)*desiredDistance*Math.cos(pitch),target.y+Math.sin(pitch)*desiredDistance,target.z+Math.cos(followYaw)*desiredDistance*Math.cos(pitch));
+  // Prevent the third-person camera from entering walls/large props.
+  const camRay=new THREE.Raycaster(target,cp.clone().sub(target).normalize(),0.25,desiredDistance);
+  const camHits=camRay.intersectObjects(scene.children,true);
+  let camDist=desiredDistance;
+  for(const hit of camHits){ if(hit.object===renderer.domElement) continue; const o=hit.object; if(o.visible && o.isMesh && !o.userData?.noCameraBlock){camDist=Math.max(2.15,Math.min(camDist,hit.distance-.18)); break;} }
+  if(camDist<desiredDistance){ const dir=cp.clone().sub(target).normalize(); cp=target.clone().add(dir.multiplyScalar(camDist)); }
   camera.position.lerp(cp,1-Math.exp(-dt*(mobile?13:16))); camera.lookAt(lookTarget);
 }
   let nearestHi=null,nearestHiDist=999; for(const [id,r] of remotePlayers){const d=Math.hypot(player.position.x-r.group.position.x,player.position.z-r.group.position.z);if(!r.vehicle&&d<5.8&&d<nearestHiDist){nearestHi=r;nearestHiDist=d;hiTargetId=id;}} const hi=document.getElementById('hiBtn'); if(hi){hi.style.display=nearestHi?'block':'none'; if(nearestHi)hi.textContent='👋 Hi '+nearestHi.name; if(!nearestHi)hiTargetId='';}
@@ -1422,7 +1428,7 @@ if(vehicleMode && firstPersonView){
   tag.style.display=(p.z<1?'block':'none');
 }
   renderer.render(scene,camera)}
-let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 '+escapeHtml(playerName)+'<br><span id="progressText">💰 ₹'+gameProgress.coins.toLocaleString()+' • ⭐ Lv. '+gameProgress.level+' • 🧩 '+((levelCollections[gameProgress.level]||[]).filter(x=>gameProgress.collection.has(x)).length)+'/'+(levelCollections[gameProgress.level]||[]).length+'</span><br>🎥 '+fps+' FPS • '+(driving?'🚗 Driving':ridingBus?'🚌 Bus':passengerRemote?'🚘 Passenger':insideHouse?'🏠 Home':'Mobile')+'<br><span id="mpStatus"><span id="mpDot"></span>'+(mpReady?'Online • '+(remotePlayers.size+1)+' players':'Connecting…')+'</span>'},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());setInterval(sendMpState,160);setInterval(updateProgressUI,500);onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.0:1.6));renderer.setSize(innerWidth,innerHeight)};
+let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 '+escapeHtml(playerName)+'<br><span id="progressText">💰 ₹'+gameProgress.coins.toLocaleString()+' • ⭐ Lv. '+gameProgress.level+' • 🧩 '+((levelCollections[gameProgress.level]||[]).filter(x=>gameProgress.collection.has(x)).length)+'/'+(levelCollections[gameProgress.level]||[]).length+'</span><br>🎥 '+fps+' FPS • '+(driving?'🚗 Driving':ridingBus?'🚌 Bus':passengerRemote?'🚘 Passenger':insideHouse?'🏠 Home':'Mobile')+'<br><span id="mpStatus"><span id="mpDot"></span>'+(mpReady?'Online • '+(remotePlayers.size+1)+' players':'Connecting…')+'</span>'},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());setInterval(updateProgressUI,500);onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(deviceQuality,mobile?0.85:1.6));renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
 3D scene failed to start. Please reload once.
 </div>
