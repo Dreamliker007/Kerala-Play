@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • V32 Gameplay + Realism</title>
+<title>Kerala Play • V33 Private Chat</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -27,6 +27,14 @@
 #mini{position:fixed;right:14px;bottom:14px;width:116px;height:116px;border-radius:18px;background:#10251dcc;border:1px solid #ffffff44;z-index:31;overflow:hidden}
 #mini canvas{width:100%;height:100%}
 .avatarTag{position:fixed;pointer-events:none;color:#fff;font:800 10px/1.15 Arial,sans-serif;background:rgba(12,30,22,.84);padding:4px 7px;border-radius:8px;transform:translate(-50%,-100%);white-space:nowrap;text-shadow:0 1px 2px #000;display:none;z-index:48}
+#chatBtn{position:fixed;right:14px;top:112px;z-index:72;border:0;border-radius:14px;background:#10251de8;color:#fff;padding:8px 11px;font-weight:800;font-size:10px;box-shadow:0 5px 16px #0005;pointer-events:auto;touch-action:manipulation}
+#chatBadge{display:none;min-width:16px;height:16px;padding:2px 4px;border-radius:9px;background:#ff4d4d;font-size:9px;margin-left:4px}
+#chatPanel{position:fixed;right:12px;top:150px;width:min(88vw,330px);z-index:90;background:rgba(10,25,20,.96);color:#fff;border:1px solid #ffffff22;border-radius:18px;padding:12px;box-shadow:0 16px 45px #0008;display:none;pointer-events:auto;backdrop-filter:blur(12px)}
+#chatPanel h3{margin:0 0 8px;font-size:14px}
+#chatTarget{width:100%;padding:8px;border:1px solid #ffffff22;border-radius:10px;background:#17372b;color:#fff;font-size:11px}
+#chatLog{height:170px;overflow:auto;margin:8px 0;padding:7px;border-radius:10px;background:#071711;border:1px solid #ffffff14;font-size:10px;line-height:1.35}
+.chatMsg{margin:5px 0;padding:5px 7px;border-radius:9px;background:#ffffff0d}.chatMsg.me{background:#174d37;text-align:right}.chatMsg .who{font-weight:800;opacity:.9}.chatMsg .time{opacity:.5;font-size:8px;margin-left:4px}
+#chatRow{display:flex;gap:6px}#chatInput{flex:1;min-width:0;padding:9px;border:1px solid #ffffff22;border-radius:10px;background:#fff;color:#172019;font-size:11px}#chatSend,#chatClose{border:0;border-radius:10px;padding:8px 10px;font-weight:800;font-size:10px}#chatSend{background:#0b8f50;color:#fff}#chatClose{background:#ffffff18;color:#fff}
 #name,#place{width:100%;padding:12px 13px;border:1px solid #d9d9d9;border-radius:12px;font-size:15px;margin:5px 0;background:#fff}
 #name:focus,#place:focus{outline:2px solid #75b798;border-color:#75b798}
 @media(max-width:700px){#mini{width:92px;height:92px}.top .pill:last-child{display:none}.qbtn{padding:8px 10px}.quick{bottom:12px}}
@@ -37,14 +45,15 @@
   🌤️ Kerala • Day • V31
 </div>
 <div id="vignette"></div><div id="localTag" class="avatarTag">Player<br><span>Kerala</span></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V32 Gameplay + Realism • Multiplayer</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V33 • Multiplayer + Private Chat</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you<br><span style="opacity:.85">🌐 Shared world • friends can join</span><br><span id="worldTip" style="opacity:.75">📍 Left joystick: move • swipe right: camera</span></div>
 <div id="status">👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br><span id="mpStatus"><span id="mpDot"></span>Connecting…</span></div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
-<div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><input id="name" maxlength="18" placeholder="Your name"><input id="place" maxlength="24" placeholder="Your place • e.g. Kottayam"><p>V32 — Gameplay + Realism Upgrade: realistic animation, birds, railway + train, school, playground, wells, gardens, buses, traffic and walking people.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Living Kerala world + multiplayer + vehicles + houses</div></div></div>
+<div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div><button id="chatBtn">💬 Chat <span id="chatBadge">0</span></button>
+<div id="chatPanel"><h3>💬 Private Chat</h3><select id="chatTarget"><option value="">Select an online player</option></select><div id="chatLog"><div style="opacity:.65">Select a player to start a private chat.</div></div><div id="chatRow"><input id="chatInput" maxlength="180" placeholder="Type a message…"><button id="chatSend">Send</button><button id="chatClose">✕</button></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><input id="name" maxlength="18" placeholder="Your name"><input id="place" maxlength="24" placeholder="Your place • e.g. Kottayam"><p>V33 — Private chat + Gameplay + Realism Upgrade: realistic animation, birds, railway + train, school, playground, wells, gardens, buses, traffic and walking people.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Living Kerala world + multiplayer + vehicles + houses</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -88,6 +97,42 @@ let playerAnim={mixer:null,actions:{},state:'idle'};
 let dogAnim={mixer:null,actions:{},state:'idle'};
 
 const remotePlayers=new Map();
+let chatTargetId='';
+let chatUnread=0;
+const privateChats=new Map();
+
+function chatKey(id){return String(id||'');}
+function addChatMessage(msg){
+  const key=chatKey(msg.from===mpId?msg.to:msg.from);
+  if(!key)return;
+  if(!privateChats.has(key)) privateChats.set(key,[]);
+  privateChats.get(key).push(msg);
+  if(privateChats.get(key).length>100) privateChats.get(key).shift();
+  if(chatTargetId===key) renderChatLog();
+}
+function renderChatLog(){
+  const log=document.getElementById('chatLog'); if(!log)return;
+  if(!chatTargetId){log.innerHTML='<div style="opacity:.65">Select a player to start a private chat.</div>';return;}
+  const msgs=privateChats.get(chatTargetId)||[];
+  log.innerHTML=msgs.length?msgs.map(m=>{const me=m.from===mpId; const who=me?'You':(m.name||'Player'); const tm=new Date(m.t||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); return '<div class="chatMsg '+(me?'me':'')+'"><span class="who">'+escapeHtml(who)+'</span><span class="time">'+tm+'</span><br>'+escapeHtml(m.text)+'</div>';}).join(''):'<div style="opacity:.55">No messages yet.</div>';
+  log.scrollTop=log.scrollHeight;
+}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]||c));}
+function refreshChatTargets(){
+  const sel=document.getElementById('chatTarget'); if(!sel)return;
+  const old=chatTargetId; sel.innerHTML='<option value="">Select an online player</option>';
+  for(const [id,r] of remotePlayers){const o=document.createElement('option');o.value=id;o.textContent=(r.name||'Player')+' • '+(r.place||'Kerala');sel.appendChild(o);}
+  if(remotePlayers.has(old)){sel.value=old;chatTargetId=old;} else {chatTargetId='';sel.value='';}
+  renderChatLog();
+}
+function updateChatBadge(){const b=document.getElementById('chatBadge');if(!b)return;b.textContent=String(chatUnread);b.style.display=chatUnread?'inline-block':'none';}
+function sendPrivateChat(){
+  const input=document.getElementById('chatInput'); const text=(input?.value||'').trim();
+  if(!text||!chatTargetId||!window.mpChannel||!mpReady)return;
+  const msg={type:'private_chat',from:mpId,to:chatTargetId,name:playerName,place:playerPlace,text:text.slice(0,180),t:Date.now()};
+  addChatMessage(msg); input.value='';
+  window.mpChannel.send({type:'broadcast',event:'chat',payload:msg});
+}
 let playerTemplate=null;
 let playerAnimations=[];
 let carTemplate=null;
@@ -180,6 +225,8 @@ function removeRemote(id){
   scene.remove(r.group);
   r.tag.remove();
   remotePlayers.delete(id);
+  if(chatTargetId===id){chatTargetId='';}
+  refreshChatTargets();
   updateMpStatus();
 }
 
@@ -204,6 +251,7 @@ function addOrUpdateRemote(data){
   r.name=data.name||r.name; r.place=data.place||r.place||'Kerala'; r.tag.innerHTML=r.name+'<br><span style=\"opacity:.82;font-size:9px\">'+r.place+'</span>';
   r.last=performance.now();
   r.vehicle=wantVehicle;
+  refreshChatTargets();
   updateMpStatus();
 }
 
@@ -211,6 +259,7 @@ async function setupMultiplayer(){
   try{
     const ch=supabase.channel(roomName,{config:{broadcast:{self:false}}});
     ch.on('broadcast',{event:'player'},({payload})=>{if(payload.type==='state'||payload.type==='join')addOrUpdateRemote(payload);if(payload.type==='leave')removeRemote(payload.id);if(payload.type==='join'&&payload.id!==mpId)sendMpState()});
+    ch.on('broadcast',{event:'chat'},({payload})=>{if(!payload||payload.type!=='private_chat')return;if(payload.to!==mpId)return;addChatMessage(payload);chatUnread++;updateChatBadge();if(document.getElementById('chatPanel')?.style.display==='block'){chatUnread=0;updateChatBadge();}});
     window.mpChannel=ch;
     ch.subscribe((status)=>{
       mpReady=status==='SUBSCRIBED';
@@ -237,6 +286,17 @@ setInterval(sendMpState,100);
 setInterval(()=>{const now=performance.now();for(const [id,r] of remotePlayers){if(now-r.last>3500)removeRemote(id);}},1500);
 window.addEventListener('beforeunload',()=>{try{window.mpChannel?.send({type:'broadcast',event:'player',payload:{type:'leave',id:mpId}})}catch(e){}});
 setupMultiplayer();
+
+// Private chat UI: messages are targeted to one player and filtered by recipient.
+document.getElementById('chatBtn').addEventListener('click',()=>{
+  const p=document.getElementById('chatPanel'); if(!p)return;
+  p.style.display=p.style.display==='block'?'none':'block';
+  if(p.style.display==='block'){chatUnread=0;updateChatBadge();refreshChatTargets();}
+});
+document.getElementById('chatClose').addEventListener('click',()=>{document.getElementById('chatPanel').style.display='none';});
+document.getElementById('chatTarget').addEventListener('change',e=>{chatTargetId=e.target.value;renderChatLog();});
+document.getElementById('chatSend').addEventListener('click',sendPrivateChat);
+document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendPrivateChat();}});
 const mobile=matchMedia('(pointer:coarse)').matches || innerWidth<900;
 const deviceQuality=Math.min(devicePixelRatio || 1, mobile ? 1.15 : 1.6);
 // V17 — mobile-first gameplay + house entry build
