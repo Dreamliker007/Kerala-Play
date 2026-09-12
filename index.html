@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • V33 Private Chat</title>
+<title>Kerala Play • V34 Avatars + Voice Chat</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
@@ -34,8 +34,8 @@
 #chatTarget{width:100%;padding:8px;border:1px solid #ffffff22;border-radius:10px;background:#17372b;color:#fff;font-size:11px}
 #chatLog{height:170px;overflow:auto;margin:8px 0;padding:7px;border-radius:10px;background:#071711;border:1px solid #ffffff14;font-size:10px;line-height:1.35}
 .chatMsg{margin:5px 0;padding:5px 7px;border-radius:9px;background:#ffffff0d}.chatMsg.me{background:#174d37;text-align:right}.chatMsg .who{font-weight:800;opacity:.9}.chatMsg .time{opacity:.5;font-size:8px;margin-left:4px}
-#chatRow{display:flex;gap:6px}#chatInput{flex:1;min-width:0;padding:9px;border:1px solid #ffffff22;border-radius:10px;background:#fff;color:#172019;font-size:11px}#chatSend,#chatClose{border:0;border-radius:10px;padding:8px 10px;font-weight:800;font-size:10px}#chatSend{background:#0b8f50;color:#fff}#chatClose{background:#ffffff18;color:#fff}
-#name,#place{width:100%;padding:12px 13px;border:1px solid #d9d9d9;border-radius:12px;font-size:15px;margin:5px 0;background:#fff}
+#voiceBtn{border:0;border-radius:10px;padding:8px 10px;font-weight:800;font-size:10px;background:#5b3fb5;color:#fff;min-width:42px}#voiceBtn.recording{background:#d63a3a}#chatRow{display:flex;gap:6px}#chatInput{flex:1;min-width:0;padding:9px;border:1px solid #ffffff22;border-radius:10px;background:#fff;color:#172019;font-size:11px}#chatSend,#chatClose{border:0;border-radius:10px;padding:8px 10px;font-weight:800;font-size:10px}#chatSend{background:#0b8f50;color:#fff}#chatClose{background:#ffffff18;color:#fff}
+#gender{width:100%;padding:12px 13px;border:1px solid #d9d9d9;border-radius:12px;font-size:15px;margin:5px 0;background:#fff;color:#182033}#name,#place{width:100%;padding:12px 13px;border:1px solid #d9d9d9;border-radius:12px;font-size:15px;margin:5px 0;background:#fff}
 #name:focus,#place:focus{outline:2px solid #75b798;border-color:#75b798}
 @media(max-width:700px){#mini{width:92px;height:92px}.top .pill:last-child{display:none}.qbtn{padding:8px 10px}.quick{bottom:12px}}
 </style></head>
@@ -45,15 +45,15 @@
   🌤️ Kerala • Day • V31
 </div>
 <div id="vignette"></div><div id="localTag" class="avatarTag">Player<br><span>Kerala</span></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V33 • Multiplayer + Private Chat</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V34 • Avatars + Private Voice</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you<br><span style="opacity:.85">🌐 Shared world • friends can join</span><br><span id="worldTip" style="opacity:.75">📍 Left joystick: move • swipe right: camera</span></div>
 <div id="status">👤 You<br>💰 ₹1,250 • ⭐ Lv. 1<br><span id="mpStatus"><span id="mpDot"></span>Connecting…</span></div>
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
 <div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div><button id="chatBtn">💬 Chat <span id="chatBadge">0</span></button>
-<div id="chatPanel"><h3>💬 Private Chat</h3><select id="chatTarget"><option value="">Select an online player</option></select><div id="chatLog"><div style="opacity:.65">Select a player to start a private chat.</div></div><div id="chatRow"><input id="chatInput" maxlength="180" placeholder="Type a message…"><button id="chatSend">Send</button><button id="chatClose">✕</button></div></div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><input id="name" maxlength="18" placeholder="Your name"><input id="place" maxlength="24" placeholder="Your place • e.g. Kottayam"><p>V33 — Private chat + Gameplay + Realism Upgrade: realistic animation, birds, railway + train, school, playground, wells, gardens, buses, traffic and walking people.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Living Kerala world + multiplayer + vehicles + houses</div></div></div>
+<div id="chatPanel"><h3>💬 Private Chat</h3><select id="chatTarget"><option value="">Select an online player</option></select><div id="chatLog"><div style="opacity:.65">Select a player to start a private chat.</div></div><div id="chatRow"><input id="chatInput" maxlength="180" placeholder="Type a message…"><button id="voiceBtn" title="Record private voice message">🎙️</button><button id="chatSend">Send</button><button id="chatClose">✕</button></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><input id="name" maxlength="18" placeholder="Your name"><input id="place" maxlength="24" placeholder="Your place • e.g. Kottayam"><select id="gender"><option value="male">👨 Male</option><option value="female">👩 Female</option></select><p>V34 — Male/Female avatars + outfit variation + private text/voice chat + realistic animation, birds, railway + train, school, playground, wells, gardens, buses, traffic and walking people.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Browser prototype • Living Kerala world + multiplayer + vehicles + houses</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -90,7 +90,7 @@ let mpReady=false;
 let driving=false,activeCar=null,carSpeed=0,carSteer=0;
 let ridingBus=null, passengerRemote=null;
 let player=null;
-let playerName='Player', playerPlace='Kerala';
+let playerName='Player', playerPlace='Kerala', playerGender='male', playerOutfit=0;
 let localTag=null;
 let audioCtx=null, ambientGain=null, musicGain=null, audioStarted=false;
 let playerAnim={mixer:null,actions:{},state:'idle'};
@@ -99,6 +99,8 @@ let dogAnim={mixer:null,actions:{},state:'idle'};
 const remotePlayers=new Map();
 let chatTargetId='';
 let chatUnread=0;
+let mediaRecorder=null, voiceChunks=[];
+const outfitNames={male:['Casual','T-Shirt','Long Sleeve','Sport'],female:['Salwar','Casual','Dress','Kurti']};
 const privateChats=new Map();
 
 function chatKey(id){return String(id||'');}
@@ -114,7 +116,7 @@ function renderChatLog(){
   const log=document.getElementById('chatLog'); if(!log)return;
   if(!chatTargetId){log.innerHTML='<div style="opacity:.65">Select a player to start a private chat.</div>';return;}
   const msgs=privateChats.get(chatTargetId)||[];
-  log.innerHTML=msgs.length?msgs.map(m=>{const me=m.from===mpId; const who=me?'You':(m.name||'Player'); const tm=new Date(m.t||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); return '<div class="chatMsg '+(me?'me':'')+'"><span class="who">'+escapeHtml(who)+'</span><span class="time">'+tm+'</span><br>'+escapeHtml(m.text)+'</div>';}).join(''):'<div style="opacity:.55">No messages yet.</div>';
+  log.innerHTML=msgs.length?msgs.map(m=>{const me=m.from===mpId; const who=me?'You':(m.name||'Player'); const tm=new Date(m.t||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); const body=m.type==='voice' ? '<button class="voicePlay" data-audio="'+escapeHtml(m.audio||'')+'">▶️ Voice message</button>' : escapeHtml(m.text||''); return '<div class="chatMsg '+(me?'me':'')+'"><span class="who">'+escapeHtml(who)+'</span><span class="time">'+tm+'</span><br>'+body+'</div>';}).join(''):'<div style="opacity:.55">No messages yet.</div>'; log.querySelectorAll('.voicePlay').forEach(btn=>btn.addEventListener('click',()=>{try{new Audio(btn.dataset.audio).play()}catch(e){}}));
   log.scrollTop=log.scrollHeight;
 }
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]||c));}
@@ -198,6 +200,7 @@ function createRemoteCar(){
 function buildRemoteVisual(r, vehicle){
   if(r.visual) scene.remove(r.visual);
   r.visual = vehicle ? (createRemoteCar() || fallbackRemoteHuman()) : createRemoteHuman(r);
+  if(!vehicle) applyAvatarStyle(r.visual,r.gender||'male',r.outfit||0);
   r.visual.position.set(0,0,0);
   r.visual.rotation.y=0;
   r.group.add(r.visual);
@@ -237,7 +240,7 @@ function addOrUpdateRemote(data){
   if(!r){
     const g=new THREE.Group();
     const tag=makeRemoteTag(data.name||'Player',data.place||'Kerala');
-    r={group:g,tag,last:performance.now(),targetPos:new THREE.Vector3(),targetRot:data.ry||0,visual:null,vehicle:false,name:data.name||'Player',place:data.place||'Kerala',anim:data.anim||'idle'};
+    r={group:g,tag,last:performance.now(),targetPos:new THREE.Vector3(),targetRot:data.ry||0,visual:null,vehicle:false,name:data.name||'Player',place:data.place||'Kerala',gender:data.gender||'male',outfit:Number(data.outfit)||0,anim:data.anim||'idle'};
     g.userData.tag=tag;
     remotePlayers.set(data.id,r);
     scene.add(g);
@@ -248,7 +251,7 @@ function addOrUpdateRemote(data){
 
   r.targetPos.set(Number(data.x)||0,Number(data.y)||0,Number(data.z)||0);
   r.targetRot=Number(data.ry)||0;
-  r.name=data.name||r.name; r.place=data.place||r.place||'Kerala'; r.tag.innerHTML=r.name+'<br><span style=\"opacity:.82;font-size:9px\">'+r.place+'</span>';
+  r.name=data.name||r.name; r.place=data.place||r.place||'Kerala'; r.gender=data.gender||r.gender||'male'; r.outfit=Number.isFinite(data.outfit)?data.outfit:r.outfit||0; if(r.visual)applyAvatarStyle(r.visual,r.gender,r.outfit); r.tag.innerHTML=r.name+'<br><span style=\"opacity:.82;font-size:9px\">'+r.place+'</span>';
   r.last=performance.now();
   r.vehicle=wantVehicle;
   refreshChatTargets();
@@ -264,7 +267,7 @@ async function setupMultiplayer(){
     ch.subscribe((status)=>{
       mpReady=status==='SUBSCRIBED';
       updateMpStatus();
-      if(mpReady&&player){ch.send({type:'broadcast',event:'player',payload:{type:'join',id:mpId,name:playerName,place:playerPlace,x:player.position.x,y:player.position.y,z:player.position.z,ry:player.rotation.y}})}
+      if(mpReady&&player){ch.send({type:'broadcast',event:'player',payload:{type:'join',id:mpId,name:playerName,place:playerPlace,gender:playerGender,outfit:playerOutfit,x:player.position.x,y:player.position.y,z:player.position.z,ry:player.rotation.y}})}
     });
   }catch(e){console.warn('Multiplayer unavailable',e);updateMpStatus()}
 }
@@ -278,7 +281,7 @@ function sendMpState(){
     payload:{
       type:'state',id:mpId,name:playerName,place:playerPlace,
       x:o.position.x,y:o.position.y,z:o.position.z,ry:o.rotation.y,
-      vehicle:!!drivingNow,anim:(drivingNow?'idle':(playerAnim.state||'idle')),seq:++mpSeq,t:Date.now()
+      vehicle:!!drivingNow,anim:(drivingNow?'idle':(playerAnim.state||'idle')),gender:playerGender,outfit:playerOutfit,seq:++mpSeq,t:Date.now()
     }
   });
 }
@@ -286,6 +289,13 @@ setInterval(sendMpState,100);
 setInterval(()=>{const now=performance.now();for(const [id,r] of remotePlayers){if(now-r.last>3500)removeRemote(id);}},1500);
 window.addEventListener('beforeunload',()=>{try{window.mpChannel?.send({type:'broadcast',event:'player',payload:{type:'leave',id:mpId}})}catch(e){}});
 setupMultiplayer();
+
+
+async function toggleVoiceRecord(){
+  if(!chatTargetId||!window.mpChannel||!mpReady)return;
+  const btn=document.getElementById('voiceBtn');
+  if(mediaRecorder?.state==='recording'){mediaRecorder.stop();return;}
+  try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];mediaRecorder=new MediaRecorder(stream);mediaRecorder.ondataavailable=e=>{if(e.data.size)voiceChunks.push(e.data)};mediaRecorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());btn.classList.remove('recording');btn.textContent='🎙️';const blob=new Blob(voiceChunks,{type:'audio/webm'});if(blob.size>120000){alert('Voice message too long. Keep it under 15 seconds.');return;}const reader=new FileReader();reader.onload=()=>{const msg={type:'voice',from:mpId,to:chatTargetId,name:playerName,place:playerPlace,audio:reader.result,t:Date.now()};addChatMessage(msg);window.mpChannel.send({type:'broadcast',event:'chat',payload:msg});renderChatLog()};reader.readAsDataURL(blob)};mediaRecorder.start();btn.classList.add('recording');btn.textContent='⏹️';setTimeout(()=>{if(mediaRecorder?.state==='recording')mediaRecorder.stop()},15000)}catch(e){alert('Microphone permission is needed for private voice messages.')}}
 
 // Private chat UI: messages are targeted to one player and filtered by recipient.
 document.getElementById('chatBtn').addEventListener('click',()=>{
@@ -295,7 +305,7 @@ document.getElementById('chatBtn').addEventListener('click',()=>{
 });
 document.getElementById('chatClose').addEventListener('click',()=>{document.getElementById('chatPanel').style.display='none';});
 document.getElementById('chatTarget').addEventListener('change',e=>{chatTargetId=e.target.value;renderChatLog();});
-document.getElementById('chatSend').addEventListener('click',sendPrivateChat);
+document.getElementById('chatSend').addEventListener('click',sendPrivateChat);document.getElementById('voiceBtn').addEventListener('click',toggleVoiceRecord);
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendPrivateChat();}});
 const mobile=matchMedia('(pointer:coarse)').matches || innerWidth<900;
 const deviceQuality=Math.min(devicePixelRatio || 1, mobile ? 1.15 : 1.6);
@@ -807,10 +817,18 @@ scene.add(player);
 
 // Higher-quality rigged third-person human with authored idle/walk/run clips.
 // Source: 3DAssets.dev CC0 character, 74-joint skeleton.
+
+function applyAvatarStyle(model, gender='male', outfit=0){
+  model.userData.gender=gender; model.userData.outfit=outfit;
+  const male=[0x263238,0x234f7d,0x7a3e28,0x304d35], female=[0x7b2d5f,0x2d5f8a,0x8a5a2b,0x5b3a75], p=gender==='female'?female:male;
+  model.traverse(o=>{if(!o.isMesh)return; const mats=Array.isArray(o.material)?o.material:[o.material]; mats.forEach(mat=>{if(!mat)return;const n=(mat.name||'').toLowerCase();if(/shirt|top|dress|torso|cloth|jacket|sleeve/.test(n)&&mat.color)mat.color.setHex(p[outfit%4]);if(/pants|trouser|short|lower|skirt/.test(n)&&mat.color)mat.color.setHex(gender==='female'?[0x242b4a,0x3a3026,0x5a2145,0x2d3c4a][outfit%4]:[0x262626,0x4a3b2b,0x22394f,0x303030][outfit%4]);});});
+  if(gender==='female'&&!model.getObjectByName('KP_FemaleStyle')){const st=new THREE.Group();st.name='KP_FemaleStyle';const dm=new THREE.MeshStandardMaterial({color:[0x8c3d72,0x2d6f8d,0xb06a2e,0x5a477e][outfit%4],roughness:.88});const skirt=new THREE.Mesh(new THREE.CylinderGeometry(.38,.58,.72,16,1,false),dm);skirt.position.y=1.0;st.add(skirt);const hm=new THREE.MeshStandardMaterial({color:[0x20150f,0x3b2416,0x171717,0x6b4026][outfit%4],roughness:.9});const hair=new THREE.Mesh(new THREE.SphereGeometry(.28,16,12,0,Math.PI*2,0,Math.PI*.72),hm);hair.scale.set(1.05,1.15,1.05);hair.position.y=1.78;st.add(hair);model.add(st);}
+}
+
 const playerModelUrl='https://cdn.3dassets.dev/assets/32901/v1/model.glb';
 loadGLB(playerModelUrl,g=>{
   const model=g.scene;
-  playerTemplate=model; playerAnimations=g.animations||[];
+  playerTemplate=model; playerAnimations=g.animations||[]; applyAvatarStyle(model,playerGender,playerOutfit);
   enableShadows(model);
   model.scale.setScalar(1.0);
   model.position.set(0,0,0);
@@ -932,7 +950,7 @@ function startAmbientAudio(){
     setTimeout(chirp,1200);
   }catch(err){console.warn('Audio unavailable',err)}
 }
-function enterWorld(e){if(e){e.preventDefault();e.stopPropagation();}playerName=(document.getElementById('name')?.value||'Player').trim().slice(0,18)||'Player';playerPlace=(document.getElementById('place')?.value||'Kerala').trim().slice(0,24)||'Kerala';document.getElementById('start').style.display='none';startAmbientAudio();if(localTag){localTag.innerHTML=playerName+'<br><span style=\"opacity:.82;font-size:9px\">'+playerPlace+'</span>';localTag.style.display='block';}if(window.mpChannel&&mpReady)sendMpState();}
+function enterWorld(e){if(e){e.preventDefault();e.stopPropagation();}playerName=(document.getElementById('name')?.value||'Player').trim().slice(0,18)||'Player';playerPlace=(document.getElementById('place')?.value||'Kerala').trim().slice(0,24)||'Kerala';playerGender=document.getElementById('gender')?.value||'male';playerOutfit=Math.floor(Math.random()*4);document.getElementById('start').style.display='none';startAmbientAudio();if(localTag){localTag.innerHTML=playerName+'<br><span style=\"opacity:.82;font-size:9px\">'+playerPlace+'</span>';localTag.style.display='block';}if(window.mpChannel&&mpReady)sendMpState();}
 playBtn.addEventListener('click',enterWorld);playBtn.addEventListener('pointerup',enterWorld);
 const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 let last=performance.now();
