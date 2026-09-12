@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Kerala Play • V35 Life, Home & Progression</title>
+<title>Kerala Play • V37 Immersive Foundation</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:Arial,sans-serif}
 #game{position:fixed;inset:0}#ui{position:fixed;inset:0;color:#fff;pointer-events:none}
 .top{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px}.pill{background:#10251de8;padding:8px 11px;border-radius:13px;font-weight:800;font-size:10px;backdrop-filter:blur(8px)}
 #mission{position:absolute;top:56px;left:10px;max-width:38vw;background:#10251dcc;border-radius:11px;padding:6px 8px;font-size:8px;line-height:1.28}
 #status{position:absolute;right:10px;top:56px;max-width:34vw;background:#10251dcc;border-radius:11px;padding:6px 8px;font-size:8px;line-height:1.25}
-#joy{position:absolute;left:18px;bottom:18px;width:132px;height:132px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.42);pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;z-index:60;box-shadow:inset 0 0 0 12px rgba(255,255,255,.035),0 8px 24px rgba(0,0,0,.18)}
-#houseBtn,#carBtn{position:fixed;right:18px;bottom:104px;z-index:70;width:88px !important;height:54px !important;border-radius:17px;font-size:15px;touch-action:manipulation}#knob{position:absolute;left:39px;top:39px;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 5px 18px rgba(0,0,0,.38);transition:transform .02s linear;will-change:transform}
+#joy{position:absolute;left:18px;bottom:18px;width:138px;height:138px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.42);pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;z-index:60;box-shadow:inset 0 0 0 12px rgba(255,255,255,.035),0 8px 24px rgba(0,0,0,.18)}
+#houseBtn,#carBtn{position:fixed;right:18px;bottom:104px;z-index:70;width:88px !important;height:54px !important;border-radius:17px;font-size:15px;touch-action:manipulation}#knob{position:absolute;left:42px;top:42px;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 5px 18px rgba(0,0,0,.38);transition:transform .02s linear;will-change:transform}
 .actions{position:absolute;right:18px;bottom:22px;display:flex;gap:9px;align-items:center;pointer-events:auto}.btn{width:56px;height:56px;border:0;border-radius:50%;background:#10251de8;color:#fff;font-size:21px;box-shadow:0 5px 16px #0005}
 #start{position:fixed;inset:0;z-index:1000;background:#06140bbb;display:flex;align-items:center;justify-content:center;pointer-events:auto}
 .card{position:relative;z-index:1001;width:min(92%,480px);background:#fff;color:#182033;border-radius:28px;padding:30px;text-align:center;box-shadow:0 25px 75px #000a}.card h1{margin:0 0 8px;font-size:32px}.card p{color:#555;line-height:1.5}.play{position:relative;z-index:1002;cursor:pointer;touch-action:manipulation;border:0;background:#087f45;color:#fff;font-size:18px;font-weight:800;padding:14px 25px;border-radius:14px}.small{font-size:12px;color:#777;margin-top:12px}
@@ -29,7 +29,7 @@
 .avatarTag{position:fixed;pointer-events:none;color:#fff;font:800 10px/1.15 Arial,sans-serif;background:rgba(12,30,22,.84);padding:4px 7px;border-radius:8px;transform:translate(-50%,-100%);white-space:nowrap;text-shadow:0 1px 2px #000;display:none;z-index:48}
 #chatBtn{position:fixed;right:14px;top:112px;z-index:72;border:0;border-radius:14px;background:#10251de8;color:#fff;padding:8px 11px;font-weight:800;font-size:10px;box-shadow:0 5px 16px #0005;pointer-events:auto;touch-action:manipulation}
 #chatBadge{display:none;min-width:16px;height:16px;padding:2px 4px;border-radius:9px;background:#ff4d4d;font-size:9px;margin-left:4px}
-#chatPanel{position:fixed;right:12px;top:150px;width:min(88vw,330px);z-index:90;background:rgba(10,25,20,.96);color:#fff;border:1px solid #ffffff22;border-radius:18px;padding:12px;box-shadow:0 16px 45px #0008;display:none;pointer-events:auto;backdrop-filter:blur(12px)}
+#chatPanel{position:fixed;right:12px;top:150px;width:min(90vw,340px);z-index:90;background:rgba(10,25,20,.96);color:#fff;border:1px solid #ffffff22;border-radius:18px;padding:12px;box-shadow:0 16px 45px #0008;display:none;pointer-events:auto;backdrop-filter:blur(12px)}
 #emojiRow{display:flex;gap:4px;margin:5px 0 7px;flex-wrap:wrap}#emojiRow button{border:0;background:#ffffff12;color:#fff;border-radius:9px;padding:5px 7px;font-size:15px}#chatPanel h3{margin:0 0 8px;font-size:14px}
 #chatTarget{width:100%;padding:8px;border:1px solid #ffffff22;border-radius:10px;background:#17372b;color:#fff;font-size:11px}
 #chatLog{height:170px;overflow:auto;margin:8px 0;padding:7px;border-radius:10px;background:#071711;border:1px solid #ffffff14;font-size:10px;line-height:1.35}
@@ -42,10 +42,10 @@
 <body>
 <div id="game"></div><div id="cinematic"></div>
 <div id="weather" class="pill" style="position:fixed;left:12px;bottom:12px;z-index:30">
-  🌤️ Kerala • Day • V31
+  🌤️ Kerala • Day • V37
 </div>
 <div id="vignette"></div><div id="localTag" class="avatarTag">Player<br><span>Kerala</span></div><div id="ui">
-<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kottayam • V34 • Avatars + Private Voice</div></div>
+<div class="top"><div class="pill">🌴 Kerala Play</div><div class="pill">☀️ Kerala • V37 • Immersive Foundation</div></div>
 <div id="mission"><b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you<br><span style="opacity:.85">🌐 Shared world • friends can join</span><br><span id="worldTip" style="opacity:.75">📍 Left joystick: move • swipe right: camera</span></div>
 <div id="status">👤 You<br><span id="progressText">💰 ₹1,250 • ⭐ Lv. 1 • 🧩 0/5</span><br><span id="mpStatus"><span id="mpDot"></span>Connecting…</span></div>
 <div id="joy"><div id="knob"></div></div>
@@ -53,7 +53,7 @@
 </div>
 <div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div><button id="chatBtn">💬 Chat <span id="chatBadge">0</span></button><button id="hiBtn">👋 Hi</button><button id="viewBtn">👁️ Interior view</button>
 <div id="chatPanel"><h3>💬 Private Chat</h3><select id="chatTarget"><option value="">Select an online player</option></select><div id="chatLog"><div style="opacity:.65">Select a player to start a private chat.</div></div><div id="emojiRow"><button data-e="😀">😀</button><button data-e="😂">😂</button><button data-e="❤️">❤️</button><button data-e="👍">👍</button><button data-e="👋">👋</button><button data-e="🙏">🙏</button><button data-e="😎">😎</button></div><div id="chatRow"><input id="chatInput" maxlength="180" placeholder="Message… (phone numbers are masked)"><button id="rpsStart" title="Play a private mini game">🎮</button><button id="voiceBtn" title="Record private voice message">🎙️</button><button id="chatSend">Send</button><button id="chatClose">✕</button></div></div>
-<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><input id="name" maxlength="18" placeholder="Your name"><input id="place" maxlength="24" placeholder="Your place • e.g. Kottayam"><select id="gender"><option value="male">👨 Male</option><option value="female">👩 Female</option></select><p>V35 — Male/Female avatars + different outfits + private text/voice/emoji chat + home furniture interactions + collections + levels + tasks.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Choose your gender • enter Kerala world • complete collections to level up</div></div></div>
+<div id="start"><div class="card"><h1>🌴 Kerala Play</h1><input id="name" maxlength="18" placeholder="Your name"><input id="place" maxlength="24" placeholder="Your place • e.g. Kottayam"><select id="gender"><option value="male">👨 Male</option><option value="female">👩 Female</option></select><p>V37 — smoother controller/camera • realistic vehicles • interior driving • bus travel • private chat/voice • home interactions • progression.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Choose your gender • enter Kerala world • complete collections to level up</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
 </script>
@@ -314,40 +314,78 @@ window.addEventListener('beforeunload',()=>{try{window.mpChannel?.send({type:'br
 setupMultiplayer();
 
 // V36: reliable private voice-message chunks + private mini-game/greeting protocol.
-const oldMpSetupPromise=Promise.resolve();
+const voiceOutbox=new Map();
 function addVoiceChunk(payload){
   if(!payload||payload.to!==mpId||!payload.voiceId)return;
-  let v=voiceRx.get(payload.voiceId); if(!v){v={from:payload.from,name:payload.name,place:payload.place,total:payload.total,chunks:[],received:0,mime:payload.mime||'audio/webm'};voiceRx.set(payload.voiceId,v);}
-  if(v.chunks[payload.idx])return; v.chunks[payload.idx]=payload.data; v.received++;
-  if(v.received>=v.total){const data=v.chunks.join('');const msg={type:'voice',from:v.from,to:mpId,name:v.name,place:v.place,audio:data,t:Date.now()};addChatMessage(msg);chatUnread++;updateChatBadge();voiceRx.delete(payload.voiceId);}
+  let v=voiceRx.get(payload.voiceId);
+  if(!v){v={from:payload.from,name:payload.name,place:payload.place,total:payload.total,chunks:[],received:0,mime:payload.mime||'audio/webm',started:performance.now()};voiceRx.set(payload.voiceId,v);}
+  if(v.chunks[payload.idx])return;
+  v.chunks[payload.idx]=payload.data; v.received++;
+  if(v.received>=v.total){
+    const data=v.chunks.join('');
+    const msg={type:'voice',from:v.from,to:mpId,name:v.name,place:v.place,audio:data,t:Date.now()};
+    addChatMessage(msg); chatUnread++; updateChatBadge(); voiceRx.delete(payload.voiceId);
+  }
 }
+function checkVoiceGaps(){
+  const now=performance.now();
+  for(const [id,v] of voiceRx){
+    if(now-v.started<900||v.received>=v.total)continue;
+    const missing=[]; for(let i=0;i<v.total;i++)if(!v.chunks[i])missing.push(i);
+    if(missing.length&&window.mpChannel){window.mpChannel.send({type:'broadcast',event:'chat',payload:{type:'voice_nack',voiceId:id,to:v.from,from:mpId,missing}});v.started=now;}
+  }
+}
+setInterval(checkVoiceGaps,700);
+window.mpChannel?.on('broadcast',{event:'chat'},({payload})=>{
+  if(!payload)return;
+  if(payload.type==='voice_chunk'){addVoiceChunk(payload);return;}
+  if(payload.type==='voice_nack'&&payload.to===mpId){
+    const out=voiceOutbox.get(payload.voiceId);
+    if(out&&window.mpChannel){for(const idx of (payload.missing||[])){const d=out.chunks[idx];if(d)window.mpChannel.send({type:'broadcast',event:'chat',payload:{type:'voice_chunk',voiceId:payload.voiceId,idx,total:out.total,data:d,from:mpId,to:out.to,name:playerName,place:playerPlace,mime:out.mime,t:Date.now()}});}}
+    return;
+  }
+  if(payload.type==='greet'&&payload.to===mpId){awardProgress('👋 Greeting',10);showMission('👋 '+(payload.name||'Player')+' says Hi!','Tap 👋 Hi to reply');setTimeout(()=>showMission('🎯 Mission','Explore Kerala • complete collections to level up'),1600);return;}
+  if(payload.type==='rps_invite'&&payload.to===mpId){const id=payload.gameId;rpsGames.set(id,{other:payload.from,myChoice:null,otherChoice:null});chatTargetId=payload.from;refreshChatTargets();showRpsChoices(id);return;}
+  if(payload.type==='rps_choice'&&payload.to===mpId){const g=rpsGames.get(payload.gameId);if(g){g.otherChoice=payload.choice;finishRps(payload.gameId);}return;}
+});
+
+async function toggleVoiceRecordV37(){
+  if(!chatTargetId||!window.mpChannel||!mpReady)return;
+  const btn=document.getElementById('voiceBtn'); if(!btn)return;
+  if(mediaRecorder?.state==='recording'){mediaRecorder.stop();return;}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    voiceChunks=[];
+    const opts=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?{mimeType:'audio/webm;codecs=opus',audioBitsPerSecond:16000}:{audioBitsPerSecond:16000};
+    mediaRecorder=new MediaRecorder(stream,opts);
+    mediaRecorder.ondataavailable=e=>{if(e.data.size)voiceChunks.push(e.data)};
+    mediaRecorder.onstop=()=>{
+      stream.getTracks().forEach(t=>t.stop());btn.classList.remove('recording');btn.textContent='🎙️';
+      const blob=new Blob(voiceChunks,{type:mediaRecorder.mimeType||'audio/webm'});
+      if(blob.size>180000){alert('Voice message too large. Keep it under 10 seconds.');return;}
+      const reader=new FileReader(); reader.onload=async()=>{
+        const data=reader.result,voiceId=mpId+'-'+Date.now(),chunkSize=5200,total=Math.ceil(data.length/chunkSize);
+        const chunks=Array.from({length:total},(_,i)=>data.slice(i*chunkSize,(i+1)*chunkSize));
+        voiceOutbox.set(voiceId,{chunks,total,to:chatTargetId,mime:blob.type});
+        for(let i=0;i<total;i++){
+          const payload={type:'voice_chunk',voiceId,idx:i,total,data:chunks[i],from:mpId,to:chatTargetId,name:playerName,place:playerPlace,mime:blob.type,t:Date.now()};
+          for(let rep=0;rep<2;rep++){window.mpChannel.send({type:'broadcast',event:'chat',payload});await new Promise(r=>setTimeout(r,55));}
+        }
+        const msg={type:'voice',from:mpId,to:chatTargetId,name:playerName,place:playerPlace,audio:data,t:Date.now()};addChatMessage(msg);renderChatLog();
+        setTimeout(()=>voiceOutbox.delete(voiceId),20000);
+      }; reader.readAsDataURL(blob);
+    };
+    mediaRecorder.start();btn.classList.add('recording');btn.textContent='⏹️';
+    setTimeout(()=>{if(mediaRecorder?.state==='recording')mediaRecorder.stop()},10000);
+  }catch(e){alert('Microphone permission is needed for private voice messages.');}
+}
+const vb=document.getElementById('voiceBtn');if(vb){const nv=vb.cloneNode(true);vb.replaceWith(nv);nv.addEventListener('click',toggleVoiceRecordV37);}
 function rpsResult(a,b){if(a===b)return 0;if((a==='rock'&&b==='scissors')||(a==='paper'&&b==='rock')||(a==='scissors'&&b==='paper'))return 1;return -1;}
 function showRpsChoices(gameId){const log=document.getElementById('chatLog');if(!log)return;const box=document.createElement('div');box.id='rpsBox';box.innerHTML='<b>🎮 Rock • Paper • Scissors</b><button data-r="rock">🪨 Rock</button><button data-r="paper">📄 Paper</button><button data-r="scissors">✂️ Scissors</button>';log.appendChild(box);box.querySelectorAll('button').forEach(b=>b.onclick=()=>{const g=rpsGames.get(gameId);if(!g||g.myChoice)return;g.myChoice=b.dataset.r;window.mpChannel?.send({type:'broadcast',event:'chat',payload:{type:'rps_choice',gameId,to:g.other,from:mpId,choice:g.myChoice,name:playerName,t:Date.now()}});b.parentElement.querySelectorAll('button').forEach(x=>x.disabled=true);finishRps(gameId);});}
 function finishRps(gameId){const g=rpsGames.get(gameId);if(!g||!g.myChoice||!g.otherChoice)return;const r=rpsResult(g.myChoice,g.otherChoice);const text=r===0?'🤝 Draw!':r===1?'🏆 You win! +50':'🙂 You lose';addChatMessage({type:'private_chat',from:mpId,to:g.other,name:playerName,text:'🎮 '+text,t:Date.now()});if(r===1){gameProgress.coins+=50;awardProgress('🎮 Play Area',15);}else if(r===0){gameProgress.coins+=15;}updateProgressUI();showMission('🎮 Mini game',text);rpsGames.delete(gameId);}
 window.mpChannel?.on('broadcast',{event:'chat'},({payload})=>{if(!payload)return;if(payload.type==='voice_chunk'){addVoiceChunk(payload);return;}if(payload.type==='greet'&&payload.to===mpId){awardProgress('👋 Greeting',10);showMission('👋 '+(payload.name||'Player')+' says Hi!','Tap 👋 Hi to reply');setTimeout(()=>showMission('🎯 Mission','Explore Kerala • complete collections to level up'),1600);return;}if(payload.type==='rps_invite'&&payload.to===mpId){const id=payload.gameId;rpsGames.set(id,{other:payload.from,myChoice:null,otherChoice:null});chatTargetId=payload.from;refreshChatTargets();showRpsChoices(id);return;}if(payload.type==='rps_choice'&&payload.to===mpId){const g=rpsGames.get(payload.gameId);if(g){g.otherChoice=payload.choice;finishRps(payload.gameId);}return;}});
 
-async function toggleVoiceRecordV36(){
-  if(!chatTargetId||!window.mpChannel||!mpReady)return;
-  const btn=document.getElementById('voiceBtn'); if(!btn)return;
-  if(mediaRecorder?.state==='recording'){mediaRecorder.stop();return;}
-  try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true}); voiceChunks=[];
-    const opts=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?{mimeType:'audio/webm;codecs=opus',audioBitsPerSecond:32000}:{audioBitsPerSecond:32000};
-    mediaRecorder=new MediaRecorder(stream,opts);
-    mediaRecorder.ondataavailable=e=>{if(e.data.size)voiceChunks.push(e.data)};
-    mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());btn.classList.remove('recording');btn.textContent='🎙️';const blob=new Blob(voiceChunks,{type:mediaRecorder.mimeType||'audio/webm'});if(blob.size>240000){alert('Voice message too large. Keep it under 15 seconds.');return;}const reader=new FileReader();reader.onload=async()=>{const data=reader.result;const voiceId=mpId+'-'+Date.now();const chunkSize=9000;const total=Math.ceil(data.length/chunkSize);for(let i=0;i<total;i++){await window.mpChannel.send({type:'broadcast',event:'chat',payload:{type:'voice_chunk',voiceId,idx:i,total,data:data.slice(i*chunkSize,(i+1)*chunkSize),from:mpId,to:chatTargetId,name:playerName,place:playerPlace,mime:blob.type,t:Date.now()}});await new Promise(r=>setTimeout(r,12));}const msg={type:'voice',from:mpId,to:chatTargetId,name:playerName,place:playerPlace,audio:data,t:Date.now()};addChatMessage(msg);renderChatLog();};reader.readAsDataURL(blob);
-    };
-    mediaRecorder.start();btn.classList.add('recording');btn.textContent='⏹️';setTimeout(()=>{if(mediaRecorder?.state==='recording')mediaRecorder.stop()},15000);
-  }catch(e){alert('Microphone permission is needed for private voice messages.')}
-}
-const vb=document.getElementById('voiceBtn');if(vb){const nv=vb.cloneNode(true);vb.replaceWith(nv);nv.addEventListener('click',toggleVoiceRecordV36);}
 const rb=document.getElementById('rpsStart');if(rb)rb.addEventListener('click',()=>{if(!chatTargetId||!window.mpChannel||!mpReady)return;const id=mpId+'-'+Date.now();rpsGames.set(id,{other:chatTargetId,myChoice:null,otherChoice:null});showRpsChoices(id);window.mpChannel.send({type:'broadcast',event:'chat',payload:{type:'rps_invite',gameId:id,to:chatTargetId,from:mpId,name:playerName,t:Date.now()}});});
-
-async function toggleVoiceRecord(){
-  if(!chatTargetId||!window.mpChannel||!mpReady)return;
-  const btn=document.getElementById('voiceBtn');
-  if(mediaRecorder?.state==='recording'){mediaRecorder.stop();return;}
-  try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];mediaRecorder=new MediaRecorder(stream);mediaRecorder.ondataavailable=e=>{if(e.data.size)voiceChunks.push(e.data)};mediaRecorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());btn.classList.remove('recording');btn.textContent='🎙️';const blob=new Blob(voiceChunks,{type:'audio/webm'});if(blob.size>120000){alert('Voice message too long. Keep it under 15 seconds.');return;}const reader=new FileReader();reader.onload=()=>{const msg={type:'voice',from:mpId,to:chatTargetId,name:playerName,place:playerPlace,audio:reader.result,t:Date.now()};addChatMessage(msg);window.mpChannel.send({type:'broadcast',event:'chat',payload:msg});renderChatLog()};reader.readAsDataURL(blob)};mediaRecorder.start();btn.classList.add('recording');btn.textContent='⏹️';setTimeout(()=>{if(mediaRecorder?.state==='recording')mediaRecorder.stop()},15000)}catch(e){alert('Microphone permission is needed for private voice messages.')}}
 
 // Private chat UI: messages are targeted to one player and filtered by recipient.
 document.getElementById('chatBtn').addEventListener('click',()=>{
@@ -357,10 +395,10 @@ document.getElementById('chatBtn').addEventListener('click',()=>{
 });
 document.getElementById('chatClose').addEventListener('click',()=>{document.getElementById('chatPanel').style.display='none';});
 document.getElementById('chatTarget').addEventListener('change',e=>{chatTargetId=e.target.value;renderChatLog();});
-document.getElementById('chatSend').addEventListener('click',sendPrivateChat);document.getElementById('voiceBtn').addEventListener('click',toggleVoiceRecord);document.querySelectorAll('#emojiRow button').forEach(b=>b.addEventListener('click',()=>{const i=document.getElementById('chatInput');if(!i)return;i.value+=b.dataset.e||'';i.focus();gameProgress.emojiCount++;if(gameProgress.emojiCount>=3)completeTask('emoji',20)}));
+document.getElementById('chatSend').addEventListener('click',sendPrivateChat);document.querySelectorAll('#emojiRow button').forEach(b=>b.addEventListener('click',()=>{const i=document.getElementById('chatInput');if(!i)return;i.value+=b.dataset.e||'';i.focus();gameProgress.emojiCount++;if(gameProgress.emojiCount>=3)completeTask('emoji',20)}));
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendPrivateChat();}});
 const mobile=matchMedia('(pointer:coarse)').matches || innerWidth<900;
-const deviceQuality=Math.min(devicePixelRatio || 1, mobile ? 1.15 : 1.6);
+const deviceQuality=Math.min(devicePixelRatio || 1, mobile ? 1.0 : 1.5);
 // V17 — mobile-first gameplay + house entry build
 const woodMat = new THREE.MeshStandardMaterial({color:0x5a3928,roughness:.82,metalness:0});
 const wallMat = new THREE.MeshStandardMaterial({color:0xd7c6a5,roughness:.92});
@@ -623,10 +661,10 @@ busStop(-38,9,.05);busStop(38,11,-.05);
 
 const camera=new THREE.PerspectiveCamera(66,innerWidth/innerHeight,.08,900);
 const renderer=new THREE.WebGLRenderer({antialias:!mobile,powerPreference:'high-performance',precision:mobile?'mediump':'highp'});
-renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.25:1.85));renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.0:1.6));renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-scene.fog=new THREE.FogExp2(0x9fc4bb,mobile?0.00225:0.00175);
+scene.fog=new THREE.FogExp2(0x9fc4bb,mobile?0.0028:0.0019);
 renderer.domElement.style.touchAction='none';document.getElementById('game').appendChild(renderer.domElement);
 const loader=new GLTFLoader();const mixers=[];
 const ASSET_BASE='https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/';
@@ -638,7 +676,7 @@ function enableShadows(root){root.traverse(o=>{if(o.isMesh){
         mats.forEach(mat=>{ if('roughness' in mat) mat.roughness=Math.min(mat.roughness??.78,.88); if('metalness' in mat) mat.metalness=Math.min(mat.metalness??0,.25); });
       }} });}
 const hemi=new THREE.HemisphereLight(0xe6f7ff,0x274b31,1.35);scene.add(hemi);
-const sun=new THREE.DirectionalLight(0xfff0d2,3.15);sun.position.set(-85,150,65);sun.castShadow=true;sun.shadow.mapSize.set(mobile?512:1536,mobile?512:1536);sun.shadow.camera.left=-110;sun.shadow.camera.right=110;sun.shadow.camera.top=110;sun.shadow.camera.bottom=-110;sun.shadow.bias=-0.00025;scene.add(sun);
+const sun=new THREE.DirectionalLight(0xfff0d2,3.15);sun.position.set(-85,150,65);sun.castShadow=true;sun.shadow.mapSize.set(mobile?256:1024,mobile?256:1024);sun.shadow.camera.left=-110;sun.shadow.camera.right=110;sun.shadow.camera.top=110;sun.shadow.camera.bottom=-110;sun.shadow.bias=-0.00025;scene.add(sun);
 const fill=new THREE.DirectionalLight(0xaed6ff,.55);fill.position.set(90,55,-80);scene.add(fill);
 // V31 procedural Kerala sky: softer horizon gradient, sun halo and natural daylight.
 const skyDome=new Sky(); skyDome.scale.setScalar(520); scene.add(skyDome);
@@ -646,7 +684,7 @@ const skyUniforms=skyDome.material.uniforms; skyUniforms.turbidity.value=7.2; sk
 // Soft moving cloud layer for a more natural Kerala sky.
 const skyDecor=new THREE.Group();scene.add(skyDecor);
 function makeCloud(x,y,z,s){const g=new THREE.Group(),mat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.46,depthWrite:false});for(let i=0;i<5;i++){const q=new THREE.Mesh(new THREE.SphereGeometry(3.2*s*(.7+Math.random()*.45),12,8),mat);q.scale.y=.32;q.position.set((i-2)*2.3*s,(i%2)*.7*s,Math.sin(i)*.5*s);g.add(q);}g.position.set(x,y,z);skyDecor.add(g);return g;}
-for(let i=0;i<7;i++)makeCloud(-150+i*48,45+(i%3)*9,-100+(i%4)*65,.8+(i%3)*.22);
+for(let i=0;i<(mobile?4:7);i++)makeCloud(-150+i*48,45+(i%3)*9,-100+(i%4)*65,.8+(i%3)*.22);
 
 
 function add(g,m,x=0,y=0,z=0){let o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=!mobile;o.receiveShadow=!mobile;scene.add(o);return o}
@@ -813,6 +851,7 @@ function setCarDoors(model,open){
 function loadRealCar(x,z,scale=1,colorize=null){
   loadGLB(carAssetUrl,g=>{
     const model=g.scene;
+    model.userData.realVehicle=true;
     prepareCarDoors(model);
     if(!carTemplate){
       carTemplate=model.clone(true);
@@ -836,7 +875,7 @@ loadRealCar(-5,-8,1.18,0xb52d2d);
 loadRealCar(48,-3,1.18,0x245d9c);
 // Upgrade background traffic to the same realistic GLB car instead of primitive boxes.
 function upgradeTrafficCars(){if(!carTemplate)return; const entries=traffic.filter(q=>q.type==='car'); entries.forEach((q,i)=>{const old=q.obj; const g=skeletonClone(carTemplate); g.scale.setScalar(.88+(i%2)*.08); g.position.copy(old.position); g.rotation.y=old.rotation.y; g.traverse(o=>{if(o.isMesh&&o.material&&o.material.color&&o.material.name&&/body|paint/i.test(o.material.name))o.material.color.setHex([0xf0eee7,0x4d6fbe,0xb63a32][i%3]);}); scene.remove(old);q.obj=g;scene.add(g);});}
-setTimeout(upgradeTrafficCars,1800);
+setTimeout(upgradeTrafficCars,1200);setTimeout(()=>{for(const q of traffic)if(q.type==='car')q.obj.visible=!!q.obj.userData.realVehicle;},2500);
 
 // V14 vehicle gameplay: use loaded cars when available, with a lightweight fallback if an asset is unavailable.
 function fallbackCar(x,z,color){
@@ -936,17 +975,17 @@ function setDogAnim(state){
   const speed=state==='run'?1.18:state==='walk'?0.92:0.72; if(a[state]) a[state].timeScale=speed;
 }
 
-let moveX=0,moveY=0,targetMoveX=0,targetMoveY=0,yaw=0,targetYaw=0,pitch=.16,targetPitch=.16,jump=false,vy=0; player.userData.turnLean=0;
+let moveX=0,moveY=0,targetMoveX=0,targetMoveY=0,yaw=0,targetYaw=0,pitch=.12,targetPitch=.12,jump=false,vy=0; player.userData.turnLean=0;
 const joy=document.getElementById('joy'),knob=document.getElementById('knob'); localTag=document.getElementById('localTag'); let jid=null;
 function jm(e){
   if(!e)return; e.preventDefault();
   const r=joy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
-  let dx=e.clientX-cx,dy=e.clientY-cy,max=Math.min(r.width,r.height)*.34,l=Math.hypot(dx,dy);
-  if(l>max){dx=dx/l*max;dy=dy/l*max}
-  const rawX=dx/max,rawY=dy/max,m=Math.hypot(rawX,rawY),dead=.075;
+  let dx=e.clientX-cx,dy=e.clientY-cy,max=Math.min(r.width,r.height)*.38,l=Math.hypot(dx,dy);
+  if(l>max){dx=dx/l*max;dy=dy/l*max;l=max}
+  const rawX=dx/max,rawY=dy/max,m=Math.hypot(rawX,rawY),dead=.055;
   let nx=0,ny=0;
-  if(m>dead){const k=Math.min(1,(m-dead)/(1-dead))/Math.max(m,.001);nx=rawX*k;ny=rawY*k}
-  knob.style.transform=`translate(${dx}px,${dy}px)`;targetMoveX=nx;targetMoveY=ny;
+  if(m>dead){const n=Math.min(1,(m-dead)/(1-dead));const curve=.82+0.18*n;nx=(rawX/Math.max(m,.001))*n*curve;ny=(rawY/Math.max(m,.001))*n*curve;}
+  knob.style.transform=`translate(${dx}px,${dy}px)`;targetMoveX=Math.max(-1,Math.min(1,nx));targetMoveY=Math.max(-1,Math.min(1,ny));
 }
 function releaseJoy(e){if(e && jid!==null && e.pointerId!==undefined && e.pointerId!==jid)return;jid=null;targetMoveX=targetMoveY=0;knob.style.transform='translate(0,0)';}
 joy.addEventListener('pointerdown',e=>{e.preventDefault();jid=e.pointerId;try{joy.setPointerCapture(jid)}catch(_){}jm(e)},{passive:false});
@@ -1029,8 +1068,8 @@ function useFurniture(f){if(!f||!insideHouse)return;const a=f.userData.action;fu
   else {showMission(f.userData.label||'🏠 Home','Interacting with '+(f.userData.label||'item'));completeTask('home-'+a,20);}
 }
 function clearFurniture(){if(!furnitureState)return;player.position.copy(furnitureState.restore);player.rotation.y=furnitureState.rot;if(playerTemplate){playerTemplate.rotation.x=0;playerTemplate.position.y=0;}furnitureState=null;showMission('🏠 House Interior','Walk around • use furniture when prompted');}
-function enterHouse(){if(insideHouse||driving)return;const n=getNearestHouse();if(!n.pos||n.dist>18)return;outsideHousePos.copy(player.position);insideHouse=true;interior.visible=true;player.position.set(300,0,302.8);yaw=Math.PI;targetYaw=yaw;camera.far=24;camera.updateProjectionMatrix();skyDecor.visible=false;birds.forEach(b=>b.g.visible=false);showMission('🏠 House Interior','Only the inside is visible • bed, sofa, TV, kitchen, fridge, dining table');houseBtn.textContent='🚪';awardProgress('🏠 Home',25);}
-function exitHouse(){if(!insideHouse)return;if(furnitureState)clearFurniture();insideHouse=false;interior.visible=false;player.position.copy(outsideHousePos);yaw=targetYaw=0;camera.far=900;camera.updateProjectionMatrix();skyDecor.visible=true;birds.forEach(b=>b.g.visible=true);setHouseButton(false);showMission('🎯 Mission','Complete collections to level up • explore Kerala');}
+function enterHouse(){if(insideHouse||driving)return;const n=getNearestHouse();if(!n.pos||n.dist>18)return;outsideHousePos.copy(player.position);insideHouse=true;interior.visible=true;scene.background=new THREE.Color(0x2c302d);player.position.set(300,0,302.8);yaw=Math.PI;targetYaw=yaw;camera.far=24;camera.updateProjectionMatrix();skyDecor.visible=false;birds.forEach(b=>b.g.visible=false);showMission('🏠 House Interior','Only the inside is visible • bed, sofa, TV, kitchen, fridge, dining table');houseBtn.textContent='🚪';awardProgress('🏠 Home',25);}
+function exitHouse(){if(!insideHouse)return;if(furnitureState)clearFurniture();insideHouse=false;interior.visible=false;scene.background=new THREE.Color(0x9bc3b7);player.position.copy(outsideHousePos);yaw=targetYaw=0;camera.far=900;camera.updateProjectionMatrix();skyDecor.visible=true;birds.forEach(b=>b.g.visible=true);setHouseButton(false);showMission('🎯 Mission','Complete collections to level up • explore Kerala');}
 houseBtn.addEventListener('click',()=>{if(insideHouse){const n=nearestFurniture();if(n.f&&n.dist<2.2)useFurniture(n.f);else exitHouse();}else enterHouse();});
 
 document.getElementById('viewBtn').addEventListener('click',()=>{firstPersonView=!firstPersonView;document.getElementById('viewBtn').textContent=firstPersonView?'👁️ Exterior view':'👁️ Interior view';});
@@ -1212,39 +1251,22 @@ function makeBusStand(x,z){
 }
 makeBusStand(38,-47);makeLabel('BUS STOP',-38,6,7,1.1,0x1e5c43);makeLabel('BUS STOP',38,8,7,1.1,0x1e5c43);
 
-function simpleBus(x,z,color=0xd4b23e){
-  const g=new THREE.Group();
-  const bodyMat=M(color,.48), dark=M(0x1f2a2d,.32), glass=M(0x183e49,.16), trim=M(0xd7d5c9,.42), black=M(0x111315,.82);
-  gbox(g,3.05,2.65,8.35,color,0,2.0,0);
-  gbox(g,2.72,1.12,6.95,glass,0,2.65,.05);
-  gbox(g,3.08,.18,8.15,trim,0,3.15,0);
-  gbox(g,3.0,.25,8.0,dark,0,.78,0);
-  gbox(g,2.45,.55,.18,glass,0,2.42,-4.18);
-  gbox(g,2.45,.55,.18,glass,0,2.42,4.18);
-  for(const zz of [-3.05,-1.55,-.05,1.45,2.95]){gbox(g,.09,1.0,.08,trim,-1.39,2.58,zz);gbox(g,.09,1.0,.08,trim,1.39,2.58,zz)}
-  for(const sx of [-1.52,1.52])for(const zz of [-2.75,-.9,.95,2.8]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.28,18),black);w.rotation.z=Math.PI/2;w.position.set(sx,.55,zz);g.add(w)}
-  gbox(g,.65,.65,.2,trim,-1.18,1.05,-4.27);gbox(g,.65,.65,.2,trim,1.18,1.05,-4.27);
-  g.position.set(x,0,z);scene.add(g);return g;
+function roundedBusShape(w,h,r){const sh=new THREE.Shape();const x=w/2,y=h/2;sh.moveTo(-x+r,-y);sh.lineTo(x-r,-y);sh.quadraticCurveTo(x,-y,x,-y+r);sh.lineTo(x,y-r);sh.quadraticCurveTo(x,y,x-r,y);sh.lineTo(-x+r,y);sh.quadraticCurveTo(-x,y,-x,y-r);sh.lineTo(-x,-y+r);sh.quadraticCurveTo(-x,-y,-x+r,-y);return sh;}
+function realisticBus(x,z,color=0xc63d32){
+  const g=new THREE.Group(),bodyMat=M(color,.55),dark=M(0x172024,.26),glass=M(0x163b45,.12),trim=M(0xd8d2c4,.4),seatMat=M(0x4b3440,.92),black=M(0x101214,.85);
+  const body=new THREE.Mesh(new THREE.ExtrudeGeometry(roundedBusShape(2.65,1.75,.28),{depth:8.2,bevelEnabled:true,bevelSegments:2,bevelSize:.08,bevelThickness:.08,curveSegments:3}),bodyMat);body.position.set(0,2.05,-4.1);g.add(body);
+  // glasshouse panels
+  for(const side of [-1,1]){for(let i=0;i<5;i++){const w=new THREE.Mesh(new THREE.BoxGeometry(.05,1.05,1.1),glass);w.position.set(side*2.67,2.75,-2.8+i*1.45);g.add(w);const pillar=new THREE.Mesh(new THREE.BoxGeometry(.07,1.18,.08),trim);pillar.position.set(side*2.70,2.75,-3.5+i*1.45);g.add(pillar);}}
+  gbox(g,5.0,.16,8.0,trim,0,3.85,-4.1);gbox(g,4.9,.28,7.8,dark,0,.72,-4.1);
+  // front/rear windscreen
+  gbox(g,4.7,1.15,.06,glass,0,2.75,-8.25);gbox(g,4.7,1.15,.06,glass,0,2.75,-.0);
+  // entrance door and lights
+  gbox(g,.9,2.0,.08,glass,-1.65,2.0,-.05);gbox(g,.9,.16,.08,trim,-1.65,1.0,-.08);
+  for(const sx of [-1.75,1.75])for(const zz of [-6.45,-1.15]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.53,.53,.34,18),black);w.rotation.z=Math.PI/2;w.position.set(sx,.62,zz);g.add(w);}
+  for(let row=0;row<3;row++)for(let col=0;col<3;col++){const seat=new THREE.Mesh(new THREE.BoxGeometry(1.2,.45,.85),seatMat);seat.position.set(-.65+col*.65,1.35,-6.2+row*2.0);g.add(seat);}
+  g.userData.vehicleKind='bus';g.userData.kpDoors=[{o:g.children.find(o=>o.position.x<0&&o.position.y===2.0),base:new THREE.Euler()}];g.position.set(x,0,z);scene.add(g);return g;
 }
-const bus1=simpleBus(-115,4,0xe1bd35),bus2=simpleBus(115,-4,0x2f78a9);bus1.rotation.y=Math.PI/2;bus2.rotation.y=-Math.PI/2;traffic.push({obj:bus1,type:'bus',axis:'x',speed:4.8,base:4});traffic.push({obj:bus2,type:'bus',axis:'x',speed:-4.2,base:-4});
-// V31: replace primitive buses with a realistic CC0 road minibus when available.
-const realisticFleetUrl='https://cdn.3dassets.dev/assets/32562/v1/model.glb';
-let busTemplate=null;
-function findBusTemplate(root){let hit=null;root.traverse(o=>{if(hit)return; if(o.name && /sixteen.?seat|minibus|bus/i.test(o.name) && (o.isGroup||o.isObject3D)) hit=o;});return hit;}
-function fitVehicle(obj, targetLength){const b=new THREE.Box3().setFromObject(obj),sz=b.getSize(new THREE.Vector3());const len=Math.max(sz.z,sz.x);if(len>0)obj.scale.multiplyScalar(targetLength/len);}
-function upgradeBuses(){
-  loadGLB(realisticFleetUrl,g=>{
-    const found=findBusTemplate(g.scene);
-    if(!found)return;
-    busTemplate=found.clone(true);
-    busTemplate.visible=true;
-    busTemplate.position.set(0,0,0); busTemplate.rotation.set(0,0,0);
-    fitVehicle(busTemplate,8.8);
-    const entries=traffic.filter(q=>q.type==='bus');
-    entries.forEach((q,i)=>{const old=q.obj;const b=skeletonClone(busTemplate);b.position.copy(old.position);b.rotation.y=q.speed>0?Math.PI/2:-Math.PI/2;b.traverse(o=>{if(o.isMesh){o.castShadow=!mobile;o.receiveShadow=!mobile;}});scene.remove(old);q.obj=b;scene.add(b);});
-  });
-}
-upgradeBuses();
+const bus1=realisticBus(-115,4,0xc53c32),bus2=realisticBus(115,-4,0x2467a8);bus1.rotation.y=Math.PI/2;bus2.rotation.y=-Math.PI/2;traffic.push({obj:bus1,type:'bus',axis:'x',speed:4.8,base:4});traffic.push({obj:bus2,type:'bus',axis:'x',speed:-4.2,base:-4});
 function addTrafficCar(x,z,color,r=0){const g=new THREE.Group();gbox(g,2.1,.85,4.2,color,0,1.0,0);gbox(g,1.65,.75,1.8,0x283238,0,1.65,.25);for(const sx of [-.95,.95])for(const zz of [-1.35,1.35]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.22,14),M(0x171717));w.rotation.z=Math.PI/2;w.position.set(sx,.45,zz);g.add(w)}g.position.set(x,0,z);g.rotation.y=r;scene.add(g);return g}
 const tc1=addTrafficCar(-105,-7,0xeff0e8),tc2=addTrafficCar(105,7,0x5a73d0),tc3=addTrafficCar(-105,7,0x9b352d);traffic.push({obj:tc1,type:'car',axis:'x',speed:7.2,base:-7});traffic.push({obj:tc2,type:'car',axis:'x',speed:-6.3,base:7});traffic.push({obj:tc3,type:'car',axis:'x',speed:5.4,base:7});
 function movingBike(x,z,r=0){const g=new THREE.Group();for(const zz of [-.65,.65]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.27,.27,.11,14),M(0x151515));w.rotation.x=Math.PI/2;w.position.set(0,.3,zz);g.add(w)}gbox(g,.8,.15,.2,0x2e6fba,0,.65,0);gbox(g,.45,.12,.55,0x202020,0,.85,.05);g.position.set(x,0,z);g.rotation.y=r;scene.add(g);return g}
@@ -1260,7 +1282,7 @@ for(const [x,z] of [[-86,-58],[86,-60]])for(let i=0;i<4;i++)fruit(x+Math.cos(i*M
 function createWalkingNPCsFromTemplate(template,clips){
   if(walkingNPCs.length) return;
   const spots=[[-58,-18],[52,-18],[-66,14],[66,16],[-92,-30],[90,-30],[-12,28],[15,30],[-40,-42],[42,-42],[-18,52],[20,52]];
-  spots.forEach((p,i)=>{
+  spots.slice(0,mobile?7:12).forEach((p,i)=>{
     const root=new THREE.Group();const model=skeletonClone(template);model.scale.setScalar(.96+(i%3)*.04);root.add(model);root.position.set(p[0],0,p[1]);root.userData={path:i%2?1:-1,phase:Math.random()*10, speed:1.0+(i%4)*.22, pause:0, pauseSeed:Math.random()*6.28};
     const mixer=new THREE.AnimationMixer(model), acts={};const idle=pickClip(clips,['idle','stand','breath'])||clips[0],walk=pickClip(clips,['walk','locomotion'])||idle,run=pickClip(clips,['run','jog'])||walk;
     acts.idle=mixer.clipAction(idle);acts.walk=mixer.clipAction(walk);acts.run=mixer.clipAction(run);Object.values(acts).forEach(a=>{a.setLoop(THREE.LoopRepeat,Infinity);a.clampWhenFinished=false});acts.walk.play();root.userData.mixer=mixer;root.userData.actions=acts;root.userData.state='walk';root.userData.baseX=p[0];root.userData.baseZ=p[1];walkingNPCs.push(root);scene.add(root);mixers.push(mixer);
@@ -1276,7 +1298,7 @@ function updateWalkingNPCs(dt,t){
 }
 
 function addBird(x,y,z,s=1){const g=new THREE.Group();const mat=M(0x34383a,.85);const body=new THREE.Mesh(new THREE.SphereGeometry(.28*s,10,8),mat);body.scale.set(1.35,.65,.7);g.add(body);for(const side of [-1,1]){const wing=new THREE.Mesh(new THREE.ConeGeometry(.12*s,.9*s,5),mat);wing.rotation.z=side*(Math.PI/2-.3);wing.rotation.y=side*.25;wing.position.set(side*.42*s,.08,0);g.add(wing)}g.position.set(x,y,z);scene.add(g);birds.push({g,baseY:y,phase:Math.random()*6.28,speed:5+Math.random()*3,spread:45+Math.random()*35});}
-for(let i=0;i<12;i++)addBird(-110+Math.random()*220,22+Math.random()*18,-95+Math.random()*190,.7+Math.random()*.35);
+for(let i=0;i<(mobile?7:12);i++)addBird(-110+Math.random()*220,22+Math.random()*18,-95+Math.random()*190,.7+Math.random()*.35);
 function updateBirds(dt,t){for(const b of birds){b.g.position.x+=b.speed*dt;b.g.position.z+=Math.sin(t*.0007+b.phase)*.9*dt;b.g.position.y=b.baseY+Math.sin(t*.004+b.phase)*1.2;b.g.rotation.y=Math.PI/2;b.g.rotation.z=Math.sin(t*.004+b.phase)*.06;if(b.g.position.x>155)b.g.position.x=-155}}
 function updateTrain(dt){if(!trainGroup)return;trainGroup.position.x=0;trainGroup.position.z+=18*dt;if(trainGroup.position.z>185)trainGroup.position.z=18;trainGroup.rotation.y=0;trainGroup.position.y=.08}
 function updateTraffic(dt){for(const q of traffic){const o=q.obj;o.position.x+=q.speed*dt;if(o.position.x>175)o.position.x=-175;if(o.position.x<-175)o.position.x=175;o.position.z=q.base;if(q.speed>0)o.rotation.y=Math.PI/2;else o.rotation.y=-Math.PI/2}}
@@ -1320,7 +1342,7 @@ if(!driving && !ridingBus && !passengerRemote){
   if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));const turnK=1-Math.exp(-dt*(l>.72?11:8));player.rotation.y+=diff*turnK;
   const turnAmount=Math.max(-1,Math.min(1,diff/0.9)); player.userData.turnLean+=(turnAmount-(player.userData.turnLean||0))*(1-Math.exp(-dt*8));
   if(playerTemplate){ playerTemplate.rotation.z=-0.045*(player.userData.turnLean||0); }
-  targetYaw += Math.atan2(Math.sin(player.rotation.y-targetYaw),Math.cos(player.rotation.y-targetYaw))*(1-Math.exp(-dt*7));
+  targetYaw += Math.atan2(Math.sin(player.rotation.y-targetYaw),Math.cos(player.rotation.y-targetYaw))*(1-Math.exp(-dt*15));
 } else if(playerTemplate){ playerTemplate.rotation.z+=(0-playerTemplate.rotation.z)*(1-Math.exp(-dt*8));}
   player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
 } else if(activeCar){
@@ -1372,14 +1394,21 @@ let follow=driving&&activeCar?activeCar:(ridingBus?ridingBus:(passengerRemote?pa
 let followYaw=driving&&activeCar?activeCar.rotation.y:(ridingBus?ridingBus.rotation.y:(passengerRemote?passengerRemote.group.rotation.y:player.rotation.y));
 const vehicleMode=!!(driving||ridingBus||passengerRemote);
 if(vehicleMode && firstPersonView){
-  const base=new THREE.Vector3(0,driving?1.35:1.75,driving?.65:0.55); base.applyQuaternion(follow.quaternion); const cp=follow.position.clone().add(base);
-  const ahead=new THREE.Vector3(0,driving?1.25:1.8,driving?5.0:5.5); ahead.applyQuaternion(follow.quaternion); const look=follow.position.clone().add(ahead);
-  camera.position.lerp(cp,1-Math.exp(-dt*(mobile?12:15))); camera.lookAt(look);
+  // True interior view: camera sits inside the cabin and looks through the windscreen.
+  const isBus=!!ridingBus;
+  const base=new THREE.Vector3(0,isBus?1.62:1.28,isBus?1.25:.55); base.applyQuaternion(follow.quaternion);
+  const cp=follow.position.clone().add(base);
+  const ahead=new THREE.Vector3(0,isBus?1.55:1.28,isBus?7.0:5.8); ahead.applyQuaternion(follow.quaternion);
+  const look=follow.position.clone().add(ahead);
+  camera.position.lerp(cp,1-Math.exp(-dt*(mobile?14:18))); camera.lookAt(look);
 }else{
-  const desiredDistance=vehicleMode?8.2:(moving?6.8:6.25); const height=vehicleMode?1.75:1.52; const target=new THREE.Vector3(follow.position.x,follow.position.y+height,follow.position.z);
-  const lookAhead=vehicleMode?2.6:(moving?1.0:0.35); const lookTarget=new THREE.Vector3(target.x+Math.sin(followYaw)*lookAhead,target.y+0.30,target.z+Math.cos(followYaw)*lookAhead);
+  const desiredDistance=vehicleMode?8.0:(moving?6.35:5.9);
+  const height=vehicleMode?1.72:1.48;
+  const target=new THREE.Vector3(follow.position.x,follow.position.y+height,follow.position.z);
+  const lookAhead=vehicleMode?3.0:(moving?1.45:.55);
+  const lookTarget=new THREE.Vector3(target.x+Math.sin(followYaw)*lookAhead,target.y+0.28,target.z+Math.cos(followYaw)*lookAhead);
   const cp=new THREE.Vector3(target.x+Math.sin(followYaw)*desiredDistance*Math.cos(pitch),target.y+Math.sin(pitch)*desiredDistance,target.z+Math.cos(followYaw)*desiredDistance*Math.cos(pitch));
-  camera.position.lerp(cp,1-Math.exp(-dt*(mobile?9.5:12))); camera.lookAt(lookTarget);
+  camera.position.lerp(cp,1-Math.exp(-dt*(mobile?13:16))); camera.lookAt(lookTarget);
 }
   let nearestHi=null,nearestHiDist=999; for(const [id,r] of remotePlayers){const d=Math.hypot(player.position.x-r.group.position.x,player.position.z-r.group.position.z);if(!r.vehicle&&d<5.8&&d<nearestHiDist){nearestHi=r;nearestHiDist=d;hiTargetId=id;}} const hi=document.getElementById('hiBtn'); if(hi){hi.style.display=nearestHi?'block':'none'; if(nearestHi)hi.textContent='👋 Hi '+nearestHi.name; if(!nearestHi)hiTargetId='';}
   if(localTag && !insideHouse){const lp=(ridingBus?ridingBus:passengerRemote?passengerRemote.group:player).position.clone();lp.y+=ridingBus||passengerRemote?2.6:2.9;lp.project(camera);localTag.style.left=((lp.x*.5+.5)*innerWidth)+'px';localTag.style.top=((-lp.y*.5+.5)*innerHeight)+'px';localTag.style.display=(lp.z<1?'block':'none');} else if(localTag) localTag.style.display='none';
@@ -1393,7 +1422,7 @@ if(vehicleMode && firstPersonView){
   tag.style.display=(p.z<1?'block':'none');
 }
   renderer.render(scene,camera)}
-let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 '+escapeHtml(playerName)+'<br><span id="progressText">💰 ₹'+gameProgress.coins.toLocaleString()+' • ⭐ Lv. '+gameProgress.level+' • 🧩 '+((levelCollections[gameProgress.level]||[]).filter(x=>gameProgress.collection.has(x)).length)+'/'+(levelCollections[gameProgress.level]||[]).length+'</span><br>🎥 '+fps+' FPS • '+(driving?'🚗 Driving':ridingBus?'🚌 Bus':passengerRemote?'🚘 Passenger':insideHouse?'🏠 Home':'Mobile')+'<br><span id="mpStatus"><span id="mpDot"></span>'+(mpReady?'Online • '+(remotePlayers.size+1)+' players':'Connecting…')+'</span>'},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());setInterval(sendMpState,160);setInterval(updateProgressUI,500);onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.25:1.85));renderer.setSize(innerWidth,innerHeight)};
+let fpsFrames=0,fpsTime=performance.now();setInterval(()=>{const now=performance.now();const fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsTime));fpsFrames=0;fpsTime=now;const st=document.getElementById('status');if(st)st.innerHTML='👤 '+escapeHtml(playerName)+'<br><span id="progressText">💰 ₹'+gameProgress.coins.toLocaleString()+' • ⭐ Lv. '+gameProgress.level+' • 🧩 '+((levelCollections[gameProgress.level]||[]).filter(x=>gameProgress.collection.has(x)).length)+'/'+(levelCollections[gameProgress.level]||[]).length+'</span><br>🎥 '+fps+' FPS • '+(driving?'🚗 Driving':ridingBus?'🚌 Bus':passengerRemote?'🚘 Passenger':insideHouse?'🏠 Home':'Mobile')+'<br><span id="mpStatus"><span id="mpDot"></span>'+(mpReady?'Online • '+(remotePlayers.size+1)+' players':'Connecting…')+'</span>'},1000);const oldAnimate=animate;animate=function(t){fpsFrames++;oldAnimate(t)};animate(performance.now());setInterval(sendMpState,160);setInterval(updateProgressUI,500);onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(deviceQuality,mobile?1.0:1.6));renderer.setSize(innerWidth,innerHeight)};
 </script><div id="boot-error" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:2000;background:#7a1717;color:#fff;padding:14px;border-radius:12px;font:14px Arial">
 3D scene failed to start. Please reload once.
 </div>
