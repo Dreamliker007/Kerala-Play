@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#4a8cda">
-  <title>Kerala Play — Asset Realism</title>
+  <title>Kerala Play — Stable Asset Realism</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -26,7 +26,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V43</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V44</span></div>
     <div id="hint">Left pad: move<br>Right side: look around<br>Hold RUN: run</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -49,6 +49,17 @@
     const villagers = [];
     const photoTextureCache = new Map();
     let villageTime = 0;
+
+    window.addEventListener('error', event => {
+      console.error(event.error || event.message);
+      fallback.style.display = 'grid';
+      fallback.textContent = 'A game asset could not start. Reload once, or use the complete V44 folder from the ZIP.';
+    });
+    window.addEventListener('unhandledrejection', event => {
+      console.error(event.reason);
+      fallback.style.display = 'grid';
+      fallback.textContent = 'A game asset could not start. Reload once, or use the complete V44 folder from the ZIP.';
+    });
 
     try {
       const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
