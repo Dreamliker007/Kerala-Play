@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#4a8cda">
-  <title>Kerala Play — Realism Update</title>
+  <title>Kerala Play — Asset Realism</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -26,7 +26,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V42</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V43</span></div>
     <div id="hint">Left pad: move<br>Right side: look around<br>Hold RUN: run</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -47,6 +47,7 @@
     const cameraZone = document.querySelector('#camera-zone');
     const runButton = document.querySelector('#run');
     const villagers = [];
+    const photoTextureCache = new Map();
     let villageTime = 0;
 
     try {
@@ -241,10 +242,60 @@
       return current + THREE.MathUtils.clamp(turn, -amount, amount);
     }
 
+    function loadGameTexture(path, removeCheckerboard = false) {
+      const cacheKey = `${path}:${removeCheckerboard}`;
+      if (photoTextureCache.has(cacheKey)) return photoTextureCache.get(cacheKey);
+      const texture = new THREE.TextureLoader().load(path, image => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        if (removeCheckerboard) {
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const context = canvas.getContext('2d', { willReadFrequently: true });
+          context.drawImage(image, 0, 0);
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+          for (let index = 0; index < pixels.data.length; index += 4) {
+            const red = pixels.data[index];
+            const green = pixels.data[index + 1];
+            const blue = pixels.data[index + 2];
+            const nearlyGrey = Math.max(red, green, blue) - Math.min(red, green, blue) < 11;
+            if (nearlyGrey && red > 185 && green > 185 && blue > 185) pixels.data[index + 3] = 0;
+          }
+          context.putImageData(pixels, 0, 0);
+          texture.image = canvas;
+          texture.needsUpdate = true;
+        }
+      });
+      texture.colorSpace = THREE.SRGBColorSpace;
+      photoTextureCache.set(cacheKey, texture);
+      return texture;
+    }
+
+    function createPhotoSprite(path, width, height, removeCheckerboard = false) {
+      const material = new THREE.SpriteMaterial({
+        map: loadGameTexture(path, removeCheckerboard),
+        transparent: true,
+        alphaTest: .025,
+        depthWrite: false
+      });
+      const sprite = new THREE.Sprite(material);
+      sprite.center.set(.5, 0);
+      sprite.scale.set(width, height, 1);
+      return sprite;
+    }
+
     function buildPlayer(player) {
-      const human = createHuman({ shirt: 0x3b82a7, trousers: 0x253342, skin: 0xa96d4c, hair: 0x161616, shoes: 0x27231f });
-      player.add(human);
-      player.userData.human = human;
+      const shadow = new THREE.Mesh(
+        new THREE.CircleGeometry(.48, 20),
+        new THREE.MeshBasicMaterial({ color: 0x16201a, transparent: true, opacity: .25, depthWrite: false })
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = .025;
+      const avatar = createPhotoSprite('./assets/player-back-v1.png', 1.36, 2.42);
+      avatar.position.y = .04;
+      player.add(shadow, avatar);
+      player.userData.avatar = avatar;
+      player.userData.shadow = shadow;
     }
 
     function createHuman({ shirt, trousers, skin, hair, shoes }) {
@@ -325,7 +376,10 @@
     }
 
     function animatePlayer(player, phase, moving) {
-      animateHuman(player.userData.human, phase, moving);
+      const bob = moving ? Math.abs(Math.sin(phase)) * .035 : 0;
+      player.userData.avatar.position.y = .04 + bob;
+      player.userData.avatar.rotation.z = moving ? Math.sin(phase * .5) * .012 : 0;
+      player.userData.shadow.scale.setScalar(1 - bob * 2.3);
     }
 
     function animateHuman(human, phase, moving) {
@@ -342,7 +396,11 @@
         const pace = (Math.sin(time * villager.userData.speed + villager.userData.offset) + 1) * .5;
         villager.position.z = villager.userData.startZ + Math.sin(time * villager.userData.speed + villager.userData.offset) * villager.userData.distance;
         villager.rotation.y = Math.cos(time * villager.userData.speed + villager.userData.offset) > 0 ? 0 : Math.PI;
-        animateHuman(villager.userData.human, time * villager.userData.speed * 7, .55 + pace * .45);
+        if (villager.userData.photo) {
+          villager.userData.photo.position.y = .025 + Math.abs(Math.sin(time * villager.userData.speed * 6)) * .018;
+        } else {
+          animateHuman(villager.userData.human, time * villager.userData.speed * 7, .55 + pace * .45);
+        }
       });
     }
 
@@ -384,19 +442,19 @@
       scene.add(sideRoad);
       addRoadEdges(scene, -28, -22, 88, 12);
 
-      addHouse(scene, -24, -36, 0xf0e5d1, 0x9e533a);
-      addHouse(scene, 28, 24, 0xf6dfb6, 0x94503b);
-      addHouse(scene, -36, 33, 0xd9ebe3, 0x834d3a);
-      addShop(scene, 18, -32);
+      addPhotoHouse(scene, -24, -36, 10.2, 6.8);
+      addPhotoHouse(scene, 28, 24, 8.8, 5.9);
+      addPhotoHouse(scene, -36, 33, 9.4, 6.25);
+      addPhotoHouse(scene, 18, -32, 8.6, 5.75);
       const treePositions = [[-15,-62],[14,-55],[-20,-47],[20,-42],[-18,-20],[17,-10],[-18,5],[18,9],[-16,34],[16,43],[-14,61],[17,66],[-50,-20],[-45,14],[-42,48],[46,-42],[42,4],[47,52]];
-      treePositions.forEach(([x, z], i) => addTree(scene, x, z, .92 + (i % 3) * .11));
-      [[-43,-35,1.08],[41,-29,1.15],[-48,41,.96],[45,39,1.04]].forEach(([x, z, scale]) => addPalm(scene, x, z, scale));
+      treePositions.forEach(([x, z], i) => addPalm(scene, x, z, .72 + (i % 3) * .09));
+      [[-43,-35,1.08],[41,-29,1.15],[-48,41,.96],[45,39,1.04],[-27,-13,.88],[30,6,.8],[-28,57,.85]].forEach(([x, z, scale]) => addPalm(scene, x, z, scale));
       addPond(scene, 39, -4);
       addBench(scene, -10, -10);
-      addVillager(scene, -6, -50, 11, { shirt: 0xa94b40, trousers: 0x2a3342, skin: 0x9d6245, hair: 0x1a1715, shoes: 0x28231f }, .55, 0);
-      addVillager(scene, 10, -5, 8, { shirt: 0xd58e2f, trousers: 0x3b3a4e, skin: 0xb97755, hair: 0x261c17, shoes: 0x33302b }, .45, 2);
-      addVillager(scene, -9, 19, 8, { shirt: 0x6d8d5a, trousers: 0x242b35, skin: 0x7e4a37, hair: 0x161310, shoes: 0x2b2723 }, .5, 4);
-      addVillager(scene, 10, 50, 7, { shirt: 0x9c5c92, trousers: 0x24303c, skin: 0xaa7154, hair: 0x171311, shoes: 0x29241f }, .42, 1);
+      addPhotoVillager(scene, -6, -50, 11, .55, 0, .78);
+      addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
+      addPhotoVillager(scene, -9, 19, 8, .5, 4, .75);
+      addPhotoVillager(scene, 10, 50, 7, .42, 1, .68);
     }
 
     function addRoadEdges(scene, x, z, width, depth) {
@@ -406,6 +464,12 @@
       left.position.set(x - width / 2, .05, z);
       right.position.set(x + width / 2, .05, z);
       scene.add(left, right);
+    }
+
+    function addPhotoHouse(scene, x, z, width, height) {
+      const house = createPhotoSprite('./assets/kerala-home-v1.png', width, height, true);
+      house.position.set(x, .03, z);
+      scene.add(house);
     }
 
     function addHouse(scene, x, z, wallColor, roofColor) {
@@ -509,36 +573,18 @@
     }
 
     function addPalm(scene, x, z, scale) {
-      const group = new THREE.Group();
-      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x765436, roughness: 1 });
-      for (let i = 0; i < 6; i++) {
-        const segment = new THREE.Mesh(new THREE.CylinderGeometry(.2 - i * .009, .28 - i * .01, 1.1, 8), trunkMat);
-        segment.position.set(i * .11, .55 + i * 1.02, 0);
-        segment.rotation.z = -.11;
-        group.add(segment);
-      }
-      const frondMat = new THREE.MeshStandardMaterial({ color: 0x2e7b38, roughness: .9, side: THREE.DoubleSide });
-      const lightFrondMat = new THREE.MeshStandardMaterial({ color: 0x4d9946, roughness: .9, side: THREE.DoubleSide });
-      for (let i = 0; i < 9; i++) {
-        const frond = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 4.8, 1, 4), i % 2 ? frondMat : lightFrondMat);
-        frond.position.set(.64 + Math.sin(i) * .12, 6.45, 0);
-        frond.rotation.x = -Math.PI / 2 + .18;
-        frond.rotation.z = Math.PI / 2 - .23;
-        frond.rotation.y = (Math.PI * 2 * i) / 9;
-        group.add(frond);
-      }
-      group.position.set(x, 0, z);
-      group.scale.setScalar(scale);
-      scene.add(group);
+      const palm = createPhotoSprite('./assets/coconut-palm-v1.png', 5.2 * scale, 9.25 * scale, true);
+      palm.position.set(x, .02, z);
+      scene.add(palm);
     }
 
-    function addVillager(scene, x, z, distance, colors, speed, offset) {
+    function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
       const villager = new THREE.Group();
-      const human = createHuman(colors);
-      human.scale.setScalar(.92);
-      villager.add(human);
+      const photo = createPhotoSprite('./assets/kerala-villager-v1.png', .98 * scale, 1.95 * scale, true);
+      photo.position.y = .025;
+      villager.add(photo);
       villager.position.set(x, 0, z);
-      villager.userData = { human, startZ: z, distance, speed, offset };
+      villager.userData = { photo, startZ: z, distance, speed, offset };
       villagers.push(villager);
       scene.add(villager);
     }
