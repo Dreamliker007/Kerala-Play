@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#4a8cda">
-  <title>Kerala Play — Stable Asset Realism</title>
+  <title>Kerala Play — Open World Foundation</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -21,12 +21,57 @@
     #camera-zone { position: absolute; right: 0; bottom: 0; width: 52vw; height: 100vh; pointer-events: auto; touch-action: none; }
     #camera-note { position: absolute; right: 122px; bottom: calc(env(safe-area-inset-bottom) + 65px); color: rgba(255,255,255,.87); background: rgba(11,35,45,.42); padding: 6px 8px; border-radius: 8px; font-size: 11px; }
     #fallback { display: none; position: fixed; inset: 0; z-index: 5; place-items: center; padding: 24px; background: #16323f; color: white; text-align: center; line-height: 1.5; }
+    #camera-zone { z-index: 1; }
+    #profile-chip, #mission-card, #minimap, #chat-toggle, #chat-panel, #asset-notice { z-index: 5; pointer-events: auto; }
+    #profile-chip { position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:176px; max-width:180px; padding:8px 10px; border:1px solid rgba(255,255,255,.22); border-radius:11px; background:rgba(8,29,34,.67); color:#fff; font-size:11px; line-height:1.25; cursor:pointer; touch-action:manipulation; }
+    #profile-name { display:block; font-weight:800; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #profile-district { display:block; margin-top:2px; color:#bde7d0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #mission-card { position:absolute; top:calc(env(safe-area-inset-top) + 108px); left:16px; width:194px; padding:11px 12px; border:1px solid rgba(255,255,255,.17); border-radius:12px; background:rgba(10,29,34,.67); color:#fff; font-size:12px; line-height:1.4; }
+    #mission-card strong { display:block; color:#f6d66b; margin-bottom:3px; font-size:12px; }
+    #landmark-status { color:#d3ece1; font-size:11px; }
+    #minimap { position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:16px; width:155px; padding:8px; border:1px solid rgba(255,255,255,.32); border-radius:14px; background:rgba(8,29,34,.74); box-shadow:0 5px 18px rgba(0,0,0,.24); touch-action:manipulation; }
+    .map-header { display:flex; align-items:center; justify-content:space-between; color:#fff; font-size:11px; letter-spacing:.9px; }
+    #map-toggle { border:0; color:#fff; background:transparent; font-size:17px; line-height:1; cursor:pointer; }
+    #kerala-map { display:block; width:100%; height:188px; margin-top:4px; overflow:visible; }
+    #kerala-outline { fill:rgba(48,119,79,.88); stroke:#d9f2c8; stroke-width:1.5; }
+    .district-lines path { fill:none; stroke:rgba(228,255,225,.30); stroke-width:.65; }
+    #map-route { stroke:#f5d566; stroke-width:1.2; stroke-dasharray:2 2; }
+    .landmark-marker { cursor:pointer; pointer-events:all; }
+    .landmark-marker .pin { fill:#f5c95c; stroke:#162b32; stroke-width:1.2; }
+    .landmark-marker text { fill:#102831; font-size:7px; font-weight:800; text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+    #map-player circle { fill:#fff; stroke:#152f3b; stroke-width:1.5; }
+    #map-player path { fill:#1ee879; stroke:#062f1c; stroke-width:.8; }
+    #map-status { display:block; min-height:15px; color:rgba(255,255,255,.88); font-size:10px; text-align:center; }
+    #chat-toggle { position:absolute; right:16px; top:calc(env(safe-area-inset-top) + 226px); border:1px solid rgba(255,255,255,.34); border-radius:11px; padding:9px 11px; color:#fff; background:rgba(10,38,48,.76); font-weight:800; font-size:11px; cursor:pointer; touch-action:manipulation; }
+    #chat-panel { display:none; position:absolute; right:16px; top:calc(env(safe-area-inset-top) + 267px); width:min(310px, calc(100vw - 32px)); max-height:340px; padding:11px; border:1px solid rgba(255,255,255,.28); border-radius:14px; background:rgba(7,23,29,.93); color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+    #chat-panel.open { display:block; }
+    .chat-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; font-weight:800; }
+    #chat-channel { margin-top:8px; width:100%; border:1px solid rgba(255,255,255,.23); border-radius:8px; padding:7px; color:#fff; background:#17323a; font-size:12px; }
+    #chat-note { margin:7px 0; color:#b9d8cf; font-size:10px; line-height:1.35; }
+    #chat-log { height:142px; overflow-y:auto; padding:7px; border-radius:9px; background:rgba(255,255,255,.06); font-size:11px; line-height:1.35; }
+    .chat-message { margin:0 0 7px; word-break:break-word; }
+    .chat-message small { display:block; color:#9ec8b6; font-size:9px; }
+    #chat-form { display:flex; gap:6px; margin-top:8px; }
+    #chat-input { min-width:0; flex:1; border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:8px; color:#fff; background:#163139; font:inherit; }
+    #chat-send, #chat-close { border:0; border-radius:8px; color:#fff; background:#25865c; padding:8px 10px; font-weight:800; cursor:pointer; }
+    #chat-close { padding:3px 7px; background:rgba(255,255,255,.14); }
+    #asset-notice { display:none; position:absolute; left:50%; top:calc(env(safe-area-inset-top) + 14px); transform:translateX(-50%); max-width:310px; padding:8px 10px; border-radius:9px; color:#fff7d7; background:rgba(93,60,10,.85); font-size:11px; text-align:center; }
+    #profile-modal { display:none; position:fixed; inset:0; z-index:20; align-items:center; justify-content:center; padding:20px; background:rgba(3,15,18,.72); color:#fff; }
+    #profile-modal.open { display:flex; }
+    .profile-card { width:min(360px, 100%); padding:22px; border:1px solid rgba(255,255,255,.25); border-radius:18px; background:linear-gradient(145deg, #143e43, #0c2229); box-shadow:0 12px 36px rgba(0,0,0,.38); }
+    .profile-card h1 { margin:0 0 7px; font-size:23px; }
+    .profile-card p { margin:0 0 15px; color:#bcdad1; font-size:13px; line-height:1.4; }
+    .profile-card label { display:block; margin:11px 0 5px; color:#d7f0e4; font-size:12px; font-weight:700; }
+    .profile-card input, .profile-card select { width:100%; padding:11px; border:1px solid rgba(255,255,255,.24); border-radius:9px; color:#fff; background:#18363d; font:inherit; }
+    #profile-submit { width:100%; margin-top:17px; border:0; border-radius:10px; padding:12px; color:#062019; background:#50c980; font-weight:900; font-size:14px; cursor:pointer; }
+    #profile-error { min-height:17px; margin-top:8px; color:#ffd996; font-size:11px; }
+    @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #mission-card { top:calc(env(safe-area-inset-top) + 112px); width:165px; } #hint { display:none; } #minimap { width:133px; } #kerala-map { height:165px; } #chat-toggle { top:calc(env(safe-area-inset-top) + 202px); } #chat-panel { top:calc(env(safe-area-inset-top) + 242px); } }
     @media (min-width: 740px) { #joystick-zone { width: 330px; height: 330px; } #joystick-base { left: 44px; bottom: 38px; } #run { right: 44px; bottom: 46px; } }
   </style>
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V44</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V45</span></div>
     <div id="hint">Left pad: move<br>Right side: look around<br>Hold RUN: run</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -34,8 +79,24 @@
     <div id="camera-zone" aria-label="Camera look area"></div>
     <div id="camera-note">Swipe to look</div>
     <button id="run" type="button" aria-label="Hold to run">RUN</button>
+    <button id="profile-chip" type="button" aria-label="Edit profile"><span id="profile-name">Explorer</span><span id="profile-district">Choose district</span></button>
+    <div id="mission-card"><strong>● Current Mission</strong><span id="mission-text">Explore Kerala landmarks</span><br><span id="landmark-status">Choose a destination on the map</span></div>
+    <aside id="minimap" aria-label="Kerala mini-map">
+      <div class="map-header"><strong>KERALA MAP</strong><button id="map-toggle" type="button" aria-label="Toggle landmark labels">⌄</button></div>
+      <svg id="kerala-map" viewBox="0 0 120 300" role="img" aria-label="Kerala outline map with landmarks and player location">
+        <defs><clipPath id="kerala-clip"><path d="M56 8 C68 15 74 24 76 39 C87 52 84 66 91 82 C85 96 92 109 89 125 C97 140 91 154 98 170 C93 184 96 197 90 211 C92 227 85 239 83 253 C76 267 67 282 55 292 C48 285 43 275 42 263 C34 250 37 237 31 225 C34 211 26 198 31 184 C24 170 30 156 25 142 C30 128 24 115 29 101 C26 87 34 72 31 59 C39 48 35 33 43 22 C46 14 51 10 56 8 Z"/></clipPath></defs>
+        <path id="kerala-outline" d="M56 8 C68 15 74 24 76 39 C87 52 84 66 91 82 C85 96 92 109 89 125 C97 140 91 154 98 170 C93 184 96 197 90 211 C92 227 85 239 83 253 C76 267 67 282 55 292 C48 285 43 275 42 263 C34 250 37 237 31 225 C34 211 26 198 31 184 C24 170 30 156 25 142 C30 128 24 115 29 101 C26 87 34 72 31 59 C39 48 35 33 43 22 C46 14 51 10 56 8 Z"/>
+        <g class="district-lines" clip-path="url(#kerala-clip)"><path d="M22 58 H92 M22 101 H94 M22 142 H97 M22 184 H96 M25 225 H90 M35 263 H82"/></g>
+        <line id="map-route" hidden /><g id="landmark-layer"></g><g id="map-player" aria-label="Your location"><circle r="6.4"></circle><path d="M0 -5 L4 5 L0 2.4 L-4 5 Z"></path></g>
+      </svg>
+      <output id="map-status" aria-live="polite">Village · You</output>
+    </aside>
+    <button id="chat-toggle" type="button" aria-label="Open regional chat">💬 CHAT</button>
+    <section id="chat-panel" aria-label="Regional text chat"><div class="chat-heading"><span>Regional Chat</span><button id="chat-close" type="button" aria-label="Close chat">×</button></div><select id="chat-channel" aria-label="Chat channel"></select><div id="chat-note">Local demo — connect Supabase to chat with other players.</div><div id="chat-log" aria-live="polite"></div><form id="chat-form"><input id="chat-input" maxlength="240" autocomplete="off" placeholder="Write a message"><button id="chat-send" type="submit">Send</button></form></section>
+    <div id="asset-notice" role="status"></div>
   </div>
   <div id="fallback">Kerala Play could not start. Please open this page while connected to the internet, then reload.</div>
+  <section id="profile-modal" aria-label="Create Kerala profile"><form class="profile-card" id="profile-form"><h1>🌴 Kerala Play</h1><p>Choose a Kerala district to set your first regional room and map location.</p><label for="profile-input">Display name</label><input id="profile-input" maxlength="18" autocomplete="nickname" placeholder="Your name"><label for="district-input">District</label><select id="district-input"><option value="">Select your district</option><option>Alappuzha</option><option>Ernakulam</option><option>Idukki</option><option>Kannur</option><option>Kasaragod</option><option>Kollam</option><option>Kottayam</option><option>Kozhikode</option><option>Malappuram</option><option>Palakkad</option><option>Pathanamthitta</option><option>Thiruvananthapuram</option><option>Thrissur</option><option>Wayanad</option></select><button id="profile-submit" type="submit">Start Exploring</button><div id="profile-error" aria-live="polite"></div></form></section>
 
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.160.1/build/three.module.js';
@@ -46,20 +107,227 @@
     const joystickKnob = document.querySelector('#joystick-knob');
     const cameraZone = document.querySelector('#camera-zone');
     const runButton = document.querySelector('#run');
+    const profileModal = document.querySelector('#profile-modal');
+    const profileForm = document.querySelector('#profile-form');
+    const profileInput = document.querySelector('#profile-input');
+    const districtInput = document.querySelector('#district-input');
+    const profileError = document.querySelector('#profile-error');
+    const profileName = document.querySelector('#profile-name');
+    const profileDistrict = document.querySelector('#profile-district');
+    const profileChip = document.querySelector('#profile-chip');
+    const mapLayer = document.querySelector('#landmark-layer');
+    const mapPlayer = document.querySelector('#map-player');
+    const mapRoute = document.querySelector('#map-route');
+    const mapStatus = document.querySelector('#map-status');
+    const mapToggle = document.querySelector('#map-toggle');
+    const missionText = document.querySelector('#mission-text');
+    const landmarkStatus = document.querySelector('#landmark-status');
+    const chatToggle = document.querySelector('#chat-toggle');
+    const chatPanel = document.querySelector('#chat-panel');
+    const chatClose = document.querySelector('#chat-close');
+    const chatChannel = document.querySelector('#chat-channel');
+    const chatLog = document.querySelector('#chat-log');
+    const chatForm = document.querySelector('#chat-form');
+    const chatInput = document.querySelector('#chat-input');
+    const assetNotice = document.querySelector('#asset-notice');
     const villagers = [];
     const photoTextureCache = new Map();
     let villageTime = 0;
+    let playerRef = null;
+    let selectedLandmark = null;
+    let mapLabelsVisible = false;
+    const storagePrefix = 'kerala-play-v45';
+    let profile = readProfile();
+    const districtStarts = {
+      Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
+    };
+    const landmarks = [
+      { id: 'bekal', name: 'Bekal Fort', icon: 'F', x: -7, z: 60, district: 'Kasaragod' },
+      { id: 'munnar', name: 'Munnar Tea Hills', icon: 'M', x: 42, z: 26, district: 'Idukki' },
+      { id: 'kochi', name: 'Mattancherry Palace', icon: 'P', x: -26, z: 6, district: 'Ernakulam' },
+      { id: 'alappuzha', name: 'Alappuzha Backwaters', icon: 'B', x: -34, z: -13, district: 'Alappuzha' },
+      { id: 'kuttanad', name: 'Kuttanad Fields', icon: 'K', x: 7, z: -23, district: 'Kottayam' },
+      { id: 'temple', name: 'Padmanabhaswamy Temple', icon: 'T', x: 13, z: -57, district: 'Thiruvananthapuram' }
+    ];
 
     window.addEventListener('error', event => {
       console.error(event.error || event.message);
-      fallback.style.display = 'grid';
-      fallback.textContent = 'A game asset could not start. Reload once, or use the complete V44 folder from the ZIP.';
+      showAssetNotice('Some visual assets could not load. The lightweight world is still available.');
     });
     window.addEventListener('unhandledrejection', event => {
       console.error(event.reason);
-      fallback.style.display = 'grid';
-      fallback.textContent = 'A game asset could not start. Reload once, or use the complete V44 folder from the ZIP.';
+      showAssetNotice('Some visual assets could not load. The lightweight world is still available.');
     });
+
+    function readProfile() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(`${storagePrefix}:profile`) || 'null');
+        return saved && typeof saved.name === 'string' && typeof saved.district === 'string' ? saved : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function writeProfile(nextProfile) {
+      profile = nextProfile;
+      try { localStorage.setItem(`${storagePrefix}:profile`, JSON.stringify(profile)); } catch { /* Private mode can still use this session. */ }
+      updateProfileHud();
+      updateChatChannels();
+      if (playerRef) placePlayerAtDistrict(profile.district);
+    }
+
+    function updateProfileHud() {
+      profileName.textContent = profile?.name || 'Explorer';
+      profileDistrict.textContent = profile?.district ? `${profile.district} · Regional room` : 'Choose your district';
+    }
+
+    function openProfile() {
+      profileInput.value = profile?.name || '';
+      districtInput.value = profile?.district || '';
+      profileError.textContent = '';
+      profileModal.classList.add('open');
+      setTimeout(() => profileInput.focus(), 0);
+    }
+
+    function placePlayerAtDistrict(district) {
+      const start = districtStarts[district] || [0, 0];
+      playerRef.position.set(start[0], 0, start[1]);
+      updateMapPlayer(playerRef);
+    }
+
+    function showAssetNotice(message) {
+      assetNotice.textContent = message;
+      assetNotice.style.display = 'block';
+      clearTimeout(showAssetNotice.timer);
+      showAssetNotice.timer = setTimeout(() => { assetNotice.style.display = 'none'; }, 5200);
+    }
+
+    function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function worldToKeralaMap(worldX, worldZ) {
+      const bands = [[0,52,7],[.12,56,13],[.28,60,19],[.44,62,20],[.60,65,20],[.76,62,18],[.90,58,14],[1,54,7]];
+      const t = clamp((70 - worldZ) / 140, 0, 1);
+      let index = 0;
+      while (index < bands.length - 2 && t > bands[index + 1][0]) index++;
+      const [t0, center0, half0] = bands[index];
+      const [t1, center1, half1] = bands[index + 1];
+      const localT = (t - t0) / (t1 - t0);
+      return { x: lerp(center0, center1, localT) + clamp(worldX / 70, -1, 1) * (lerp(half0, half1, localT) - 4), y: 16 + t * 268 };
+    }
+
+    function renderMapLandmarks() {
+      const svgNamespace = 'http://www.w3.org/2000/svg';
+      mapLayer.replaceChildren();
+      landmarks.forEach(landmark => {
+        const point = worldToKeralaMap(landmark.x, landmark.z);
+        const marker = document.createElementNS(svgNamespace, 'g');
+        marker.setAttribute('class', 'landmark-marker');
+        marker.setAttribute('transform', `translate(${point.x} ${point.y})`);
+        marker.setAttribute('aria-label', landmark.name);
+        const pin = document.createElementNS(svgNamespace, 'circle');
+        pin.setAttribute('class', 'pin'); pin.setAttribute('r', '5.8');
+        const label = document.createElementNS(svgNamespace, 'text');
+        label.textContent = landmark.icon;
+        const caption = document.createElementNS(svgNamespace, 'text');
+        caption.textContent = landmark.name.replace('Padmanabhaswamy ', '').replace('Mattancherry ', '');
+        caption.setAttribute('y', '11'); caption.setAttribute('font-size', '5.2'); caption.setAttribute('fill', '#fff'); caption.setAttribute('text-anchor', 'middle');
+        caption.style.display = mapLabelsVisible ? 'block' : 'none';
+        marker.append(pin, label, caption);
+        marker.addEventListener('click', event => { event.stopPropagation(); setWaypoint(landmark); });
+        mapLayer.append(marker);
+      });
+    }
+
+    function setWaypoint(landmark) {
+      selectedLandmark = landmark;
+      missionText.textContent = `Travel to ${landmark.name}`;
+      landmarkStatus.textContent = `${landmark.district} landmark selected`;
+      if (playerRef) updateMapPlayer(playerRef);
+    }
+
+    function updateMapPlayer(player) {
+      const point = worldToKeralaMap(player.position.x, player.position.z);
+      const angle = player.rotation.y * 180 / Math.PI;
+      mapPlayer.setAttribute('transform', `translate(${point.x} ${point.y}) rotate(${angle})`);
+      if (selectedLandmark) {
+        const target = worldToKeralaMap(selectedLandmark.x, selectedLandmark.z);
+        mapRoute.setAttribute('x1', point.x); mapRoute.setAttribute('y1', point.y);
+        mapRoute.setAttribute('x2', target.x); mapRoute.setAttribute('y2', target.y);
+        mapRoute.hidden = false;
+        const distance = Math.hypot(selectedLandmark.x - player.position.x, selectedLandmark.z - player.position.z);
+        mapStatus.textContent = `${selectedLandmark.name} · ${Math.ceil(distance)} m`;
+      } else {
+        mapRoute.hidden = true;
+        mapStatus.textContent = `${profile?.district || 'Kerala'} · You`;
+      }
+    }
+
+    function chatStorageKey(channel) { return `${storagePrefix}:chat:${channel}`; }
+
+    function updateChatChannels() {
+      const prior = chatChannel.value;
+      chatChannel.replaceChildren();
+      [['kerala-global', 'Kerala Global Chat'], [profile?.district ? `district-${profile.district}` : 'district-local', profile?.district ? `${profile.district} Regional Chat` : 'Choose a district first']].forEach(([value, label]) => {
+        const option = document.createElement('option'); option.value = value; option.textContent = label;
+        if (value === 'district-local' && !profile?.district) option.disabled = true;
+        chatChannel.append(option);
+      });
+      chatChannel.value = [...chatChannel.options].some(option => option.value === prior) ? prior : 'kerala-global';
+      renderChat();
+    }
+
+    function getLocalMessages() {
+      try {
+        const messages = JSON.parse(localStorage.getItem(chatStorageKey(chatChannel.value)) || '[]');
+        return Array.isArray(messages) ? messages.slice(-30) : [];
+      } catch { return []; }
+    }
+
+    function renderChat() {
+      chatLog.replaceChildren();
+      const messages = getLocalMessages();
+      if (!messages.length) {
+        const empty = document.createElement('div'); empty.className = 'chat-message'; empty.textContent = 'No local messages in this room yet.'; chatLog.append(empty);
+      }
+      messages.forEach(message => {
+        const entry = document.createElement('div'); entry.className = 'chat-message';
+        const sender = document.createElement('small'); sender.textContent = `${message.name} · ${new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        const body = document.createElement('div'); body.textContent = message.body;
+        entry.append(sender, body); chatLog.append(entry);
+      });
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function submitChatMessage(rawMessage) {
+      const body = rawMessage.trim().replace(/\b\d{10}\b/g, '★★★★★★★★★★');
+      if (!body) return;
+      const messages = getLocalMessages();
+      messages.push({ name: profile?.name || 'Explorer', body, createdAt: Date.now() });
+      try { localStorage.setItem(chatStorageKey(chatChannel.value), JSON.stringify(messages.slice(-30))); } catch { /* Session-only display still works below. */ }
+      renderChat();
+    }
+
+    function wireInterface() {
+      updateProfileHud();
+      updateChatChannels();
+      renderMapLandmarks();
+      profileChip.addEventListener('click', openProfile);
+      profileForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const name = profileInput.value.trim().replace(/[<>]/g, '');
+        const district = districtInput.value;
+        if (name.length < 2 || !district) { profileError.textContent = 'Enter a name and select a Kerala district.'; return; }
+        writeProfile({ name, district, createdAt: Date.now() });
+        profileModal.classList.remove('open');
+      });
+      mapToggle.addEventListener('click', () => { mapLabelsVisible = !mapLabelsVisible; mapToggle.textContent = mapLabelsVisible ? '⌃' : '⌄'; renderMapLandmarks(); });
+      chatToggle.addEventListener('click', () => chatPanel.classList.toggle('open'));
+      chatClose.addEventListener('click', () => chatPanel.classList.remove('open'));
+      chatChannel.addEventListener('change', renderChat);
+      chatForm.addEventListener('submit', event => { event.preventDefault(); submitChatMessage(chatInput.value); chatInput.value = ''; });
+      if (!profile) openProfile();
+    }
 
     try {
       const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -82,8 +350,13 @@
       const desiredMove = new THREE.Vector3();
 
       scene.add(player);
+      playerRef = player;
       buildWorld(scene);
+      buildLandmarkWorld(scene);
       buildPlayer(player);
+      if (profile) placePlayerAtDistrict(profile.district);
+      wireInterface();
+      updateMapPlayer(player);
 
       const sun = new THREE.HemisphereLight(0xeaf7ff, 0x486231, 2.25);
       scene.add(sun);
@@ -226,6 +499,7 @@
           cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 1.4);
           walkPhase += delta * (runHeld ? 15 : 9) * controlLength;
           animatePlayer(player, walkPhase, controlLength);
+          updateMapPlayer(player);
         } else {
           animatePlayer(player, walkPhase, 0);
         }
@@ -256,35 +530,36 @@
     function loadGameTexture(path, removeCheckerboard = false) {
       const cacheKey = `${path}:${removeCheckerboard}`;
       if (photoTextureCache.has(cacheKey)) return photoTextureCache.get(cacheKey);
+      const record = { texture: null, failed: false, sprites: new Set() };
       const texture = new THREE.TextureLoader().load(path, image => {
         texture.colorSpace = THREE.SRGBColorSpace;
-        if (removeCheckerboard) {
-          const canvas = document.createElement('canvas');
-          canvas.width = image.width;
-          canvas.height = image.height;
-          const context = canvas.getContext('2d', { willReadFrequently: true });
-          context.drawImage(image, 0, 0);
+        if (removeCheckerboard) try {
+          const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+          const context = canvas.getContext('2d', { willReadFrequently: true }); context.drawImage(image, 0, 0);
           const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
           for (let index = 0; index < pixels.data.length; index += 4) {
-            const red = pixels.data[index];
-            const green = pixels.data[index + 1];
-            const blue = pixels.data[index + 2];
-            const nearlyGrey = Math.max(red, green, blue) - Math.min(red, green, blue) < 11;
-            if (nearlyGrey && red > 185 && green > 185 && blue > 185) pixels.data[index + 3] = 0;
+            const red = pixels.data[index], green = pixels.data[index + 1], blue = pixels.data[index + 2];
+            if (Math.max(red, green, blue) - Math.min(red, green, blue) < 11 && red > 185 && green > 185 && blue > 185) pixels.data[index + 3] = 0;
           }
           context.putImageData(pixels, 0, 0);
           texture.image = canvas;
           texture.needsUpdate = true;
-        }
+        } catch { showAssetNotice('A photo overlay was skipped; the lightweight scenery is still visible.'); }
+      }, undefined, () => {
+        record.failed = true;
+        record.sprites.forEach(sprite => { sprite.visible = false; });
+        showAssetNotice('A photo overlay is unavailable. The lightweight scenery is still visible.');
       });
       texture.colorSpace = THREE.SRGBColorSpace;
-      photoTextureCache.set(cacheKey, texture);
-      return texture;
+      record.texture = texture;
+      photoTextureCache.set(cacheKey, record);
+      return record;
     }
 
     function createPhotoSprite(path, width, height, removeCheckerboard = false) {
+      const record = loadGameTexture(path, removeCheckerboard);
       const material = new THREE.SpriteMaterial({
-        map: loadGameTexture(path, removeCheckerboard),
+        map: record.texture,
         transparent: true,
         alphaTest: .025,
         depthWrite: false
@@ -292,21 +567,27 @@
       const sprite = new THREE.Sprite(material);
       sprite.center.set(.5, 0);
       sprite.scale.set(width, height, 1);
+      record.sprites.add(sprite);
+      if (record.failed) sprite.visible = false;
       return sprite;
     }
 
     function buildPlayer(player) {
+      const fallbackHuman = createHuman({ shirt: 0x3b82a7, trousers: 0x253342, skin: 0xa96d4c, hair: 0x161616, shoes: 0x27231f });
       const shadow = new THREE.Mesh(
         new THREE.CircleGeometry(.48, 20),
         new THREE.MeshBasicMaterial({ color: 0x16201a, transparent: true, opacity: .25, depthWrite: false })
       );
       shadow.rotation.x = -Math.PI / 2;
       shadow.position.y = .025;
-      const avatar = createPhotoSprite('./assets/player-back-v1.png', 1.36, 2.42);
+      const avatar = createPhotoSprite('./assets/player-back-v2.png', 1.36, 2.42);
       avatar.position.y = .04;
-      player.add(shadow, avatar);
+      avatar.material.depthTest = false;
+      avatar.renderOrder = 2;
+      player.add(fallbackHuman, shadow, avatar);
       player.userData.avatar = avatar;
       player.userData.shadow = shadow;
+      player.userData.fallbackHuman = fallbackHuman;
     }
 
     function createHuman({ shirt, trousers, skin, hair, shoes }) {
@@ -391,6 +672,7 @@
       player.userData.avatar.position.y = .04 + bob;
       player.userData.avatar.rotation.z = moving ? Math.sin(phase * .5) * .012 : 0;
       player.userData.shadow.scale.setScalar(1 - bob * 2.3);
+      animateHuman(player.userData.fallbackHuman, phase, moving);
     }
 
     function animateHuman(human, phase, moving) {
@@ -409,6 +691,7 @@
         villager.rotation.y = Math.cos(time * villager.userData.speed + villager.userData.offset) > 0 ? 0 : Math.PI;
         if (villager.userData.photo) {
           villager.userData.photo.position.y = .025 + Math.abs(Math.sin(time * villager.userData.speed * 6)) * .018;
+          animateHuman(villager.userData.human, time * villager.userData.speed * 7, .55 + pace * .45);
         } else {
           animateHuman(villager.userData.human, time * villager.userData.speed * 7, .55 + pace * .45);
         }
@@ -416,17 +699,13 @@
     }
 
     function buildWorld(scene) {
-      const texture = new THREE.TextureLoader().load('./assets/kerala-ground-v1.png', map => {
-        map.colorSpace = THREE.SRGBColorSpace;
-        map.wrapS = THREE.RepeatWrapping;
-        map.wrapT = THREE.RepeatWrapping;
-        map.repeat.set(11, 11);
-        map.anisotropy = 2;
-      });
+      const groundRecord = loadGameTexture('./assets/kerala-ground-v2.png');
+      const texture = groundRecord.texture;
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
       texture.repeat.set(11, 11);
+      texture.anisotropy = 2;
       const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(160, 160),
         new THREE.MeshStandardMaterial({ map: texture, color: 0x91af74, roughness: 1 })
@@ -468,6 +747,83 @@
       addPhotoVillager(scene, 10, 50, 7, .42, 1, .68);
     }
 
+    function buildLandmarkWorld(scene) {
+      addFortLandmark(scene, -7, 60);
+      addTeaHills(scene, 42, 26);
+      addPalaceLandmark(scene, -26, 6);
+      addBackwaterHouseboat(scene, -34, -13);
+      addPaddyFields(scene, 7, -23);
+      addTempleLandmark(scene, 13, -57);
+    }
+
+    function landmarkBeacon(scene, x, z, color) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(.045, .06, 2.7, 8), new THREE.MeshStandardMaterial({ color: 0x38443f, roughness: .9 }));
+      const marker = new THREE.Mesh(new THREE.SphereGeometry(.18, 10, 8), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .22, roughness: .6 }));
+      pole.position.set(x, 1.35, z); marker.position.set(x, 2.78, z);
+      scene.add(pole, marker);
+    }
+
+    function addFortLandmark(scene, x, z) {
+      const group = new THREE.Group();
+      const stone = new THREE.MeshStandardMaterial({ color: 0x777167, roughness: 1 });
+      const grassStone = new THREE.MeshStandardMaterial({ color: 0x5d6651, roughness: 1 });
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(8.8, 2.2, 1.15), stone); wall.position.set(0, 1.1, 0);
+      group.add(wall);
+      [-3.5, 0, 3.5].forEach(px => {
+        const tower = new THREE.Mesh(new THREE.CylinderGeometry(.75, .9, 2.85, 8), grassStone); tower.position.set(px, 1.42, .25); group.add(tower);
+      });
+      group.position.set(x, 0, z); scene.add(group); landmarkBeacon(scene, x, z - 1.2, 0xf1c658);
+    }
+
+    function addTeaHills(scene, x, z) {
+      const group = new THREE.Group();
+      const hillMat = new THREE.MeshStandardMaterial({ color: 0x497a45, roughness: 1 });
+      [[0,0,4.5],[-3,1,2.8],[3,-1,3.2]].forEach(([px,pz,radius]) => {
+        const hill = new THREE.Mesh(new THREE.ConeGeometry(radius, radius * .72, 18), hillMat); hill.position.set(px, radius * .34, pz); group.add(hill);
+      });
+      group.position.set(x, 0, z); scene.add(group); landmarkBeacon(scene, x, z - 3, 0x74ca68);
+    }
+
+    function addPalaceLandmark(scene, x, z) {
+      const group = new THREE.Group();
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0xb99667, roughness: .9 });
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x7d3f2e, roughness: .95 });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(7.2, 3.5, 4.8), wallMat); body.position.y = 1.75;
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(4.65, 2.3, 4), roofMat); roof.rotation.y = Math.PI / 4; roof.position.y = 4.45;
+      group.add(body, roof); group.position.set(x, 0, z); scene.add(group); landmarkBeacon(scene, x, z - 3, 0xf5b25e);
+    }
+
+    function addBackwaterHouseboat(scene, x, z) {
+      const group = new THREE.Group();
+      const water = new THREE.Mesh(new THREE.CircleGeometry(7, 32), new THREE.MeshStandardMaterial({ color: 0x287d94, roughness: .28, metalness: .1 }));
+      water.rotation.x = -Math.PI / 2; water.position.y = .03;
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(5.9, .72, 2.2), new THREE.MeshStandardMaterial({ color: 0x624528, roughness: .9 })); hull.position.y = .6;
+      const cabin = new THREE.Mesh(new THREE.CapsuleGeometry(.85, 3.0, 6, 12), new THREE.MeshStandardMaterial({ color: 0xb69258, roughness: .95 })); cabin.rotation.z = Math.PI / 2; cabin.position.y = 1.45;
+      group.add(water, hull, cabin); group.position.set(x, 0, z); scene.add(group); landmarkBeacon(scene, x, z - 2.6, 0x48bad2);
+    }
+
+    function addPaddyFields(scene, x, z) {
+      const group = new THREE.Group();
+      const soil = new THREE.Mesh(new THREE.PlaneGeometry(10, 7), new THREE.MeshStandardMaterial({ color: 0x807142, roughness: 1 })); soil.rotation.x = -Math.PI / 2; soil.position.y = .018;
+      group.add(soil);
+      for (let row = -2.4; row <= 2.4; row += .8) {
+        const rice = new THREE.Mesh(new THREE.BoxGeometry(9.2, .34, .22), new THREE.MeshStandardMaterial({ color: 0x9bbd41, roughness: 1 })); rice.position.set(0, .17, row); group.add(rice);
+      }
+      group.position.set(x, 0, z); scene.add(group); landmarkBeacon(scene, x, z - 3.5, 0xcbe064);
+    }
+
+    function addTempleLandmark(scene, x, z) {
+      const group = new THREE.Group();
+      const stone = new THREE.MeshStandardMaterial({ color: 0xc8b58b, roughness: .9 });
+      const wood = new THREE.MeshStandardMaterial({ color: 0x693d24, roughness: .92 });
+      const base = new THREE.Mesh(new THREE.BoxGeometry(7, .55, 5.8), stone); base.position.y = .28;
+      const hall = new THREE.Mesh(new THREE.BoxGeometry(5.5, 2.8, 4.1), stone); hall.position.y = 1.68;
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(4.1, 2.4, 4), wood); roof.rotation.y = Math.PI / 4; roof.position.y = 4.25;
+      group.add(base, hall, roof);
+      [-2.2, 2.2].forEach(px => { const column = new THREE.Mesh(new THREE.CylinderGeometry(.18, .23, 3.2, 10), stone); column.position.set(px, 1.8, 2.1); group.add(column); });
+      group.position.set(x, 0, z); scene.add(group); landmarkBeacon(scene, x, z - 3.1, 0xe8bf55);
+    }
+
     function addRoadEdges(scene, x, z, width, depth) {
       const curbMat = new THREE.MeshStandardMaterial({ color: 0xc3b9a3, roughness: 1 });
       const left = new THREE.Mesh(new THREE.BoxGeometry(.36, .13, depth), curbMat);
@@ -478,8 +834,11 @@
     }
 
     function addPhotoHouse(scene, x, z, width, height) {
-      const house = createPhotoSprite('./assets/kerala-home-v1.png', width, height, true);
+      addHouse(scene, x, z, 0xf0e5d1, 0x9e533a);
+      const house = createPhotoSprite('./assets/kerala-home-v2.png', width, height, true);
       house.position.set(x, .03, z);
+      house.material.depthTest = false;
+      house.renderOrder = 1;
       scene.add(house);
     }
 
@@ -584,18 +943,25 @@
     }
 
     function addPalm(scene, x, z, scale) {
-      const palm = createPhotoSprite('./assets/coconut-palm-v1.png', 5.2 * scale, 9.25 * scale, true);
+      addTree(scene, x, z, scale);
+      const palm = createPhotoSprite('./assets/coconut-palm-v2.png', 5.2 * scale, 9.25 * scale, true);
       palm.position.set(x, .02, z);
+      palm.material.depthTest = false;
+      palm.renderOrder = 1;
       scene.add(palm);
     }
 
     function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
       const villager = new THREE.Group();
-      const photo = createPhotoSprite('./assets/kerala-villager-v1.png', .98 * scale, 1.95 * scale, true);
+      const human = createHuman({ shirt: 0x6d8d5a, trousers: 0x242b35, skin: 0x9d6245, hair: 0x161310, shoes: 0x2b2723 });
+      human.scale.setScalar(.9 * scale + .2);
+      const photo = createPhotoSprite('./assets/kerala-villager-v2.png', .98 * scale, 1.95 * scale, true);
       photo.position.y = .025;
-      villager.add(photo);
+      photo.material.depthTest = false;
+      photo.renderOrder = 1;
+      villager.add(human, photo);
       villager.position.set(x, 0, z);
-      villager.userData = { photo, startZ: z, distance, speed, offset };
+      villager.userData = { human, photo, startZ: z, distance, speed, offset };
       villagers.push(villager);
       scene.add(villager);
     }
