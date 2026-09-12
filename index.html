@@ -34,7 +34,7 @@
 #chatTarget{width:100%;padding:8px;border:1px solid #ffffff22;border-radius:10px;background:#17372b;color:#fff;font-size:11px}
 #chatLog{height:170px;overflow:auto;margin:8px 0;padding:7px;border-radius:10px;background:#071711;border:1px solid #ffffff14;font-size:10px;line-height:1.35}
 .chatMsg{margin:5px 0;padding:5px 7px;border-radius:9px;background:#ffffff0d}.chatMsg.me{background:#174d37;text-align:right}.chatMsg .who{font-weight:800;opacity:.9}.chatMsg .time{opacity:.5;font-size:8px;margin-left:4px}
-#voiceBtn{border:0;border-radius:10px;padding:8px 10px;font-weight:800;font-size:10px;background:#5b3fb5;color:#fff;min-width:42px}#voiceBtn.recording{background:#d63a3a}#chatRow{display:flex;gap:6px}#chatInput{flex:1;min-width:0;padding:9px;border:1px solid #ffffff22;border-radius:10px;background:#fff;color:#172019;font-size:11px}#chatSend,#chatClose{border:0;border-radius:10px;padding:8px 10px;font-weight:800;font-size:10px}#chatSend{background:#0b8f50;color:#fff}#chatClose{background:#ffffff18;color:#fff}
+#voiceBtn{border:0;border-radius:10px;padding:8px 10px;font-weight:800;font-size:10px;background:#5b3fb5;color:#fff;min-width:42px}#viewBtn{display:none;position:fixed;right:18px;bottom:166px;z-index:70;border:0;border-radius:14px;background:#10251de8;color:#fff;padding:9px 12px;font-weight:800;font-size:10px;pointer-events:auto}#hiBtn{display:none;position:fixed;right:18px;top:155px;z-index:72;border:0;border-radius:14px;background:#087f45;color:#fff;padding:8px 12px;font-weight:800;font-size:11px;pointer-events:auto}#rpsBox{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0}#rpsBox button{border:0;background:#ffffff14;color:#fff;border-radius:9px;padding:7px 9px;font-size:12px}#voiceBtn.recording{background:#d63a3a}#chatRow{display:flex;gap:6px}#chatInput{flex:1;min-width:0;padding:9px;border:1px solid #ffffff22;border-radius:10px;background:#fff;color:#172019;font-size:11px}#chatSend,#chatClose{border:0;border-radius:10px;padding:8px 10px;font-weight:800;font-size:10px}#chatSend{background:#0b8f50;color:#fff}#chatClose{background:#ffffff18;color:#fff}
 #gender{width:100%;padding:12px 13px;border:1px solid #d9d9d9;border-radius:12px;font-size:15px;margin:5px 0;background:#fff;color:#182033}#name,#place{width:100%;padding:12px 13px;border:1px solid #d9d9d9;border-radius:12px;font-size:15px;margin:5px 0;background:#fff}
 #name:focus,#place:focus{outline:2px solid #75b798;border-color:#75b798}
 @media(max-width:700px){#mini{width:92px;height:92px}.top .pill:last-child{display:none}.qbtn{padding:8px 10px}.quick{bottom:12px}}
@@ -51,8 +51,8 @@
 <div id="joy"><div id="knob"></div></div>
 <div class="actions"><button class="btn" id="pet">🐾</button><button class="btn" id="jump">⬆️</button><button class="btn" id="reset">↻</button><button class="btn" id="carBtn" style="display:none">🚗</button><button class="btn" id="houseBtn" style="display:none;width:78px">🏠 Enter</button></div>
 </div>
-<div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div><button id="chatBtn">💬 Chat <span id="chatBadge">0</span></button>
-<div id="chatPanel"><h3>💬 Private Chat</h3><select id="chatTarget"><option value="">Select an online player</option></select><div id="chatLog"><div style="opacity:.65">Select a player to start a private chat.</div></div><div id="emojiRow"><button data-e="😀">😀</button><button data-e="😂">😂</button><button data-e="❤️">❤️</button><button data-e="👍">👍</button><button data-e="👋">👋</button><button data-e="🙏">🙏</button><button data-e="😎">😎</button></div><div id="chatRow"><input id="chatInput" maxlength="180" placeholder="Type a message…"><button id="voiceBtn" title="Record private voice message">🎙️</button><button id="chatSend">Send</button><button id="chatClose">✕</button></div></div>
+<div id="quick"><button class="qbtn" id="dayBtn">🌤️ Day</button><button class="qbtn" id="qualityBtn">⚡ Balanced</button><button class="qbtn" id="mapBtn">🗺️ Map</button></div><div id="prompt"></div><div id="mini"><canvas id="miniCanvas" width="232" height="232"></canvas></div><button id="chatBtn">💬 Chat <span id="chatBadge">0</span></button><button id="hiBtn">👋 Hi</button><button id="viewBtn">👁️ Interior view</button>
+<div id="chatPanel"><h3>💬 Private Chat</h3><select id="chatTarget"><option value="">Select an online player</option></select><div id="chatLog"><div style="opacity:.65">Select a player to start a private chat.</div></div><div id="emojiRow"><button data-e="😀">😀</button><button data-e="😂">😂</button><button data-e="❤️">❤️</button><button data-e="👍">👍</button><button data-e="👋">👋</button><button data-e="🙏">🙏</button><button data-e="😎">😎</button></div><div id="chatRow"><input id="chatInput" maxlength="180" placeholder="Message… (phone numbers are masked)"><button id="rpsStart" title="Play a private mini game">🎮</button><button id="voiceBtn" title="Record private voice message">🎙️</button><button id="chatSend">Send</button><button id="chatClose">✕</button></div></div>
 <div id="start"><div class="card"><h1>🌴 Kerala Play</h1><input id="name" maxlength="18" placeholder="Your name"><input id="place" maxlength="24" placeholder="Your place • e.g. Kottayam"><select id="gender"><option value="male">👨 Male</option><option value="female">👩 Female</option></select><p>V35 — Male/Female avatars + different outfits + private text/voice/emoji chat + home furniture interactions + collections + levels + tasks.</p><button class="play" id="play">▶ ENTER WORLD</button><div class="small">Choose your gender • enter Kerala world • complete collections to level up</div></div></div>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}
@@ -100,6 +100,10 @@ const remotePlayers=new Map();
 let chatTargetId='';
 let chatUnread=0;
 let mediaRecorder=null, voiceChunks=[];
+let firstPersonView=false;
+const voiceRx=new Map();
+const rpsGames=new Map();
+let hiTargetId="";
 const outfitNames={male:['Casual','T-Shirt','Long Sleeve','Sport'],female:['Salwar','Casual','Dress','Kurti']};
 const privateChats=new Map();
 // V35 progression: 5 collections per level. Completing all 5 unlocks the next level and rewards coins.
@@ -144,12 +148,15 @@ function refreshChatTargets(){
   renderChatLog();
 }
 function updateChatBadge(){const b=document.getElementById('chatBadge');if(!b)return;b.textContent=String(chatUnread);b.style.display=chatUnread?'inline-block':'none';}
+function maskPhoneNumbers(text){
+  return String(text||'').replace(/(?:\+?91[\s-]?)?(?:[6-9]\d{9}|\d{3}[\s-]\d{3}[\s-]\d{4}|\d{5}[\s-]\d{5})/g,m=>'★'.repeat(Math.max(8,m.replace(/\D/g,'').length)));
+}
 function sendPrivateChat(){
-  const input=document.getElementById('chatInput'); const text=(input?.value||'').trim();
-  if(!text||!chatTargetId||!window.mpChannel||!mpReady)return;
-  const msg={type:'private_chat',from:mpId,to:chatTargetId,name:playerName,place:playerPlace,text:text.slice(0,180),t:Date.now()};
-  addChatMessage(msg); input.value='';
-  window.mpChannel.send({type:'broadcast',event:'chat',payload:msg});
+  const input=document.getElementById('chatInput'); const raw=(input?.value||'').trim();
+  if(!raw||!chatTargetId||!window.mpChannel||!mpReady)return;
+  const text=maskPhoneNumbers(raw).slice(0,180);
+  const msg={type:'private_chat',from:mpId,to:chatTargetId,name:playerName,place:playerPlace,text,t:Date.now()};
+  addChatMessage(msg); input.value=''; window.mpChannel.send({type:'broadcast',event:'chat',payload:msg});
 }
 let playerTemplate=null;
 let playerAnimations=[];
@@ -306,6 +313,35 @@ setInterval(()=>{const now=performance.now();for(const [id,r] of remotePlayers){
 window.addEventListener('beforeunload',()=>{try{window.mpChannel?.send({type:'broadcast',event:'player',payload:{type:'leave',id:mpId}})}catch(e){}});
 setupMultiplayer();
 
+// V36: reliable private voice-message chunks + private mini-game/greeting protocol.
+const oldMpSetupPromise=Promise.resolve();
+function addVoiceChunk(payload){
+  if(!payload||payload.to!==mpId||!payload.voiceId)return;
+  let v=voiceRx.get(payload.voiceId); if(!v){v={from:payload.from,name:payload.name,place:payload.place,total:payload.total,chunks:[],received:0,mime:payload.mime||'audio/webm'};voiceRx.set(payload.voiceId,v);}
+  if(v.chunks[payload.idx])return; v.chunks[payload.idx]=payload.data; v.received++;
+  if(v.received>=v.total){const data=v.chunks.join('');const msg={type:'voice',from:v.from,to:mpId,name:v.name,place:v.place,audio:data,t:Date.now()};addChatMessage(msg);chatUnread++;updateChatBadge();voiceRx.delete(payload.voiceId);}
+}
+function rpsResult(a,b){if(a===b)return 0;if((a==='rock'&&b==='scissors')||(a==='paper'&&b==='rock')||(a==='scissors'&&b==='paper'))return 1;return -1;}
+function showRpsChoices(gameId){const log=document.getElementById('chatLog');if(!log)return;const box=document.createElement('div');box.id='rpsBox';box.innerHTML='<b>🎮 Rock • Paper • Scissors</b><button data-r="rock">🪨 Rock</button><button data-r="paper">📄 Paper</button><button data-r="scissors">✂️ Scissors</button>';log.appendChild(box);box.querySelectorAll('button').forEach(b=>b.onclick=()=>{const g=rpsGames.get(gameId);if(!g||g.myChoice)return;g.myChoice=b.dataset.r;window.mpChannel?.send({type:'broadcast',event:'chat',payload:{type:'rps_choice',gameId,to:g.other,from:mpId,choice:g.myChoice,name:playerName,t:Date.now()}});b.parentElement.querySelectorAll('button').forEach(x=>x.disabled=true);finishRps(gameId);});}
+function finishRps(gameId){const g=rpsGames.get(gameId);if(!g||!g.myChoice||!g.otherChoice)return;const r=rpsResult(g.myChoice,g.otherChoice);const text=r===0?'🤝 Draw!':r===1?'🏆 You win! +50':'🙂 You lose';addChatMessage({type:'private_chat',from:mpId,to:g.other,name:playerName,text:'🎮 '+text,t:Date.now()});if(r===1){gameProgress.coins+=50;awardProgress('🎮 Play Area',15);}else if(r===0){gameProgress.coins+=15;}updateProgressUI();showMission('🎮 Mini game',text);rpsGames.delete(gameId);}
+window.mpChannel?.on('broadcast',{event:'chat'},({payload})=>{if(!payload)return;if(payload.type==='voice_chunk'){addVoiceChunk(payload);return;}if(payload.type==='greet'&&payload.to===mpId){awardProgress('👋 Greeting',10);showMission('👋 '+(payload.name||'Player')+' says Hi!','Tap 👋 Hi to reply');setTimeout(()=>showMission('🎯 Mission','Explore Kerala • complete collections to level up'),1600);return;}if(payload.type==='rps_invite'&&payload.to===mpId){const id=payload.gameId;rpsGames.set(id,{other:payload.from,myChoice:null,otherChoice:null});chatTargetId=payload.from;refreshChatTargets();showRpsChoices(id);return;}if(payload.type==='rps_choice'&&payload.to===mpId){const g=rpsGames.get(payload.gameId);if(g){g.otherChoice=payload.choice;finishRps(payload.gameId);}return;}});
+
+async function toggleVoiceRecordV36(){
+  if(!chatTargetId||!window.mpChannel||!mpReady)return;
+  const btn=document.getElementById('voiceBtn'); if(!btn)return;
+  if(mediaRecorder?.state==='recording'){mediaRecorder.stop();return;}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true}); voiceChunks=[];
+    const opts=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?{mimeType:'audio/webm;codecs=opus',audioBitsPerSecond:32000}:{audioBitsPerSecond:32000};
+    mediaRecorder=new MediaRecorder(stream,opts);
+    mediaRecorder.ondataavailable=e=>{if(e.data.size)voiceChunks.push(e.data)};
+    mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());btn.classList.remove('recording');btn.textContent='🎙️';const blob=new Blob(voiceChunks,{type:mediaRecorder.mimeType||'audio/webm'});if(blob.size>240000){alert('Voice message too large. Keep it under 15 seconds.');return;}const reader=new FileReader();reader.onload=async()=>{const data=reader.result;const voiceId=mpId+'-'+Date.now();const chunkSize=9000;const total=Math.ceil(data.length/chunkSize);for(let i=0;i<total;i++){await window.mpChannel.send({type:'broadcast',event:'chat',payload:{type:'voice_chunk',voiceId,idx:i,total,data:data.slice(i*chunkSize,(i+1)*chunkSize),from:mpId,to:chatTargetId,name:playerName,place:playerPlace,mime:blob.type,t:Date.now()}});await new Promise(r=>setTimeout(r,12));}const msg={type:'voice',from:mpId,to:chatTargetId,name:playerName,place:playerPlace,audio:data,t:Date.now()};addChatMessage(msg);renderChatLog();};reader.readAsDataURL(blob);
+    };
+    mediaRecorder.start();btn.classList.add('recording');btn.textContent='⏹️';setTimeout(()=>{if(mediaRecorder?.state==='recording')mediaRecorder.stop()},15000);
+  }catch(e){alert('Microphone permission is needed for private voice messages.')}
+}
+const vb=document.getElementById('voiceBtn');if(vb){const nv=vb.cloneNode(true);vb.replaceWith(nv);nv.addEventListener('click',toggleVoiceRecordV36);}
+const rb=document.getElementById('rpsStart');if(rb)rb.addEventListener('click',()=>{if(!chatTargetId||!window.mpChannel||!mpReady)return;const id=mpId+'-'+Date.now();rpsGames.set(id,{other:chatTargetId,myChoice:null,otherChoice:null});showRpsChoices(id);window.mpChannel.send({type:'broadcast',event:'chat',payload:{type:'rps_invite',gameId:id,to:chatTargetId,from:mpId,name:playerName,t:Date.now()}});});
 
 async function toggleVoiceRecord(){
   if(!chatTargetId||!window.mpChannel||!mpReady)return;
@@ -764,9 +800,20 @@ function shop(x,z){box(9,4.8,6.5,0xa1d3a7,x,2.4,z);box(9.5,1.5,7,0x167a4d,x,5.5,
 
 const carAssetUrl='https://cdn.3dassets.dev/assets/32487/v1/model.glb';
 let c1=null,c2=null;
+function prepareCarDoors(model){
+  if(!model||model.userData.kpDoorsPrepared)return;
+  const doors=[]; model.traverse(o=>{if(o.name&&/(door|front_left|front_right|rear_left|rear_right)/i.test(o.name)) doors.push(o);});
+  model.userData.kpDoors=doors.map(o=>({o,base:o.rotation.clone()})); model.userData.kpDoorsPrepared=true;
+}
+function setCarDoors(model,open){
+  if(!model)return; prepareCarDoors(model); const list=model.userData.kpDoors||[];
+  list.forEach((d,i)=>{d.o.rotation.copy(d.base); if(open){const side=(i%2===0?1:-1); d.o.rotation.y+=side*.72; d.o.rotation.z+=side*.10;}});
+  model.userData.doorsOpen=!!open;
+}
 function loadRealCar(x,z,scale=1,colorize=null){
   loadGLB(carAssetUrl,g=>{
     const model=g.scene;
+    prepareCarDoors(model);
     if(!carTemplate){
       carTemplate=model.clone(true);
       for(const r of remotePlayers.values()) if(r.vehicle) buildRemoteVisual(r,true);
@@ -810,7 +857,7 @@ const dogAssetUrl='https://cdn.3dassets.dev/assets/29204/v1/model.glb';
 loadGLB(dogAssetUrl,g=>{
   const model=g.scene;
   enableShadows(model);
-  model.scale.setScalar(1.0);
+  model.scale.setScalar(1.0); if(playerGender==='female'){model.scale.x=.93;model.scale.z=.93;}
   model.position.set(0,0,0);
   pet.add(model);
   const clips=g.animations||[];
@@ -844,10 +891,10 @@ function applyAvatarStyle(model, gender='male', outfit=0){
     femaleStyle.clear();
     model.scale.x=.93; model.scale.z=.93;
     const dressMat=new THREE.MeshStandardMaterial({color:[0x8c3d72,0x2d6f8d,0xb06a2e,0x5a477e][outfit%4],roughness:.86});
-    const dress=new THREE.Mesh(new THREE.CylinderGeometry(.28,.60,.92,20,1,false),dressMat); dress.position.y=.98; femaleStyle.add(dress);
-    const waist=new THREE.Mesh(new THREE.TorusGeometry(.36,.035,8,20),dressMat); waist.rotation.x=Math.PI/2; waist.position.y=1.22; femaleStyle.add(waist);
+    const skirt=new THREE.Mesh(new THREE.CylinderGeometry(.30,.48,.62,24,1,false),dressMat); skirt.position.y=.82; femaleStyle.add(skirt); const blouse=new THREE.Mesh(new THREE.CapsuleGeometry(.26,.42,6,12),dressMat); blouse.position.y=1.22; femaleStyle.add(blouse);
+    const waist=new THREE.Mesh(new THREE.TorusGeometry(.34,.028,8,20),dressMat); waist.rotation.x=Math.PI/2; waist.position.y=1.10; femaleStyle.add(waist);
     const hairMat=new THREE.MeshStandardMaterial({color:[0x20150f,0x3b2416,0x171717,0x6b4026][outfit%4],roughness:.92});
-    const hair=new THREE.Mesh(new THREE.SphereGeometry(.30,18,14,0,Math.PI*2,0,Math.PI*.78),hairMat); hair.scale.set(1.05,1.2,1.08); hair.position.set(0,1.80,-.015); femaleStyle.add(hair);
+    const hair=new THREE.Mesh(new THREE.SphereGeometry(.30,18,14,0,Math.PI*2,0,Math.PI*.78),hairMat); hair.scale.set(1.02,1.08,1.04); hair.position.set(0,1.82,-.02); femaleStyle.add(hair); const lockL=new THREE.Mesh(new THREE.CapsuleGeometry(.055,.22,4,8),hairMat);lockL.position.set(-.27,1.68,.02);femaleStyle.add(lockL);const lockR=lockL.clone();lockR.position.x=.27;femaleStyle.add(lockR);
     const pony=new THREE.Mesh(new THREE.SphereGeometry(.13,12,10),hairMat); pony.scale.set(.9,1.6,.9); pony.position.set(-.19,1.62,-.03); femaleStyle.add(pony);
     const bagMat=new THREE.MeshStandardMaterial({color:0x5b3428,roughness:.9}); const bag=new THREE.Mesh(new THREE.BoxGeometry(.16,.22,.08),bagMat); bag.position.set(.37,1.0,.04); femaleStyle.add(bag);
   }else if(femaleStyle){femaleStyle.clear(); femaleStyle.visible=false; model.scale.x=model.scale.z=1;}
@@ -858,7 +905,7 @@ loadGLB(playerModelUrl,g=>{
   const model=g.scene;
   playerTemplate=model; playerAnimations=g.animations||[]; applyAvatarStyle(model,playerGender,playerOutfit);
   enableShadows(model);
-  model.scale.setScalar(1.0);
+  model.scale.setScalar(1.0); if(playerGender==='female'){model.scale.x=.93;model.scale.z=.93;}
   model.position.set(0,0,0);
   player.add(model);
   createWalkingNPCsFromTemplate(model,g.animations||[]);
@@ -920,13 +967,13 @@ const carBtn=document.getElementById('carBtn');
 function setCarButton(show,label){carBtn.style.display=show?'block':'none';carBtn.textContent=label||'🚗'}
 function getNearestRemoteVehicle(){let best=null,bd=999;for(const r of remotePlayers.values()){if(!r.vehicle)continue;const d=Math.hypot(player.position.x-r.group.position.x,player.position.z-r.group.position.z);if(d<bd){bd=d;best=r}}return {r:best,dist:bd}}
 function getNearestBus(){let best=null,bd=999;for(const q of traffic){if(q.type!=='bus')continue;const d=Math.hypot(player.position.x-q.obj.position.x,player.position.z-q.obj.position.z);if(d<bd){bd=d;best=q.obj}}return {bus:best,dist:bd}}
-function enterBus(bus){if(!bus||driving||insideHouse||ridingBus)return;ridingBus=bus;awardProgress('🚌 Bus',40);completeTask('bus',80);player.visible=false;setCarButton(true,'🚪 Exit');document.getElementById('mission').innerHTML='<b>🚌 Bus Travel</b><br>You are travelling by bus';}
-function exitBus(){if(!ridingBus)return;player.visible=true;player.position.set(ridingBus.position.x+3,0,ridingBus.position.z+2);yaw=targetYaw=ridingBus.rotation.y; ridingBus=null;setCarButton(false);document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Explore Kerala';}
-function enterPassenger(r){if(!r||!r.vehicle||passengerRemote)return;passengerRemote=r;player.visible=false;setCarButton(true,'🚪 Exit');document.getElementById('mission').innerHTML='<b>🚘 Passenger</b><br>Riding with '+r.name;}
-function exitPassenger(){if(!passengerRemote)return;player.visible=true;player.position.set(passengerRemote.group.position.x+2,0,passengerRemote.group.position.z+2);yaw=targetYaw=passengerRemote.group.rotation.y;passengerRemote=null;setCarButton(false);}
+function enterBus(bus){if(!bus||driving||insideHouse||ridingBus)return;ridingBus=bus;awardProgress('🚌 Bus',40);completeTask('bus',80);player.visible=false;setCarButton(true,'🚪 Exit');document.getElementById('viewBtn').style.display='block';firstPersonView=true;document.getElementById('viewBtn').textContent='👁️ Exterior view';document.getElementById('mission').innerHTML='<b>🚌 Bus Travel</b><br>You are inside the bus • 👁️ toggle view';}
+function exitBus(){if(!ridingBus)return;player.visible=true;player.position.set(ridingBus.position.x+3,0,ridingBus.position.z+2);yaw=targetYaw=ridingBus.rotation.y; ridingBus=null;setCarButton(false);document.getElementById('viewBtn').style.display='none';firstPersonView=false;document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Explore Kerala';}
+function enterPassenger(r){if(!r||!r.vehicle||passengerRemote)return;passengerRemote=r;player.visible=false;setCarButton(true,'🚪 Exit');document.getElementById('viewBtn').style.display='block';firstPersonView=true;document.getElementById('viewBtn').textContent='👁️ Exterior view';document.getElementById('mission').innerHTML='<b>🚘 Passenger</b><br>Riding with '+r.name+' • 👁️ toggle view';}
+function exitPassenger(){if(!passengerRemote)return;player.visible=true;player.position.set(passengerRemote.group.position.x+2,0,passengerRemote.group.position.z+2);yaw=targetYaw=passengerRemote.group.rotation.y;passengerRemote=null;setCarButton(false);document.getElementById('viewBtn').style.display='none';firstPersonView=false;}
 function getNearestCar(){const list=[c1,c2,fallback1,fallback2].filter(Boolean);let best=null,bd=999;for(const c of list){const d=Math.hypot(player.position.x-c.position.x,player.position.z-c.position.z);if(d<bd){bd=d;best=c}}return {car:best,dist:bd}}
-function enterCar(car){if(!car||driving)return;driving=true;awardProgress('🚗 Car',35);completeTask('car',60);activeCar=car;carSpeed=0;player.visible=false;setCarButton(true,'🚪');document.getElementById('mission').innerHTML='<b>🚗 Driving</b><br>Joystick ↑ accelerate • ← → steer<br>Tap 🚪 to exit';}
-function exitCar(){if(!driving||!activeCar)return;const c=activeCar;driving=false;carSpeed=0;player.visible=true;player.position.set(c.position.x+3,0,c.position.z);yaw=c.rotation.y;targetYaw=yaw;setCarButton(false);document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you';activeCar=null;}
+function enterCar(car){if(!car||driving)return;driving=true;awardProgress('🚗 Car',35);completeTask('car',60);activeCar=car;carSpeed=0;player.visible=false;setCarDoors(car,true);setCarButton(true,'🚪');document.getElementById('viewBtn').style.display='block';firstPersonView=true;document.getElementById('viewBtn').textContent='👁️ Exterior view';document.getElementById('mission').innerHTML='<b>🚗 Driving</b><br>Joystick ↑ accelerate • ← → steer<br>👁️ Interior/Exterior view';}
+function exitCar(){if(!driving||!activeCar)return;const c=activeCar;setCarDoors(c,false);driving=false;carSpeed=0;player.visible=true;player.position.set(c.position.x+3,0,c.position.z);yaw=c.rotation.y;targetYaw=yaw;setCarButton(false);document.getElementById('viewBtn').style.display='none';firstPersonView=false;document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you';activeCar=null;}
 carBtn.addEventListener('click',()=>{if(driving)exitCar();else if(ridingBus)exitBus();else if(passengerRemote)exitPassenger();else {const n=getNearestCar();const rr=getNearestRemoteVehicle();const bb=getNearestBus();if(rr.r&&rr.dist<5.5)enterPassenger(rr.r);else if(bb.bus&&bb.dist<7)enterBus(bb.bus);else if(n.dist<6)enterCar(n.car)}});
 const houseBtn=document.getElementById('houseBtn');
 let insideHouse=false;
@@ -950,7 +997,9 @@ function buildInterior(){
   ibox(14,.2,12,floorMat,300,-.1,300);
   ibox(14,4,.25,wallI,300,2,294); ibox(14,4,.25,wallI,300,2,306);
   ibox(.25,4,12,wallI,293,2,300); ibox(.25,4,12,wallI,307,2,300);
+  ibox(14,.18,12,wallI,300,4.0,300);
   ibox(2.1,3.2,.18,woodI,300,1.6,305.82);
+  const ceilingLight=new THREE.PointLight(0xffe7c2,2.0,12);ceilingLight.position.set(300,3.5,300);interior.add(ceilingLight);
   // Kerala home furniture: bed, sofa, dining set, TV, cabinet, fridge, kitchen, wardrobe, mirror, rug, plant.
   addFurniture(3.8,.35,2.0,woodI,297.2,.28,296.3,'🛏️ Bed','bed');
   ibox(3.55,.22,1.82,white,297.2,.53,296.3);ibox(1.0,.25,.65,white,296.2,.70,296.45);ibox(1.0,.25,.65,white,298.2,.70,296.45);
@@ -980,10 +1029,12 @@ function useFurniture(f){if(!f||!insideHouse)return;const a=f.userData.action;fu
   else {showMission(f.userData.label||'🏠 Home','Interacting with '+(f.userData.label||'item'));completeTask('home-'+a,20);}
 }
 function clearFurniture(){if(!furnitureState)return;player.position.copy(furnitureState.restore);player.rotation.y=furnitureState.rot;if(playerTemplate){playerTemplate.rotation.x=0;playerTemplate.position.y=0;}furnitureState=null;showMission('🏠 House Interior','Walk around • use furniture when prompted');}
-function enterHouse(){if(insideHouse||driving)return;const n=getNearestHouse();if(!n.pos||n.dist>18)return;outsideHousePos.copy(player.position);insideHouse=true;interior.visible=true;player.position.set(300,0,302.8);yaw=Math.PI;targetYaw=yaw;showMission('🏠 House Interior','Walk around • bed, sofa, TV, kitchen, fridge, dining table');houseBtn.textContent='🚪';awardProgress('🏠 Home',25);}
-function exitHouse(){if(!insideHouse)return;if(furnitureState)clearFurniture();insideHouse=false;interior.visible=false;player.position.copy(outsideHousePos);yaw=targetYaw=0;setHouseButton(false);showMission('🎯 Mission','Complete collections to level up • explore Kerala');}
+function enterHouse(){if(insideHouse||driving)return;const n=getNearestHouse();if(!n.pos||n.dist>18)return;outsideHousePos.copy(player.position);insideHouse=true;interior.visible=true;player.position.set(300,0,302.8);yaw=Math.PI;targetYaw=yaw;camera.far=24;camera.updateProjectionMatrix();skyDecor.visible=false;birds.forEach(b=>b.g.visible=false);showMission('🏠 House Interior','Only the inside is visible • bed, sofa, TV, kitchen, fridge, dining table');houseBtn.textContent='🚪';awardProgress('🏠 Home',25);}
+function exitHouse(){if(!insideHouse)return;if(furnitureState)clearFurniture();insideHouse=false;interior.visible=false;player.position.copy(outsideHousePos);yaw=targetYaw=0;camera.far=900;camera.updateProjectionMatrix();skyDecor.visible=true;birds.forEach(b=>b.g.visible=true);setHouseButton(false);showMission('🎯 Mission','Complete collections to level up • explore Kerala');}
 houseBtn.addEventListener('click',()=>{if(insideHouse){const n=nearestFurniture();if(n.f&&n.dist<2.2)useFurniture(n.f);else exitHouse();}else enterHouse();});
 
+document.getElementById('viewBtn').addEventListener('click',()=>{firstPersonView=!firstPersonView;document.getElementById('viewBtn').textContent=firstPersonView?'👁️ Exterior view':'👁️ Interior view';});
+document.getElementById('hiBtn').addEventListener('click',()=>{if(!hiTargetId||!window.mpChannel||!mpReady)return;const msg={type:'greet',from:mpId,to:hiTargetId,name:playerName,t:Date.now()};window.mpChannel.send({type:'broadcast',event:'chat',payload:msg});awardProgress('👋 Greeting',10);showMission('👋 Hi!','You greeted '+(remotePlayers.get(hiTargetId)?.name||'player'));setTimeout(()=>showMission('🎯 Mission','Explore Kerala • complete collections to level up'),1300);});
 document.getElementById('jump').onclick=()=>{if(!driving&&!jump){jump=true;vy=8}};document.getElementById('reset').onclick=()=>{if(driving&&activeCar){activeCar.position.set(0,0,0);carSpeed=0}else{player.position.set(0,0,0);yaw=0;targetYaw=0;pitch=.18;targetPitch=.18}};
 document.getElementById('pet').onclick=()=>{if(driving)return;awardProgress('🐕 Pet',30);completeTask('pet',40);document.getElementById('mission').innerHTML='<b>🐾 Pet interaction</b><br>Your dog is happy ❤️';setTimeout(()=>document.getElementById('mission').innerHTML='<b>🎯 Mission</b><br>Reach the riverside shop<br>🐕 Your pet is with you',1800)};
 const playBtn=document.getElementById('play');
@@ -1269,6 +1320,7 @@ if(!driving && !ridingBus && !passengerRemote){
   if(moving){const desired=Math.atan2(x,z)+yaw;let diff=Math.atan2(Math.sin(desired-player.rotation.y),Math.cos(desired-player.rotation.y));const turnK=1-Math.exp(-dt*(l>.72?11:8));player.rotation.y+=diff*turnK;
   const turnAmount=Math.max(-1,Math.min(1,diff/0.9)); player.userData.turnLean+=(turnAmount-(player.userData.turnLean||0))*(1-Math.exp(-dt*8));
   if(playerTemplate){ playerTemplate.rotation.z=-0.045*(player.userData.turnLean||0); }
+  targetYaw += Math.atan2(Math.sin(player.rotation.y-targetYaw),Math.cos(player.rotation.y-targetYaw))*(1-Math.exp(-dt*7));
 } else if(playerTemplate){ playerTemplate.rotation.z+=(0-playerTemplate.rotation.z)*(1-Math.exp(-dt*8));}
   player.position.y+=vy*dt;if(jump){vy-=21*dt;if(player.position.y<=0){player.position.y=0;jump=false;vy=0}}
 } else if(activeCar){
@@ -1316,17 +1368,20 @@ if(!driving && !ridingBus && !passengerRemote){
     if(!driving&&!ridingBus&&!passengerRemote){const nh=getNearestHouse();if(nh.pos&&nh.dist<18)setHouseButton(true,'🏠 Enter');else setHouseButton(false);}
   }
 }
-let follow=driving&&activeCar?activeCar:player;
-const movingSpeed=Math.abs(carSpeed||0);
-let followYaw=driving&&activeCar?activeCar.rotation.y:yaw;
-const desiredDistance=(driving||ridingBus||passengerRemote)?8.2:(moving?6.8:6.25);
-const height=(driving||ridingBus||passengerRemote)?1.75:1.52;
-const target=new THREE.Vector3(follow.position.x,follow.position.y+height,follow.position.z);
-// Camera look-ahead reduces the feeling of steering through a fixed tripod.
-const lookAhead=(driving||ridingBus||passengerRemote)?2.6:(moving?1.0:0.35);
-const lookTarget=new THREE.Vector3(target.x+Math.sin(followYaw)*lookAhead,target.y+0.30,target.z+Math.cos(followYaw)*lookAhead);
-const cp=new THREE.Vector3(target.x+Math.sin(followYaw)*desiredDistance*Math.cos(pitch),target.y+Math.sin(pitch)*desiredDistance,target.z+Math.cos(followYaw)*desiredDistance*Math.cos(pitch));
-const cameraFollow=1-Math.exp(-dt*(mobile?9.5:12));camera.position.lerp(cp,cameraFollow);camera.lookAt(lookTarget);
+let follow=driving&&activeCar?activeCar:(ridingBus?ridingBus:(passengerRemote?passengerRemote.group:player));
+let followYaw=driving&&activeCar?activeCar.rotation.y:(ridingBus?ridingBus.rotation.y:(passengerRemote?passengerRemote.group.rotation.y:player.rotation.y));
+const vehicleMode=!!(driving||ridingBus||passengerRemote);
+if(vehicleMode && firstPersonView){
+  const base=new THREE.Vector3(0,driving?1.35:1.75,driving?.65:0.55); base.applyQuaternion(follow.quaternion); const cp=follow.position.clone().add(base);
+  const ahead=new THREE.Vector3(0,driving?1.25:1.8,driving?5.0:5.5); ahead.applyQuaternion(follow.quaternion); const look=follow.position.clone().add(ahead);
+  camera.position.lerp(cp,1-Math.exp(-dt*(mobile?12:15))); camera.lookAt(look);
+}else{
+  const desiredDistance=vehicleMode?8.2:(moving?6.8:6.25); const height=vehicleMode?1.75:1.52; const target=new THREE.Vector3(follow.position.x,follow.position.y+height,follow.position.z);
+  const lookAhead=vehicleMode?2.6:(moving?1.0:0.35); const lookTarget=new THREE.Vector3(target.x+Math.sin(followYaw)*lookAhead,target.y+0.30,target.z+Math.cos(followYaw)*lookAhead);
+  const cp=new THREE.Vector3(target.x+Math.sin(followYaw)*desiredDistance*Math.cos(pitch),target.y+Math.sin(pitch)*desiredDistance,target.z+Math.cos(followYaw)*desiredDistance*Math.cos(pitch));
+  camera.position.lerp(cp,1-Math.exp(-dt*(mobile?9.5:12))); camera.lookAt(lookTarget);
+}
+  let nearestHi=null,nearestHiDist=999; for(const [id,r] of remotePlayers){const d=Math.hypot(player.position.x-r.group.position.x,player.position.z-r.group.position.z);if(!r.vehicle&&d<5.8&&d<nearestHiDist){nearestHi=r;nearestHiDist=d;hiTargetId=id;}} const hi=document.getElementById('hiBtn'); if(hi){hi.style.display=nearestHi?'block':'none'; if(nearestHi)hi.textContent='👋 Hi '+nearestHi.name; if(!nearestHi)hiTargetId='';}
   if(localTag && !insideHouse){const lp=(ridingBus?ridingBus:passengerRemote?passengerRemote.group:player).position.clone();lp.y+=ridingBus||passengerRemote?2.6:2.9;lp.project(camera);localTag.style.left=((lp.x*.5+.5)*innerWidth)+'px';localTag.style.top=((-lp.y*.5+.5)*innerHeight)+'px';localTag.style.display=(lp.z<1?'block':'none');} else if(localTag) localTag.style.display='none';
   for(const r of remotePlayers.values()){
   const p=r.group.position.clone();
