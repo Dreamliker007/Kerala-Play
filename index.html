@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#4a8cda">
-  <title>Kerala Play — Open World Foundation</title>
+  <title>Kerala Play — Living Kerala</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -13,26 +13,36 @@
     #hud { position: fixed; inset: 0; pointer-events: none; }
     #brand { position: absolute; top: calc(env(safe-area-inset-top) + 14px); left: 16px; padding: 9px 12px; border-radius: 12px; color: white; background: rgba(11, 35, 45, .62); box-shadow: 0 2px 12px rgba(0,0,0,.18); font-weight: 700; letter-spacing: .2px; }
     #hint { position: absolute; top: calc(env(safe-area-inset-top) + 64px); left: 16px; color: rgba(255,255,255,.92); background: rgba(11,35,45,.46); border-radius: 10px; padding: 7px 10px; font-size: 12px; line-height: 1.35; }
-    #joystick-zone { position: absolute; left: 0; bottom: 0; width: 48vw; height: 42vh; min-width: 220px; min-height: 245px; pointer-events: auto; touch-action: none; }
+    #joystick-zone { position: absolute; z-index:2; left: 0; bottom: 0; width: 48vw; height: 42vh; min-width: 220px; min-height: 245px; pointer-events: auto; touch-action: none; }
     #joystick-base { position: absolute; width: 118px; height: 118px; left: 30px; bottom: calc(env(safe-area-inset-bottom) + 28px); border: 2px solid rgba(255,255,255,.34); border-radius: 50%; background: rgba(10,37,42,.24); box-shadow: inset 0 0 22px rgba(0,0,0,.15); }
     #joystick-knob { position: absolute; width: 54px; height: 54px; left: 30px; top: 30px; border: 2px solid rgba(255,255,255,.55); border-radius: 50%; background: rgba(255,255,255,.28); box-shadow: 0 3px 9px rgba(0,0,0,.18); transform: translate(0,0); }
-    #run { position: absolute; right: 22px; bottom: calc(env(safe-area-inset-bottom) + 38px); width: 80px; height: 80px; pointer-events: auto; touch-action: none; border: 2px solid rgba(255,255,255,.55); border-radius: 50%; color: #fff; font-weight: 800; font-size: 14px; letter-spacing: .5px; background: rgba(26,92,72,.68); box-shadow: 0 4px 15px rgba(0,0,0,.24); }
+    #run { position: absolute; z-index:3; right: 22px; bottom: calc(env(safe-area-inset-bottom) + 38px); width: 80px; height: 80px; pointer-events: auto; touch-action: none; border: 2px solid rgba(255,255,255,.55); border-radius: 50%; color: #fff; font-weight: 800; font-size: 14px; letter-spacing: .5px; background: rgba(26,92,72,.68); box-shadow: 0 4px 15px rgba(0,0,0,.24); }
     #run.active { background: rgba(55,174,112,.9); transform: scale(.96); }
     #camera-zone { position: absolute; right: 0; bottom: 0; width: 52vw; height: 100vh; pointer-events: auto; touch-action: none; }
-    #camera-note { position: absolute; right: 122px; bottom: calc(env(safe-area-inset-bottom) + 65px); color: rgba(255,255,255,.87); background: rgba(11,35,45,.42); padding: 6px 8px; border-radius: 8px; font-size: 11px; }
+    #camera-note { position: absolute; z-index:2; right: 122px; bottom: calc(env(safe-area-inset-bottom) + 65px); color: rgba(255,255,255,.87); background: rgba(11,35,45,.42); padding: 6px 8px; border-radius: 8px; font-size: 11px; pointer-events:none; }
     #fallback { display: none; position: fixed; inset: 0; z-index: 5; place-items: center; padding: 24px; background: #16323f; color: white; text-align: center; line-height: 1.5; }
     #camera-zone { z-index: 1; }
-    #profile-chip, #mission-card, #minimap, #chat-toggle, #chat-panel, #asset-notice { z-index: 5; pointer-events: auto; }
+    #profile-chip, #progress-chip, #online-chip, #mission-card, #quick-actions, #minimap, #chat-panel, #people-panel, #task-panel, #dm-panel, #asset-notice, #toast { z-index: 5; pointer-events: auto; }
     #profile-chip { position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:176px; max-width:180px; padding:8px 10px; border:1px solid rgba(255,255,255,.22); border-radius:11px; background:rgba(8,29,34,.67); color:#fff; font-size:11px; line-height:1.25; cursor:pointer; touch-action:manipulation; }
     #profile-name { display:block; font-weight:800; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     #profile-district { display:block; margin-top:2px; color:#bde7d0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    #mission-card { position:absolute; top:calc(env(safe-area-inset-top) + 108px); left:16px; width:194px; padding:11px 12px; border:1px solid rgba(255,255,255,.17); border-radius:12px; background:rgba(10,29,34,.67); color:#fff; font-size:12px; line-height:1.4; }
+    #progress-chip { position:absolute; top:calc(env(safe-area-inset-top) + 58px); left:176px; max-width:180px; padding:7px 10px; border:1px solid rgba(255,255,255,.18); border-radius:10px; background:rgba(8,29,34,.62); color:#f8dc79; font-size:11px; font-weight:800; }
+    #online-chip { position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:74px; display:flex; align-items:center; gap:6px; max-width:160px; padding:7px 9px; border:1px solid rgba(255,255,255,.2); border-radius:10px; background:rgba(8,29,34,.66); color:#e7fff1; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+    #online-chip i { display:block; width:7px; height:7px; flex:0 0 auto; border-radius:50%; background:#41df83; box-shadow:0 0 8px rgba(65,223,131,.72); }
+    #mission-card { position:absolute; top:calc(env(safe-area-inset-top) + 108px); left:16px; width:194px; padding:10px 11px; border:1px solid rgba(255,255,255,.17); border-radius:12px; background:rgba(10,29,34,.67); color:#fff; font:inherit; font-size:12px; line-height:1.35; text-align:left; cursor:pointer; touch-action:manipulation; }
     #mission-card strong { display:block; color:#f6d66b; margin-bottom:3px; font-size:12px; }
     #landmark-status { color:#d3ece1; font-size:11px; }
-    #minimap { position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:16px; width:155px; padding:8px; border:1px solid rgba(255,255,255,.32); border-radius:14px; background:rgba(8,29,34,.74); box-shadow:0 5px 18px rgba(0,0,0,.24); touch-action:manipulation; }
-    .map-header { display:flex; align-items:center; justify-content:space-between; color:#fff; font-size:11px; letter-spacing:.9px; }
-    #map-toggle { border:0; color:#fff; background:transparent; font-size:17px; line-height:1; cursor:pointer; }
-    #kerala-map { display:block; width:100%; height:188px; margin-top:4px; overflow:visible; }
+    #quick-actions { position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:14px; display:grid; gap:8px; pointer-events:auto; }
+    .hud-icon { width:48px; height:48px; border:1px solid rgba(255,255,255,.36); border-radius:14px; color:#fff; background:rgba(8,35,43,.78); box-shadow:0 4px 14px rgba(0,0,0,.18); font-size:20px; cursor:pointer; touch-action:manipulation; }
+    .hud-icon span { display:block; margin-top:-1px; font-size:8px; font-weight:900; letter-spacing:.4px; }
+    .hud-icon[aria-expanded="true"] { background:rgba(38,133,91,.95); border-color:#b9ffe1; }
+    #minimap, #chat-panel, #people-panel, #task-panel, #dm-panel { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:72px; width:min(310px, calc(100vw - 90px)); max-height:min(58dvh, 380px); overflow-y:auto; padding:11px; border:1px solid rgba(255,255,255,.3); border-radius:15px; background:rgba(7,24,30,.94); color:#fff; box-shadow:0 9px 26px rgba(0,0,0,.32); touch-action:pan-y; }
+    #minimap.open, #chat-panel.open, #people-panel.open, #task-panel.open, #dm-panel.open { display:block; z-index:7; }
+    .panel-heading, .map-header, .chat-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#fff; font-size:13px; font-weight:900; }
+    .panel-heading small { color:#abd7c1; font-size:10px; font-weight:600; }
+    .panel-close, #map-label-toggle { border:0; border-radius:7px; color:#fff; background:rgba(255,255,255,.13); padding:4px 7px; font:inherit; font-size:12px; cursor:pointer; touch-action:manipulation; }
+    #map-label-toggle { margin-left:auto; }
+    #kerala-map { display:block; width:100%; height:250px; margin-top:6px; overflow:visible; }
     #kerala-outline { fill:rgba(48,119,79,.88); stroke:#d9f2c8; stroke-width:1.5; }
     .district-lines path { fill:none; stroke:rgba(228,255,225,.30); stroke-width:.65; }
     #map-route { stroke:#f5d566; stroke-width:1.2; stroke-dasharray:2 2; }
@@ -42,10 +52,6 @@
     #map-player circle { fill:#fff; stroke:#152f3b; stroke-width:1.5; }
     #map-player path { fill:#1ee879; stroke:#062f1c; stroke-width:.8; }
     #map-status { display:block; min-height:15px; color:rgba(255,255,255,.88); font-size:10px; text-align:center; }
-    #chat-toggle { position:absolute; right:16px; top:calc(env(safe-area-inset-top) + 226px); border:1px solid rgba(255,255,255,.34); border-radius:11px; padding:9px 11px; color:#fff; background:rgba(10,38,48,.76); font-weight:800; font-size:11px; cursor:pointer; touch-action:manipulation; }
-    #chat-panel { display:none; position:absolute; right:16px; top:calc(env(safe-area-inset-top) + 267px); width:min(310px, calc(100vw - 32px)); max-height:340px; padding:11px; border:1px solid rgba(255,255,255,.28); border-radius:14px; background:rgba(7,23,29,.93); color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.3); }
-    #chat-panel.open { display:block; }
-    .chat-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; font-weight:800; }
     #chat-channel { margin-top:8px; width:100%; border:1px solid rgba(255,255,255,.23); border-radius:8px; padding:7px; color:#fff; background:#17323a; font-size:12px; }
     #chat-note { margin:7px 0; color:#b9d8cf; font-size:10px; line-height:1.35; }
     #chat-log { height:142px; overflow-y:auto; padding:7px; border-radius:9px; background:rgba(255,255,255,.06); font-size:11px; line-height:1.35; }
@@ -53,8 +59,24 @@
     .chat-message small { display:block; color:#9ec8b6; font-size:9px; }
     #chat-form { display:flex; gap:6px; margin-top:8px; }
     #chat-input { min-width:0; flex:1; border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:8px; color:#fff; background:#163139; font:inherit; }
-    #chat-send, #chat-close { border:0; border-radius:8px; color:#fff; background:#25865c; padding:8px 10px; font-weight:800; cursor:pointer; }
-    #chat-close { padding:3px 7px; background:rgba(255,255,255,.14); }
+    #chat-send, .action-button { border:0; border-radius:8px; color:#fff; background:#25865c; padding:8px 10px; font-weight:800; font:inherit; cursor:pointer; touch-action:manipulation; }
+    .panel-note { margin:8px 0; color:#b9d8cf; font-size:10px; line-height:1.4; }
+    .people-entry, .task-card, .challenge-box { margin-top:8px; padding:9px; border:1px solid rgba(255,255,255,.13); border-radius:10px; background:rgba(255,255,255,.055); }
+    .people-entry strong, .task-card strong { display:block; color:#fff; font-size:12px; }
+    .people-entry small, .task-card small { display:block; margin-top:3px; color:#b9d8cf; font-size:10px; line-height:1.32; }
+    .people-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .people-actions button, .challenge-box button { border:1px solid rgba(255,255,255,.18); border-radius:7px; padding:6px 8px; color:#fff; background:#1d5d55; font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
+    .people-actions button.secondary, .challenge-box button.secondary { background:#28434d; }
+    .task-card.done { border-color:rgba(79,213,132,.62); background:rgba(33,123,80,.18); }
+    .task-card progress { width:100%; height:6px; margin-top:7px; accent-color:#50ce82; }
+    .challenge-box p { margin:5px 0 8px; color:#c5e5d8; font-size:11px; line-height:1.35; }
+    #challenge-result { display:block; min-height:15px; margin-top:7px; color:#f6d66b; font-size:10px; line-height:1.35; }
+    #dm-log { min-height:90px; max-height:155px; overflow-y:auto; padding:7px; border-radius:9px; background:rgba(255,255,255,.06); font-size:11px; line-height:1.35; }
+    .dm-message { margin-bottom:7px; }
+    .dm-message small { display:block; color:#9ec8b6; font-size:9px; }
+    #dm-form { display:flex; gap:6px; margin-top:8px; }
+    #dm-input { min-width:0; flex:1; border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:8px; color:#fff; background:#163139; font:inherit; }
+    #toast { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:50%; transform:translateX(-50%); max-width:260px; padding:8px 11px; border-radius:10px; color:#fff; background:rgba(21,105,69,.93); box-shadow:0 4px 17px rgba(0,0,0,.24); text-align:center; font-size:11px; font-weight:800; pointer-events:none; }
     #asset-notice { display:none; position:absolute; left:50%; top:calc(env(safe-area-inset-top) + 14px); transform:translateX(-50%); max-width:310px; padding:8px 10px; border-radius:9px; color:#fff7d7; background:rgba(93,60,10,.85); font-size:11px; text-align:center; }
     #profile-modal { display:none; position:fixed; inset:0; z-index:20; align-items:center; justify-content:center; padding:20px; background:rgba(3,15,18,.72); color:#fff; }
     #profile-modal.open { display:flex; }
@@ -65,13 +87,13 @@
     .profile-card input, .profile-card select { width:100%; padding:11px; border:1px solid rgba(255,255,255,.24); border-radius:9px; color:#fff; background:#18363d; font:inherit; }
     #profile-submit { width:100%; margin-top:17px; border:0; border-radius:10px; padding:12px; color:#062019; background:#50c980; font-weight:900; font-size:14px; cursor:pointer; }
     #profile-error { min-height:17px; margin-top:8px; color:#ffd996; font-size:11px; }
-    @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #mission-card { top:calc(env(safe-area-inset-top) + 112px); width:165px; } #hint { display:none; } #minimap { width:133px; } #kerala-map { height:165px; } #chat-toggle { top:calc(env(safe-area-inset-top) + 202px); } #chat-panel { top:calc(env(safe-area-inset-top) + 242px); } }
+    @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #progress-chip { top:calc(env(safe-area-inset-top) + 105px); left:16px; max-width:165px; } #mission-card { top:calc(env(safe-area-inset-top) + 144px); width:166px; } #online-chip { top:calc(env(safe-area-inset-top) + 242px); right:14px; max-width:118px; } #hint { display:none; } #minimap, #chat-panel, #people-panel, #task-panel, #dm-panel { width:min(284px, calc(100vw - 88px)); max-height:min(56dvh, 350px); } #kerala-map { height:220px; } }
     @media (min-width: 740px) { #joystick-zone { width: 330px; height: 330px; } #joystick-base { left: 44px; bottom: 38px; } #run { right: 44px; bottom: 46px; } }
   </style>
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V45</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V46</span></div>
     <div id="hint">Left pad: move<br>Right side: look around<br>Hold RUN: run</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -80,9 +102,17 @@
     <div id="camera-note">Swipe to look</div>
     <button id="run" type="button" aria-label="Hold to run">RUN</button>
     <button id="profile-chip" type="button" aria-label="Edit profile"><span id="profile-name">Explorer</span><span id="profile-district">Choose district</span></button>
-    <div id="mission-card"><strong>● Current Mission</strong><span id="mission-text">Explore Kerala landmarks</span><br><span id="landmark-status">Choose a destination on the map</span></div>
+    <output id="progress-chip" aria-live="polite">Lv. 1 · 0 / 100 XP</output>
+    <output id="online-chip" aria-live="polite"><i></i><span id="online-count">1 online · local</span></output>
+    <button id="mission-card" type="button" aria-label="Open tasks"><strong>● Current Mission</strong><span id="mission-text">Explore Kerala landmarks</span><br><span id="landmark-status">Tap TASKS for rewards</span></button>
+    <div id="quick-actions" aria-label="Expandable game panels">
+      <button id="map-open" class="hud-icon" type="button" aria-label="Open Kerala map" aria-controls="minimap" aria-expanded="false">🗺<span>MAP</span></button>
+      <button id="people-toggle" class="hud-icon" type="button" aria-label="Open people" aria-controls="people-panel" aria-expanded="false">👥<span>PEOPLE</span></button>
+      <button id="chat-toggle" class="hud-icon" type="button" aria-label="Open chat" aria-controls="chat-panel" aria-expanded="false">💬<span>CHAT</span></button>
+      <button id="task-toggle" class="hud-icon" type="button" aria-label="Open tasks" aria-controls="task-panel" aria-expanded="false">★<span>TASKS</span></button>
+    </div>
     <aside id="minimap" aria-label="Kerala mini-map">
-      <div class="map-header"><strong>KERALA MAP</strong><button id="map-toggle" type="button" aria-label="Toggle landmark labels">⌄</button></div>
+      <div class="map-header"><strong>KERALA MAP</strong><button id="map-label-toggle" type="button" aria-label="Toggle landmark labels">Labels</button><button id="map-close" class="panel-close" type="button" aria-label="Close map">×</button></div>
       <svg id="kerala-map" viewBox="0 0 120 300" role="img" aria-label="Kerala outline map with landmarks and player location">
         <defs><clipPath id="kerala-clip"><path d="M56 8 C68 15 74 24 76 39 C87 52 84 66 91 82 C85 96 92 109 89 125 C97 140 91 154 98 170 C93 184 96 197 90 211 C92 227 85 239 83 253 C76 267 67 282 55 292 C48 285 43 275 42 263 C34 250 37 237 31 225 C34 211 26 198 31 184 C24 170 30 156 25 142 C30 128 24 115 29 101 C26 87 34 72 31 59 C39 48 35 33 43 22 C46 14 51 10 56 8 Z"/></clipPath></defs>
         <path id="kerala-outline" d="M56 8 C68 15 74 24 76 39 C87 52 84 66 91 82 C85 96 92 109 89 125 C97 140 91 154 98 170 C93 184 96 197 90 211 C92 227 85 239 83 253 C76 267 67 282 55 292 C48 285 43 275 42 263 C34 250 37 237 31 225 C34 211 26 198 31 184 C24 170 30 156 25 142 C30 128 24 115 29 101 C26 87 34 72 31 59 C39 48 35 33 43 22 C46 14 51 10 56 8 Z"/>
@@ -91,12 +121,15 @@
       </svg>
       <output id="map-status" aria-live="polite">Village · You</output>
     </aside>
-    <button id="chat-toggle" type="button" aria-label="Open regional chat">💬 CHAT</button>
-    <section id="chat-panel" aria-label="Regional text chat"><div class="chat-heading"><span>Regional Chat</span><button id="chat-close" type="button" aria-label="Close chat">×</button></div><select id="chat-channel" aria-label="Chat channel"></select><div id="chat-note">Local demo — connect Supabase to chat with other players.</div><div id="chat-log" aria-live="polite"></div><form id="chat-form"><input id="chat-input" maxlength="240" autocomplete="off" placeholder="Write a message"><button id="chat-send" type="submit">Send</button></form></section>
+    <section id="chat-panel" aria-label="Regional text chat"><div class="chat-heading"><span>Regional Chat</span><button id="chat-close" class="panel-close" type="button" aria-label="Close chat">×</button></div><select id="chat-channel" aria-label="Chat channel"></select><div id="chat-note">Saved only on this device. Connect Supabase for real regional chat.</div><div id="chat-log" aria-live="polite"></div><form id="chat-form"><input id="chat-input" maxlength="240" autocomplete="off" placeholder="Write a message"><button id="chat-send" type="submit">Send</button></form></section>
+    <section id="people-panel" aria-label="People and follows"><div class="panel-heading"><span>People</span><button id="people-close" class="panel-close" type="button" aria-label="Close people">×</button></div><p class="panel-note"><strong id="people-online-label">1 online · you</strong><br>Multiplayer joins appear here after Supabase Presence is connected. The guides below are local NPC demos.</p><div id="people-list"></div></section>
+    <section id="task-panel" aria-label="Tasks and challenges"><div class="panel-heading"><span>Tasks &amp; Challenges</span><button id="task-close" class="panel-close" type="button" aria-label="Close tasks">×</button></div><p class="panel-note">Complete activities to collect XP. Level requirements grow gradually.</p><div id="task-list"></div><div class="challenge-box"><strong>🥥 Coconut Pick</strong><p>Try a quick village challenge. A ripe pick earns a bonus.</p><button id="challenge-play" type="button">Pick a coconut</button><output id="challenge-result" aria-live="polite"></output></div></section>
+    <section id="dm-panel" aria-label="Direct message"><div class="panel-heading"><span id="dm-title">Direct message</span><button id="dm-close" class="panel-close" type="button" aria-label="Close direct message">×</button></div><p id="dm-note" class="panel-note">Saved only on this device; delivery starts when multiplayer is connected.</p><div id="dm-log" aria-live="polite"></div><form id="dm-form"><input id="dm-input" maxlength="240" autocomplete="off" placeholder="Write a direct message"><button class="action-button" type="submit">Send</button></form></section>
     <div id="asset-notice" role="status"></div>
+    <div id="toast" role="status" aria-live="polite"></div>
   </div>
   <div id="fallback">Kerala Play could not start. Please open this page while connected to the internet, then reload.</div>
-  <section id="profile-modal" aria-label="Create Kerala profile"><form class="profile-card" id="profile-form"><h1>🌴 Kerala Play</h1><p>Choose a Kerala district to set your first regional room and map location.</p><label for="profile-input">Display name</label><input id="profile-input" maxlength="18" autocomplete="nickname" placeholder="Your name"><label for="district-input">District</label><select id="district-input"><option value="">Select your district</option><option>Alappuzha</option><option>Ernakulam</option><option>Idukki</option><option>Kannur</option><option>Kasaragod</option><option>Kollam</option><option>Kottayam</option><option>Kozhikode</option><option>Malappuram</option><option>Palakkad</option><option>Pathanamthitta</option><option>Thiruvananthapuram</option><option>Thrissur</option><option>Wayanad</option></select><button id="profile-submit" type="submit">Start Exploring</button><div id="profile-error" aria-live="polite"></div></form></section>
+  <section id="profile-modal" aria-label="Create Kerala profile"><form class="profile-card" id="profile-form"><h1>🌴 Kerala Play</h1><p>Choose a Kerala district and your avatar style. You can edit this later from your profile chip.</p><label for="profile-input">Display name</label><input id="profile-input" maxlength="18" autocomplete="nickname" placeholder="Your name"><label for="district-input">District</label><select id="district-input"><option value="">Select your district</option><option>Alappuzha</option><option>Ernakulam</option><option>Idukki</option><option>Kannur</option><option>Kasaragod</option><option>Kollam</option><option>Kottayam</option><option>Kozhikode</option><option>Malappuram</option><option>Palakkad</option><option>Pathanamthitta</option><option>Thiruvananthapuram</option><option>Thrissur</option><option>Wayanad</option></select><label for="gender-input">Avatar</label><select id="gender-input"><option value="male">Male — shirt &amp; jeans</option><option value="female">Female — kurta &amp; leggings</option></select><button id="profile-submit" type="submit">Start Exploring</button><div id="profile-error" aria-live="polite"></div></form></section>
 
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.160.1/build/three.module.js';
@@ -111,17 +144,24 @@
     const profileForm = document.querySelector('#profile-form');
     const profileInput = document.querySelector('#profile-input');
     const districtInput = document.querySelector('#district-input');
+    const genderInput = document.querySelector('#gender-input');
     const profileError = document.querySelector('#profile-error');
     const profileName = document.querySelector('#profile-name');
     const profileDistrict = document.querySelector('#profile-district');
     const profileChip = document.querySelector('#profile-chip');
+    const progressChip = document.querySelector('#progress-chip');
+    const onlineCount = document.querySelector('#online-count');
     const mapLayer = document.querySelector('#landmark-layer');
     const mapPlayer = document.querySelector('#map-player');
     const mapRoute = document.querySelector('#map-route');
     const mapStatus = document.querySelector('#map-status');
-    const mapToggle = document.querySelector('#map-toggle');
+    const minimap = document.querySelector('#minimap');
+    const mapOpen = document.querySelector('#map-open');
+    const mapClose = document.querySelector('#map-close');
+    const mapLabelToggle = document.querySelector('#map-label-toggle');
     const missionText = document.querySelector('#mission-text');
     const landmarkStatus = document.querySelector('#landmark-status');
+    const missionCard = document.querySelector('#mission-card');
     const chatToggle = document.querySelector('#chat-toggle');
     const chatPanel = document.querySelector('#chat-panel');
     const chatClose = document.querySelector('#chat-close');
@@ -129,15 +169,41 @@
     const chatLog = document.querySelector('#chat-log');
     const chatForm = document.querySelector('#chat-form');
     const chatInput = document.querySelector('#chat-input');
+    const peopleToggle = document.querySelector('#people-toggle');
+    const peoplePanel = document.querySelector('#people-panel');
+    const peopleClose = document.querySelector('#people-close');
+    const peopleList = document.querySelector('#people-list');
+    const peopleOnlineLabel = document.querySelector('#people-online-label');
+    const taskToggle = document.querySelector('#task-toggle');
+    const taskPanel = document.querySelector('#task-panel');
+    const taskClose = document.querySelector('#task-close');
+    const taskList = document.querySelector('#task-list');
+    const challengePlay = document.querySelector('#challenge-play');
+    const challengeResult = document.querySelector('#challenge-result');
+    const dmPanel = document.querySelector('#dm-panel');
+    const dmClose = document.querySelector('#dm-close');
+    const dmTitle = document.querySelector('#dm-title');
+    const dmLog = document.querySelector('#dm-log');
+    const dmForm = document.querySelector('#dm-form');
+    const dmInput = document.querySelector('#dm-input');
     const assetNotice = document.querySelector('#asset-notice');
+    const toast = document.querySelector('#toast');
     const villagers = [];
+    const traffic = [];
     const photoTextureCache = new Map();
+    const fruitGeometry = new THREE.SphereGeometry(.14, 6, 5);
+    const fruitMaterial = new THREE.MeshStandardMaterial({ color: 0xe4a737, roughness: .72 });
+    const birdBodyGeometry = new THREE.SphereGeometry(.10, 6, 5);
+    const birdWingGeometry = new THREE.PlaneGeometry(.28, .055);
+    const birdMaterial = new THREE.MeshBasicMaterial({ color: 0x202724, side: THREE.DoubleSide });
     let villageTime = 0;
     let playerRef = null;
     let selectedLandmark = null;
     let mapLabelsVisible = false;
-    const storagePrefix = 'kerala-play-v45';
+    let activeDmContact = null;
+    const storagePrefix = 'kerala-play-v46';
     let profile = readProfile();
+    let progress = readProgress();
     const districtStarts = {
       Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
     };
@@ -149,6 +215,17 @@
       { id: 'kuttanad', name: 'Kuttanad Fields', icon: 'K', x: 7, z: -23, district: 'Kottayam' },
       { id: 'temple', name: 'Padmanabhaswamy Temple', icon: 'T', x: 13, z: -57, district: 'Thiruvananthapuram' }
     ];
+    const localGuides = [
+      { id: 'guide-anu', name: 'Anu', role: 'Village guide · NPC demo', district: 'Kottayam', gender: 'female' },
+      { id: 'guide-vivek', name: 'Vivek', role: 'Roadside guide · NPC demo', district: 'Ernakulam', gender: 'male' }
+    ];
+    const taskCatalog = [
+      { id: 'open-map', title: 'Open the Kerala map', target: 1, reward: 10 },
+      { id: 'walk-50', title: 'Walk 50 metres', target: 50, reward: 25 },
+      { id: 'visit-landmark', title: 'Visit one landmark', target: 1, reward: 50 },
+      { id: 'follow-guide', title: 'Follow a village guide', target: 1, reward: 35 },
+      { id: 'coconut-challenge', title: 'Win a Coconut Pick challenge', target: 1, reward: 20 }
+    ];
 
     window.addEventListener('error', event => {
       console.error(event.error || event.message);
@@ -159,31 +236,173 @@
       showAssetNotice('Some visual assets could not load. The lightweight world is still available.');
     });
 
+    function createLocalId() {
+      try { return crypto.randomUUID(); } catch { return `player-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`; }
+    }
+
     function readProfile() {
       try {
         const saved = JSON.parse(localStorage.getItem(`${storagePrefix}:profile`) || 'null');
-        return saved && typeof saved.name === 'string' && typeof saved.district === 'string' ? saved : null;
+        if (!saved || typeof saved.name !== 'string' || typeof saved.district !== 'string') return null;
+        return {
+          version: 1,
+          id: typeof saved.id === 'string' ? saved.id : createLocalId(),
+          name: saved.name,
+          district: saved.district,
+          gender: saved.gender === 'female' ? 'female' : 'male',
+          createdAt: Number(saved.createdAt) || Date.now(),
+          updatedAt: Number(saved.updatedAt) || Date.now()
+        };
       } catch {
         return null;
       }
     }
 
-    function writeProfile(nextProfile) {
-      profile = nextProfile;
+    function newProgress() {
+      return { version: 1, xp: 0, level: 1, walkMeters: 0, lastWalkSave: 0, visitedLandmarkIds: [], completedTaskIds: [], followingIds: [] };
+    }
+
+    function readProgress() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(`${storagePrefix}:progress`) || 'null');
+        if (!saved || typeof saved !== 'object') return newProgress();
+        const base = newProgress();
+        return {
+          ...base,
+          ...saved,
+          xp: Math.max(0, Number(saved.xp) || 0),
+          walkMeters: Math.max(0, Number(saved.walkMeters) || 0),
+          lastWalkSave: Math.max(0, Number(saved.lastWalkSave) || 0),
+          visitedLandmarkIds: Array.isArray(saved.visitedLandmarkIds) ? saved.visitedLandmarkIds.filter(id => typeof id === 'string') : [],
+          completedTaskIds: Array.isArray(saved.completedTaskIds) ? saved.completedTaskIds.filter(id => typeof id === 'string') : [],
+          followingIds: Array.isArray(saved.followingIds) ? saved.followingIds.filter(id => typeof id === 'string') : []
+        };
+      } catch {
+        return newProgress();
+      }
+    }
+
+    function saveProgress() {
+      try { localStorage.setItem(`${storagePrefix}:progress`, JSON.stringify(progress)); } catch { /* Session progress remains available. */ }
+    }
+
+    function xpState(totalXp = progress.xp) {
+      let level = 1;
+      let used = 0;
+      let next = 100;
+      const total = Math.max(0, Math.floor(totalXp));
+      while (total - used >= next) {
+        used += next;
+        level += 1;
+        next = 100 + (level - 1) * 50;
+      }
+      return { level, current: total - used, next };
+    }
+
+    function updateProgressHud() {
+      const state = xpState();
+      progress.level = state.level;
+      progressChip.textContent = `Lv. ${state.level} · ${state.current} / ${state.next} XP`;
+    }
+
+    function updateOnlineUi() {
+      onlineCount.textContent = '1 online · local';
+      peopleOnlineLabel.textContent = '1 online · you';
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.style.display = 'block';
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => { toast.style.display = 'none'; }, 2600);
+    }
+
+    function taskProgress(task) {
+      if (progress.completedTaskIds.includes(task.id)) return task.target;
+      if (task.id === 'walk-50') return Math.min(task.target, Math.floor(progress.walkMeters));
+      if (task.id === 'visit-landmark') return Math.min(task.target, progress.visitedLandmarkIds.length);
+      if (task.id === 'follow-guide') return Math.min(task.target, progress.followingIds.length);
+      return 0;
+    }
+
+    function renderTasks() {
+      taskList.replaceChildren();
+      taskCatalog.forEach(task => {
+        const done = progress.completedTaskIds.includes(task.id);
+        const card = document.createElement('div');
+        card.className = `task-card${done ? ' done' : ''}`;
+        const title = document.createElement('strong');
+        title.textContent = `${done ? '✓ ' : ''}${task.title}`;
+        const details = document.createElement('small');
+        details.textContent = done ? `Completed · +${task.reward} XP` : `${taskProgress(task)} / ${task.target} · reward ${task.reward} XP`;
+        const meter = document.createElement('progress');
+        meter.max = task.target;
+        meter.value = taskProgress(task);
+        card.append(title, details, meter);
+        taskList.append(card);
+      });
+    }
+
+    function finishTask(taskId) {
+      const task = taskCatalog.find(item => item.id === taskId);
+      if (!task || progress.completedTaskIds.includes(taskId)) return false;
+      const before = xpState();
+      progress.completedTaskIds.push(taskId);
+      progress.xp += task.reward;
+      const after = xpState();
+      saveProgress();
+      updateProgressHud();
+      renderTasks();
+      showToast(after.level > before.level ? `Level ${after.level}! +${task.reward} XP` : `+${task.reward} XP · ${task.title}`);
+      return true;
+    }
+
+    function addWalkProgress(metres) {
+      progress.walkMeters += metres;
+      if (progress.walkMeters >= 50) finishTask('walk-50');
+      if (progress.walkMeters - progress.lastWalkSave >= 5) {
+        progress.lastWalkSave = progress.walkMeters;
+        saveProgress();
+        if (taskPanel.classList.contains('open')) renderTasks();
+      }
+    }
+
+    function markLandmarkVisited(landmark) {
+      if (progress.visitedLandmarkIds.includes(landmark.id)) return;
+      progress.visitedLandmarkIds.push(landmark.id);
+      saveProgress();
+      finishTask('visit-landmark');
+    }
+
+    function writeProfile(nextProfile, { relocate = false } = {}) {
+      profile = {
+        version: 1,
+        id: nextProfile.id || profile?.id || createLocalId(),
+        name: nextProfile.name,
+        district: nextProfile.district,
+        gender: nextProfile.gender === 'female' ? 'female' : 'male',
+        createdAt: profile?.createdAt || nextProfile.createdAt || Date.now(),
+        updatedAt: Date.now()
+      };
       try { localStorage.setItem(`${storagePrefix}:profile`, JSON.stringify(profile)); } catch { /* Private mode can still use this session. */ }
       updateProfileHud();
       updateChatChannels();
-      if (playerRef) placePlayerAtDistrict(profile.district);
+      renderPeople();
+      if (playerRef) {
+        replacePlayerAvatar(profile.gender);
+        if (relocate) placePlayerAtDistrict(profile.district);
+      }
     }
 
     function updateProfileHud() {
       profileName.textContent = profile?.name || 'Explorer';
-      profileDistrict.textContent = profile?.district ? `${profile.district} · Regional room` : 'Choose your district';
+      profileDistrict.textContent = profile?.district ? `${profile.district} · ${profile.gender === 'female' ? 'Female' : 'Male'} avatar` : 'Choose your district';
     }
 
     function openProfile() {
       profileInput.value = profile?.name || '';
       districtInput.value = profile?.district || '';
+      genderInput.value = profile?.gender || 'male';
       profileError.textContent = '';
       profileModal.classList.add('open');
       setTimeout(() => profileInput.focus(), 0);
@@ -251,12 +470,22 @@
       const angle = player.rotation.y * 180 / Math.PI;
       mapPlayer.setAttribute('transform', `translate(${point.x} ${point.y}) rotate(${angle})`);
       if (selectedLandmark) {
-        const target = worldToKeralaMap(selectedLandmark.x, selectedLandmark.z);
+        const activeLandmark = selectedLandmark;
+        const target = worldToKeralaMap(activeLandmark.x, activeLandmark.z);
         mapRoute.setAttribute('x1', point.x); mapRoute.setAttribute('y1', point.y);
         mapRoute.setAttribute('x2', target.x); mapRoute.setAttribute('y2', target.y);
         mapRoute.hidden = false;
-        const distance = Math.hypot(selectedLandmark.x - player.position.x, selectedLandmark.z - player.position.z);
-        mapStatus.textContent = `${selectedLandmark.name} · ${Math.ceil(distance)} m`;
+        const distance = Math.hypot(activeLandmark.x - player.position.x, activeLandmark.z - player.position.z);
+        if (distance < 5.2) {
+          markLandmarkVisited(activeLandmark);
+          selectedLandmark = null;
+          missionText.textContent = `Visited ${activeLandmark.name}`;
+          landmarkStatus.textContent = 'Landmark reward collected · choose another place';
+          mapRoute.hidden = true;
+          mapStatus.textContent = `${activeLandmark.name} · visited`;
+        } else {
+          mapStatus.textContent = `${activeLandmark.name} · ${Math.ceil(distance)} m`;
+        }
       } else {
         mapRoute.hidden = true;
         mapStatus.textContent = `${profile?.district || 'Kerala'} · You`;
@@ -308,24 +537,171 @@
       renderChat();
     }
 
+    function renderPeople() {
+      peopleList.replaceChildren();
+      localGuides.forEach(guide => {
+        const following = progress.followingIds.includes(guide.id);
+        const entry = document.createElement('div');
+        entry.className = 'people-entry';
+        const name = document.createElement('strong');
+        name.textContent = `${guide.gender === 'female' ? '♀' : '♂'} ${guide.name}`;
+        const role = document.createElement('small');
+        role.textContent = `${guide.role} · ${guide.district}`;
+        const actionNote = document.createElement('small');
+        actionNote.textContent = following ? 'Following saved locally.' : 'NPC contact — not an online player.';
+        const actions = document.createElement('div');
+        actions.className = 'people-actions';
+        const follow = document.createElement('button');
+        follow.type = 'button';
+        follow.textContent = following ? 'Unfollow' : 'Follow';
+        follow.addEventListener('click', () => toggleFollow(guide.id));
+        const message = document.createElement('button');
+        message.type = 'button';
+        message.className = 'secondary';
+        message.textContent = 'Message';
+        message.addEventListener('click', () => openDirectMessage(guide.id));
+        actions.append(follow, message);
+        entry.append(name, role, actionNote, actions);
+        peopleList.append(entry);
+      });
+    }
+
+    function toggleFollow(contactId) {
+      if (!profile) { openProfile(); return; }
+      const index = progress.followingIds.indexOf(contactId);
+      if (index >= 0) {
+        progress.followingIds.splice(index, 1);
+        showToast('Guide unfollowed on this device');
+      } else {
+        progress.followingIds.push(contactId);
+        showToast('Guide followed on this device');
+        finishTask('follow-guide');
+      }
+      saveProgress();
+      renderPeople();
+      renderTasks();
+    }
+
+    function directMessageKey(contactId) {
+      return `${storagePrefix}:dm:${[profile.id, contactId].sort().join(':')}`;
+    }
+
+    function getDirectMessages(contactId) {
+      try {
+        const messages = JSON.parse(localStorage.getItem(directMessageKey(contactId)) || '[]');
+        return Array.isArray(messages) ? messages.slice(-30) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function renderDirectMessages() {
+      dmLog.replaceChildren();
+      if (!activeDmContact) return;
+      const messages = getDirectMessages(activeDmContact.id);
+      if (!messages.length) {
+        const empty = document.createElement('div');
+        empty.className = 'dm-message';
+        empty.textContent = 'No local messages yet. Messages are not delivered until multiplayer is connected.';
+        dmLog.append(empty);
+      }
+      messages.forEach(message => {
+        const entry = document.createElement('div');
+        entry.className = 'dm-message';
+        const info = document.createElement('small');
+        info.textContent = `You · ${new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · local only`;
+        const body = document.createElement('div');
+        body.textContent = message.body;
+        entry.append(info, body);
+        dmLog.append(entry);
+      });
+      dmLog.scrollTop = dmLog.scrollHeight;
+    }
+
+    function openDirectMessage(contactId) {
+      if (!profile) { openProfile(); return; }
+      activeDmContact = localGuides.find(guide => guide.id === contactId) || null;
+      if (!activeDmContact) return;
+      dmTitle.textContent = `Message · ${activeDmContact.name}`;
+      renderDirectMessages();
+      setOpenPanel('dm');
+      setTimeout(() => dmInput.focus(), 0);
+    }
+
+    function submitDirectMessage(rawMessage) {
+      if (!activeDmContact || !profile) return;
+      const body = rawMessage.trim().replace(/\b\d{10}\b/g, '★★★★★★★★★★');
+      if (!body) return;
+      const messages = getDirectMessages(activeDmContact.id);
+      messages.push({ id: createLocalId(), senderId: profile.id, recipientId: activeDmContact.id, body, createdAt: Date.now(), status: 'local-only' });
+      try { localStorage.setItem(directMessageKey(activeDmContact.id), JSON.stringify(messages.slice(-30))); } catch { /* The current view still keeps working. */ }
+      renderDirectMessages();
+    }
+
+    function setOpenPanel(which = null) {
+      const panels = { map: minimap, people: peoplePanel, chat: chatPanel, tasks: taskPanel, dm: dmPanel };
+      Object.entries(panels).forEach(([name, panel]) => panel.classList.toggle('open', name === which));
+      mapOpen.setAttribute('aria-expanded', String(which === 'map'));
+      peopleToggle.setAttribute('aria-expanded', String(which === 'people'));
+      chatToggle.setAttribute('aria-expanded', String(which === 'chat'));
+      taskToggle.setAttribute('aria-expanded', String(which === 'tasks'));
+      if (which === 'map') finishTask('open-map');
+      if (which === 'tasks') renderTasks();
+    }
+
+    function playCoconutChallenge() {
+      if (progress.completedTaskIds.includes('coconut-challenge')) {
+        challengeResult.textContent = 'Today’s Coconut Pick reward is already collected.';
+        return;
+      }
+      if (Math.random() < .38) {
+        challengeResult.textContent = 'Unripe coconut — try again.';
+        return;
+      }
+      challengeResult.textContent = 'Ripe coconut! Challenge complete.';
+      finishTask('coconut-challenge');
+    }
+
     function wireInterface() {
       updateProfileHud();
+      updateProgressHud();
+      updateOnlineUi();
       updateChatChannels();
+      renderPeople();
+      renderTasks();
       renderMapLandmarks();
+      setOpenPanel();
       profileChip.addEventListener('click', openProfile);
       profileForm.addEventListener('submit', event => {
         event.preventDefault();
         const name = profileInput.value.trim().replace(/[<>]/g, '');
         const district = districtInput.value;
+        const gender = genderInput.value === 'female' ? 'female' : 'male';
         if (name.length < 2 || !district) { profileError.textContent = 'Enter a name and select a Kerala district.'; return; }
-        writeProfile({ name, district, createdAt: Date.now() });
+        const relocate = !profile || profile.district !== district;
+        writeProfile({ name, district, gender, createdAt: profile?.createdAt || Date.now() }, { relocate });
         profileModal.classList.remove('open');
       });
-      mapToggle.addEventListener('click', () => { mapLabelsVisible = !mapLabelsVisible; mapToggle.textContent = mapLabelsVisible ? '⌃' : '⌄'; renderMapLandmarks(); });
-      chatToggle.addEventListener('click', () => chatPanel.classList.toggle('open'));
-      chatClose.addEventListener('click', () => chatPanel.classList.remove('open'));
+      mapOpen.addEventListener('click', () => setOpenPanel(minimap.classList.contains('open') ? null : 'map'));
+      mapClose.addEventListener('click', () => setOpenPanel());
+      mapLabelToggle.addEventListener('click', () => {
+        mapLabelsVisible = !mapLabelsVisible;
+        mapLabelToggle.textContent = mapLabelsVisible ? 'Labels on' : 'Labels';
+        renderMapLandmarks();
+      });
+      peopleToggle.addEventListener('click', () => setOpenPanel(peoplePanel.classList.contains('open') ? null : 'people'));
+      peopleClose.addEventListener('click', () => setOpenPanel());
+      chatToggle.addEventListener('click', () => setOpenPanel(chatPanel.classList.contains('open') ? null : 'chat'));
+      chatClose.addEventListener('click', () => setOpenPanel());
+      taskToggle.addEventListener('click', () => setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'));
+      taskClose.addEventListener('click', () => setOpenPanel());
+      missionCard.addEventListener('click', () => setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'));
+      dmClose.addEventListener('click', () => setOpenPanel());
       chatChannel.addEventListener('change', renderChat);
       chatForm.addEventListener('submit', event => { event.preventDefault(); submitChatMessage(chatInput.value); chatInput.value = ''; });
+      dmForm.addEventListener('submit', event => { event.preventDefault(); submitDirectMessage(dmInput.value); dmInput.value = ''; });
+      challengePlay.addEventListener('click', playCoconutChallenge);
+      document.addEventListener('keydown', event => { if (event.key === 'Escape') setOpenPanel(); });
       if (!profile) openProfile();
     }
 
@@ -450,20 +826,28 @@
       runButton.addEventListener('pointercancel', () => setRun(false));
       runButton.addEventListener('lostpointercapture', () => setRun(false));
 
-      window.addEventListener('keydown', event => {
-        keys.add(event.key.toLowerCase());
-        if (event.key === 'Shift') setRun(true);
-      });
-      window.addEventListener('keyup', event => {
-        keys.delete(event.key.toLowerCase());
-        if (event.key === 'Shift') setRun(false);
-      });
-      window.addEventListener('blur', () => {
+      function typingIntoField(event) {
+        return event.target instanceof Element && event.target.matches('input, select, textarea, [contenteditable]');
+      }
+      function clearGameInput() {
         keys.clear();
         clearJoystick();
         setRun(false);
         lookPointerId = null;
+      }
+      window.addEventListener('keydown', event => {
+        if (typingIntoField(event)) return;
+        keys.add(event.key.toLowerCase());
+        if (event.key === 'Shift') setRun(true);
       });
+      window.addEventListener('keyup', event => {
+        if (typingIntoField(event)) { keys.clear(); return; }
+        keys.delete(event.key.toLowerCase());
+        if (event.key === 'Shift') setRun(false);
+      });
+      document.addEventListener('focusin', event => { if (typingIntoField(event)) clearGameInput(); });
+      window.addEventListener('blur', clearGameInput);
+      document.addEventListener('visibilitychange', () => { if (document.hidden) clearGameInput(); });
       window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
@@ -480,6 +864,7 @@
         const delta = Math.min(clock.getDelta(), .05);
         villageTime += delta;
         updateVillagers(villageTime);
+        updateTraffic(delta);
         const keyboardX = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
         const keyboardY = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
         const controlX = Math.abs(keyboardX) > 0 ? keyboardX : inputX;
@@ -492,6 +877,7 @@
           desiredMove.copy(forward).multiplyScalar(-controlY).addScaledVector(right, controlX).normalize();
           const speed = runHeld ? 7.2 : 3.8;
           player.position.addScaledVector(desiredMove, speed * controlLength * delta);
+          addWalkProgress(speed * controlLength * delta);
           player.position.x = THREE.MathUtils.clamp(player.position.x, -70, 70);
           player.position.z = THREE.MathUtils.clamp(player.position.z, -70, 70);
           const desiredYaw = Math.atan2(desiredMove.x, desiredMove.z);
@@ -573,41 +959,63 @@
     }
 
     function buildPlayer(player) {
-      const fallbackHuman = createHuman({ shirt: 0x3b82a7, trousers: 0x253342, skin: 0xa96d4c, hair: 0x161616, shoes: 0x27231f });
       const shadow = new THREE.Mesh(
         new THREE.CircleGeometry(.48, 20),
         new THREE.MeshBasicMaterial({ color: 0x16201a, transparent: true, opacity: .25, depthWrite: false })
       );
       shadow.rotation.x = -Math.PI / 2;
       shadow.position.y = .025;
-      const avatar = createPhotoSprite('./assets/player-back-v2.png', 1.36, 2.42);
-      avatar.position.y = .04;
-      avatar.material.depthTest = false;
-      avatar.renderOrder = 2;
-      player.add(fallbackHuman, shadow, avatar);
-      player.userData.avatar = avatar;
+      player.add(shadow);
       player.userData.shadow = shadow;
-      player.userData.fallbackHuman = fallbackHuman;
+      replacePlayerAvatar(profile?.gender || 'male');
     }
 
-    function createHuman({ shirt, trousers, skin, hair, shoes }) {
+    function replacePlayerAvatar(gender) {
+      if (!playerRef) return;
+      const oldAvatar = playerRef.userData.avatar;
+      if (oldAvatar) playerRef.remove(oldAvatar);
+      const avatarStyle = gender === 'female'
+        ? { gender: 'female', shirt: 0x1e8173, trousers: 0x273253, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x6c3c2c, accent: 0xe5bb51 }
+        : { gender: 'male', shirt: 0x2a759b, trousers: 0x26354a, skin: 0xa96d4c, hair: 0x171616, shoes: 0x27231f, accent: 0x6eaad0 };
+      const avatar = createHuman(avatarStyle);
+      avatar.position.y = .04;
+      playerRef.add(avatar);
+      playerRef.userData.avatar = avatar;
+    }
+
+    function createHuman({ gender = 'male', shirt, trousers, skin, hair, shoes, accent = 0xffffff }) {
       const person = new THREE.Group();
+      const isFemale = gender === 'female';
       const shirtMat = new THREE.MeshStandardMaterial({ color: shirt, roughness: .82 });
       const trouserMat = new THREE.MeshStandardMaterial({ color: trousers, roughness: .9 });
       const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: .88 });
       const hairMat = new THREE.MeshStandardMaterial({ color: hair, roughness: 1 });
       const shoeMat = new THREE.MeshStandardMaterial({ color: shoes, roughness: .95 });
+      const accentMat = new THREE.MeshStandardMaterial({ color: accent, roughness: .8 });
       const white = new THREE.MeshStandardMaterial({ color: 0xf6f5ec, roughness: .5 });
       const eye = new THREE.MeshStandardMaterial({ color: 0x251b17, roughness: .55 });
       const mouthMat = new THREE.MeshStandardMaterial({ color: 0x7d3734, roughness: .65 });
 
-      const hips = new THREE.Mesh(new THREE.CylinderGeometry(.28, .31, .27, 10), trouserMat);
+      const hips = new THREE.Mesh(new THREE.CylinderGeometry(isFemale ? .30 : .28, isFemale ? .33 : .31, .27, 10), trouserMat);
       hips.position.y = .94;
       person.add(hips);
-      const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.34, .62, 7, 12), shirtMat);
-      torso.scale.set(1, 1.08, .82);
+      const torso = new THREE.Mesh(new THREE.CapsuleGeometry(isFemale ? .32 : .34, isFemale ? .58 : .62, 7, 12), shirtMat);
+      torso.scale.set(isFemale ? .94 : 1, 1.08, .82);
       torso.position.y = 1.37;
       person.add(torso);
+      if (isFemale) {
+        const kurta = new THREE.Mesh(new THREE.BoxGeometry(.67, .75, .40), shirtMat);
+        kurta.position.set(0, 1.30, .01);
+        const hem = new THREE.Mesh(new THREE.CylinderGeometry(.39, .27, .55, 12), accentMat);
+        hem.position.set(0, .92, .01);
+        const scarf = new THREE.Mesh(new THREE.BoxGeometry(.10, .82, .46), accentMat);
+        scarf.position.set(.30, 1.37, -.03);
+        person.add(kurta, hem, scarf);
+      } else {
+        const belt = new THREE.Mesh(new THREE.BoxGeometry(.60, .08, .38), accentMat);
+        belt.position.y = 1.00;
+        person.add(belt);
+      }
       const neck = new THREE.Mesh(new THREE.CylinderGeometry(.12, .13, .18, 9), skinMat);
       neck.position.y = 1.87;
       person.add(neck);
@@ -619,6 +1027,16 @@
       hairCap.scale.set(.9, 1.08, .95);
       hairCap.position.y = 2.19;
       person.add(hairCap);
+      if (isFemale) {
+        const hairBack = new THREE.Mesh(new THREE.CapsuleGeometry(.18, .54, 5, 10), hairMat);
+        hairBack.position.set(0, 1.93, -.16);
+        hairBack.scale.set(1.12, 1, .45);
+        const hairLeft = new THREE.Mesh(new THREE.CapsuleGeometry(.075, .38, 5, 8), hairMat);
+        const hairRight = hairLeft.clone();
+        hairLeft.position.set(-.21, 1.99, -.02);
+        hairRight.position.set(.21, 1.99, -.02);
+        person.add(hairBack, hairLeft, hairRight);
+      }
       const nose = new THREE.Mesh(new THREE.SphereGeometry(.035, 8, 7), skinMat);
       nose.scale.set(.75, 1.1, 1.3);
       nose.position.set(0, 2.09, .245);
@@ -641,8 +1059,8 @@
         pivot.name = name;
         pivot.position.set(x, 1.61, 0);
         pivot.rotation.z = tilt;
-        const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(.115, .25, 5, 9), shirtMat);
-        sleeve.position.y = -.16;
+        const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(.115, isFemale ? .31 : .25, 5, 9), shirtMat);
+        sleeve.position.y = isFemale ? -.19 : -.16;
         const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(.088, .28, 5, 9), skinMat);
         forearm.position.y = -.47;
         const hand = new THREE.Mesh(new THREE.SphereGeometry(.1, 9, 8), skinMat);
@@ -669,10 +1087,12 @@
 
     function animatePlayer(player, phase, moving) {
       const bob = moving ? Math.abs(Math.sin(phase)) * .035 : 0;
-      player.userData.avatar.position.y = .04 + bob;
-      player.userData.avatar.rotation.z = moving ? Math.sin(phase * .5) * .012 : 0;
+      const avatar = player.userData.avatar;
+      if (!avatar) return;
+      avatar.position.y = .04 + bob;
+      avatar.rotation.z = moving ? Math.sin(phase * .5) * .012 : 0;
       player.userData.shadow.scale.setScalar(1 - bob * 2.3);
-      animateHuman(player.userData.fallbackHuman, phase, moving);
+      animateHuman(avatar, phase, moving);
     }
 
     function animateHuman(human, phase, moving) {
@@ -731,6 +1151,9 @@
       sideRoad.position.set(-28, .017, -22);
       scene.add(sideRoad);
       addRoadEdges(scene, -28, -22, 88, 12);
+      addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737 });
+      addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -76, max: 76, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d });
+      addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5 });
 
       addPhotoHouse(scene, -24, -36, 10.2, 6.8);
       addPhotoHouse(scene, 28, 24, 8.8, 5.9);
@@ -739,6 +1162,11 @@
       const treePositions = [[-15,-62],[14,-55],[-20,-47],[20,-42],[-18,-20],[17,-10],[-18,5],[18,9],[-16,34],[16,43],[-14,61],[17,66],[-50,-20],[-45,14],[-42,48],[46,-42],[42,4],[47,52]];
       treePositions.forEach(([x, z], i) => addPalm(scene, x, z, .72 + (i % 3) * .09));
       [[-43,-35,1.08],[41,-29,1.15],[-48,41,.96],[45,39,1.04],[-27,-13,.88],[30,6,.8],[-28,57,.85]].forEach(([x, z, scale]) => addPalm(scene, x, z, scale));
+      [[-43,-49,.88],[39,-25,.94],[-42,27,.90],[43,43,.92]].forEach(([x, z, scale]) => addTree(scene, x, z, scale, true));
+      addBird(scene, -43.4, 5.15, -48.7, .6);
+      addBird(scene, 39.4, 5.6, -24.8, -.8);
+      addBird(scene, -42.4, 5.2, 26.5, 1.1);
+      addBird(scene, 42.4, 5.4, 42.6, -.45);
       addPond(scene, 39, -4);
       addBench(scene, -10, -10);
       addPhotoVillager(scene, -6, -50, 11, .55, 0, .78);
@@ -833,6 +1261,97 @@
       scene.add(left, right);
     }
 
+    function createRoadVehicle(kind, color) {
+      const isBus = kind === 'bus';
+      const width = isBus ? 2.25 : 1.55;
+      const length = isBus ? 5.15 : 3.05;
+      const vehicle = new THREE.Group();
+      const paint = new THREE.MeshStandardMaterial({ color, roughness: .78 });
+      const glass = new THREE.MeshStandardMaterial({ color: 0x193543, roughness: .3, metalness: .1 });
+      const tire = new THREE.MeshStandardMaterial({ color: 0x16191b, roughness: 1 });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(width, isBus ? 1.30 : .68, length), paint);
+      body.position.y = isBus ? .90 : .55;
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(width - .16, isBus ? .62 : .54, isBus ? 3.85 : 1.62), glass);
+      cabin.position.y = isBus ? 1.64 : 1.12;
+      const windscreen = new THREE.Mesh(new THREE.BoxGeometry(width - .27, isBus ? .42 : .30, .055), glass);
+      windscreen.position.set(0, isBus ? 1.63 : 1.12, length / 2 + .03);
+      vehicle.add(body, cabin, windscreen);
+      if (isBus) {
+        for (let row = -1.25; row <= 1.25; row += .82) {
+          const window = new THREE.Mesh(new THREE.BoxGeometry(.045, .34, .56), glass);
+          const opposite = window.clone();
+          window.position.set(width / 2 + .025, 1.66, row);
+          opposite.position.set(-width / 2 - .025, 1.66, row);
+          vehicle.add(window, opposite);
+        }
+      }
+      [-length * .31, length * .31].forEach(zPos => {
+        [-width / 2, width / 2].forEach(xPos => {
+          const wheel = new THREE.Mesh(new THREE.CylinderGeometry(.20, .20, .12, 10), tire);
+          wheel.rotation.z = Math.PI / 2;
+          wheel.position.set(xPos, .22, zPos);
+          vehicle.add(wheel);
+        });
+      });
+      return vehicle;
+    }
+
+    function addRoadVehicle(scene, config) {
+      const vehicle = createRoadVehicle(config.kind, config.color);
+      vehicle.userData.traffic = { ...config };
+      if (config.axis === 'z') {
+        vehicle.position.set(config.fixed, 0, config.progress);
+        vehicle.rotation.y = config.direction > 0 ? 0 : Math.PI;
+      } else {
+        vehicle.position.set(config.progress, 0, config.fixed);
+        vehicle.rotation.y = config.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+      }
+      traffic.push(vehicle);
+      scene.add(vehicle);
+    }
+
+    function updateTraffic(delta) {
+      traffic.forEach(vehicle => {
+        const config = vehicle.userData.traffic;
+        config.progress += config.direction * config.speed * delta;
+        if (config.direction > 0 && config.progress > config.max) config.progress = config.min;
+        if (config.direction < 0 && config.progress < config.min) config.progress = config.max;
+        if (config.axis === 'z') vehicle.position.z = config.progress;
+        else vehicle.position.x = config.progress;
+      });
+    }
+
+    function addFruitClusters(parent) {
+      const positions = [[-.8,5,.3],[.45,5.45,.55],[1.05,4.82,-.2],[-.3,6,0],[.7,5.52,-.7],[-1.1,4.75,-.2],[.15,4.75,1.05]];
+      const fruits = new THREE.InstancedMesh(fruitGeometry, fruitMaterial, positions.length);
+      const dummy = new THREE.Object3D();
+      positions.forEach(([x, y, z], index) => {
+        dummy.position.set(x, y, z);
+        dummy.scale.setScalar(.8 + (index % 3) * .12);
+        dummy.updateMatrix();
+        fruits.setMatrixAt(index, dummy.matrix);
+      });
+      fruits.instanceMatrix.needsUpdate = true;
+      parent.add(fruits);
+    }
+
+    function addBird(scene, x, y, z, yaw = 0) {
+      const bird = new THREE.Group();
+      const body = new THREE.Mesh(birdBodyGeometry, birdMaterial);
+      body.scale.set(.8, .75, 1.55);
+      body.rotation.x = .1;
+      const leftWing = new THREE.Mesh(birdWingGeometry, birdMaterial);
+      leftWing.position.set(-.13, .01, 0);
+      leftWing.rotation.z = .42;
+      const rightWing = new THREE.Mesh(birdWingGeometry, birdMaterial);
+      rightWing.position.set(.13, .01, 0);
+      rightWing.rotation.z = -.42;
+      bird.add(body, leftWing, rightWing);
+      bird.position.set(x, y, z);
+      bird.rotation.y = yaw;
+      scene.add(bird);
+    }
+
     function addPhotoHouse(scene, x, z, width, height) {
       addHouse(scene, x, z, 0xf0e5d1, 0x9e533a);
       const house = createPhotoSprite('./assets/kerala-home-v2.png', width, height, true);
@@ -916,7 +1435,7 @@
       scene.add(group);
     }
 
-    function addTree(scene, x, z, scale) {
+    function addTree(scene, x, z, scale, withFruit = false) {
       const group = new THREE.Group();
       const trunkMat = new THREE.MeshStandardMaterial({ color: 0x65442e, roughness: 1 });
       const branchMat = new THREE.MeshStandardMaterial({ color: 0x77503a, roughness: 1 });
@@ -937,6 +1456,7 @@
         leaves.position.set(lx, ly, lz);
         group.add(leaves);
       });
+      if (withFruit) addFruitClusters(group);
       group.position.set(x, 0, z);
       group.scale.setScalar(scale);
       scene.add(group);
