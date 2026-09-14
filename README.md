@@ -4,7 +4,7 @@ Kerala Play is a static Three.js game client backed by Supabase.
 
 ## Current structure
 
-- `index.html` — main 3D world, game UI, email/password authentication, account profile, local tasks, XP, follows, and chat demos
+- `index.html` — main 3D world, game UI, email/password authentication, account profiles, real follows/blocking, local tasks/XP, and chat demos
 - `ludo.html` — realtime Ludo prototype
 - `schema.sql` — Supabase tables and row-level security policies
 - `supabase-config.js` — browser-safe Supabase project URL and publishable key
@@ -17,3 +17,5 @@ Kerala Play is a static Three.js game client backed by Supabase.
 3. Open `index.html`, create an account, and save a Kerala profile.
 
 Authentication credentials stay in Supabase Auth. The `profiles` table stores only the authenticated user's display name, district, and avatar selection. Row-level security lets users change only their own profile.
+
+The `follows` and `blocks` tables store the social graph. Players can follow/unfollow visible profiles, see follower/following counts, block or unblock players, and manage their blocked list. A block automatically removes follows in both directions.

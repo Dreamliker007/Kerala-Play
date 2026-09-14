@@ -77,6 +77,37 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Upgrade older Kerala Play profile tables without deleting existing rows.
+alter table public.profiles
+  add column if not exists display_name text,
+  add column if not exists district text,
+  add column if not exists gender text default 'male',
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+do $$
+declare
+  old_constraint record;
+begin
+  for old_constraint in
+    select conname
+    from pg_constraint
+    where conrelid = 'public.profiles'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%username%'
+  loop
+    execute format('alter table public.profiles drop constraint %I', old_constraint.conname);
+  end loop;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'username'
+  ) then
+    execute 'alter table public.profiles alter column username drop not null';
+    execute 'alter table public.profiles alter column username drop default';
+  end if;
+end $$;
+
 alter table public.profiles enable row level security;
 
 drop policy if exists "profiles_authenticated_read" on public.profiles;
@@ -116,3 +147,136 @@ before update on public.profiles
 for each row execute function public.set_profile_updated_at();
 
 grant select, insert, update on public.profiles to authenticated;
+
+-- Social graph: follows are public to signed-in players; blocks are private to
+-- the blocker. Blocking removes follows in both directions.
+create table if not exists public.follows (
+  follower_id uuid not null references public.profiles(id) on delete cascade,
+  following_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (follower_id, following_id),
+  check (follower_id <> following_id)
+);
+
+create table if not exists public.blocks (
+  blocker_id uuid not null references public.profiles(id) on delete cascade,
+  blocked_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker_id, blocked_id),
+  check (blocker_id <> blocked_id)
+);
+
+create index if not exists follows_following_id_idx on public.follows(following_id);
+create index if not exists blocks_blocked_id_idx on public.blocks(blocked_id);
+
+alter table public.follows enable row level security;
+alter table public.blocks enable row level security;
+
+create or replace function public.users_are_blocked(user_a uuid, user_b uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.blocks
+    where (blocker_id = user_a and blocked_id = user_b)
+       or (blocker_id = user_b and blocked_id = user_a)
+  );
+$$;
+
+create or replace function public.can_view_profile(profile_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select profile_id = (select auth.uid())
+    or exists (
+      select 1 from public.blocks
+      where blocker_id = (select auth.uid()) and blocked_id = profile_id
+    )
+    or not public.users_are_blocked((select auth.uid()), profile_id);
+$$;
+
+revoke all on function public.users_are_blocked(uuid, uuid) from public;
+revoke all on function public.can_view_profile(uuid) from public;
+grant execute on function public.users_are_blocked(uuid, uuid) to authenticated;
+grant execute on function public.can_view_profile(uuid) to authenticated;
+
+drop policy if exists "profiles_authenticated_read" on public.profiles;
+create policy "profiles_authenticated_read"
+on public.profiles for select
+to authenticated
+using (public.can_view_profile(id));
+
+drop policy if exists "follows_authenticated_read" on public.follows;
+create policy "follows_authenticated_read"
+on public.follows for select
+to authenticated
+using (
+  public.can_view_profile(follower_id)
+  and public.can_view_profile(following_id)
+);
+
+drop policy if exists "follows_owner_insert" on public.follows;
+create policy "follows_owner_insert"
+on public.follows for insert
+to authenticated
+with check (
+  follower_id = (select auth.uid())
+  and following_id <> (select auth.uid())
+  and not public.users_are_blocked(follower_id, following_id)
+);
+
+drop policy if exists "follows_owner_delete" on public.follows;
+create policy "follows_owner_delete"
+on public.follows for delete
+to authenticated
+using (follower_id = (select auth.uid()));
+
+drop policy if exists "blocks_owner_read" on public.blocks;
+create policy "blocks_owner_read"
+on public.blocks for select
+to authenticated
+using (blocker_id = (select auth.uid()));
+
+drop policy if exists "blocks_owner_insert" on public.blocks;
+create policy "blocks_owner_insert"
+on public.blocks for insert
+to authenticated
+with check (blocker_id = (select auth.uid()) and blocked_id <> (select auth.uid()));
+
+drop policy if exists "blocks_owner_delete" on public.blocks;
+create policy "blocks_owner_delete"
+on public.blocks for delete
+to authenticated
+using (blocker_id = (select auth.uid()));
+
+create or replace function public.cleanup_follows_after_block()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.follows
+  where (follower_id = new.blocker_id and following_id = new.blocked_id)
+     or (follower_id = new.blocked_id and following_id = new.blocker_id);
+  return new;
+end;
+$$;
+
+revoke all on function public.cleanup_follows_after_block() from public;
+
+drop trigger if exists blocks_cleanup_follows on public.blocks;
+create trigger blocks_cleanup_follows
+after insert on public.blocks
+for each row execute function public.cleanup_follows_after_block();
+
+grant select, insert, delete on public.follows to authenticated;
+grant select, insert, delete on public.blocks to authenticated;
+
+notify pgrst, 'reload schema';
