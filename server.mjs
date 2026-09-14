@@ -486,7 +486,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const server = await createGameServer();
-  const port = Number(process.env.PORT || 3000), host = process.env.HOST || '127.0.0.1';
+  const port = Number(process.env.PORT || 3000), host = process.env.HOST || '0.0.0.0';
   server.listen(port, host, () => console.log(`Kerala Play running at http://${host}:${server.address().port}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, async () => { await server.shutdown(); process.exit(0); });
 }
