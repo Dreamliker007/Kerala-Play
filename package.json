@@ -1,0 +1,12 @@
+{
+  "name": "kerala-play",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kerala Play persistent social world",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/server.test.mjs"
+  }
+}

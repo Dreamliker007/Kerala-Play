@@ -1,0 +1,61 @@
+.social-modal[hidden], .social-modal [hidden], #hud [hidden] { display:none !important; }
+.social-modal { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; padding:max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); background:rgba(3,17,20,.82); backdrop-filter:blur(9px); color:#edf9f0; touch-action:pan-y; overflow-y:auto; }
+.social-card { width:min(430px, 100%); max-height:calc(100dvh - 40px); overflow-y:auto; padding:26px; border:1px solid #52776a; border-radius:22px; background:linear-gradient(145deg,#163d3b,#0a212a); box-shadow:0 24px 70px #0008; touch-action:pan-y; }
+.social-card h1 { margin:8px 0 10px; font-size:26px; letter-spacing:-.7px; line-height:1.15; }
+.social-card h2 { margin:0; font-size:22px; overflow-wrap:anywhere; }
+.social-eyebrow { color:#9ad2a0; font-size:10px; font-weight:800; letter-spacing:2.5px; }
+.social-muted { color:#b6d3c8; font-size:12px; line-height:1.5; }
+.social-tabs { display:flex; flex-wrap:wrap; gap:5px; margin:16px 0; padding:4px; background:#0002; border-radius:12px; }
+.social-tabs .social-button { flex:1; border-color:transparent; background:transparent; font-size:12px; padding:9px; }
+.social-tabs button[aria-pressed="true"] { color:#082a22; background:#a2e2bb; }
+.social-field { display:flex; flex:1; min-width:0; flex-direction:column; gap:7px; margin:14px 0; color:#d7eee0; font-size:12px; font-weight:700; }
+.social-fields-row { display:flex; gap:12px; }
+.social-card input, .social-card select, .social-card textarea, #people-panel input[type="search"] { box-sizing:border-box; width:100%; min-width:0; padding:11px 12px; border:1px solid #52756c; border-radius:10px; color:#effbf4; background:#0c242c; font:inherit; font-size:14px; touch-action:manipulation; }
+.social-card textarea { resize:vertical; min-height:80px; max-height:200px; }
+.social-card select { color-scheme:dark; }
+.social-card input::placeholder, .social-card textarea::placeholder { color:#91aea5; }
+.social-card .social-field input { margin:0; }
+.social-button { border:1px solid #4b8070; border-radius:9px; padding:9px 11px; color:#eefff6; background:#216749; font:inherit; font-size:12px; font-weight:700; cursor:pointer; touch-action:manipulation; line-height:1.3; }
+.social-button:hover { filter:brightness(1.12); }
+.social-button.primary { width:100%; margin-top:9px; padding:12px; color:#092a21; background:#a2e2bb; font-size:14px; }
+.social-button.secondary { background:#223e45; border-color:#49616b; }
+.social-button.danger { color:#ffd9c8; background:#583731; border-color:#9b5b50; }
+.social-button:disabled, #dm-panel button:disabled { opacity:.48; cursor:not-allowed; }
+.social-button:focus-visible, .social-modal :focus-visible, #people-panel :focus-visible, #dm-panel :focus-visible, #chat-panel :focus-visible { outline:3px solid #ffe298; outline-offset:3px; }
+.social-error { min-height:17px; margin:9px 0 0; color:#ffddaa; font-size:12px; line-height:1.4; overflow-wrap:anywhere; }
+.social-error:empty { margin:0; min-height:0; }
+.social-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:11px; }
+.social-person { padding:11px; }
+.social-person-name { display:flex; align-items:center; gap:9px; width:100%; padding:0; border:0; color:#fff; background:transparent; text-align:left; cursor:pointer; font:inherit; touch-action:manipulation; }
+.social-person-name strong { overflow-wrap:anywhere; }
+.social-avatar { display:grid; width:38px; height:38px; flex:0 0 38px; place-items:center; border:1px solid #a0c18b; border-radius:13px; color:#ddf4cb; background:#375448; font-size:18px; font-weight:700; }
+.social-avatar.female { background:#59495b; border-color:#baa1bc; color:#ffe1f0; }
+.social-person > .social-muted { display:block; margin:6px 0; }
+.social-profile-header { display:flex; align-items:center; gap:12px; }
+.social-profile-header .panel-close { margin-left:auto; flex:0 0 30px; width:30px; height:30px; }
+.social-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:15px 0; margin:16px 0; border-top:1px solid #4b716333; border-bottom:1px solid #4b716366; }
+.social-stats div { text-align:center; }
+.social-stats strong { display:block; color:#eafbcf; font-size:21px; }
+.social-stats small { display:block; margin-top:4px; color:#b0cfc1; font-size:10px; }
+.social-bio { white-space:pre-wrap; overflow-wrap:anywhere; color:#d5eade; font-size:14px; line-height:1.6; }
+.social-empty { padding:15px 4px; color:#b4cdc4; font-size:12px; line-height:1.6; }
+.people-tabs { gap:3px; margin:10px 0; padding:3px; }
+.people-tabs .social-button { flex:auto; font-size:10px; padding:7px 5px; }
+#people-panel, #chat-panel, #dm-panel { max-height:min(76dvh,620px); }
+#people-panel .social-button, #chat-panel .social-button { font-size:11px; }
+#dm-panel #dm-log { min-height:120px; max-height:27dvh; }
+#dm-panel .dm-message { max-width:95%; padding:9px; margin:5px 0 9px; background:#ffffff09; border-radius:8px; overflow-wrap:anywhere; }
+#dm-panel .dm-message.mine { margin-left:auto; background:#35654d66; }
+.dm-message p { margin:4px 0; white-space:pre-wrap; line-height:1.5; }
+.dm-message audio { display:block; width:100%; height:36px; max-width:100%; margin-top:6px; }
+.social-voice { margin-top:13px; padding-top:13px; border-top:1px solid #496b6255; font-size:12px; }
+.social-voice > strong { color:#d6eacb; font-size:12px; }
+.social-check { display:flex; align-items:flex-start; gap:7px; margin:13px 0; color:#c8e0d4; font-size:11px; line-height:1.4; cursor:pointer; touch-action:manipulation; }
+.social-check input { width:17px; height:17px; flex:0 0 17px; margin:0; accent-color:#a2e2bb; }
+.social-talk { width:100%; padding:11px; background:#324d3f; border:1px solid #82a082; user-select:none; -webkit-user-select:none; touch-action:none; }
+.social-talk.transmitting { background:#a2e2bb; color:#0a2b20; box-shadow:0 0 0 3px #a2e2bb22; }
+.social-live-audio audio { width:100%; height:34px; margin-top:8px; }
+#online-chip.social-offline i { background:#c6a978; box-shadow:none; }
+#auth-modal, #social-profile-modal { overscroll-behavior:contain; }
+@media (max-width:560px) { .social-card { padding:21px; border-radius:18px; } .social-card h1 { font-size:24px; } .social-card input, .social-card select, .social-card textarea, #people-panel input[type="search"], #dm-input { font-size:16px; } .social-fields-row { gap:8px; } #people-panel, #chat-panel, #dm-panel { width:min(340px,calc(100vw - 86px)); max-height:calc(100dvh - 40px - env(safe-area-inset-top)); } .social-stats strong { font-size:19px; } }
+@media (max-height:580px) { .social-modal { align-items:flex-start; padding-top:12px; padding-bottom:12px; } .social-card { max-height:calc(100dvh - 24px); padding:19px; } .social-card h1 { font-size:21px; } .social-field { margin:10px 0; } .social-tabs { margin:10px 0; } }

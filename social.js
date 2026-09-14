@@ -1,0 +1,825 @@
+const districts = ['Alappuzha', 'Ernakulam', 'Idukki', 'Kannur', 'Kasaragod', 'Kollam', 'Kottayam', 'Kozhikode', 'Malappuram', 'Palakkad', 'Pathanamthitta', 'Thiruvananthapuram', 'Thrissur', 'Wayanad'];
+const accepted = relation => ['following', 'follower', 'mutual'].includes(relation);
+const serverHelp = 'Start the Kerala Play server with npm start, then open http://localhost:3000. Accounts and live features need the server.';
+
+export async function api(path, body, method) {
+  if (!/^https?:$/.test(location.protocol)) throw new Error(serverHelp);
+  let response;
+  try {
+    response = await fetch(path, { method: method || (body === undefined ? 'GET' : 'POST'), credentials: 'same-origin', headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  } catch { throw new Error(`Cannot reach the Kerala Play server. ${serverHelp}`); }
+  let result;
+  try { result = await response.json(); }
+  catch { throw new Error(`This page is not connected to the Kerala Play server. ${serverHelp}`); }
+  if (!response.ok) {
+    const error = new Error(result.error || result.message || `Request failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+  return result;
+}
+
+function node(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+function button(label, action, className = 'social-button') {
+  const element = node('button', className, label);
+  element.type = 'button';
+  element.addEventListener('click', action);
+  return element;
+}
+function field(label, input) {
+  const wrap = node('label', 'social-field');
+  wrap.append(node('span', '', label), input);
+  return wrap;
+}
+function select(options, value) {
+  const element = document.createElement('select');
+  options.forEach(option => {
+    const entry = node('option', '', typeof option === 'string' ? option : option[1]);
+    entry.value = typeof option === 'string' ? option : option[0];
+    element.append(entry);
+  });
+  if (value) element.value = value;
+  return element;
+}
+function input(type, options = {}) {
+  const element = document.createElement('input');
+  element.type = type;
+  Object.assign(element, options);
+  return element;
+}
+
+export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconnect = () => {}, onOpenProfile = () => {}, onToast = () => {} } = {}) {
+  let user = null;
+  let connected = false;
+  let source = null;
+  let people = [];
+  let peopleSignature = '';
+  let activePeer = null;
+  let profileId = null;
+  let peopleFilter = 'all';
+  let peopleSearch = '';
+  let messageVersion = 0;
+  let profileVersion = 0;
+  let peopleVersion = 0;
+  let sessionVersion = 0;
+  let profileReturnFocus = null;
+  let authMode = 'login';
+  let recording = null;
+  let recordingStream = null;
+  let recordingTimer = null;
+  let recordingTick = null;
+  let recordingPending = false;
+  let recordingCancelled = false;
+  let holding = false;
+  let holdVersion = 0;
+  let talkPeer = null;
+  let talkStream = null;
+  const messageURLs = new Set();
+  const receiving = new Set();
+  const receiversReady = new Set();
+  const peers = new Map();
+  const earlyCandidates = new Map();
+  const listeners = new Set();
+  const $ = id => document.getElementById(id);
+  const peoplePanel = $('people-panel');
+  const dmPanel = $('dm-panel');
+  const chatPanel = $('chat-panel');
+  const peopleToggle = $('people-toggle');
+  const chatToggle = $('chat-toggle');
+  const profileChip = $('profile-chip');
+
+  function toast(message) { onToast(message); }
+  function notifyState() { for (const listener of listeners) listener({ user, connected }); }
+  function report(error, target) {
+    const message = error?.message || 'Something went wrong. Please try again.';
+    if (target) target.textContent = message;
+    else toast(message);
+    if (error?.status === 401 && user) endSession('Your session expired. Please log in again.');
+  }
+  async function run(action, target) {
+    const version = sessionVersion;
+    try { if (target) target.textContent = ''; return await action(); }
+    catch (error) { if (version === sessionVersion) report(error, target); return null; }
+  }
+  function setUser(next) {
+    user = next || null;
+    if ($('profile-name')) $('profile-name').textContent = user?.username || 'Sign in';
+    if ($('profile-district')) $('profile-district').textContent = user?.district || 'Your Kerala adventure';
+    profileChip?.setAttribute('aria-label', user ? `Open ${user.username}'s profile` : 'Sign in');
+    onUser(user);
+    notifyState();
+  }
+  function setConnection(next, count) {
+    connected = next;
+    const label = user ? (next ? `${count ?? Math.max(1, people.filter(person => person.online).length + 1)} online` : 'Reconnecting…') : 'Not connected';
+    if ($('online-count')) $('online-count').textContent = label;
+    if ($('people-online-label')) $('people-online-label').textContent = label;
+    $('online-chip')?.classList.toggle('social-offline', !next);
+    notifyState();
+    updateVoiceControls();
+  }
+  function closePanels() {
+    cancelRecording(); stopTalking();
+    for (const panel of [peoplePanel, dmPanel, chatPanel]) panel?.classList.remove('open');
+    peopleToggle?.setAttribute('aria-expanded', 'false');
+    chatToggle?.setAttribute('aria-expanded', 'false');
+  }
+  function showPanel(panel) {
+    closePanels();
+    for (const [panelId, toggleId] of [['minimap', 'map-open'], ['task-panel', 'task-toggle']]) {
+      $(panelId)?.classList.remove('open');
+      $(toggleId)?.setAttribute('aria-expanded', 'false');
+    }
+    panel?.classList.add('open');
+    if (panel === chatPanel || panel === dmPanel) chatToggle?.classList.remove('unread');
+    peopleToggle?.setAttribute('aria-expanded', String(panel === peoplePanel));
+    chatToggle?.setAttribute('aria-expanded', String(panel === dmPanel || panel === chatPanel));
+  }
+  function panelHeader(title, panel, id) {
+    const header = node('div', 'panel-heading');
+    const heading = node('strong', '', title);
+    if (id) heading.id = id;
+    header.append(heading, button('×', () => { closePanels(); (panel === peoplePanel ? peopleToggle : chatToggle)?.focus(); }, 'panel-close'));
+    header.lastChild.setAttribute('aria-label', `Close ${title}`);
+    return header;
+  }
+
+  const authModal = node('section', 'social-modal');
+  authModal.id = 'auth-modal';
+  authModal.setAttribute('role', 'dialog');
+  authModal.setAttribute('aria-modal', 'true');
+  authModal.setAttribute('aria-labelledby', 'auth-title');
+  authModal.hidden = true;
+  const authCard = node('div', 'social-card auth-card');
+  const authTitle = node('h1', '', 'Welcome to Kerala Play');
+  authTitle.id = 'auth-title';
+  const authIntro = node('p', 'social-muted', 'Your avatar. Your people. One living Kerala.');
+  const authTabs = node('div', 'social-tabs');
+  const loginTab = button('Log in', () => renderAuth('login'));
+  const signupTab = button('Create account', () => renderAuth('signup'));
+  authTabs.append(loginTab, signupTab);
+  const authForm = node('form', 'social-form');
+  const firstName = input('text', { name: 'firstName', required: true, maxLength: 40, autocomplete: 'given-name' });
+  const username = input('text', { name: 'identifier', required: true, minLength: 3, maxLength: 80, autocomplete: 'username', spellcheck: false });
+  username.setAttribute('autocapitalize', 'none');
+  username.setAttribute('aria-describedby', 'auth-username-note');
+  const usernameNote = node('small', 'social-muted', 'Use your username, email, or mobile number.');
+  usernameNote.id = 'auth-username-note';
+  const password = input('password', { name: 'password', required: true, minLength: 8, maxLength: 128, autocomplete: 'current-password' });
+  const signupFields = node('div', 'social-fields-row');
+  const signupContact = node('div', 'social-fields-row');
+  const signupEmail = input('email', { placeholder: 'Email (optional)', autocomplete: 'email' });
+  const signupMobile = input('tel', { placeholder: 'Mobile (optional)', autocomplete: 'tel' });
+  signupContact.append(field('Email', signupEmail), field('Mobile', signupMobile));
+  const signupDistrict = select(districts, 'Ernakulam');
+  const signupGender = select([['male', 'Male'], ['female', 'Female'], ['other', 'Other']], 'male');
+  signupFields.append(field('District', signupDistrict), field('Avatar', signupGender));
+  const authSubmit = node('button', 'social-button primary', 'Log in');
+  authSubmit.type = 'submit';
+  const authError = node('div', 'social-error');
+  authError.setAttribute('role', 'status');
+  authError.setAttribute('aria-live', 'polite');
+  const authNote = node('p', 'social-muted', 'New accounts start at 0 points. Earn rewards by completing tasks and winning games.');
+  const forgot = button('Forgot password?', () => renderReset()); forgot.className = 'social-link';
+  authForm.append(field('First name', firstName), field('Username', username), usernameNote, field('Password', password), signupContact, signupFields, authSubmit, forgot, authError);
+  authCard.append(node('div', 'social-eyebrow', 'KERALA PLAY'), authTitle, authIntro, authTabs, authForm, authNote);
+  authModal.append(authCard);
+  document.body.append(authModal);
+
+  const profileModal = node('section', 'social-modal');
+  profileModal.id = 'social-profile-modal';
+  profileModal.setAttribute('role', 'dialog');
+  profileModal.setAttribute('aria-modal', 'true');
+  profileModal.setAttribute('aria-labelledby', 'social-profile-title');
+  profileModal.hidden = true;
+  const profileCard = node('div', 'social-card');
+  profileModal.append(profileCard);
+  document.body.append(profileModal);
+
+  function trapFocus(event) {
+    event.stopPropagation();
+    if (event.key === 'Escape' && !profileModal.hidden) { closeProfile(); return; }
+    if (event.key !== 'Tab') return;
+    const elements = [...event.currentTarget.querySelectorAll('button, input, select, textarea, a[href], [tabindex="0"]')].filter(element => !element.disabled && element.getClientRects().length);
+    if (!elements.length) { event.preventDefault(); return; }
+    const first = elements[0], last = elements.at(-1);
+    if (event.shiftKey && (document.activeElement === first || !elements.includes(document.activeElement))) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || !elements.includes(document.activeElement))) { event.preventDefault(); first.focus(); }
+  }
+  authModal.addEventListener('keydown', trapFocus);
+  profileModal.addEventListener('keydown', trapFocus);
+  profileModal.addEventListener('click', event => { if (event.target === profileModal) closeProfile(); });
+  for (const panel of [peoplePanel, dmPanel, chatPanel]) {
+    panel?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape') { closePanels(); chatToggle?.focus(); } });
+    panel?.addEventListener('pointerdown', event => event.stopPropagation());
+  }
+  function renderAuth(mode = authMode, error = '') {
+    authMode = mode;
+    authModal.hidden = false;
+    signupFields.hidden = mode !== 'signup';
+    signupContact.hidden = mode !== 'signup';
+    firstName.parentElement.hidden = mode !== 'signup';
+    firstName.required = mode === 'signup';
+    if (mode === 'signup') username.pattern = '(?=.*[A-Za-z])[A-Za-z0-9_]{3,24}';
+    else username.removeAttribute('pattern');
+    username.minLength = mode === 'signup' ? 3 : 3;
+    username.maxLength = mode === 'signup' ? 24 : 80;
+    usernameNote.textContent = mode === 'signup' ? 'Letters, numbers and underscores; at least one letter.' : 'Use your username or mobile number.';
+    authNote.hidden = mode !== 'signup';
+    signupTab.setAttribute('aria-pressed', String(mode === 'signup'));
+    loginTab.setAttribute('aria-pressed', String(mode === 'login'));
+    authSubmit.textContent = mode === 'signup' ? 'Create account & explore' : 'Log in & explore';
+    password.autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+    authError.textContent = error;
+    queueMicrotask(() => username.focus());
+  }
+  async function renderReset() {
+    const identifier = window.prompt('Enter your username, email, or mobile number:');
+    if (!identifier) return;
+    await run(async () => { const result = await api('/api/auth/forgot', { identifier }); window.alert(result.message); const code = window.prompt('Enter the 6-digit reset code from the server console:'); if (!code) return; const next = window.prompt('Choose a new password (8+ characters):'); if (!next) return; await api('/api/auth/reset', { code, password: next }); window.alert('Password reset. You can log in now.'); }, authError);
+  }
+  authForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!authForm.reportValidity()) return;
+    authSubmit.disabled = true;
+    await run(async () => {
+      const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, ...(authMode === 'signup' ? { email: signupEmail.value, mobile: signupMobile.value, district: signupDistrict.value, gender: signupGender.value } : {}) });
+      password.value = '';
+      await beginSession(result.user);
+    }, authError);
+    authSubmit.disabled = false;
+  });
+
+  peoplePanel.replaceChildren(panelHeader('People', peoplePanel));
+  const onlineLabel = node('p', 'panel-note', 'Not connected');
+  onlineLabel.id = 'people-online-label';
+  const peopleTabs = node('div', 'social-tabs people-tabs');
+  for (const [value, label] of [['all', 'Everyone'], ['followers', 'Followers'], ['following', 'Following'], ['requests', 'Requests'], ['blocked', 'Blocked']]) {
+    const tab = button(label, () => { peopleFilter = value; renderPeople(); });
+    tab.dataset.filter = value;
+    peopleTabs.append(tab);
+  }
+  const search = input('search', { placeholder: 'Find a username', maxLength: 24 });
+  search.setAttribute('aria-label', 'Find people by username');
+  search.addEventListener('input', () => { peopleSearch = search.value.trim().toLowerCase(); renderPeople(); });
+  const peopleError = node('div', 'social-error');
+  peopleError.setAttribute('role', 'status');
+  const peopleList = node('div', 'social-people-list');
+  peopleList.id = 'people-list';
+  peoplePanel.append(onlineLabel, peopleTabs, search, peopleError, peopleList);
+
+  chatPanel.replaceChildren(panelHeader('Messages', chatPanel));
+  chatPanel.setAttribute('aria-label', 'Accepted contacts and messages');
+  chatPanel.append(node('p', 'panel-note', 'Direct messages unlock when either of you accepts a follow request. Voice messages and walkie-talkie are available inside a conversation.'));
+  const conversations = node('div', 'social-people-list');
+  chatPanel.append(conversations);
+
+  dmPanel.replaceChildren(panelHeader('Direct message', dmPanel, 'dm-title'));
+  const dmNote = node('p', 'panel-note', 'Messages are shared privately with this contact.');
+  dmNote.id = 'dm-note';
+  const dmLog = node('div', '');
+  dmLog.id = 'dm-log';
+  dmLog.setAttribute('role', 'log');
+  dmLog.setAttribute('aria-live', 'polite');
+  const dmForm = node('form');
+  dmForm.id = 'dm-form';
+  const dmInput = input('text', { placeholder: 'Write a message', maxLength: 1000, autocomplete: 'off', required: true });
+  dmInput.id = 'dm-input';
+  dmInput.setAttribute('aria-label', 'Direct message text');
+  const dmSend = node('button', 'action-button', 'Send');
+  dmSend.type = 'submit';
+  dmForm.append(dmInput, dmSend);
+  const dmError = node('div', 'social-error');
+  dmError.setAttribute('role', 'status');
+  const voiceBox = node('div', 'social-voice');
+  const voiceTitle = node('strong', '', 'Voice');
+  const recordButton = button('Record voice message', () => recording || recordingPending ? finishRecording() : run(startRecording, dmError));
+  const recordCancel = button('Discard', cancelRecording, 'social-button secondary');
+  recordCancel.hidden = true;
+  const recordRow = node('div', 'social-actions');
+  recordRow.append(recordButton, recordCancel);
+  const receiveInput = input('checkbox');
+  const receiveLabel = node('label', 'social-check');
+  receiveLabel.append(receiveInput, node('span', '', 'Allow this contact’s live voice'));
+  receiveInput.addEventListener('change', () => run(async () => {
+    if (!activePeer) return;
+    const peerId = activePeer.id;
+    if (receiveInput.checked) receiving.add(peerId);
+    else { receiving.delete(peerId); closePeer(peerId); }
+    await sendSignal(peerId, { type: receiveInput.checked ? 'opt-in' : 'disabled', enabled: receiveInput.checked });
+    updateVoiceControls();
+  }, dmError));
+  const talkButton = button('Hold to talk', () => {});
+  talkButton.classList.add('social-talk');
+  talkButton.setAttribute('aria-label', 'Hold to talk to this contact');
+  const voiceStatus = node('p', 'panel-note');
+  voiceStatus.setAttribute('role', 'status');
+  const audioMount = node('div', 'social-live-audio');
+  voiceBox.append(voiceTitle, recordRow, receiveLabel, talkButton, voiceStatus, audioMount);
+  dmPanel.append(dmNote, dmLog, dmForm, dmError, voiceBox);
+  talkButton.addEventListener('pointerdown', event => { if (event.button !== 0) return; event.preventDefault(); talkButton.setPointerCapture(event.pointerId); run(startTalking, dmError); });
+  talkButton.addEventListener('pointerup', stopTalking);
+  talkButton.addEventListener('pointercancel', stopTalking);
+  talkButton.addEventListener('lostpointercapture', stopTalking);
+  talkButton.addEventListener('keydown', event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); if (!event.repeat) run(startTalking, dmError); } });
+  talkButton.addEventListener('keyup', event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); stopTalking(); } });
+  talkButton.addEventListener('blur', stopTalking);
+  dmForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const body = dmInput.value.trim();
+    if (!activePeer || !body) return;
+    const peerId = activePeer.id;
+    dmSend.disabled = true;
+    await run(async () => { await api(`/api/messages/${encodeURIComponent(peerId)}`, { body }); if (activePeer?.id === peerId) { dmInput.value = ''; await loadMessages(); } }, dmError);
+    dmSend.disabled = false;
+  });
+
+  function canMessage(person) { return !!person && !person.blocked && person.canMessage !== false && accepted(person.relationship); }
+  function avatar(person) {
+    const picture = node('span', `social-avatar ${person.gender === 'female' ? 'female' : ''}`, person.username?.slice(0, 1).toUpperCase() || '?');
+    picture.setAttribute('aria-hidden', 'true');
+    return picture;
+  }
+  function relationshipText(person) {
+    if (person.blocked) return 'Blocked';
+    return { none: 'Meet someone new', outgoing: 'Request sent', incoming: 'Wants to follow you', following: 'Following', follower: 'Follows you', mutual: 'Following each other' }[person.relationship] || '';
+  }
+  async function relationshipAction(person, action) {
+    await api(`/api/follows/${encodeURIComponent(person.id)}`, { action });
+    if (['unfollow', 'decline', 'cancel'].includes(action)) { closePeer(person.id); receiversReady.delete(person.id); receiving.delete(person.id); }
+    await refreshPeople();
+    await refreshUser();
+    if (!profileModal.hidden && profileId === person.id) await openProfile(person.id, true);
+  }
+  function relationshipButtons(person, errorTarget = peopleError) {
+    const actions = node('div', 'social-actions');
+    if (person.id === user?.id) return actions;
+    if (person.blocked) {
+      actions.append(button('Unblock', () => run(async () => { await api(`/api/blocks/${encodeURIComponent(person.id)}`, { blocked: false }); await refreshPeople(); if (!profileModal.hidden) await openProfile(person.id, true); }, errorTarget), 'social-button secondary'));
+      return actions;
+    }
+    const relation = person.relationship;
+    if (relation === 'incoming') {
+      actions.append(button('Accept', () => run(() => relationshipAction(person, 'accept'), errorTarget)));
+      actions.append(button('Decline', () => run(() => relationshipAction(person, 'decline'), errorTarget), 'social-button secondary'));
+    } else if (relation === 'outgoing') actions.append(button('Cancel request', () => run(() => relationshipAction(person, 'cancel'), errorTarget), 'social-button secondary'));
+    else if (['following', 'mutual'].includes(relation)) actions.append(button('Unfollow', () => run(() => relationshipAction(person, 'unfollow'), errorTarget), 'social-button secondary'));
+    else actions.append(button(relation === 'follower' ? 'Follow back' : 'Request follow', () => run(() => relationshipAction(person, 'request'), errorTarget)));
+    if (canMessage(person)) actions.append(button('Message', () => run(() => openConversation(person), errorTarget)));
+    return actions;
+  }
+  function personCard(person, messageOnly = false) {
+    const card = node('article', 'people-entry social-person');
+    const name = button('', () => openProfile(person.id), 'social-person-name');
+    const details = node('span');
+    details.append(node('strong', '', person.username), node('small', '', person.blocked ? 'Blocked account' : `${person.online ? '● Online' : 'Offline'} · ${person.district || 'Kerala'} · Level ${person.level || 1}`));
+    name.append(avatar(person), details);
+    card.append(name, node('small', 'social-muted', relationshipText(person)));
+    if (messageOnly) card.append(button('Open conversation', () => run(() => openConversation(person), peopleError)));
+    else card.append(relationshipButtons(person));
+    return card;
+  }
+  function renderPeople() {
+    peopleList.replaceChildren();
+    for (const tab of peopleTabs.children) tab.setAttribute('aria-pressed', String(tab.dataset.filter === peopleFilter));
+    const visible = people.filter(person => {
+      if (person.id === user?.id || !person.username?.toLowerCase().includes(peopleSearch)) return false;
+      if (peopleFilter === 'blocked') return person.blocked;
+      if (person.blocked) return false;
+      if (peopleFilter === 'followers') return ['follower', 'mutual'].includes(person.relationship);
+      if (peopleFilter === 'following') return ['following', 'mutual'].includes(person.relationship);
+      if (peopleFilter === 'requests') return ['outgoing', 'incoming'].includes(person.relationship);
+      return true;
+    }).sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
+    if (!visible.length) peopleList.append(node('p', 'social-empty', peopleFilter === 'all' ? 'No people here yet. Invite a friend to open this world and create an account.' : 'No people in this list yet.'));
+    for (const person of visible) peopleList.append(personCard(person));
+    conversations.replaceChildren();
+    const contacts = people.filter(person => person.id !== user?.id && canMessage(person));
+    if (!contacts.length) conversations.append(node('p', 'social-empty', 'No accepted contacts yet. Open People to send or accept a follow request.'), button('Find people', openPeople));
+    contacts.forEach(person => conversations.append(personCard(person, true)));
+    if (activePeer) {
+      const updated = people.find(person => person.id === activePeer.id);
+      if (!updated || !canMessage(updated)) {
+        closePeer(activePeer.id); receiving.delete(activePeer.id); receiversReady.delete(activePeer.id);
+        cancelRecording(); stopTalking(); activePeer = null; messageVersion++;
+        if (dmPanel.classList.contains('open')) { showPanel(chatPanel); toast('Messaging is unavailable until a follow is accepted.'); }
+        clearMessageURLs(); dmLog.replaceChildren();
+      } else activePeer = updated;
+    }
+    for (const id of [...receiving]) if (!canMessage(people.find(person => person.id === id))) { receiving.delete(id); closePeer(id); }
+    for (const person of people) if (!person.online) {
+      receiversReady.delete(person.id);
+      receiving.delete(person.id);
+      closePeer(person.id);
+      if (talkPeer === person.id) stopTalking();
+    }
+    updateVoiceControls();
+  }
+  async function refreshPeople() {
+    if (!user) return;
+    const version = ++peopleVersion;
+    const result = await api('/api/people');
+    if (!user || version !== peopleVersion) return;
+    people = result.people || [];
+    const signature = JSON.stringify(people.map(person => [person.id, person.username, person.district, person.gender, person.points, person.level, person.followers, person.following, person.bio, person.relationship, person.blocked, person.canMessage, person.online]));
+    if (signature !== peopleSignature) { peopleSignature = signature; renderPeople(); }
+  }
+  async function refreshUser() {
+    const version = sessionVersion;
+    const result = await api('/api/session');
+    if (version !== sessionVersion) return user;
+    if (result.user && user && result.user.id !== user.id) await beginSession(result.user);
+    else if (result.user) setUser(result.user);
+    else if (user) endSession('Please log in again.');
+    return user;
+  }
+  function requireUser() { if (user) return true; renderAuth(); return false; }
+  function openPeople() {
+    if (!requireUser()) return;
+    closeProfile(); showPanel(peoplePanel);
+    run(refreshPeople, peopleError);
+    search.focus();
+  }
+  function openChat() {
+    if (!requireUser()) return;
+    closeProfile(); showPanel(chatPanel);
+    run(refreshPeople, peopleError);
+  }
+  function closeProfile() {
+    if (profileModal.hidden) return;
+    profileModal.hidden = true;
+    profileVersion++;
+    if (profileReturnFocus?.isConnected) profileReturnFocus.focus();
+  }
+  async function openProfile(id = user?.id, preserveFocus = false) {
+    if (!requireUser()) return;
+    cancelRecording(); stopTalking();
+    if (!preserveFocus) profileReturnFocus = document.activeElement;
+    profileId = id || user.id;
+    const version = ++profileVersion;
+    profileModal.hidden = false;
+    onOpenProfile(profileId);
+    profileCard.replaceChildren(node('p', 'social-muted', 'Loading profile…'));
+    await run(async () => {
+      const result = profileId === user.id ? { user } : await api(`/api/profile/${encodeURIComponent(profileId)}`);
+      if (profileModal.hidden || version !== profileVersion) return;
+      const person = { ...result.user, relationship: result.relationship || result.user.relationship, blocked: result.blocked || result.user.blocked, canMessage: result.canMessage ?? result.user.canMessage };
+      const own = person.id === user.id;
+      const header = node('div', 'social-profile-header');
+      const title = node('h2', '', person.username);
+      title.id = 'social-profile-title';
+      const close = button('×', closeProfile, 'panel-close'); close.setAttribute('aria-label', 'Close profile');
+      header.append(avatar(person), title, close);
+      if (person.blocked) {
+        profileCard.replaceChildren(header, node('p', 'social-muted', 'This account is blocked. Unblock to allow a new follow request.'), relationshipButtons(person));
+        if (!preserveFocus) close.focus();
+        return;
+      }
+      const stats = node('div', 'social-stats');
+      for (const [value, label] of [[person.points || 0, 'points'], [person.level || 1, 'level'], [Array.isArray(person.followers) ? person.followers.length : person.followers || 0, 'followers'], [Array.isArray(person.following) ? person.following.length : person.following || 0, 'following']]) {
+        const stat = node('div'); stat.append(node('strong', '', String(value)), node('small', '', label)); stats.append(stat);
+      }
+      const error = node('div', 'social-error'); error.setAttribute('role', 'status');
+      profileCard.replaceChildren(header, node('p', 'social-muted', `${person.district || 'Kerala'} · ${person.gender === 'female' ? 'Female' : 'Male'} avatar`), stats);
+      if (own) {
+        const form = node('form', 'social-form');
+        const district = select(districts, person.district);
+        const gender = select([['male', 'Male'], ['female', 'Female']], person.gender);
+        const row = node('div', 'social-fields-row'); row.append(field('District', district), field('Avatar', gender));
+        const bio = node('textarea'); bio.value = person.bio || ''; bio.maxLength = 180; bio.rows = 3;
+        bio.placeholder = 'Tell people a little about yourself';
+        const save = node('button', 'social-button primary', 'Save profile'); save.type = 'submit';
+        form.append(row, field('About you', bio), save);
+        form.addEventListener('submit', async event => { event.preventDefault(); save.disabled = true; await run(async () => { const response = await api('/api/profile', { district: district.value, gender: gender.value, bio: bio.value.trim() }, 'PATCH'); if (response.user) setUser(response.user); else await refreshUser(); toast('Profile saved'); closeProfile(); }, error); save.disabled = false; });
+        const logout = button('Log out', () => run(async () => { await api('/api/auth/logout', {}); endSession(); }, error), 'social-button secondary');
+        const socialActions = node('div', 'social-actions');
+        socialActions.append(button('Followers & requests', () => { peopleFilter = 'followers'; openPeople(); }), logout);
+        profileCard.append(form, socialActions);
+      } else {
+        profileCard.append(node('p', 'social-bio', person.bio || 'This explorer has not added a bio yet.'), node('p', 'social-muted', relationshipText(person)));
+        const actions = relationshipButtons(person, error);
+        if (!person.blocked) actions.append(button('Block', () => run(async () => { await api(`/api/blocks/${encodeURIComponent(person.id)}`, { blocked: true }); closePeer(person.id); receiving.delete(person.id); receiversReady.delete(person.id); if (activePeer?.id === person.id) { cancelRecording(); stopTalking(); } await refreshPeople(); await refreshUser(); await openProfile(person.id, true); }, error), 'social-button danger'));
+        profileCard.append(actions);
+      }
+      profileCard.append(error);
+      if (!preserveFocus) close.focus();
+    }, null);
+    if (version === profileVersion && !profileCard.querySelector('#social-profile-title')) {
+      profileCard.replaceChildren(node('p', 'social-error', 'Could not load this profile. Please try again.'), button('Close', closeProfile));
+    }
+  }
+  async function openConversation(person) {
+    if (!requireUser()) return;
+    if (!canMessage(person)) throw new Error('Accept a follow request before starting a direct message.');
+    if (activePeer?.id !== person.id) { cancelRecording(); stopTalking(); clearMessageURLs(); }
+    activePeer = person;
+    closeProfile(); showPanel(dmPanel);
+    $('dm-title').textContent = `@${person.username}`;
+    dmNote.textContent = `${person.online ? 'Online' : 'Offline'} · Accepted contact · Messages are saved on this server.`;
+    dmError.textContent = '';
+    await loadMessages();
+    updateVoiceControls();
+    if (person.online) run(() => sendSignal(person.id, { type: 'request' }));
+    dmInput.focus();
+  }
+  function clearMessageURLs() { messageURLs.forEach(url => URL.revokeObjectURL(url)); messageURLs.clear(); }
+  function audioURL(base64, mime) {
+    const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime })); messageURLs.add(url); return url;
+  }
+  async function loadMessages() {
+    if (!activePeer || !user) return;
+    const peerId = activePeer.id;
+    const version = ++messageVersion;
+    const response = await api(`/api/messages/${encodeURIComponent(peerId)}`);
+    if (!user || activePeer?.id !== peerId || version !== messageVersion) return;
+    clearMessageURLs(); dmLog.replaceChildren();
+    const messages = response.messages || [];
+    if (!messages.length) dmLog.append(node('p', 'social-empty', 'Say hello. Your conversation starts here.'));
+    for (const message of messages) {
+      const mine = message.from === user.id;
+      const item = node('div', `dm-message ${mine ? 'mine' : ''}`);
+      const time = new Date(message.createdAt);
+      item.append(node('small', '', `${mine ? 'You' : activePeer.username}${Number.isNaN(time.getTime()) ? '' : ` · ${time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}`));
+      if (message.body) item.append(node('p', '', message.body));
+      if (message.audio) {
+        try {
+          const audio = document.createElement('audio'); audio.controls = true; audio.preload = 'auto'; audio.src = audioURL(message.audio, message.mime || 'audio/webm'); audio.addEventListener('canplay', () => audio.load(), { once: true });
+          audio.setAttribute('aria-label', `Voice message from ${mine ? 'you' : activePeer.username}`);
+          item.append(audio);
+        } catch { item.append(node('span', 'social-muted', 'Voice message could not be loaded.')); }
+      }
+      dmLog.append(item);
+    }
+    dmLog.scrollTop = dmLog.scrollHeight;
+  }
+
+  function supportsMicrophone() { return !!(window.isSecureContext && navigator.mediaDevices?.getUserMedia); }
+  function updateVoiceControls() {
+    const allowed = !!activePeer && canMessage(activePeer);
+    recordButton.disabled = !allowed || !supportsMicrophone() || !window.MediaRecorder;
+    receiveInput.disabled = !allowed || !window.RTCPeerConnection || !window.isSecureContext || !connected || !activePeer?.online;
+    receiveInput.checked = !!activePeer && receiving.has(activePeer.id);
+    talkButton.disabled = !allowed || !supportsMicrophone() || !window.RTCPeerConnection || !connected || !activePeer?.online || !!recording || recordingPending;
+    talkButton.classList.toggle('transmitting', holding);
+    talkButton.textContent = holding ? 'Talking… release to stop' : 'Hold to talk';
+    if (!supportsMicrophone()) voiceStatus.textContent = 'Microphone access needs HTTPS or localhost and a browser that supports audio capture.';
+    else if (!window.RTCPeerConnection) voiceStatus.textContent = 'Live voice is unavailable in this browser. You can still send voice messages.';
+    else if (!connected) voiceStatus.textContent = 'Reconnect to the world to use live voice.';
+    else if (!activePeer?.online) voiceStatus.textContent = 'Live voice needs both contacts online. You can send a recorded message now.';
+    else if (holding) voiceStatus.textContent = 'Your microphone is active. Release the button to end transmission.';
+    else if (!receiversReady.has(activePeer.id)) voiceStatus.textContent = 'Hold to talk. Your contact will be prompted to allow live voice.';
+    else voiceStatus.textContent = 'Hold to transmit. Your microphone stops when you release. Remote networks may require a TURN relay.';
+  }
+  async function startRecording() {
+    if (!activePeer || !canMessage(activePeer) || recording || recordingPending) return;
+    if (!supportsMicrophone() || !window.MediaRecorder) throw new Error('Voice recording requires HTTPS or localhost and a supported browser.');
+    stopTalking(); recordingPending = true; recordingCancelled = false;
+    const peerId = activePeer.id;
+    const accountId = user.id;
+    recordButton.textContent = 'Waiting for microphone…'; recordCancel.hidden = false; updateVoiceControls();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (recordingCancelled || activePeer?.id !== peerId || user?.id !== accountId) { stream.getTracks().forEach(track => track.stop()); return; }
+      recordingStream = stream;
+      const mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'].find(value => MediaRecorder.isTypeSupported(value));
+      const recorder = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 48000 });
+      recording = recorder;
+      const chunks = [];
+      const started = Date.now();
+      recorder.addEventListener('dataavailable', event => { if (event.data.size) chunks.push(event.data); });
+      recorder.addEventListener('error', () => { cancelRecording(); report(new Error('Recording failed. Please try again.'), dmError); });
+      recorder.addEventListener('stop', async () => {
+        const cancelled = recordingCancelled;
+        const duration = Math.min(30, (Date.now() - started) / 1000);
+        stream.getTracks().forEach(track => track.stop());
+        clearInterval(recordingTick); clearTimeout(recordingTimer);
+        recording = null; recordingStream = null; recordingPending = false;
+        recordButton.textContent = 'Record voice message'; recordCancel.hidden = true; updateVoiceControls();
+        if (cancelled || user?.id !== accountId || duration < 0.25 || activePeer?.id !== peerId) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        if (blob.size > 500000) { report(new Error('This recording is too large. Try a shorter voice message.'), dmError); return; }
+        await run(async () => {
+          const audio = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(blob); });
+          if (user?.id !== accountId || activePeer?.id !== peerId) return;
+          await api(`/api/messages/${encodeURIComponent(peerId)}`, { audio, mime: blob.type, duration });
+          await loadMessages();
+        }, dmError);
+      }, { once: true });
+      recorder.start(250);
+      recordingTick = setInterval(() => { recordButton.textContent = `Stop & send · ${Math.min(30, Math.floor((Date.now() - started) / 1000))}/30s`; }, 250);
+      recordingTimer = setTimeout(finishRecording, 30000);
+      recordButton.textContent = 'Stop & send · 0/30s';
+    } catch (error) {
+      recordingStream?.getTracks().forEach(track => track.stop()); recordingStream = null;
+      throw new Error(error.name === 'NotAllowedError' ? 'Microphone permission was denied. Allow microphone access in your browser to record.' : 'Could not open the microphone. Check your microphone and browser permissions.');
+    } finally {
+      recordingPending = false;
+      if (!recording) { recordButton.textContent = 'Record voice message'; recordCancel.hidden = true; }
+      updateVoiceControls();
+    }
+  }
+  function finishRecording() { if (recordingPending) { cancelRecording(); return; } if (recording?.state === 'recording') recording.stop(); }
+  function cancelRecording() {
+    recordingCancelled = true;
+    clearInterval(recordingTick); clearTimeout(recordingTimer);
+    if (recording?.state === 'recording') recording.stop();
+    recordingStream?.getTracks().forEach(track => track.stop());
+    if (!recording) { recordButton.textContent = 'Record voice message'; recordCancel.hidden = true; }
+  }
+  async function sendSignal(peerId, data) { if (!user || !connected) return; return api(`/api/voice/signal/${encodeURIComponent(peerId)}`, { data }); }
+  function closePeer(peerId, callId) {
+    const connection = peers.get(peerId);
+    if (!connection || (callId && connection.callId !== callId)) return;
+    peers.delete(peerId);
+    connection.pc.close();
+    connection.audio.pause();
+    connection.audio.srcObject?.getTracks().forEach(track => track.stop());
+    connection.audio.srcObject = null;
+    connection.audio.remove();
+    earlyCandidates.delete(`${peerId}:${connection.callId}`);
+  }
+  function makePeer(peerId, callId) {
+    closePeer(peerId);
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const audio = document.createElement('audio'); audio.autoplay = true; audio.controls = true;
+    audio.setAttribute('aria-label', 'Incoming walkie-talkie audio');
+    const connection = { pc, audio, callId };
+    peers.set(peerId, connection);
+    pc.onicecandidate = event => { if (event.candidate) run(() => sendSignal(peerId, { type: 'candidate', callId, candidate: event.candidate.toJSON() })); };
+    pc.ontrack = event => {
+      if (!receiving.has(peerId)) { closePeer(peerId, callId); return; }
+      audio.srcObject = event.streams[0] || new MediaStream([event.track]);
+      audioMount.append(audio);
+      audio.play().catch(() => toast('Press play in the conversation to hear incoming live voice.'));
+      const contact = people.find(person => person.id === peerId);
+      toast(`${contact?.username || 'Your contact'} is speaking`);
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed') { closePeer(peerId, callId); if (talkPeer === peerId) stopTalking(); toast('Live voice could not connect. Try a voice message; remote networks may need a TURN relay.'); }
+    };
+    return connection;
+  }
+  async function flushCandidates(peerId, connection) {
+    const key = `${peerId}:${connection.callId}`;
+    const candidates = earlyCandidates.get(key) || [];
+    earlyCandidates.delete(key);
+    for (const candidate of candidates) if (connection.pc.signalingState !== 'closed') await connection.pc.addIceCandidate(candidate);
+  }
+  async function startTalking() {
+    if (holding || talkButton.disabled || !activePeer) return;
+    const peerId = activePeer.id;
+    const version = ++holdVersion;
+    holding = true; talkPeer = peerId; updateVoiceControls();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (!holding || version !== holdVersion || activePeer?.id !== peerId || !connected) { stream.getTracks().forEach(track => track.stop()); return; }
+      talkStream = stream;
+      const callId = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      const connection = makePeer(peerId, callId);
+      for (const track of stream.getAudioTracks()) connection.pc.addTrack(track, stream);
+      const offer = await connection.pc.createOffer();
+      if (!holding || version !== holdVersion) return;
+      await connection.pc.setLocalDescription(offer);
+      await sendSignal(peerId, { type: 'offer', callId, sdp: offer.sdp });
+    } catch (error) {
+      stopTalking();
+      throw new Error(error.name === 'NotAllowedError' ? 'Microphone permission was denied. Allow access to use push-to-talk.' : 'Could not start live voice. Please try again.');
+    }
+  }
+  function stopTalking() {
+    if (!holding && !talkStream && !talkPeer) return;
+    holding = false; holdVersion++;
+    talkStream?.getTracks().forEach(track => track.stop()); talkStream = null;
+    const peerId = talkPeer; talkPeer = null;
+    const callId = peers.get(peerId)?.callId;
+    if (peerId) { closePeer(peerId, callId); if (callId) run(() => sendSignal(peerId, { type: 'end', callId })); }
+    updateVoiceControls();
+  }
+  async function handleSignal({ from, data }) {
+    if (!user || !from || !data) return;
+    if (data.type === 'request') { await sendSignal(from, { type: receiving.has(from) ? 'opt-in' : 'disabled', enabled: receiving.has(from) }); return; }
+    if (data.type === 'opt-in') { receiversReady.add(from); updateVoiceControls(); return; }
+    if (data.type === 'disabled') { receiversReady.delete(from); if (talkPeer === from) stopTalking(); closePeer(from); updateVoiceControls(); return; }
+    if (data.type === 'end') { closePeer(from, data.callId); return; }
+    if (!data.callId) return;
+    if (data.type === 'offer') {
+      if (!receiving.has(from) || !window.RTCPeerConnection || !canMessage(people.find(person => person.id === from))) { await sendSignal(from, { type: 'disabled' }); return; }
+      if (talkPeer === from) stopTalking();
+      const connection = makePeer(from, data.callId);
+      await connection.pc.setRemoteDescription({ type: 'offer', sdp: data.sdp });
+      await flushCandidates(from, connection);
+      const answer = await connection.pc.createAnswer();
+      await connection.pc.setLocalDescription(answer);
+      await sendSignal(from, { type: 'answer', callId: data.callId, sdp: answer.sdp });
+    } else if (data.type === 'answer') {
+      const connection = peers.get(from);
+      if (!connection || connection.callId !== data.callId || connection.pc.signalingState !== 'have-local-offer') return;
+      await connection.pc.setRemoteDescription({ type: 'answer', sdp: data.sdp });
+      await flushCandidates(from, connection);
+    } else if (data.type === 'candidate' && data.candidate) {
+      const connection = peers.get(from);
+      if (connection?.callId === data.callId && connection.pc.remoteDescription) await connection.pc.addIceCandidate(data.candidate);
+      else if (receiving.has(from) || talkPeer === from) {
+        const key = `${from}:${data.callId}`;
+        const pending = earlyCandidates.get(key) || [];
+        if (pending.length < 50 && earlyCandidates.size < 30) { pending.push(data.candidate); earlyCandidates.set(key, pending); }
+      }
+    }
+  }
+  function cleanupVoice() {
+    cancelRecording(); stopTalking();
+    for (const peerId of [...peers.keys()]) closePeer(peerId);
+    earlyCandidates.clear(); receiving.clear(); receiversReady.clear();
+    audioMount.replaceChildren(); updateVoiceControls();
+  }
+  function startEvents() {
+    source?.close();
+    source = new EventSource('/api/events');
+    const events = source;
+    const listen = (name, action) => events.addEventListener(name, event => {
+      if (source !== events || !user) return;
+      const version = sessionVersion;
+      try { const value = JSON.parse(event.data); Promise.resolve(action(value)).catch(error => { if (source === events && version === sessionVersion) report(error); }); }
+      catch { /* Ignore malformed event payloads without breaking the stream. */ }
+    });
+    events.onopen = () => { if (source !== events || !user) return; setConnection(true); run(refreshPeople, peopleError); };
+    events.onerror = () => {
+      if (source !== events || !user) return;
+      if (connected) { setConnection(false); cleanupVoice(); onDisconnect(); onPlayers([]); run(refreshUser); }
+    };
+    listen('world', value => {
+      const players = value.players || [];
+      setConnection(true, players.length);
+      const online = new Set(players.map(player => player.id));
+      let changed = false;
+      people.forEach(person => { const isOnline = online.has(person.id); if (person.online !== isOnline) changed = true; person.online = isOnline; });
+      if (changed) renderPeople();
+      onPlayers(players);
+    });
+    listen('social', async () => { await refreshPeople(); await refreshUser(); if (!profileModal.hidden && profileId && profileId !== user?.id) await openProfile(profileId, true); });
+    listen('message', async value => {
+      if (activePeer?.id === value.peerId && dmPanel.classList.contains('open')) await loadMessages();
+      else { chatToggle?.classList.add('unread'); toast(`New message${people.find(person => person.id === value.peerId)?.username ? ` from ${people.find(person => person.id === value.peerId).username}` : ''}`); }
+    });
+    listen('profile', value => { if (value.user?.id === user?.id) setUser(value.user); run(refreshPeople, peopleError); });
+    listen('signal', handleSignal);
+  }
+  async function beginSession(next) {
+    if (!next) { renderAuth(); return; }
+    sessionVersion++;
+    cleanupVoice(); clearMessageURLs();
+    source?.close(); source = null;
+    peopleVersion++; messageVersion++; profileVersion++;
+    people = []; peopleSignature = ''; activePeer = null; profileId = null;
+    closePanels(); closeProfile();
+    dmInput.value = ''; dmLog.replaceChildren();
+    setUser(next);
+    authModal.hidden = true;
+    profileChip?.focus();
+    setConnection(false);
+    startEvents();
+    await run(refreshPeople, peopleError);
+  }
+  function endSession(message = '') {
+    sessionVersion++;
+    source?.close(); source = null;
+    cleanupVoice(); clearMessageURLs();
+    peopleVersion++; messageVersion++; profileVersion++;
+    people = []; peopleSignature = ''; activePeer = null; profileId = null;
+    closePanels(); closeProfile();
+    setUser(null); setConnection(false); onPlayers([]); onDisconnect();
+    dmInput.value = ''; dmLog.replaceChildren();
+    renderPeople(); renderAuth('login', message);
+  }
+  profileChip?.addEventListener('click', () => openProfile());
+  peopleToggle?.addEventListener('click', () => peoplePanel.classList.contains('open') ? closePanels() : openPeople());
+  chatToggle?.addEventListener('click', () => chatPanel.classList.contains('open') || dmPanel.classList.contains('open') ? closePanels() : openChat());
+  window.addEventListener('blur', () => { stopTalking(); cancelRecording(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { stopTalking(); cancelRecording(); } });
+  window.addEventListener('pagehide', () => { cleanupVoice(); clearMessageURLs(); source?.close(); });
+  setConnection(false);
+  const initialVersion = sessionVersion;
+  run(async () => {
+    const result = await api('/api/session');
+    if (initialVersion !== sessionVersion) return;
+    if (result.user) await beginSession(result.user);
+    else renderAuth();
+  }, authError).then(() => { if (!user && authModal.hidden) renderAuth('login', authError.textContent); });
+
+  return {
+    closePanels,
+    get user() { return user; },
+    get connected() { return connected; },
+    refreshUser,
+    openProfile,
+    openPeople,
+    openChat,
+    onState(listener) { listeners.add(listener); listener({ user, connected }); return () => listeners.delete(listener); },
+  };
+}
