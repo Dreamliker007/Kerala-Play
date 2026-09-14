@@ -78,15 +78,22 @@
     #dm-input { min-width:0; flex:1; border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:8px; color:#fff; background:#163139; font:inherit; }
     #toast { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:50%; transform:translateX(-50%); max-width:260px; padding:8px 11px; border-radius:10px; color:#fff; background:rgba(21,105,69,.93); box-shadow:0 4px 17px rgba(0,0,0,.24); text-align:center; font-size:11px; font-weight:800; pointer-events:none; }
     #asset-notice { display:none; position:absolute; left:50%; top:calc(env(safe-area-inset-top) + 14px); transform:translateX(-50%); max-width:310px; padding:8px 10px; border-radius:9px; color:#fff7d7; background:rgba(93,60,10,.85); font-size:11px; text-align:center; }
-    #profile-modal { display:none; position:fixed; inset:0; z-index:20; align-items:center; justify-content:center; padding:20px; background:rgba(3,15,18,.72); color:#fff; }
-    #profile-modal.open { display:flex; }
+    #profile-modal, #auth-modal { display:none; position:fixed; inset:0; z-index:20; align-items:center; justify-content:center; padding:20px; background:rgba(3,15,18,.82); color:#fff; touch-action:pan-y; }
+    #auth-modal { z-index:30; }
+    #profile-modal.open, #auth-modal.open { display:flex; }
     .profile-card { width:min(360px, 100%); padding:22px; border:1px solid rgba(255,255,255,.25); border-radius:18px; background:linear-gradient(145deg, #143e43, #0c2229); box-shadow:0 12px 36px rgba(0,0,0,.38); }
     .profile-card h1 { margin:0 0 7px; font-size:23px; }
     .profile-card p { margin:0 0 15px; color:#bcdad1; font-size:13px; line-height:1.4; }
     .profile-card label { display:block; margin:11px 0 5px; color:#d7f0e4; font-size:12px; font-weight:700; }
     .profile-card input, .profile-card select { width:100%; padding:11px; border:1px solid rgba(255,255,255,.24); border-radius:9px; color:#fff; background:#18363d; font:inherit; }
-    #profile-submit { width:100%; margin-top:17px; border:0; border-radius:10px; padding:12px; color:#062019; background:#50c980; font-weight:900; font-size:14px; cursor:pointer; }
-    #profile-error { min-height:17px; margin-top:8px; color:#ffd996; font-size:11px; }
+    #profile-submit, #auth-submit { width:100%; margin-top:17px; border:0; border-radius:10px; padding:12px; color:#062019; background:#50c980; font-weight:900; font-size:14px; cursor:pointer; }
+    #profile-submit:disabled, #auth-submit:disabled { cursor:wait; opacity:.65; }
+    #profile-error, #auth-error { min-height:17px; margin-top:8px; color:#ffd996; font-size:11px; line-height:1.35; }
+    .auth-switch { display:flex; justify-content:center; margin-top:5px; }
+    .auth-switch button, #profile-logout { border:0; padding:7px; color:#bde7d0; background:transparent; font:inherit; font-size:12px; font-weight:800; cursor:pointer; }
+    .profile-account { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:14px; padding-top:11px; border-top:1px solid rgba(255,255,255,.13); }
+    #profile-email { min-width:0; overflow:hidden; color:#9ec8b6; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+    #profile-logout { flex:0 0 auto; color:#ffd996; }
     @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #progress-chip { top:calc(env(safe-area-inset-top) + 105px); left:16px; max-width:165px; } #mission-card { top:calc(env(safe-area-inset-top) + 144px); width:166px; } #online-chip { top:calc(env(safe-area-inset-top) + 242px); right:14px; max-width:118px; } #hint { display:none; } #minimap, #chat-panel, #people-panel, #task-panel, #dm-panel { width:min(284px, calc(100vw - 88px)); max-height:min(56dvh, 350px); } #kerala-map { height:220px; } }
     @media (min-width: 740px) { #joystick-zone { width: 330px; height: 330px; } #joystick-base { left: 44px; bottom: 38px; } #run { right: 44px; bottom: 46px; } }
   </style>
@@ -129,10 +136,17 @@
     <div id="toast" role="status" aria-live="polite"></div>
   </div>
   <div id="fallback">Kerala Play could not start. Please open this page while connected to the internet, then reload.</div>
-  <section id="profile-modal" aria-label="Create Kerala profile"><form class="profile-card" id="profile-form"><h1>🌴 Kerala Play</h1><p>Choose a Kerala district and your avatar style. You can edit this later from your profile chip.</p><label for="profile-input">Display name</label><input id="profile-input" maxlength="18" autocomplete="nickname" placeholder="Your name"><label for="district-input">District</label><select id="district-input"><option value="">Select your district</option><option>Alappuzha</option><option>Ernakulam</option><option>Idukki</option><option>Kannur</option><option>Kasaragod</option><option>Kollam</option><option>Kottayam</option><option>Kozhikode</option><option>Malappuram</option><option>Palakkad</option><option>Pathanamthitta</option><option>Thiruvananthapuram</option><option>Thrissur</option><option>Wayanad</option></select><label for="gender-input">Avatar</label><select id="gender-input"><option value="male">Male — shirt &amp; jeans</option><option value="female">Female — kurta &amp; leggings</option></select><button id="profile-submit" type="submit">Start Exploring</button><div id="profile-error" aria-live="polite"></div></form></section>
+  <section id="auth-modal" class="open" aria-label="Kerala Play account"><form class="profile-card" id="auth-form"><h1>🌴 Kerala Play</h1><p id="auth-copy">Log in to keep your Kerala profile on every device.</p><label for="auth-email">Email</label><input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com" required><label for="auth-password">Password</label><input id="auth-password" type="password" minlength="6" autocomplete="current-password" placeholder="Minimum 6 characters" required><button id="auth-submit" type="submit">Log in</button><div id="auth-error" aria-live="polite"></div><div class="auth-switch"><button id="auth-toggle" type="button">Create a new account</button></div></form></section>
+  <section id="profile-modal" aria-label="Create Kerala profile"><form class="profile-card" id="profile-form"><h1>🌴 Your Kerala Profile</h1><p>Choose a display name, Kerala district, and avatar. This profile is saved securely to your account.</p><label for="profile-input">Display name</label><input id="profile-input" maxlength="18" autocomplete="nickname" placeholder="Your name"><label for="district-input">District</label><select id="district-input"><option value="">Select your district</option><option>Alappuzha</option><option>Ernakulam</option><option>Idukki</option><option>Kannur</option><option>Kasaragod</option><option>Kollam</option><option>Kottayam</option><option>Kozhikode</option><option>Malappuram</option><option>Palakkad</option><option>Pathanamthitta</option><option>Thiruvananthapuram</option><option>Thrissur</option><option>Wayanad</option></select><label for="gender-input">Avatar</label><select id="gender-input"><option value="male">Male — shirt &amp; jeans</option><option value="female">Female — kurta &amp; leggings</option></select><button id="profile-submit" type="submit">Save profile</button><div id="profile-error" aria-live="polite"></div><div class="profile-account"><span id="profile-email"></span><button id="profile-logout" type="button">Log out</button></div></form></section>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.160.1/build/three.module.js';
+
+    const sb = window.supabase && window.SUPABASE_URL && window.SUPABASE_PUBLISHABLE_KEY
+      ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_PUBLISHABLE_KEY)
+      : null;
 
     const fallback = document.querySelector('#fallback');
     const joystickZone = document.querySelector('#joystick-zone');
@@ -140,6 +154,14 @@
     const joystickKnob = document.querySelector('#joystick-knob');
     const cameraZone = document.querySelector('#camera-zone');
     const runButton = document.querySelector('#run');
+    const authModal = document.querySelector('#auth-modal');
+    const authForm = document.querySelector('#auth-form');
+    const authEmail = document.querySelector('#auth-email');
+    const authPassword = document.querySelector('#auth-password');
+    const authSubmit = document.querySelector('#auth-submit');
+    const authToggle = document.querySelector('#auth-toggle');
+    const authCopy = document.querySelector('#auth-copy');
+    const authError = document.querySelector('#auth-error');
     const profileModal = document.querySelector('#profile-modal');
     const profileForm = document.querySelector('#profile-form');
     const profileInput = document.querySelector('#profile-input');
@@ -149,6 +171,9 @@
     const profileName = document.querySelector('#profile-name');
     const profileDistrict = document.querySelector('#profile-district');
     const profileChip = document.querySelector('#profile-chip');
+    const profileSubmit = document.querySelector('#profile-submit');
+    const profileEmail = document.querySelector('#profile-email');
+    const profileLogout = document.querySelector('#profile-logout');
     const progressChip = document.querySelector('#progress-chip');
     const onlineCount = document.querySelector('#online-count');
     const mapLayer = document.querySelector('#landmark-layer');
@@ -202,7 +227,9 @@
     let mapLabelsVisible = false;
     let activeDmContact = null;
     const storagePrefix = 'kerala-play-v46';
-    let profile = readProfile();
+    let authMode = 'login';
+    let authUser = null;
+    let profile = null;
     let progress = readProgress();
     const districtStarts = {
       Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
@@ -240,13 +267,15 @@
       try { return crypto.randomUUID(); } catch { return `player-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`; }
     }
 
-    function readProfile() {
+    function readLocalProfile(userId) {
       try {
-        const saved = JSON.parse(localStorage.getItem(`${storagePrefix}:profile`) || 'null');
+        const accountProfile = localStorage.getItem(`${storagePrefix}:profile:${userId}`);
+        const legacyProfile = localStorage.getItem(`${storagePrefix}:profile`);
+        const saved = JSON.parse(accountProfile || legacyProfile || 'null');
         if (!saved || typeof saved.name !== 'string' || typeof saved.district !== 'string') return null;
         return {
-          version: 1,
-          id: typeof saved.id === 'string' ? saved.id : createLocalId(),
+          version: 2,
+          id: userId,
           name: saved.name,
           district: saved.district,
           gender: saved.gender === 'female' ? 'female' : 'male',
@@ -256,6 +285,11 @@
       } catch {
         return null;
       }
+    }
+
+    function saveLocalProfile(nextProfile) {
+      if (!authUser || !nextProfile) return;
+      try { localStorage.setItem(`${storagePrefix}:profile:${authUser.id}`, JSON.stringify(nextProfile)); } catch { /* The Supabase profile remains authoritative. */ }
     }
 
     function newProgress() {
@@ -374,17 +408,9 @@
       finishTask('visit-landmark');
     }
 
-    function writeProfile(nextProfile, { relocate = false } = {}) {
-      profile = {
-        version: 1,
-        id: nextProfile.id || profile?.id || createLocalId(),
-        name: nextProfile.name,
-        district: nextProfile.district,
-        gender: nextProfile.gender === 'female' ? 'female' : 'male',
-        createdAt: profile?.createdAt || nextProfile.createdAt || Date.now(),
-        updatedAt: Date.now()
-      };
-      try { localStorage.setItem(`${storagePrefix}:profile`, JSON.stringify(profile)); } catch { /* Private mode can still use this session. */ }
+    function applyProfile(nextProfile, { relocate = false } = {}) {
+      profile = nextProfile;
+      saveLocalProfile(profile);
       updateProfileHud();
       updateChatChannels();
       renderPeople();
@@ -394,18 +420,129 @@
       }
     }
 
+    function profileFromRecord(record) {
+      return {
+        version: 2,
+        id: record.id,
+        name: record.display_name,
+        district: record.district,
+        gender: record.gender === 'female' ? 'female' : 'male',
+        createdAt: Date.parse(record.created_at) || Date.now(),
+        updatedAt: Date.parse(record.updated_at) || Date.now()
+      };
+    }
+
+    async function loadPersistentProfile(user) {
+      const localProfile = readLocalProfile(user.id);
+      const { data, error } = await sb.from('profiles').select('id, display_name, district, gender, created_at, updated_at').eq('id', user.id).maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        profile = localProfile;
+        updateProfileHud();
+        return false;
+      }
+      applyProfile(profileFromRecord(data), { relocate: true });
+      return true;
+    }
+
+    async function savePersistentProfile(nextProfile, { relocate = false } = {}) {
+      if (!sb || !authUser) throw new Error('Please log in before saving your profile.');
+      const payload = {
+        id: authUser.id,
+        display_name: nextProfile.name,
+        district: nextProfile.district,
+        gender: nextProfile.gender === 'female' ? 'female' : 'male'
+      };
+      const { data, error } = await sb.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, display_name, district, gender, created_at, updated_at').single();
+      if (error) throw error;
+      applyProfile(profileFromRecord(data), { relocate });
+    }
+
     function updateProfileHud() {
       profileName.textContent = profile?.name || 'Explorer';
       profileDistrict.textContent = profile?.district ? `${profile.district} · ${profile.gender === 'female' ? 'Female' : 'Male'} avatar` : 'Choose your district';
     }
 
     function openProfile() {
+      if (!authUser) { openAuth(); return; }
       profileInput.value = profile?.name || '';
       districtInput.value = profile?.district || '';
       genderInput.value = profile?.gender || 'male';
+      profileEmail.textContent = authUser.email || 'Signed in';
       profileError.textContent = '';
       profileModal.classList.add('open');
       setTimeout(() => profileInput.focus(), 0);
+    }
+
+    function setAuthMode(nextMode) {
+      authMode = nextMode === 'signup' ? 'signup' : 'login';
+      const signingUp = authMode === 'signup';
+      authCopy.textContent = signingUp ? 'Create an account to save your Kerala profile.' : 'Log in to keep your Kerala profile on every device.';
+      authSubmit.textContent = signingUp ? 'Create account' : 'Log in';
+      authToggle.textContent = signingUp ? 'Already have an account? Log in' : 'Create a new account';
+      authPassword.autocomplete = signingUp ? 'new-password' : 'current-password';
+      authError.textContent = '';
+    }
+
+    function openAuth(message = '') {
+      profileModal.classList.remove('open');
+      authError.textContent = message;
+      authModal.classList.add('open');
+      setTimeout(() => authEmail.focus(), 0);
+    }
+
+    let authSequence = 0;
+    async function enterAccount(user) {
+      const sequence = ++authSequence;
+      authUser = user;
+      profileEmail.textContent = user.email || 'Signed in';
+      try {
+        const hasProfile = await loadPersistentProfile(user);
+        if (sequence !== authSequence) return;
+        authModal.classList.remove('open');
+        if (hasProfile) profileModal.classList.remove('open');
+        else openProfile();
+      } catch (error) {
+        if (sequence !== authSequence) return;
+        console.error(error);
+        authModal.classList.remove('open');
+        openProfile();
+        profileError.textContent = 'Profile storage is not ready. Run the updated schema.sql in Supabase, then try again.';
+      }
+    }
+
+    function leaveAccount(message = '') {
+      authSequence += 1;
+      authUser = null;
+      profile = null;
+      updateProfileHud();
+      updateChatChannels();
+      renderPeople();
+      setAuthMode('login');
+      openAuth(message);
+    }
+
+    async function bootstrapAuth() {
+      if (!sb) {
+        openAuth('Supabase configuration could not be loaded.');
+        authSubmit.disabled = true;
+        authToggle.disabled = true;
+        return;
+      }
+      const { data, error } = await sb.auth.getSession();
+      if (error) {
+        openAuth(error.message);
+      } else if (data.session?.user) {
+        await enterAccount(data.session.user);
+      } else {
+        leaveAccount();
+      }
+      sb.auth.onAuthStateChange((_event, session) => {
+        setTimeout(() => {
+          if (session?.user) enterAccount(session.user);
+          else if (authUser) leaveAccount('You have been logged out.');
+        }, 0);
+      });
     }
 
     function placePlayerAtDistrict(district) {
@@ -671,16 +808,65 @@
       renderTasks();
       renderMapLandmarks();
       setOpenPanel();
+      authToggle.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
+      authForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!sb) return;
+        const email = authEmail.value.trim();
+        const password = authPassword.value;
+        if (!email || password.length < 6) {
+          authError.textContent = 'Enter a valid email and a password with at least 6 characters.';
+          return;
+        }
+        authSubmit.disabled = true;
+        authToggle.disabled = true;
+        authError.textContent = '';
+        try {
+          const result = authMode === 'signup'
+            ? await sb.auth.signUp({ email, password })
+            : await sb.auth.signInWithPassword({ email, password });
+          if (result.error) throw result.error;
+          if (result.data.session?.user) {
+            await enterAccount(result.data.session.user);
+          } else {
+            setAuthMode('login');
+            authEmail.value = email;
+            authError.textContent = 'Account created. Check your email to confirm it, then log in.';
+          }
+        } catch (error) {
+          authError.textContent = error.message || 'Unable to continue. Please try again.';
+        } finally {
+          authSubmit.disabled = false;
+          authToggle.disabled = false;
+        }
+      });
       profileChip.addEventListener('click', openProfile);
-      profileForm.addEventListener('submit', event => {
+      profileLogout.addEventListener('click', async () => {
+        profileLogout.disabled = true;
+        const { error } = await sb.auth.signOut();
+        profileLogout.disabled = false;
+        if (error) { profileError.textContent = error.message; return; }
+        leaveAccount('You have been logged out.');
+      });
+      profileForm.addEventListener('submit', async event => {
         event.preventDefault();
         const name = profileInput.value.trim().replace(/[<>]/g, '');
         const district = districtInput.value;
         const gender = genderInput.value === 'female' ? 'female' : 'male';
         if (name.length < 2 || !district) { profileError.textContent = 'Enter a name and select a Kerala district.'; return; }
         const relocate = !profile || profile.district !== district;
-        writeProfile({ name, district, gender, createdAt: profile?.createdAt || Date.now() }, { relocate });
-        profileModal.classList.remove('open');
+        profileSubmit.disabled = true;
+        profileError.textContent = '';
+        try {
+          await savePersistentProfile({ name, district, gender }, { relocate });
+          profileModal.classList.remove('open');
+          showToast('Profile saved to your account');
+        } catch (error) {
+          console.error(error);
+          profileError.textContent = error.message || 'Unable to save your profile. Please try again.';
+        } finally {
+          profileSubmit.disabled = false;
+        }
       });
       mapOpen.addEventListener('click', () => setOpenPanel(minimap.classList.contains('open') ? null : 'map'));
       mapClose.addEventListener('click', () => setOpenPanel());
@@ -702,7 +888,6 @@
       dmForm.addEventListener('submit', event => { event.preventDefault(); submitDirectMessage(dmInput.value); dmInput.value = ''; });
       challengePlay.addEventListener('click', playCoconutChallenge);
       document.addEventListener('keydown', event => { if (event.key === 'Escape') setOpenPanel(); });
-      if (!profile) openProfile();
     }
 
     try {
@@ -732,6 +917,7 @@
       buildPlayer(player);
       if (profile) placePlayerAtDistrict(profile.district);
       wireInterface();
+      bootstrapAuth();
       updateMapPlayer(player);
 
       const sun = new THREE.HemisphereLight(0xeaf7ff, 0x486231, 2.25);
