@@ -67,6 +67,10 @@
     .people-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
     .people-actions button, .challenge-box button { border:1px solid rgba(255,255,255,.18); border-radius:7px; padding:6px 8px; color:#fff; background:#1d5d55; font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
     .people-actions button.secondary, .challenge-box button.secondary { background:#28434d; }
+    .people-actions button.danger { background:#773d3d; }
+    .people-actions button:disabled { cursor:wait; opacity:.62; }
+    .social-section-title { margin-top:12px; padding-top:9px; border-top:1px solid rgba(255,255,255,.13); color:#f6d66b; font-size:11px; font-weight:900; }
+    .social-empty { margin-top:8px; color:#9ec8b6; font-size:10px; line-height:1.4; }
     .task-card.done { border-color:rgba(79,213,132,.62); background:rgba(33,123,80,.18); }
     .task-card progress { width:100%; height:6px; margin-top:7px; accent-color:#50ce82; }
     .challenge-box p { margin:5px 0 8px; color:#c5e5d8; font-size:11px; line-height:1.35; }
@@ -92,6 +96,10 @@
     .auth-switch { display:flex; justify-content:center; margin-top:5px; }
     .auth-switch button, #profile-logout { border:0; padding:7px; color:#bde7d0; background:transparent; font:inherit; font-size:12px; font-weight:800; cursor:pointer; }
     .profile-account { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:14px; padding-top:11px; border-top:1px solid rgba(255,255,255,.13); }
+    .profile-stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:13px; }
+    .profile-stat { padding:9px; border:1px solid rgba(255,255,255,.13); border-radius:9px; background:rgba(255,255,255,.05); text-align:center; }
+    .profile-stat strong { display:block; color:#f6d66b; font-size:16px; }
+    .profile-stat span { display:block; margin-top:2px; color:#b9d8cf; font-size:10px; }
     #profile-email { min-width:0; overflow:hidden; color:#9ec8b6; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
     #profile-logout { flex:0 0 auto; color:#ffd996; }
     @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #progress-chip { top:calc(env(safe-area-inset-top) + 105px); left:16px; max-width:165px; } #mission-card { top:calc(env(safe-area-inset-top) + 144px); width:166px; } #online-chip { top:calc(env(safe-area-inset-top) + 242px); right:14px; max-width:118px; } #hint { display:none; } #minimap, #chat-panel, #people-panel, #task-panel, #dm-panel { width:min(284px, calc(100vw - 88px)); max-height:min(56dvh, 350px); } #kerala-map { height:220px; } }
@@ -129,7 +137,7 @@
       <output id="map-status" aria-live="polite">Village · You</output>
     </aside>
     <section id="chat-panel" aria-label="Regional text chat"><div class="chat-heading"><span>Regional Chat</span><button id="chat-close" class="panel-close" type="button" aria-label="Close chat">×</button></div><select id="chat-channel" aria-label="Chat channel"></select><div id="chat-note">Saved only on this device. Connect Supabase for real regional chat.</div><div id="chat-log" aria-live="polite"></div><form id="chat-form"><input id="chat-input" maxlength="240" autocomplete="off" placeholder="Write a message"><button id="chat-send" type="submit">Send</button></form></section>
-    <section id="people-panel" aria-label="People and follows"><div class="panel-heading"><span>People</span><button id="people-close" class="panel-close" type="button" aria-label="Close people">×</button></div><p class="panel-note"><strong id="people-online-label">1 online · you</strong><br>Multiplayer joins appear here after Supabase Presence is connected. The guides below are local NPC demos.</p><div id="people-list"></div></section>
+    <section id="people-panel" aria-label="People and follows"><div class="panel-heading"><span>Kerala Players</span><button id="people-close" class="panel-close" type="button" aria-label="Close people">×</button></div><p class="panel-note"><strong id="people-online-label">Loading players…</strong><br>Follow real Kerala Play profiles. Blocking removes follows in both directions and hides that player.</p><div class="social-section-title">Players</div><div id="people-list"></div><div class="social-section-title">Blocked players</div><div id="blocked-list"></div></section>
     <section id="task-panel" aria-label="Tasks and challenges"><div class="panel-heading"><span>Tasks &amp; Challenges</span><button id="task-close" class="panel-close" type="button" aria-label="Close tasks">×</button></div><p class="panel-note">Complete activities to collect XP. Level requirements grow gradually.</p><div id="task-list"></div><div class="challenge-box"><strong>🥥 Coconut Pick</strong><p>Try a quick village challenge. A ripe pick earns a bonus.</p><button id="challenge-play" type="button">Pick a coconut</button><output id="challenge-result" aria-live="polite"></output></div></section>
     <section id="dm-panel" aria-label="Direct message"><div class="panel-heading"><span id="dm-title">Direct message</span><button id="dm-close" class="panel-close" type="button" aria-label="Close direct message">×</button></div><p id="dm-note" class="panel-note">Saved only on this device; delivery starts when multiplayer is connected.</p><div id="dm-log" aria-live="polite"></div><form id="dm-form"><input id="dm-input" maxlength="240" autocomplete="off" placeholder="Write a direct message"><button class="action-button" type="submit">Send</button></form></section>
     <div id="asset-notice" role="status"></div>
@@ -137,7 +145,7 @@
   </div>
   <div id="fallback">Kerala Play could not start. Please open this page while connected to the internet, then reload.</div>
   <section id="auth-modal" class="open" aria-label="Kerala Play account"><form class="profile-card" id="auth-form"><h1>🌴 Kerala Play</h1><p id="auth-copy">Log in to keep your Kerala profile on every device.</p><label for="auth-email">Email</label><input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com" required><label for="auth-password">Password</label><input id="auth-password" type="password" minlength="6" autocomplete="current-password" placeholder="Minimum 6 characters" required><button id="auth-submit" type="submit">Log in</button><div id="auth-error" aria-live="polite"></div><div class="auth-switch"><button id="auth-toggle" type="button">Create a new account</button></div></form></section>
-  <section id="profile-modal" aria-label="Create Kerala profile"><form class="profile-card" id="profile-form"><h1>🌴 Your Kerala Profile</h1><p>Choose a display name, Kerala district, and avatar. This profile is saved securely to your account.</p><label for="profile-input">Display name</label><input id="profile-input" maxlength="18" autocomplete="nickname" placeholder="Your name"><label for="district-input">District</label><select id="district-input"><option value="">Select your district</option><option>Alappuzha</option><option>Ernakulam</option><option>Idukki</option><option>Kannur</option><option>Kasaragod</option><option>Kollam</option><option>Kottayam</option><option>Kozhikode</option><option>Malappuram</option><option>Palakkad</option><option>Pathanamthitta</option><option>Thiruvananthapuram</option><option>Thrissur</option><option>Wayanad</option></select><label for="gender-input">Avatar</label><select id="gender-input"><option value="male">Male — shirt &amp; jeans</option><option value="female">Female — kurta &amp; leggings</option></select><button id="profile-submit" type="submit">Save profile</button><div id="profile-error" aria-live="polite"></div><div class="profile-account"><span id="profile-email"></span><button id="profile-logout" type="button">Log out</button></div></form></section>
+  <section id="profile-modal" aria-label="Create Kerala profile"><form class="profile-card" id="profile-form"><h1>🌴 Your Kerala Profile</h1><p>Choose a display name, Kerala district, and avatar. This profile is saved securely to your account.</p><label for="profile-input">Display name</label><input id="profile-input" maxlength="18" autocomplete="nickname" placeholder="Your name"><label for="district-input">District</label><select id="district-input"><option value="">Select your district</option><option>Alappuzha</option><option>Ernakulam</option><option>Idukki</option><option>Kannur</option><option>Kasaragod</option><option>Kollam</option><option>Malappuram</option><option>Palakkad</option><option>Pathanamthitta</option><option>Thiruvananthapuram</option><option>Thrissur</option><option>Wayanad</option></select><label for="gender-input">Avatar</label><select id="gender-input"><option value="male">Male — shirt &amp; jeans</option><option value="female">Female — kurta &amp; leggings</option></select><div class="profile-stats"><div class="profile-stat"><strong id="profile-followers">0</strong><span>Followers</span></div><div class="profile-stat"><strong id="profile-following">0</strong><span>Following</span></div></div><button id="profile-submit" type="submit">Save profile</button><div id="profile-error" aria-live="polite"></div><div class="profile-account"><span id="profile-email"></span><button id="profile-logout" type="button">Log out</button></div></form></section>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
@@ -174,6 +182,8 @@
     const profileSubmit = document.querySelector('#profile-submit');
     const profileEmail = document.querySelector('#profile-email');
     const profileLogout = document.querySelector('#profile-logout');
+    const profileFollowers = document.querySelector('#profile-followers');
+    const profileFollowing = document.querySelector('#profile-following');
     const progressChip = document.querySelector('#progress-chip');
     const onlineCount = document.querySelector('#online-count');
     const mapLayer = document.querySelector('#landmark-layer');
@@ -198,6 +208,7 @@
     const peoplePanel = document.querySelector('#people-panel');
     const peopleClose = document.querySelector('#people-close');
     const peopleList = document.querySelector('#people-list');
+    const blockedList = document.querySelector('#blocked-list');
     const peopleOnlineLabel = document.querySelector('#people-online-label');
     const taskToggle = document.querySelector('#task-toggle');
     const taskPanel = document.querySelector('#task-panel');
@@ -230,6 +241,10 @@
     let authMode = 'login';
     let authUser = null;
     let profile = null;
+    let playerProfiles = [];
+    let followRows = [];
+    let blockedIds = [];
+    let socialLoading = false;
     let progress = readProgress();
     const districtStarts = {
       Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
@@ -242,15 +257,11 @@
       { id: 'kuttanad', name: 'Kuttanad Fields', icon: 'K', x: 7, z: -23, district: 'Kottayam' },
       { id: 'temple', name: 'Padmanabhaswamy Temple', icon: 'T', x: 13, z: -57, district: 'Thiruvananthapuram' }
     ];
-    const localGuides = [
-      { id: 'guide-anu', name: 'Anu', role: 'Village guide · NPC demo', district: 'Kottayam', gender: 'female' },
-      { id: 'guide-vivek', name: 'Vivek', role: 'Roadside guide · NPC demo', district: 'Ernakulam', gender: 'male' }
-    ];
     const taskCatalog = [
       { id: 'open-map', title: 'Open the Kerala map', target: 1, reward: 10 },
       { id: 'walk-50', title: 'Walk 50 metres', target: 50, reward: 25 },
       { id: 'visit-landmark', title: 'Visit one landmark', target: 1, reward: 50 },
-      { id: 'follow-guide', title: 'Follow a village guide', target: 1, reward: 35 },
+      { id: 'follow-guide', title: 'Follow another Kerala player', target: 1, reward: 35 },
       { id: 'coconut-challenge', title: 'Win a Coconut Pick challenge', target: 1, reward: 20 }
     ];
 
@@ -456,11 +467,22 @@
       const { data, error } = await sb.from('profiles').upsert(payload, { onConflict: 'id' }).select('id, display_name, district, gender, created_at, updated_at').single();
       if (error) throw error;
       applyProfile(profileFromRecord(data), { relocate });
+      await loadSocialData();
     }
 
     function updateProfileHud() {
       profileName.textContent = profile?.name || 'Explorer';
       profileDistrict.textContent = profile?.district ? `${profile.district} · ${profile.gender === 'female' ? 'Female' : 'Male'} avatar` : 'Choose your district';
+    }
+
+    function updateProfileStats() {
+      if (!authUser) {
+        profileFollowers.textContent = '0';
+        profileFollowing.textContent = '0';
+        return;
+      }
+      profileFollowers.textContent = String(followRows.filter(row => row.following_id === authUser.id).length);
+      profileFollowing.textContent = String(followRows.filter(row => row.follower_id === authUser.id).length);
     }
 
     function openProfile() {
@@ -469,6 +491,7 @@
       districtInput.value = profile?.district || '';
       genderInput.value = profile?.gender || 'male';
       profileEmail.textContent = authUser.email || 'Signed in';
+      updateProfileStats();
       profileError.textContent = '';
       profileModal.classList.add('open');
       setTimeout(() => profileInput.focus(), 0);
@@ -500,7 +523,10 @@
         const hasProfile = await loadPersistentProfile(user);
         if (sequence !== authSequence) return;
         authModal.classList.remove('open');
-        if (hasProfile) profileModal.classList.remove('open');
+        if (hasProfile) {
+          profileModal.classList.remove('open');
+          await loadSocialData();
+        }
         else openProfile();
       } catch (error) {
         if (sequence !== authSequence) return;
@@ -515,7 +541,12 @@
       authSequence += 1;
       authUser = null;
       profile = null;
+      playerProfiles = [];
+      followRows = [];
+      blockedIds = [];
+      socialLoading = false;
       updateProfileHud();
+      updateProfileStats();
       updateChatChannels();
       renderPeople();
       setAuthMode('login');
@@ -674,49 +705,142 @@
       renderChat();
     }
 
-    function renderPeople() {
-      peopleList.replaceChildren();
-      localGuides.forEach(guide => {
-        const following = progress.followingIds.includes(guide.id);
-        const entry = document.createElement('div');
-        entry.className = 'people-entry';
-        const name = document.createElement('strong');
-        name.textContent = `${guide.gender === 'female' ? '♀' : '♂'} ${guide.name}`;
-        const role = document.createElement('small');
-        role.textContent = `${guide.role} · ${guide.district}`;
-        const actionNote = document.createElement('small');
-        actionNote.textContent = following ? 'Following saved locally.' : 'NPC contact — not an online player.';
-        const actions = document.createElement('div');
-        actions.className = 'people-actions';
+    function socialCount(userId, column) {
+      return followRows.filter(row => row[column] === userId).length;
+    }
+
+    function appendSocialEmpty(container, message) {
+      const empty = document.createElement('div');
+      empty.className = 'social-empty';
+      empty.textContent = message;
+      container.append(empty);
+    }
+
+    function createPlayerEntry(playerProfile, { blocked = false } = {}) {
+      const entry = document.createElement('div');
+      entry.className = 'people-entry';
+      const name = document.createElement('strong');
+      name.textContent = `${playerProfile.gender === 'female' ? '♀' : '♂'} ${playerProfile.name}`;
+      const location = document.createElement('small');
+      location.textContent = `${playerProfile.district} · ${playerProfile.gender === 'female' ? 'Female' : 'Male'} avatar`;
+      const counts = document.createElement('small');
+      counts.textContent = `${socialCount(playerProfile.id, 'following_id')} followers · ${socialCount(playerProfile.id, 'follower_id')} following`;
+      const actions = document.createElement('div');
+      actions.className = 'people-actions';
+
+      if (blocked) {
+        const unblock = document.createElement('button');
+        unblock.type = 'button';
+        unblock.textContent = 'Unblock';
+        unblock.addEventListener('click', () => unblockPlayer(playerProfile.id));
+        actions.append(unblock);
+      } else {
+        const following = followRows.some(row => row.follower_id === authUser.id && row.following_id === playerProfile.id);
         const follow = document.createElement('button');
         follow.type = 'button';
         follow.textContent = following ? 'Unfollow' : 'Follow';
-        follow.addEventListener('click', () => toggleFollow(guide.id));
+        follow.addEventListener('click', () => toggleFollow(playerProfile.id));
         const message = document.createElement('button');
         message.type = 'button';
         message.className = 'secondary';
         message.textContent = 'Message';
-        message.addEventListener('click', () => openDirectMessage(guide.id));
-        actions.append(follow, message);
-        entry.append(name, role, actionNote, actions);
-        peopleList.append(entry);
-      });
+        message.addEventListener('click', () => openDirectMessage(playerProfile.id));
+        const block = document.createElement('button');
+        block.type = 'button';
+        block.className = 'danger';
+        block.textContent = 'Block';
+        block.addEventListener('click', () => blockPlayer(playerProfile.id));
+        actions.append(follow, message, block);
+      }
+
+      entry.append(name, location, counts, actions);
+      return entry;
     }
 
-    function toggleFollow(contactId) {
-      if (!profile) { openProfile(); return; }
-      const index = progress.followingIds.indexOf(contactId);
-      if (index >= 0) {
-        progress.followingIds.splice(index, 1);
-        showToast('Guide unfollowed on this device');
-      } else {
-        progress.followingIds.push(contactId);
-        showToast('Guide followed on this device');
-        finishTask('follow-guide');
+    function renderPeople() {
+      peopleList.replaceChildren();
+      blockedList.replaceChildren();
+      if (!authUser || !profile) {
+        peopleOnlineLabel.textContent = 'Log in and save your profile first';
+        appendSocialEmpty(peopleList, 'Player profiles will appear here after login.');
+        appendSocialEmpty(blockedList, 'No blocked players.');
+        return;
       }
-      saveProgress();
+      if (socialLoading) {
+        peopleOnlineLabel.textContent = 'Loading registered players…';
+        appendSocialEmpty(peopleList, 'Loading profiles…');
+        appendSocialEmpty(blockedList, 'Loading blocked players…');
+        return;
+      }
+
+      peopleOnlineLabel.textContent = `${playerProfiles.length} registered player${playerProfiles.length === 1 ? '' : 's'}`;
+      const visiblePlayers = playerProfiles.filter(item => item.id !== authUser.id && !blockedIds.includes(item.id));
+      const blockedPlayers = playerProfiles.filter(item => blockedIds.includes(item.id));
+      if (!visiblePlayers.length) appendSocialEmpty(peopleList, 'No other visible player profiles yet.');
+      visiblePlayers.forEach(item => peopleList.append(createPlayerEntry(item)));
+      if (!blockedPlayers.length) appendSocialEmpty(blockedList, 'No blocked players.');
+      blockedPlayers.forEach(item => blockedList.append(createPlayerEntry(item, { blocked: true })));
+    }
+
+    async function loadSocialData() {
+      if (!sb || !authUser || !profile || socialLoading) return;
+      socialLoading = true;
       renderPeople();
-      renderTasks();
+      try {
+        const [profilesResult, followsResult, blocksResult] = await Promise.all([
+          sb.from('profiles').select('id, display_name, district, gender, created_at, updated_at').order('display_name'),
+          sb.from('follows').select('follower_id, following_id'),
+          sb.from('blocks').select('blocked_id').eq('blocker_id', authUser.id)
+        ]);
+        if (profilesResult.error) throw profilesResult.error;
+        if (followsResult.error) throw followsResult.error;
+        if (blocksResult.error) throw blocksResult.error;
+        playerProfiles = (profilesResult.data || []).map(profileFromRecord);
+        followRows = followsResult.data || [];
+        blockedIds = (blocksResult.data || []).map(row => row.blocked_id);
+        progress.followingIds = followRows.filter(row => row.follower_id === authUser.id).map(row => row.following_id);
+        saveProgress();
+        updateProfileStats();
+        renderTasks();
+      } catch (error) {
+        console.error(error);
+        showToast(error.message || 'Unable to load player profiles');
+      } finally {
+        socialLoading = false;
+        renderPeople();
+      }
+    }
+
+    async function toggleFollow(contactId) {
+      if (!profile || !authUser) { openProfile(); return; }
+      const following = followRows.some(row => row.follower_id === authUser.id && row.following_id === contactId);
+      const query = following
+        ? sb.from('follows').delete().eq('follower_id', authUser.id).eq('following_id', contactId)
+        : sb.from('follows').insert({ follower_id: authUser.id, following_id: contactId });
+      const { error } = await query;
+      if (error) { showToast(error.message); return; }
+      if (!following) finishTask('follow-guide');
+      showToast(following ? 'Player unfollowed' : 'Player followed');
+      await loadSocialData();
+    }
+
+    async function blockPlayer(contactId) {
+      const contact = playerProfiles.find(item => item.id === contactId);
+      if (!contact || !authUser) return;
+      if (!window.confirm(`Block ${contact.name}? Follows between you will be removed.`)) return;
+      const { error } = await sb.from('blocks').insert({ blocker_id: authUser.id, blocked_id: contactId });
+      if (error) { showToast(error.message); return; }
+      showToast(`${contact.name} blocked`);
+      if (activeDmContact?.id === contactId) { activeDmContact = null; setOpenPanel('people'); }
+      await loadSocialData();
+    }
+
+    async function unblockPlayer(contactId) {
+      if (!authUser) return;
+      const { error } = await sb.from('blocks').delete().eq('blocker_id', authUser.id).eq('blocked_id', contactId);
+      if (error) { showToast(error.message); return; }
+      showToast('Player unblocked');
+      await loadSocialData();
     }
 
     function directMessageKey(contactId) {
@@ -757,7 +881,7 @@
 
     function openDirectMessage(contactId) {
       if (!profile) { openProfile(); return; }
-      activeDmContact = localGuides.find(guide => guide.id === contactId) || null;
+      activeDmContact = playerProfiles.find(item => item.id === contactId && !blockedIds.includes(item.id)) || null;
       if (!activeDmContact) return;
       dmTitle.textContent = `Message · ${activeDmContact.name}`;
       renderDirectMessages();
@@ -783,6 +907,7 @@
       chatToggle.setAttribute('aria-expanded', String(which === 'chat'));
       taskToggle.setAttribute('aria-expanded', String(which === 'tasks'));
       if (which === 'map') finishTask('open-map');
+      if (which === 'people') loadSocialData();
       if (which === 'tasks') renderTasks();
     }
 
