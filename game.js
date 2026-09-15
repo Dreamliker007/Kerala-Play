@@ -37,6 +37,7 @@ const peopleClose = document.querySelector('#people-close');
 const peopleList = document.querySelector('#people-list');
 const peopleOnlineLabel = document.querySelector('#people-online-label');
 const taskToggle = document.querySelector('#task-toggle');
+const fullscreenToggle = document.querySelector('#fullscreen-toggle');
 const taskPanel = document.querySelector('#task-panel');
 const taskClose = document.querySelector('#task-close');
 const taskList = document.querySelector('#task-list');
@@ -512,6 +513,7 @@ function wireInterface() {
     mapLabelToggle.textContent = mapLabelsVisible ? 'Labels on' : 'Labels'; renderMapLandmarks();
   });
   taskToggle.addEventListener('click', () => setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'));
+  fullscreenToggle?.addEventListener('click', async () => { try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); else await document.exitFullscreen(); } catch { showToast('Fullscreen is unavailable in this browser'); } });
   taskClose.addEventListener('click', () => setOpenPanel());
   missionCard.addEventListener('click', () => setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'));
   challengePlay.addEventListener('click', playCoconutChallenge);
