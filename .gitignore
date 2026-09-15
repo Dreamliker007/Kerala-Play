@@ -2,3 +2,5 @@
 .test-data*/
 node_modules/
 *.log
+www/
+android/
