@@ -149,6 +149,13 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     response.end(JSON.stringify(data));
   }
+  async function sendResetEmail(user, code) {
+    const key = process.env.RESEND_API_KEY, from = process.env.EMAIL_FROM;
+    if (!key || !from || !user.email) return false;
+    const result = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to: [user.email], subject: 'Kerala Play password reset code', text: `Your Kerala Play reset code is ${code}. It expires in 10 minutes.` }) });
+    if (!result.ok) { console.error('Resend email failed:', await result.text()); return false; }
+    return true;
+  }
   function requirePeer(user, peerId, dm = false) {
     const peer = findUser(peerId);
     requireValue(peer && peer.id !== user.id, 404, 'Player not found.');
@@ -241,7 +248,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const body = await jsonBody(request); const identifier = typeof body.identifier === 'string' ? body.identifier.trim().toLowerCase() : '';
         const user = db.users.find(candidate => candidate.username.toLowerCase() === identifier || candidate.email === identifier || candidate.mobile === body.identifier?.trim());
         if (!user) send(response, 200, { ok: true, message: 'If that account exists, a reset code was issued.' });
-        else { const code = String(randomInt(100000, 1000000)); resetTokens.set(hashToken(code), { userId: user.id, expires: now() + 10 * 60000 }); console.log(`[Kerala Play] reset OTP for ${user.username}: ${code}`); send(response, 200, { ok: true, message: 'Reset code issued. In local mode, check the server console.' }); }
+        else { const code = String(randomInt(100000, 1000000)); resetTokens.set(hashToken(code), { userId: user.id, expires: now() + 10 * 60000 }); const sent = await sendResetEmail(user, code); if (!sent) console.log(`[Kerala Play] reset OTP for ${user.username}: ${code}`); send(response, 200, { ok: true, message: 'If that account exists, a reset code was issued to its saved email.' }); }
         return;
       }
       if (path === '/api/auth/reset' && request.method === 'POST') {
