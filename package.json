@@ -7,6 +7,7 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "start": "node server.mjs",
+    "start:production": "node production-server.mjs",
     "test": "node --test tests/server.test.mjs",
     "mobile:prepare": "node scripts/prepare-mobile.mjs",
     "mobile:add": "npm run mobile:prepare && npx cap add android",
