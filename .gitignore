@@ -1,4 +1,7 @@
 .data/
+.data-production-cache/
 .test-data*/
 node_modules/
 *.log
+www/
+android/
