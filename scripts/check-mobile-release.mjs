@@ -9,7 +9,7 @@ if (pkg.version !== '1.0.0') errors.push(`Expected package version 1.0.0, found 
 if (config.appId !== 'com.dreamliker007.keralaplay') errors.push(`Unexpected appId: ${config.appId}`);
 if (config.appName !== 'Kerala Play') errors.push(`Unexpected appName: ${config.appName}`);
 if (!config.server?.url?.startsWith('https://')) errors.push('Android release server.url must use HTTPS.');
-if (config.server?.url !== 'https://kerala-play-1.onrender.com') errors.push(`Unexpected production URL: ${config.server?.url || '(missing)'}`);
+if (config.server?.url !== 'https://keralaplay.in') errors.push(`Unexpected production URL: ${config.server?.url || '(missing)'}`);
 if (config.server?.cleartext !== false) errors.push('server.cleartext must be false for release.');
 if (config.android?.allowMixedContent !== false) errors.push('android.allowMixedContent must be false for release.');
 
