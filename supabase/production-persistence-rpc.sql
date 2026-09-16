@@ -32,13 +32,13 @@ begin
     coalesce(item->>'bio', ''),
     coalesce((item->>'points')::integer, 0),
     coalesce((
-      select array_agg(value)
-      from jsonb_array_elements_text(coalesce(item->'completed_tasks', '[]'::jsonb)) value
+      select array_agg(task.value)
+      from jsonb_array_elements_text(coalesce(item->'completed_tasks', '[]'::jsonb)) as task(value)
     ), '{}'::text[]),
     coalesce((item->>'walk_meters')::double precision, 0),
     coalesce((
-      select array_agg(value)
-      from jsonb_array_elements_text(coalesce(item->'visited_landmarks', '[]'::jsonb)) value
+      select array_agg(landmark.value)
+      from jsonb_array_elements_text(coalesce(item->'visited_landmarks', '[]'::jsonb)) as landmark(value)
     ), '{}'::text[]),
     nullif(item->>'game_day', '')::date,
     coalesce((item->>'game_wins')::integer, 0),
