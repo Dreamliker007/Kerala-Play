@@ -2,6 +2,10 @@
   "appId": "com.dreamliker007.keralaplay",
   "appName": "Kerala Play",
   "webDir": "www",
+  "server": {
+    "url": "https://kerala-play-1.onrender.com",
+    "cleartext": false
+  },
   "android": {
     "allowMixedContent": false
   }
