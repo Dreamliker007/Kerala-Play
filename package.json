@@ -14,7 +14,8 @@
     "mobile:prepare": "node scripts/prepare-mobile.mjs",
     "mobile:add": "npm run mobile:prepare && npx cap add android",
     "mobile:sync": "npm run mobile:prepare && npx cap sync android",
-    "mobile:open": "npm run mobile:sync && npx cap open android"
+    "mobile:open": "npm run mobile:sync && npx cap open android",
+    "mobile:release:check": "node scripts/check-mobile-release.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
