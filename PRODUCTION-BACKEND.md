@@ -1,38 +1,72 @@
 # Kerala Play production backend
 
-This branch starts the migration from the local `.data/game.json` backend to a production database without changing the public `/api` contract used by the website and Android app.
+This branch migrates the local `.data/game.json` backend toward a production Supabase database without changing the public `/api` contract used by the website and Android app.
 
 ## Why this migration is needed
 
-The current Node server stores accounts, follows, blocks, messages, points and progress in `.data/game.json`. Sessions, presence, reset codes and live connections are in memory. That is useful for local testing but is not suitable for a 24/7 public app because restarts can invalidate sessions/live state and a single JSON file is not appropriate for concurrent production traffic.
+The local Node server stores accounts, follows, blocks, messages, points and progress in `.data/game.json`. Sessions, presence, reset codes and live connections are in memory. That is useful for local testing but not enough for a 24/7 public app.
 
-The existing `schema.sql` contains an earlier Supabase-oriented profile/follow/Ludo schema. It does not fully match the current server model: the current API has pending/accepted follow requests, first name, email/mobile login, password hashes, bio, points, completed tasks, walking progress, landmark progress, daily game wins, server sessions and direct messages including voice. The production migration therefore uses separate `kp_*` server-owned tables so the current prototype schema is not destructively changed.
+The older `schema.sql` does not fully match the current server model, so the production migration uses separate server-owned `kp_*` tables. Browser and Android clients continue to call `/api/...`; they never receive the Supabase service-role key.
 
-## First production slice
+## Database setup
 
-1. Run `supabase/production-schema.sql` in the production Supabase project.
-2. Create a private Supabase Storage bucket named `kerala-play-voice` for voice-message files.
-3. Add server-side environment variables only on the backend host:
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `COOKIE_SECURE=1`
-   - `PUBLIC_ORIGIN=https://<production-host>`
-   - `RESEND_API_KEY` and `EMAIL_FROM` when password-reset email is enabled
-4. Do **not** put the service-role key in browser JavaScript, Capacitor config, GitHub, or the Android package.
-5. The next code slice will add a database adapter to `server.mjs`: Supabase/Postgres in production and the existing JSON store as a local-test fallback. This preserves the client API while accounts/social data become durable.
+Run these files in the Supabase SQL Editor, in this order:
 
-## Data ownership
+1. `supabase/production-schema.sql`
+2. `supabase/production-persistence-rpc.sql`
 
-The mobile/web client should continue to call `/api/...`. The backend owns user credentials, sessions, social writes, points/rewards and message authorization. Browser/mobile clients must never have direct write access to the `kp_*` tables.
+The second file creates the server-only transactional function used to persist a complete durable snapshot.
 
-## Realtime/live state
+## First production persistence slice
 
-Durable account/social/message data moves to PostgreSQL. High-frequency avatar presence and WebRTC signalling can remain ephemeral in the Node process for the first production release. For multi-instance scaling later, move presence/signalling to Redis or a dedicated realtime service and add a TURN service for reliable walkie-talkie connections.
+`production-server.mjs` is the production entry point. On startup it:
 
-## Voice messages
+1. Loads the durable account/social/message/progress snapshot from Supabase.
+2. Writes that snapshot to a private local runtime cache.
+3. Starts the existing `server.mjs` API against that cache, preserving current behavior.
+4. Mirrors cache changes back to Supabase through `kp_replace_snapshot`.
+5. Flushes the final snapshot to Supabase during a normal shutdown.
 
-The production schema stores `audio_path`, MIME type and duration. The backend should upload voice blobs to the private `kerala-play-voice` bucket and return short-lived signed URLs to authorized conversation participants instead of storing base64 audio inside database rows.
+This is intentionally a transitional **single backend instance** design. Supabase is the durable source across restarts, while the JSON file is only a runtime compatibility cache. A later slice should replace snapshot mirroring with row-level database operations before horizontal/multi-instance scaling.
+
+## Server environment variables
+
+Set these only on the backend host:
+
+- `SUPABASE_URL=https://<project-ref>.supabase.co`
+- `SUPABASE_SERVICE_ROLE_KEY=<server-only secret>`
+- `COOKIE_SECURE=1`
+- `PORT` is normally supplied by the hosting provider
+- `RESEND_API_KEY` and `EMAIL_FROM` when password-reset email is enabled
+- optional `KP_SYNC_INTERVAL_MS=1000`
+
+Never put `SUPABASE_SERVICE_ROLE_KEY` in browser JavaScript, `supabase-config.js`, Capacitor config, GitHub, screenshots, chat messages, or the Android package.
+
+Run production with:
+
+```powershell
+npm run start:production
+```
+
+Local development and the existing automated API tests continue to use:
+
+```powershell
+npm start
+npm test
+```
+
+## Data ownership and security
+
+The backend owns password hashes, social writes, points/rewards and message authorization. The `kp_*` tables have RLS enabled and direct `anon` / `authenticated` access revoked. Only the production server uses the service-role credential.
+
+Sessions and live presence remain in process for this slice, so users may need to sign in again after a backend restart. Moving sessions to `kp_sessions` is a later migration step.
+
+## Messages and voice
+
+Text and the current small base64 voice messages are preserved by the compatibility adapter. Voice rows use an `inline-base64:` compatibility value in `audio_path` for now. Before a public-scale release, migrate voice payloads to a private Supabase Storage bucket such as `kerala-play-voice` and serve short-lived signed URLs only to authorized conversation participants.
 
 ## Deployment target
 
-Use a Node-compatible HTTPS host that supports long-lived HTTP connections / Server-Sent Events. The backend must listen on `process.env.PORT` and sit behind HTTPS. The Android production build should use that HTTPS origin rather than a LAN IP.
+Use a Node-compatible HTTPS host that supports long-lived HTTP connections / Server-Sent Events. The backend must listen on `process.env.PORT` and sit behind HTTPS. The Android production build should use that HTTPS origin instead of a LAN IP such as `172.x.x.x:3000`.
+
+Do not use multiple production backend replicas with this snapshot adapter. Presence, sessions and snapshot writes are single-instance until the next database migration slices are complete.
