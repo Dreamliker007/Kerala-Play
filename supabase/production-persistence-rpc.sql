@@ -62,10 +62,12 @@ begin
     game_wins = excluded.game_wins;
 
   -- Replace dependent collections inside this transaction so readers never
-  -- observe a partially-written social/message snapshot.
-  delete from public.kp_messages;
-  delete from public.kp_blocks;
-  delete from public.kp_follows;
+  -- observe a partially-written social/message snapshot. Supabase projects can
+  -- enable safe-update checks, so use explicit WHERE predicates for full-table
+  -- deletes rather than a bare DELETE statement.
+  delete from public.kp_messages where true;
+  delete from public.kp_blocks where true;
+  delete from public.kp_follows where true;
 
   insert into public.kp_follows (from_id, to_id, status)
   select
