@@ -62,13 +62,15 @@ function mapUserFromRow(row) {
 }
 
 function mapMessageToRow(message) {
-  const voice = typeof message.audio === 'string' && message.audio.length > 0;
+  const inlineVoice = typeof message.audio === 'string' && message.audio.length > 0;
+  const storedVoice = !inlineVoice && typeof message.audioPath === 'string' && message.audioPath.length > 0;
+  const voice = inlineVoice || storedVoice;
   return {
     id: message.id,
     from_id: message.from,
     to_id: message.to,
     body: voice ? null : message.body,
-    audio_path: voice ? `${INLINE_AUDIO_PREFIX}${message.audio}` : null,
+    audio_path: inlineVoice ? `${INLINE_AUDIO_PREFIX}${message.audio}` : (storedVoice ? message.audioPath : null),
     audio_mime: voice ? message.mime : null,
     audio_duration: voice ? Number(message.duration || 0) : null,
     created_at: iso(message.createdAt),
