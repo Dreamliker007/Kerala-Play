@@ -6,7 +6,7 @@
   "description": "Kerala Play persistent social world",
   "engines": { "node": ">=20" },
   "scripts": {
-    "start": "node server.mjs",
+    "start": "node public-server.mjs",
     "start:production": "node production-server.mjs",
     "production:check": "node scripts/check-production-env.mjs",
     "production:import-local": "node scripts/import-local-game.mjs",
