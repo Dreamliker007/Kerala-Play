@@ -6,8 +6,8 @@ import { createGameServer } from './server.mjs';
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const server = await createGameServer();
 
-// Preserve the existing game/API server while exposing a stable public
-// privacy-policy URL for the website and Google Play listing.
+// Preserve the existing game/API server while exposing stable public policy
+// pages for the website and Google Play listing.
 const gameRequestListener = server.listeners('request')[0];
 if (gameRequestListener) {
   server.removeListener('request', gameRequestListener);
@@ -16,9 +16,17 @@ if (gameRequestListener) {
     try { pathname = new URL(request.url, 'http://localhost').pathname; }
     catch { /* The game listener will handle malformed requests. */ }
 
-    const privacyRoute = pathname === '/privacy-policy' || pathname === '/privacy-policy/' || pathname === '/privacy-policy.html';
-    if (privacyRoute && (request.method === 'GET' || request.method === 'HEAD')) {
-      void readFile(resolve(ROOT, 'privacy-policy.html'))
+    const publicPages = new Map([
+      ['/privacy-policy', 'privacy-policy.html'],
+      ['/privacy-policy/', 'privacy-policy.html'],
+      ['/privacy-policy.html', 'privacy-policy.html'],
+      ['/delete-account', 'delete-account.html'],
+      ['/delete-account/', 'delete-account.html'],
+      ['/delete-account.html', 'delete-account.html'],
+    ]);
+    const publicPage = publicPages.get(pathname);
+    if (publicPage && (request.method === 'GET' || request.method === 'HEAD')) {
+      void readFile(resolve(ROOT, publicPage))
         .then(data => {
           response.writeHead(200, {
             'Content-Type': 'text/html; charset=utf-8',
@@ -31,9 +39,9 @@ if (gameRequestListener) {
           response.end(request.method === 'HEAD' ? undefined : data);
         })
         .catch(error => {
-          console.error('[Kerala Play] privacy policy read failed:', error.message);
+          console.error(`[Kerala Play] public page read failed (${publicPage}):`, error.message);
           if (!response.headersSent) response.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-          response.end('Privacy policy is temporarily unavailable.');
+          response.end('This Kerala Play information page is temporarily unavailable.');
         });
       return;
     }
