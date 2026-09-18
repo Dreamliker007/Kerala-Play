@@ -83,3 +83,10 @@ Avatar movement now uses smoothed walking velocity instead of applying joystick 
 ## World Collision + Safer Movement (V57)
 
 The world now has a lightweight mobile-friendly collision layer for houses, palms, trees, the pond, benches, and major landmark structures. Walking uses axis-separated collision resolution so the avatar slides along obstacle edges instead of passing through them. Delivery bikes and taxis use larger collision radii, lose speed on impact, and stop cleanly when fully blocked. Moving traffic is also treated as a live obstacle. Collision movement only reports actual travelled distance, so walking progress and multiplayer movement sync stay accurate. No new Supabase migration is required.
+
+
+## Road + Traffic System (V58)
+
+Driving now reacts to the road type. The main road, village side road and off-road areas have separate speed limits and vehicle caps, shown in the driving HUD with the current simulated km/h. The side road now has lane markings. Traffic vehicles use smoother acceleration/deceleration, keep distance from the player and same-lane vehicles, and the side-road traffic yields at the main-road crossing.
+
+Job vehicles now include a HORN control and toggleable headlights. Nearby AI traffic slows/yields briefly to the player's horn. Headlights use visible emissive lamps plus one lightweight forward beam on the active player vehicle. Keyboard users can use H for horn and L for lights. A stopped job vehicle can be parked by exiting it and re-entered later. No new Supabase migration is required.
