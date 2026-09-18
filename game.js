@@ -299,6 +299,10 @@ function updateWorldInteract() {
     return;
   }
   if (active.phase === 'working') {
+    if (active.target) {
+      const distance = Math.hypot(Number(active.target.x) - playerRef.position.x, Number(active.target.z) - playerRef.position.z);
+      if (distance > Number(active.target.radius || 5.5) + .35) return;
+    }
     const seconds = Math.max(0, Math.ceil((Number(active.readyAt || 0) - Date.now()) / 1000));
     worldInteract.hidden = false;
     worldInteract.disabled = seconds > 0;
