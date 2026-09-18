@@ -1634,6 +1634,7 @@ function landmarkBeacon(scene, x, z, color) {
 }
 
 function addFortLandmark(scene, x, z) {
+  addBoxCollider(x, z, 4.5, .82, 'fort');
   const group = new THREE.Group();
   const stone = new THREE.MeshStandardMaterial({ color: 0x777167, roughness: 1 });
   const grassStone = new THREE.MeshStandardMaterial({ color: 0x5d6651, roughness: 1 });
@@ -1646,6 +1647,7 @@ function addFortLandmark(scene, x, z) {
 }
 
 function addTeaHills(scene, x, z) {
+  addCircleCollider(x, z, 2.7, 'hill');
   const group = new THREE.Group();
   const hillMat = new THREE.MeshStandardMaterial({ color: 0x497a45, roughness: 1 });
   [[0,0,4.5],[-3,1,2.8],[3,-1,3.2]].forEach(([px,pz,radius]) => {
@@ -1655,6 +1657,7 @@ function addTeaHills(scene, x, z) {
 }
 
 function addPalaceLandmark(scene, x, z) {
+  addBoxCollider(x, z, 3.65, 2.45, 'palace');
   const group = new THREE.Group();
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xb99667, roughness: .9 });
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x7d3f2e, roughness: .95 });
@@ -1664,6 +1667,7 @@ function addPalaceLandmark(scene, x, z) {
 }
 
 function addBackwaterHouseboat(scene, x, z) {
+  addBoxCollider(x, z, 3.05, 1.2, 'houseboat');
   const group = new THREE.Group();
   const water = new THREE.Mesh(new THREE.CircleGeometry(7, 32), new THREE.MeshStandardMaterial({ color: 0x287d94, roughness: .28, metalness: .1 }));
   water.rotation.x = -Math.PI / 2; water.position.y = .03;
@@ -1683,6 +1687,7 @@ function addPaddyFields(scene, x, z) {
 }
 
 function addTempleLandmark(scene, x, z) {
+  addBoxCollider(x, z, 3.5, 2.9, 'temple');
   const group = new THREE.Group();
   const stone = new THREE.MeshStandardMaterial({ color: 0xc8b58b, roughness: .9 });
   const wood = new THREE.MeshStandardMaterial({ color: 0x693d24, roughness: .92 });
