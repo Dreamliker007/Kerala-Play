@@ -20,6 +20,9 @@
     #run.active { background: rgba(55,174,112,.9); transform: scale(.96); }
     #world-interact { position:absolute; z-index:6; right:20px; bottom:calc(env(safe-area-inset-bottom) + 128px); min-width:118px; max-width:172px; padding:10px 12px; pointer-events:auto; touch-action:manipulation; border:1px solid rgba(201,255,221,.78); border-radius:13px; color:#f5fff8; background:rgba(20,112,72,.92); box-shadow:0 5px 18px rgba(0,0,0,.30); font:800 11px/1.2 system-ui,sans-serif; letter-spacing:.25px; text-transform:uppercase; cursor:pointer; }
     #world-interact:disabled { opacity:.58; cursor:default; }
+    #vehicle-action { position:absolute; z-index:6; right:20px; bottom:calc(env(safe-area-inset-bottom) + 184px); min-width:118px; max-width:172px; padding:10px 12px; pointer-events:auto; touch-action:manipulation; border:1px solid rgba(255,235,154,.9); border-radius:13px; color:#fffbea; background:rgba(137,96,16,.92); box-shadow:0 5px 18px rgba(0,0,0,.30); font:800 11px/1.2 system-ui,sans-serif; letter-spacing:.25px; text-transform:uppercase; cursor:pointer; }
+    #vehicle-action.exit { background:rgba(126,50,39,.92); border-color:rgba(255,190,174,.9); }
+    #vehicle-action:disabled { opacity:.55; cursor:default; }
     #camera-zone { position: absolute; right: 0; bottom: 0; width: 52vw; height: 100vh; pointer-events: auto; touch-action: none; }
     #camera-note { position: absolute; z-index:2; right: 122px; bottom: calc(env(safe-area-inset-bottom) + 65px); color: rgba(255,255,255,.87); background: rgba(11,35,45,.42); padding: 6px 8px; border-radius: 8px; font-size: 11px; pointer-events:none; }
     #fallback { display: none; position: fixed; inset: 0; z-index: 5; place-items: center; padding: 24px; background: #16323f; color: white; text-align: center; line-height: 1.5; }
@@ -116,6 +119,7 @@
       #joystick-base { opacity:.45; }
       #run { width:68px; height:68px; right:16px; bottom:calc(env(safe-area-inset-bottom) + 30px); opacity:.72; }
       #world-interact { right:13px; bottom:calc(env(safe-area-inset-bottom) + 108px); min-width:98px; max-width:132px; padding:8px 9px; font-size:9px; }
+      #vehicle-action { right:13px; bottom:calc(env(safe-area-inset-bottom) + 148px); min-width:98px; max-width:132px; padding:8px 9px; font-size:9px; }
       #joystick-zone:active #joystick-base, #run:active { opacity:.88; }
       #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #jobs-panel, #dm-panel { right:58px; width:min(286px,calc(100vw - 74px)); max-height:58dvh; }
     }
@@ -125,7 +129,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V53</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V54</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -134,6 +138,7 @@
     <div id="camera-note">Swipe to look</div>
     <button id="run" type="button" aria-label="Hold to run">RUN</button>
     <button id="world-interact" type="button" hidden aria-label="Interact with current job mission">INTERACT</button>
+    <button id="vehicle-action" type="button" hidden aria-label="Enter or exit current job vehicle">ENTER VEHICLE</button>
     <button id="profile-chip" type="button" aria-label="Edit profile"><span id="profile-name">Explorer</span><span id="profile-district">Choose district</span></button>
     <output id="progress-chip" aria-live="polite">Lv. 1 · 0 points</output>
     <output id="online-chip" aria-live="polite"><i></i><span id="online-count">Connecting…</span></output>

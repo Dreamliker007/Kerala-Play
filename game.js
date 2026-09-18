@@ -9,6 +9,7 @@ const joystickKnob = document.querySelector('#joystick-knob');
 const cameraZone = document.querySelector('#camera-zone');
 const runButton = document.querySelector('#run');
 const worldInteract = document.querySelector('#world-interact');
+const vehicleAction = document.querySelector('#vehicle-action');
 const profileName = document.querySelector('#profile-name');
 const profileDistrict = document.querySelector('#profile-district');
 const profileChip = document.querySelector('#profile-chip');
@@ -70,6 +71,10 @@ let activeJobMission = null;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
+let jobVehicleVisual = null;
+let jobVehicleSignature = '';
+let vehicleMode = 'walk';
+let driveSpeed = 0;
 let profile = null;
 let progress = newProgress();
 let social = null;
@@ -217,16 +222,140 @@ function shopVisual() {
   return group;
 }
 
+function createDeliveryBike() {
+  const bike = new THREE.Group();
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x2d6f55, roughness: .78 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x171a1c, roughness: .92 });
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0xaab2b3, roughness: .46, metalness: .55 });
+  const wheelGeometry = new THREE.TorusGeometry(.34, .075, 8, 18);
+  [-.68, .68].forEach(z => {
+    const wheel = new THREE.Mesh(wheelGeometry, darkMat);
+    wheel.rotation.y = Math.PI / 2;
+    wheel.position.set(0, .36, z);
+    bike.add(wheel);
+  });
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(.18, .24, 1.18), frameMat);
+  frame.position.set(0, .62, 0);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(.42, .12, .42), darkMat);
+  seat.position.set(0, .95, -.15);
+  const front = new THREE.Mesh(new THREE.BoxGeometry(.12, .72, .12), metalMat);
+  front.position.set(0, .72, .54);
+  front.rotation.x = -.12;
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(.72, .07, .07), metalMat);
+  handle.position.set(0, 1.08, .58);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(.12, 8, 7), new THREE.MeshStandardMaterial({ color: 0xffe9a2, emissive: 0x5a4816, emissiveIntensity: .35 }));
+  lamp.position.set(0, .94, .73);
+  const carrier = new THREE.Mesh(new THREE.BoxGeometry(.55, .08, .46), metalMat);
+  carrier.position.set(0, .82, -.68);
+  bike.add(frame, seat, front, handle, lamp, carrier);
+  bike.scale.setScalar(1.12);
+  return bike;
+}
+
+function createTaxiVehicle() {
+  const taxi = createRoadVehicle('car', 0xe4b52f);
+  const signMat = new THREE.MeshStandardMaterial({ color: 0xfff0a0, roughness: .72 });
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(.72, .22, .34), signMat);
+  sign.position.set(0, 1.55, -.05);
+  taxi.add(sign);
+  taxi.scale.setScalar(.94);
+  return taxi;
+}
+
+function createJobVehicleVisual(kind) {
+  return kind === 'bike' ? createDeliveryBike() : createTaxiVehicle();
+}
+
+function restorePlayerVehiclePose() {
+  const avatar = playerRef?.userData.avatar;
+  if (avatar) {
+    avatar.visible = true;
+    avatar.position.set(0, .04, 0);
+    avatar.rotation.set(0, 0, 0);
+  }
+  if (runButton) runButton.textContent = 'RUN';
+}
+
+function clearJobVehicleVisual() {
+  if (jobVehicleVisual) {
+    jobVehicleVisual.parent?.remove(jobVehicleVisual);
+    disposeMissionObject(jobVehicleVisual);
+    jobVehicleVisual = null;
+  }
+  restorePlayerVehiclePose();
+  jobVehicleSignature = '';
+  vehicleMode = 'walk';
+  driveSpeed = 0;
+}
+
+function syncJobVehicleVisual() {
+  if (!sceneRef || !playerRef) return;
+  const vehicle = activeJobMission?.vehicle;
+  const signature = vehicle ? [activeJobMission.taskId, vehicle.kind, vehicle.entered, vehicle.entered ? 'driving' : vehicle.x, vehicle.entered ? 'driving' : vehicle.z].join('|') : '';
+  if (signature === jobVehicleSignature) return;
+  clearJobVehicleVisual();
+  jobVehicleSignature = signature;
+  if (!vehicle) return;
+
+  jobVehicleVisual = createJobVehicleVisual(vehicle.kind);
+  if (vehicle.entered) {
+    vehicleMode = vehicle.kind;
+    driveSpeed = 0;
+    jobVehicleVisual.position.set(0, 0, 0);
+    playerRef.add(jobVehicleVisual);
+    const avatar = playerRef.userData.avatar;
+    if (avatar) {
+      if (vehicle.kind === 'taxi') avatar.visible = false;
+      else {
+        avatar.visible = true;
+        avatar.position.set(0, .56, -.08);
+      }
+    }
+    runButton.textContent = 'BRAKE';
+  } else {
+    vehicleMode = 'walk';
+    jobVehicleVisual.position.set(Number(vehicle.x) || 0, 0, Number(vehicle.z) || 0);
+    jobVehicleVisual.add(missionTag(vehicle.label || 'Job Vehicle', '#6e5412'));
+    sceneRef.add(jobVehicleVisual);
+    restorePlayerVehiclePose();
+  }
+}
+
+function updateVehicleAction() {
+  if (!vehicleAction) return;
+  vehicleAction.hidden = true;
+  vehicleAction.disabled = false;
+  vehicleAction.classList.remove('exit');
+  const vehicle = activeJobMission?.vehicle;
+  if (!profile || !playerRef || !vehicle) return;
+
+  if (vehicle.entered) {
+    vehicleAction.hidden = false;
+    vehicleAction.classList.add('exit');
+    const moving = Math.abs(driveSpeed) > .8;
+    vehicleAction.disabled = moving;
+    vehicleAction.textContent = moving ? 'STOP TO EXIT' : `EXIT ${vehicle.kind === 'bike' ? 'BIKE' : 'TAXI'}`;
+    return;
+  }
+  const distance = Math.hypot(Number(vehicle.x) - playerRef.position.x, Number(vehicle.z) - playerRef.position.z);
+  if (distance <= Number(vehicle.radius || 4.5) + .35) {
+    vehicleAction.hidden = false;
+    vehicleAction.textContent = `ENTER ${vehicle.kind === 'bike' ? 'BIKE' : 'TAXI'}`;
+  }
+}
+
 function addCarryVisual(kind) {
   if (!playerRef) return;
   if (kind === 'parcel') {
     jobCarryVisual = parcelVisual();
-    jobCarryVisual.scale.setScalar(.65);
-    jobCarryVisual.position.set(0, 1.28, -.42);
+    const onBike = activeJobMission?.vehicle?.entered && activeJobMission.vehicle.kind === 'bike';
+    jobCarryVisual.scale.setScalar(onBike ? .48 : .65);
+    jobCarryVisual.position.set(0, onBike ? .78 : 1.28, onBike ? -.72 : -.42);
   } else if (kind === 'passenger') {
     jobCarryVisual = passengerVisual();
-    jobCarryVisual.scale.setScalar(.72);
-    jobCarryVisual.position.set(.88, 0, .18);
+    const inTaxi = activeJobMission?.vehicle?.entered && activeJobMission.vehicle.kind === 'taxi';
+    jobCarryVisual.scale.setScalar(inTaxi ? .52 : .72);
+    jobCarryVisual.position.set(inTaxi ? .45 : .88, inTaxi ? .34 : 0, inTaxi ? -.18 : .18);
   }
   if (jobCarryVisual) playerRef.add(jobCarryVisual);
 }
@@ -290,6 +419,7 @@ function updateWorldInteract() {
   const active = activeJobMission;
 
   if (active.phase === 'travel' && active.target) {
+    if (active.vehicle && !active.vehicle.entered) return;
     const distance = Math.hypot(Number(active.target.x) - playerRef.position.x, Number(active.target.z) - playerRef.position.z);
     const radius = Number(active.target.radius || 5.5);
     if (distance <= radius + .35) {
@@ -332,13 +462,22 @@ worldInteract?.addEventListener('click', () => {
   setTimeout(() => { if (worldInteract && !worldInteract.hidden) worldInteract.disabled = false; }, 900);
 });
 
+vehicleAction?.addEventListener('click', () => {
+  const vehicle = activeJobMission?.vehicle;
+  if (!vehicle || vehicleAction.disabled) return;
+  vehicleAction.disabled = true;
+  window.dispatchEvent(new CustomEvent('kerala-job-vehicle', { detail: { action: vehicle.entered ? 'exit' : 'enter' } }));
+  setTimeout(() => { if (vehicleAction && !vehicleAction.hidden) vehicleAction.disabled = false; }, 900);
+});
 
 
 
 function applyJobMission(active) {
   activeJobMission = active || null;
+  syncJobVehicleVisual();
   syncJobWorldVisual();
   updateWorldInteract();
+  updateVehicleAction();
   if (playerRef) updateMapPlayer(playerRef);
   if (!activeJobMission) {
     if (!selectedLandmark) {
@@ -392,6 +531,7 @@ function acceptUser(user) {
     updateNameLabel(playerRef, user?.username || '', user?.id);
   }
   if (!user) {
+    applyJobMission(null);
     connectionReady = false;
     lastMovementMoving = false;
     synchronizePlayers([]);
@@ -564,6 +704,7 @@ function synchronizePlayers(players) {
     remote.userData.targetAt = receivedAt;
     remote.userData.yaw = Number(data.rotation) || 0;
     remote.userData.moving = !!data.moving;
+    remote.userData.mode = data.mode || 'walk';
     updateNameLabel(remote, data.username, data.id);
   }
   for (const [id, remote] of remotePlayers) if (!keep.has(id)) {
@@ -581,7 +722,7 @@ function updateRemotePlayers(delta, camera) {
     remote.position.lerp(remote.userData.predicted, 1 - Math.exp(-delta * 10));
     remote.rotation.y = rotateTowards(remote.rotation.y, remote.userData.yaw, delta * 12);
     remote.userData.phase += delta * 9;
-    animatePlayer(remote, remote.userData.phase, remote.userData.moving ? 1 : 0);
+    animatePlayer(remote, remote.userData.phase, remote.userData.moving && remote.userData.mode === 'walk' ? 1 : 0);
   }
   camera.updateMatrixWorld();
   for (const object of [playerRef, ...villagers, ...remotePlayers.values()]) {
@@ -604,7 +745,7 @@ async function sendMovement(player, moving) {
   movementPending = true; lastMovementSend = now;
   const userId = profile.id;
   try {
-    const result = await api('/api/world/move', { x: player.position.x, z: player.position.z, rotation: player.rotation.y, moving });
+    const result = await api('/api/world/move', { x: player.position.x, z: player.position.z, rotation: player.rotation.y, moving, mode: vehicleMode });
     if (profile?.id !== userId) return;
     lastMovementMoving = moving;
     if (result.user) acceptUser(result.user);
@@ -634,7 +775,7 @@ function flushMovement() {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x: playerRef.position.x, z: playerRef.position.z, rotation: playerRef.rotation.y, moving: false }),
+    body: JSON.stringify({ x: playerRef.position.x, z: playerRef.position.z, rotation: playerRef.rotation.y, moving: false, mode: vehicleMode }),
     keepalive: true
   }).catch(() => {});
 }
@@ -920,6 +1061,7 @@ try {
   let cameraYaw = player.rotation.y + Math.PI;
   let cameraPitch = .31;
   let runHeld = false;
+  let runPointerId = null;
   let walkPhase = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
   let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0;
@@ -946,8 +1088,16 @@ try {
       dx *= maximum / distance;
       dy *= maximum / distance;
     }
-    inputX = dx / maximum;
-    inputY = dy / maximum;
+    const normalized = Math.min(1, Math.hypot(dx, dy) / maximum);
+    const deadzone = .12;
+    if (normalized <= deadzone || !distance) {
+      inputX = 0; inputY = 0;
+    } else {
+      const scaled = (normalized - deadzone) / (1 - deadzone);
+      const length = Math.hypot(dx, dy) || 1;
+      inputX = dx / length * scaled;
+      inputY = dy / length * scaled;
+    }
     joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
   }
 
@@ -992,14 +1142,32 @@ try {
     runHeld = value;
     runButton.classList.toggle('active', value);
   }
+  function clearRun(event) {
+    if (!event || runPointerId === null || event.pointerId === runPointerId) {
+      runPointerId = null;
+      setRun(false);
+    }
+  }
   runButton.addEventListener('pointerdown', event => {
+    if (runPointerId !== null) return;
+    runPointerId = event.pointerId;
     runButton.setPointerCapture(event.pointerId);
     setRun(true);
     event.preventDefault();
   });
-  runButton.addEventListener('pointerup', () => setRun(false));
-  runButton.addEventListener('pointercancel', () => setRun(false));
-  runButton.addEventListener('lostpointercapture', () => setRun(false));
+  runButton.addEventListener('pointerup', clearRun);
+  runButton.addEventListener('pointercancel', clearRun);
+  runButton.addEventListener('lostpointercapture', clearRun);
+  window.addEventListener('pointerup', event => {
+    if (event.pointerId === joystickPointerId) clearJoystick();
+    if (event.pointerId === lookPointerId) clearLook(event);
+    if (event.pointerId === runPointerId) clearRun(event);
+  }, true);
+  window.addEventListener('pointercancel', event => {
+    if (event.pointerId === joystickPointerId) clearJoystick();
+    if (event.pointerId === lookPointerId) clearLook(event);
+    if (event.pointerId === runPointerId) clearRun(event);
+  }, true);
 
   function typingIntoField(event) {
     return event.target instanceof Element && event.target.matches('input, select, textarea, [contenteditable]');
@@ -1008,7 +1176,9 @@ try {
     keys.clear();
     clearJoystick();
     setRun(false);
+    runPointerId = null;
     lookPointerId = null;
+    driveSpeed = 0;
   }
   window.addEventListener('keydown', event => {
     if (typingIntoField(event) || !profile || document.querySelector('[aria-modal="true"]:not([hidden])')) return;
@@ -1051,8 +1221,31 @@ try {
     const paused = !profile || !connectionReady || !!document.querySelector('[aria-modal="true"]:not([hidden])');
     if (paused) clearGameInput();
     const controlLength = paused ? 0 : Math.min(1, Math.hypot(controlX, controlY));
+    let movingNow = false;
 
-    if (controlLength > .06) {
+    if (vehicleMode !== 'walk') {
+      const throttle = paused ? 0 : THREE.MathUtils.clamp(-controlY, -1, 1);
+      const steering = paused ? 0 : THREE.MathUtils.clamp(controlX, -1, 1);
+      const maxForward = vehicleMode === 'bike' ? 13 : 11;
+      const maxReverse = vehicleMode === 'bike' ? 4.5 : 4;
+      const targetSpeed = runHeld ? 0 : (throttle >= 0 ? throttle * maxForward : throttle * maxReverse);
+      const response = runHeld ? 10 : (Math.abs(throttle) > .04 ? 4.8 : 3.3);
+      driveSpeed += (targetSpeed - driveSpeed) * Math.min(1, delta * response);
+      if (Math.abs(driveSpeed) < .035) driveSpeed = 0;
+      const speedRatio = Math.min(1, Math.abs(driveSpeed) / maxForward);
+      if (Math.abs(driveSpeed) > .04) {
+        player.rotation.y += steering * delta * (1.0 + speedRatio * 1.45) * (driveSpeed >= 0 ? 1 : -1);
+        player.position.x += Math.sin(player.rotation.y) * driveSpeed * delta;
+        player.position.z += Math.cos(player.rotation.y) * driveSpeed * delta;
+        movingNow = true;
+      }
+      player.position.x = THREE.MathUtils.clamp(player.position.x, -110, 110);
+      player.position.z = THREE.MathUtils.clamp(player.position.z, -110, 110);
+      if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 2.5);
+      animatePlayer(player, walkPhase, 0);
+      if (mapAccumulator >= .12) { updateMapPlayer(player); mapAccumulator = 0; }
+    } else if (controlLength > .06) {
+      driveSpeed = 0;
       moveForward.set(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
       moveRight.set(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
       desiredMove.copy(moveForward).multiplyScalar(-controlY).addScaledVector(moveRight, controlX).normalize();
@@ -1066,13 +1259,15 @@ try {
       cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 1.4);
       walkPhase += delta * (runHeld ? 15 : 9) * controlLength;
       animatePlayer(player, walkPhase, controlLength);
+      movingNow = true;
       if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
     } else {
+      driveSpeed = 0;
       animatePlayer(player, walkPhase, 0);
     }
 
-    cameraTarget.set(player.position.x, player.position.y + 1.45, player.position.z);
-    const distance = 7.1;
+    cameraTarget.set(player.position.x, player.position.y + (vehicleMode === 'taxi' ? 1.35 : 1.45), player.position.z);
+    const distance = vehicleMode === 'taxi' ? 8.8 : vehicleMode === 'bike' ? 7.8 : 7.1;
     const horizontal = Math.cos(cameraPitch) * distance;
     cameraPosition.set(
       player.position.x + Math.sin(cameraYaw) * horizontal,
@@ -1082,8 +1277,9 @@ try {
     camera.position.lerp(cameraPosition, 1 - Math.exp(-delta * 9));
     camera.lookAt(cameraTarget);
     updateRemotePlayers(delta, camera);
-    sendMovement(player, controlLength > .06);
-    atmosphere.update(delta, villageTime, { moving: controlLength > .06, running: runHeld, nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13, inChallenge: !!challengeRound });
+    updateVehicleAction();
+    sendMovement(player, movingNow);
+    atmosphere.update(delta, villageTime, { moving: movingNow, running: vehicleMode === 'walk' && runHeld, nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13, inChallenge: !!challengeRound });
     renderer.render(scene, camera);
     if (isMobile && !atmosphere) {
       perfFrames++; const now = performance.now();
