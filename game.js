@@ -1103,6 +1103,11 @@ try {
 
   joystickZone.addEventListener('pointerdown', event => {
     if (joystickPointerId !== null) return;
+    const rect = joystickBase.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const touchDistance = Math.hypot(event.clientX - centerX, event.clientY - centerY);
+    if (touchDistance > rect.width * .72) return;
     joystickPointerId = event.pointerId;
     joystickZone.setPointerCapture(event.pointerId);
     updateJoystick(event);
@@ -1224,17 +1229,27 @@ try {
     let movingNow = false;
 
     if (vehicleMode !== 'walk') {
-      const throttle = paused ? 0 : THREE.MathUtils.clamp(-controlY, -1, 1);
-      const steering = paused ? 0 : THREE.MathUtils.clamp(controlX, -1, 1);
-      const maxForward = vehicleMode === 'bike' ? 13 : 11;
-      const maxReverse = vehicleMode === 'bike' ? 4.5 : 4;
+      const rawThrottle = paused ? 0 : THREE.MathUtils.clamp(-controlY, -1, 1);
+      const rawSteering = paused ? 0 : THREE.MathUtils.clamp(controlX, -1, 1);
+      const throttleDeadzone = .18;
+      const steeringDeadzone = .12;
+      const throttleMagnitude = Math.abs(rawThrottle) <= throttleDeadzone
+        ? 0
+        : (Math.abs(rawThrottle) - throttleDeadzone) / (1 - throttleDeadzone);
+      const steeringMagnitude = Math.abs(rawSteering) <= steeringDeadzone
+        ? 0
+        : (Math.abs(rawSteering) - steeringDeadzone) / (1 - steeringDeadzone);
+      const throttle = Math.sign(rawThrottle) * Math.pow(throttleMagnitude, 1.8);
+      const steering = Math.sign(rawSteering) * Math.pow(steeringMagnitude, 1.35);
+      const maxForward = vehicleMode === 'bike' ? 7.4 : 6.6;
+      const maxReverse = vehicleMode === 'bike' ? 2.6 : 2.4;
       const targetSpeed = runHeld ? 0 : (throttle >= 0 ? throttle * maxForward : throttle * maxReverse);
-      const response = runHeld ? 10 : (Math.abs(throttle) > .04 ? 4.8 : 3.3);
+      const response = runHeld ? 9 : (Math.abs(throttle) > .01 ? 2.25 : 3.6);
       driveSpeed += (targetSpeed - driveSpeed) * Math.min(1, delta * response);
-      if (Math.abs(driveSpeed) < .035) driveSpeed = 0;
+      if (Math.abs(driveSpeed) < .03) driveSpeed = 0;
       const speedRatio = Math.min(1, Math.abs(driveSpeed) / maxForward);
-      if (Math.abs(driveSpeed) > .04) {
-        player.rotation.y += steering * delta * (1.0 + speedRatio * 1.45) * (driveSpeed >= 0 ? 1 : -1);
+      if (Math.abs(driveSpeed) > .035) {
+        player.rotation.y -= steering * delta * (.72 + speedRatio * .9) * (driveSpeed >= 0 ? 1 : -1);
         player.position.x += Math.sin(player.rotation.y) * driveSpeed * delta;
         player.position.z += Math.cos(player.rotation.y) * driveSpeed * delta;
         movingNow = true;
