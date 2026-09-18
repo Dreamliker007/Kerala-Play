@@ -67,7 +67,7 @@ async function setup(t) {
   return { client, advance(ms) { timestamp += ms; }, dataDir, async restart() { await server.shutdown(); await boot(); } };
 }
 async function signup(client, username) {
-  const response = await client('/api/auth/signup', { username, password: 'test-password-2026', district: 'Ernakulam', gender: 'female' });
+  const response = await client('/api/auth/signup', { firstName: username, username, password: 'test-password-2026', district: 'Ernakulam', gender: 'female' });
   assert.equal(response.status, 201, JSON.stringify(response.data));
   return response.data.user;
 }
@@ -81,8 +81,8 @@ test('signup starts at zero, hashes passwords, enforces credentials and session 
   assert.equal(user.passwordHash, undefined); assert.equal(user.salt, undefined);
   const duplicate = await guest('/api/auth/signup', { username: 'alice', password: 'test-password-2026' });
   assert.equal(duplicate.status, 409);
-  assert.equal((await guest('/api/auth/login', { username: 'ALICE', password: 'wrong-password' })).status, 401);
-  const login = await guest('/api/auth/login', { username: 'ALICE', password: 'test-password-2026' });
+  assert.equal((await guest('/api/auth/login', { identifier: 'ALICE', password: 'wrong-password' })).status, 401);
+  const login = await guest('/api/auth/login', { identifier: 'ALICE', password: 'test-password-2026' });
   assert.equal(login.status, 200); assert.match(login.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/);
   assert.equal((await guest('/api/session')).data.user.id, user.id);
   await guest('/api/auth/logout', {});
@@ -161,7 +161,7 @@ test('switching the shared browser session revokes its old token and event strea
   try {
     assert.equal((await primaryEvents.next('profile')).user.id, a.id);
     assert.equal((await siblingEvents.next('profile')).user.id, a.id);
-    const changed = await browser('/api/auth/login', { username: 'Bob', password: 'test-password-2026' });
+    const changed = await browser('/api/auth/login', { identifier: 'Bob', password: 'test-password-2026' });
     assert.equal(changed.status, 200);
     assert.equal(changed.data.user.id, b.id);
     await Promise.all([primaryEvents.closed(), siblingEvents.closed()]);
@@ -220,7 +220,7 @@ test('task rewards validate movement and acceptance; rewards and game rounds can
   assert.equal((await alice('/api/games/coconut/finish', badRound)).status, 409);
   await app.restart();
   assert.equal((await alice('/api/session')).data.user, null);
-  const restored = (await alice('/api/auth/login', { username: 'Alice', password: 'test-password-2026' })).data.user;
+  const restored = (await alice('/api/auth/login', { identifier: 'Alice', password: 'test-password-2026' })).data.user;
   assert.equal(restored.points, 105);
   assert.equal(restored.x, -26);
   assert.equal(restored.z, 6);
