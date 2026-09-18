@@ -522,6 +522,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const meta = node('div', 'job-meta');
       const missionLabel = job.missionType === 'shift' ? `On-site ${Math.ceil(Number(job.durationMs || 0) / 1000)}s` : 'World route';
       meta.append(node('span', '', missionLabel), node('span', '', `Completed ${Number(job.completedCount || 0)}`));
+      if (isActive && active?.vehicle) {
+        meta.append(node('span', '', `Fuel ${Math.round(Number(active.vehicle.fuel ?? 100))}%`), node('span', '', `Condition ${Math.round(Number(active.vehicle.condition ?? 100))}%`));
+      }
       const action = document.createElement('button');
       action.type = 'button'; action.dataset.jobId = job.id;
       let missionNote = null;
