@@ -22,11 +22,17 @@ const SHOP_ITEMS = Object.freeze({
   meal: { name: 'Kerala Meal', price: 80 },
 });
 const JOB_DEFINITIONS = Object.freeze({
-  delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Collect a parcel, travel to the customer and check in at both locations.', missionType: 'route' },
-  taxi: { title: 'Taxi Driver', reward: 220, durationMs: 0, cooldownMs: 35_000, description: 'Reach the passenger pickup point, then drive to the destination.', missionType: 'route' },
-  shop: { title: 'Shop Worker', reward: 140, durationMs: 10_000, cooldownMs: 25_000, description: 'Travel to the village shop, check in and complete a short on-site shift.', missionType: 'shift' },
+  delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Take the delivery bike, collect a parcel, then ride to the customer.', missionType: 'route', vehicle: 'bike', vehicleLabel: 'Delivery Bike' },
+  taxi: { title: 'Taxi Driver', reward: 220, durationMs: 0, cooldownMs: 35_000, description: 'Enter the taxi, reach the passenger pickup point, then drive to the destination.', missionType: 'route', vehicle: 'taxi', vehicleLabel: 'Kerala Taxi' },
+  shop: { title: 'Shop Worker', reward: 140, durationMs: 10_000, cooldownMs: 25_000, description: 'Travel to the village shop, check in and complete a short on-site shift.', missionType: 'shift', vehicle: null, vehicleLabel: null },
 });
 const JOB_MISSION_RADIUS = 5.5;
+const JOB_VEHICLE_RADIUS = 4.5;
+const MOVEMENT_PROFILES = Object.freeze({
+  walk: { rate: 8.5, maxCredit: 24 },
+  bike: { rate: 16, maxCredit: 40 },
+  taxi: { rate: 14, maxCredit: 36 },
+});
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
 function freshJobState() { return { active: null, cooldowns: {}, completed: {} }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
@@ -158,7 +164,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   function worldSnapshot(viewerId) {
     return { players: [...presence.entries()].filter(([id]) => online(id) && !blocked(viewerId, id)).map(([id, state]) => {
       const user = findUser(id);
-      return { id, username: user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username), gender: user.gender, district: user.district, x: state.x, z: state.z, rotation: state.rotation, moving: state.moving };
+      return { id, username: user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username), gender: user.gender, district: user.district, x: state.x, z: state.z, rotation: state.rotation, moving: state.moving, mode: state.mode || 'walk' };
     }) };
   }
   function place(user, { reset = false } = {}) {
@@ -172,7 +178,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       user.worldX = x; user.worldZ = z; user.worldRotation = rotation; user.worldUpdatedAt = now();
       dirty = true;
     }
-    const state = { x, z, rotation, moving: false, lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now() };
+    const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now() };
     presence.set(user.id, state); worldDirty = true;
     return state;
   }
@@ -237,7 +243,23 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) user.jobState.completed = {};
     const active = user.jobState.active;
-    if (active && (!Array.isArray(active.checkpoints) || Number(active.expiresAt) <= now())) { user.jobState.active = null; dirty = true; }
+    if (active && (!Array.isArray(active.checkpoints) || Number(active.expiresAt) <= now())) {
+      user.jobState.active = null;
+      const live = presence.get(user.id);
+      if (live) { live.mode = 'walk'; live.movementCredit = Math.min(live.movementCredit, 2); }
+      dirty = true;
+    } else if (active) {
+      const job = JOB_DEFINITIONS[active.jobId];
+      if (job?.vehicle) {
+        if (typeof active.vehicleEntered !== 'boolean') { active.vehicleEntered = false; dirty = true; }
+        if (!Number.isFinite(Number(active.vehicleX)) || !Number.isFinite(Number(active.vehicleZ))) {
+          const position = savedPosition(user);
+          active.vehicleX = missionCoordinate(position.x, 2.8);
+          active.vehicleZ = missionCoordinate(position.z, 1.5);
+          dirty = true;
+        }
+      }
+    }
     return user.jobState;
   }
   function jobPosition(user) {
@@ -270,6 +292,12 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       const distance = current ? Math.hypot(current.x - position.x, current.z - position.z) : null;
       const readyAt = Number(source.readyAt || 0);
       const ready = source.phase === 'ready' || (source.phase === 'working' && timestamp >= readyAt);
+      const vehicleEntered = !!job.vehicle && !!source.vehicleEntered;
+      const vehicleX = vehicleEntered ? position.x : Number(source.vehicleX);
+      const vehicleZ = vehicleEntered ? position.z : Number(source.vehicleZ);
+      const vehicleDistance = job.vehicle && Number.isFinite(vehicleX) && Number.isFinite(vehicleZ)
+        ? Math.hypot(vehicleX - position.x, vehicleZ - position.z)
+        : null;
       active = {
         taskId: source.taskId,
         jobId: source.jobId,
@@ -283,6 +311,16 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         ready,
         remainingMs: source.phase === 'working' ? Math.max(0, readyAt - timestamp) : 0,
         target: current ? { ...current, radius: JOB_MISSION_RADIUS, distance: Math.round(distance * 10) / 10, withinRange: distance <= JOB_MISSION_RADIUS } : null,
+        vehicle: job.vehicle ? {
+          kind: job.vehicle,
+          label: job.vehicleLabel,
+          entered: vehicleEntered,
+          x: vehicleX,
+          z: vehicleZ,
+          radius: JOB_VEHICLE_RADIUS,
+          distance: vehicleDistance === null ? null : Math.round(vehicleDistance * 10) / 10,
+          withinRange: vehicleDistance !== null && vehicleDistance <= JOB_VEHICLE_RADIUS,
+        } : null,
       };
     }
     return {
@@ -297,6 +335,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           reward: job.reward,
           durationMs: job.durationMs,
           missionType: job.missionType,
+          vehicle: job.vehicle,
+          vehicleLabel: job.vehicleLabel,
           cooldownMs: job.cooldownMs,
           cooldownUntil,
           cooldownRemainingMs: Math.max(0, cooldownUntil - timestamp),
@@ -445,10 +485,58 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const timestamp = now();
         const cooldownUntil = Number(state.cooldowns[jobId] || 0);
         requireValue(cooldownUntil <= timestamp, 409, 'This job is cooling down. Try again shortly.');
-        state.active = { taskId: randomUUID(), jobId, startedAt: timestamp, readyAt: 0, expiresAt: timestamp + JOB_EXPIRY_GRACE, phase: 'travel', stepIndex: 0, checkpoints: buildJobCheckpoints(user, jobId) };
+        const position = jobPosition(user);
+        state.active = {
+          taskId: randomUUID(),
+          jobId,
+          startedAt: timestamp,
+          readyAt: 0,
+          expiresAt: timestamp + JOB_EXPIRY_GRACE,
+          phase: 'travel',
+          stepIndex: 0,
+          checkpoints: buildJobCheckpoints(user, jobId),
+          vehicleEntered: false,
+          vehicleX: job.vehicle ? missionCoordinate(position.x, 2.8) : null,
+          vehicleZ: job.vehicle ? missionCoordinate(position.z, 1.5) : null,
+        };
         await persist();
         const summary = jobsSummary(user);
         send(response, 201, { jobs: summary, active: summary.active }); return;
+      }
+      const jobVehicleMatch = path.match(/^\/api\/jobs\/([^/]+)\/vehicle$/);
+      if (jobVehicleMatch && request.method === 'POST') {
+        limited(`job-vehicle:${user.id}`, 40, 60000);
+        const body = await jsonBody(request);
+        const jobId = jobVehicleMatch[1];
+        const job = JOB_DEFINITIONS[jobId];
+        requireValue(job?.vehicle, 404, 'This job does not use a vehicle.');
+        const state = jobStateFor(user);
+        const active = state.active;
+        requireValue(active && active.jobId === jobId, 409, 'This job is not active.');
+        requireValue(typeof body.taskId === 'string' && body.taskId === active.taskId, 409, 'This job task is no longer valid.');
+        requireValue(body.action === 'enter' || body.action === 'exit', 400, 'Choose enter or exit.');
+        const position = jobPosition(user);
+        const live = presence.get(user.id) || place(user);
+        if (body.action === 'enter') {
+          requireValue(!active.vehicleEntered, 409, 'You are already in the job vehicle.');
+          const vehicleX = Number(active.vehicleX), vehicleZ = Number(active.vehicleZ);
+          requireValue(Number.isFinite(vehicleX) && Number.isFinite(vehicleZ), 409, 'Job vehicle is unavailable.');
+          requireValue(Math.hypot(vehicleX - position.x, vehicleZ - position.z) <= JOB_VEHICLE_RADIUS, 409, `Move closer to the ${job.vehicleLabel} before entering.`);
+          active.vehicleEntered = true;
+          live.mode = job.vehicle;
+          live.movementCredit = Math.max(live.movementCredit, 4);
+        } else {
+          requireValue(active.vehicleEntered, 409, 'You are not in the job vehicle.');
+          active.vehicleEntered = false;
+          active.vehicleX = position.x;
+          active.vehicleZ = position.z;
+          live.mode = 'walk';
+          live.movementCredit = Math.min(live.movementCredit, 2);
+        }
+        dirty = true;
+        await persist();
+        const summary = jobsSummary(user);
+        send(response, 200, { jobs: summary, active: summary.active }); return;
       }
       const jobCheckpointMatch = path.match(/^\/api\/jobs\/([^/]+)\/checkpoint$/);
       if (jobCheckpointMatch && request.method === 'POST') {
@@ -462,6 +550,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(active && active.jobId === jobId, 409, 'This job is not active.');
         requireValue(typeof body.taskId === 'string' && body.taskId === active.taskId, 409, 'This job task is no longer valid.');
         requireValue(active.phase === 'travel', 409, active.phase === 'working' ? 'Your shift is already in progress.' : 'No mission checkpoint is waiting.');
+        if (job.vehicle) requireValue(active.vehicleEntered, 409, `Enter the ${job.vehicleLabel} before continuing this job.`);
         const target = active.checkpoints[active.stepIndex];
         requireValue(target, 409, 'No mission checkpoint is waiting.');
         const position = jobPosition(user);
@@ -504,7 +593,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           requireValue(Math.hypot(shop.x - position.x, shop.z - position.z) <= JOB_MISSION_RADIUS, 409, 'Return to the village shop to complete your shift.');
         } else {
           requireValue(active.phase === 'ready', 409, 'Complete all mission checkpoints first.');
+          if (job.vehicle) requireValue(active.vehicleEntered, 409, `Stay in the ${job.vehicleLabel} until the route is completed.`);
         }
+        const live = presence.get(user.id);
+        if (live) { live.mode = 'walk'; live.movementCredit = Math.min(live.movementCredit, 2); }
         state.active = null;
         state.cooldowns[jobId] = timestamp + job.cooldownMs;
         state.completed[jobId] = Math.max(0, Number(state.completed[jobId] || 0)) + 1;
@@ -633,16 +725,23 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         limited(`move:${user.id}`, 20, 1000);
         const body = await jsonBody(request);
         requireValue(Number.isFinite(body.x) && Number.isFinite(body.z) && Math.abs(body.x) <= 110.01 && Math.abs(body.z) <= 110.01 && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, 'Invalid avatar position.');
+        const requestedMode = body.mode === undefined ? 'walk' : body.mode;
+        requireValue(Object.hasOwn(MOVEMENT_PROFILES, requestedMode), 400, 'Invalid movement mode.');
+        const active = jobStateFor(user).active;
+        const activeJob = active ? JOB_DEFINITIONS[active.jobId] : null;
+        const expectedMode = active?.vehicleEntered && activeJob?.vehicle ? activeJob.vehicle : 'walk';
+        requireValue(requestedMode === expectedMode, 409, 'Movement mode is out of sync. Re-enter the job vehicle if needed.');
         const state = presence.get(user.id) || place(user);
+        const movement = MOVEMENT_PROFILES[requestedMode];
         const elapsed = Math.max(0, Math.min((now() - state.movedAt) / 1000, 3));
-        const credit = Math.min(24, state.movementCredit + elapsed * 8.5);
+        const credit = Math.min(movement.maxCredit, state.movementCredit + elapsed * movement.rate);
         const distance = Math.hypot(body.x - state.x, body.z - state.z);
         if (distance > credit + 0.01) throw new ApiError(409, 'Movement was too fast. Your avatar needs to resync.', { x: state.x, z: state.z });
         const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
-        state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving;
+        state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving; state.mode = requestedMode;
         user.worldX = state.x; user.worldZ = state.z; user.worldRotation = state.rotation; user.worldUpdatedAt = now();
-        user.walkMeters += distance;
+        if (requestedMode === 'walk') user.walkMeters += distance;
         let discovered = false;
         for (const [id, x, z] of LANDMARKS) if (Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
         const turn = Math.abs(Math.atan2(Math.sin(state.rotation - previousRotation), Math.cos(state.rotation - previousRotation)));
