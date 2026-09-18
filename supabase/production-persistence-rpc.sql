@@ -116,7 +116,7 @@ returns void
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 begin
   if jsonb_typeof(payload) is distinct from 'array' then
     raise exception 'payload must be a JSON array';
@@ -143,7 +143,7 @@ begin
     where (item->>'user_id')::uuid = existing.user_id
   );
 end;
-$;
+$$;
 
 revoke all on function public.kp_replace_world_state(jsonb) from public;
 revoke all on function public.kp_replace_world_state(jsonb) from anon, authenticated;
