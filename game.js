@@ -84,6 +84,8 @@ let headlightsOn = false;
 let hornReadyAt = 0;
 let hornPulseUntil = 0;
 let driveAudioContext = null;
+let lastImpactReportAt = 0;
+let lastFuelWarningAt = 0;
 let profile = null;
 let progress = newProgress();
 let social = null;
@@ -231,6 +233,70 @@ function shopVisual() {
   return group;
 }
 
+
+function addFuelStation(scene, x, z) {
+  const group = new THREE.Group();
+  const white = new THREE.MeshStandardMaterial({ color: 0xf1eee3, roughness: .82 });
+  const red = new THREE.MeshStandardMaterial({ color: 0xc83d32, roughness: .8 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x303638, roughness: .9 });
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(6.4, .28, 4.4), red);
+  canopy.position.y = 3.7;
+  const post = new THREE.Mesh(new THREE.BoxGeometry(.35, 3.5, .35), white);
+  post.position.set(-2.6, 1.8, 0);
+  const post2 = post.clone(); post2.position.x = 2.6;
+  const pump = new THREE.Mesh(new THREE.BoxGeometry(.9, 1.55, .75), white);
+  pump.position.set(0, .78, 0);
+  const display = new THREE.Mesh(new THREE.BoxGeometry(.58, .32, .06), dark);
+  display.position.set(0, 1.05, .405);
+  group.add(canopy, post, post2, pump, display, missionTag('Fuel Station', '#9c2b25'));
+  group.position.set(x, 0, z);
+  scene.add(group);
+  addBoxCollider(x, z, 3.2, 2.2, 'fuel-station');
+}
+
+function addServiceGarage(scene, x, z) {
+  const group = new THREE.Group();
+  const wall = new THREE.MeshStandardMaterial({ color: 0xa8a39a, roughness: .95 });
+  const roof = new THREE.MeshStandardMaterial({ color: 0x314f64, roughness: .88 });
+  const shutter = new THREE.MeshStandardMaterial({ color: 0x4a5053, roughness: .95 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(7.4, 3.4, 5.2), wall);
+  body.position.y = 1.7;
+  const top = new THREE.Mesh(new THREE.BoxGeometry(7.8, .35, 5.6), roof);
+  top.position.y = 3.55;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.45, .12), shutter);
+  door.position.set(0, 1.35, 2.64);
+  group.add(body, top, door, missionTag('Service Garage', '#29475c'));
+  group.position.set(x, 0, z);
+  scene.add(group);
+  addBoxCollider(x, z, 3.7, 2.6, 'service-garage');
+}
+
+function nearestVehicleStation() {
+  const vehicle = activeJobMission?.vehicle;
+  if (!playerRef || !vehicle?.entered || !vehicle.stations) return null;
+  for (const [action, station] of Object.entries(vehicle.stations)) {
+    const distance = Math.hypot(playerRef.position.x - Number(station.x), playerRef.position.z - Number(station.z));
+    if (distance <= Number(station.radius || 7)) return { action: action === 'fuel' ? 'refuel' : 'repair', station, distance };
+  }
+  return null;
+}
+
+async function reportVehicleImpact(speed) {
+  const active = activeJobMission;
+  if (!active?.vehicle?.entered || performance.now() - lastImpactReportAt < 1200 || speed < 1.4) return;
+  lastImpactReportAt = performance.now();
+  const severity = speed >= 5.4 ? 3 : speed >= 3.2 ? 2 : 1;
+  try {
+    const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle/impact`, { taskId: active.taskId, severity });
+    if (result?.vehicle && activeJobMission?.taskId === active.taskId) {
+      activeJobMission.vehicle = { ...activeJobMission.vehicle, ...result.vehicle };
+      updateDriveHud();
+    }
+  } catch (error) {
+    if (error.status !== 409) console.warn('Vehicle impact report failed', error);
+  }
+}
+
 function roadZoneAt(x, z) {
   if (Math.abs(x) <= 7.75) return { id: 'main', label: 'MAIN ROAD', displayLimit: 40, bikeLimit: 6.6, taxiLimit: 6.4 };
   if (x >= -72 && x <= 16 && Math.abs(z + 22) <= 5.75) return { id: 'village', label: 'VILLAGE ROAD', displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 };
@@ -308,8 +374,11 @@ function updateDriveHud() {
   if (!driving || !playerRef) return;
   const zone = roadZoneAt(playerRef.position.x, playerRef.position.z);
   const speedKmh = Math.round(Math.abs(driveSpeed) * 6);
+  const fuel = Math.round(Number(activeJobMission?.vehicle?.fuel ?? 100));
+  const condition = Math.round(Number(activeJobMission?.vehicle?.condition ?? 100));
   const parkHint = Math.abs(driveSpeed) < .18 ? (zone.id === 'main' ? ' · STOPPED' : ' · PARK OK') : '';
-  roadStatus.textContent = `${zone.label} · LIMIT ${zone.displayLimit} · ${speedKmh} km/h${parkHint}`;
+  roadStatus.textContent = `${zone.label} · ${speedKmh}/${zone.displayLimit} km/h · FUEL ${fuel}% · COND ${condition}%${parkHint}`;
+  roadStatus.classList.toggle('warning', fuel <= 15 || condition <= 35);
 }
 
 hornAction?.addEventListener('pointerdown', event => {
@@ -526,8 +595,22 @@ function updateWorldInteract() {
   if (!worldInteract) return;
   worldInteract.hidden = true;
   worldInteract.disabled = false;
+  worldInteract.dataset.mode = '';
+  worldInteract.dataset.service = '';
   if (!profile || !playerRef || !activeJobMission) return;
   const active = activeJobMission;
+  const station = nearestVehicleStation();
+  if (station && Math.abs(driveSpeed) < .18) {
+    const vehicle = active.vehicle;
+    const needed = station.action === 'refuel' ? Number(vehicle.fuel) < Number(vehicle.fuelMax || 100) - .5 : Number(vehicle.condition) < Number(vehicle.conditionMax || 100) - 1;
+    if (needed) {
+      worldInteract.hidden = false;
+      worldInteract.dataset.mode = 'vehicle-service';
+      worldInteract.dataset.service = station.action;
+      worldInteract.textContent = station.action === 'refuel' ? `REFUEL · FUEL ${Math.round(Number(vehicle.fuel))}%` : `REPAIR · COND ${Math.round(Number(vehicle.condition))}%`;
+      return;
+    }
+  }
 
   if (active.phase === 'travel' && active.target) {
     if (active.vehicle && !active.vehicle.entered) return;
@@ -535,6 +618,7 @@ function updateWorldInteract() {
     const radius = Number(active.target.radius || 5.5);
     if (distance <= radius + .35) {
       worldInteract.textContent = active.target.action || 'INTERACT';
+      worldInteract.dataset.mode = 'job';
       worldInteract.hidden = false;
     }
     return;
@@ -546,12 +630,14 @@ function updateWorldInteract() {
     }
     const seconds = Math.max(0, Math.ceil((Number(active.readyAt || 0) - Date.now()) / 1000));
     worldInteract.hidden = false;
+    worldInteract.dataset.mode = 'job';
     worldInteract.disabled = seconds > 0;
     worldInteract.textContent = seconds > 0 ? `WORKING · ${seconds}s` : 'FINISH SHIFT';
     return;
   }
   if (active.phase === 'ready') {
     worldInteract.hidden = false;
+    worldInteract.dataset.mode = 'job';
     worldInteract.textContent = 'COLLECT SALARY';
   }
 }
@@ -569,7 +655,11 @@ function animateJobMissionVisual(time) {
 worldInteract?.addEventListener('click', () => {
   if (!activeJobMission || worldInteract.disabled) return;
   worldInteract.disabled = true;
-  window.dispatchEvent(new CustomEvent('kerala-job-interact'));
+  if (worldInteract.dataset.mode === 'vehicle-service') {
+    window.dispatchEvent(new CustomEvent('kerala-vehicle-service', { detail: { action: worldInteract.dataset.service } }));
+  } else {
+    window.dispatchEvent(new CustomEvent('kerala-job-interact'));
+  }
   setTimeout(() => { if (worldInteract && !worldInteract.hidden) worldInteract.disabled = false; }, 900);
 });
 
@@ -860,6 +950,14 @@ async function sendMovement(player, moving) {
     if (profile?.id !== userId) return;
     lastMovementMoving = moving;
     if (result.user) acceptUser(result.user);
+    if (result.vehicle && activeJobMission?.vehicle) {
+      activeJobMission.vehicle = { ...activeJobMission.vehicle, ...result.vehicle };
+      updateDriveHud();
+      if (Number(result.vehicle.fuel) <= 15 && performance.now() - lastFuelWarningAt > 12000) {
+        lastFuelWarningAt = performance.now();
+        showToast(Number(result.vehicle.fuel) <= .1 ? 'Fuel empty · go to Kerala Fuel Station' : 'Low fuel · visit Kerala Fuel Station');
+      }
+    }
     if (now - lastProgressRefresh > 3000) {
       lastProgressRefresh = now;
       await social.refreshUser();
@@ -1370,7 +1468,10 @@ try {
       const throttle = Math.sign(rawThrottle) * Math.pow(throttleMagnitude, 1.8);
       const steering = Math.sign(rawSteering) * Math.pow(steeringMagnitude, 1.35);
       const roadZone = roadZoneAt(player.position.x, player.position.z);
-      const maxForward = vehicleMode === 'bike' ? roadZone.bikeLimit : roadZone.taxiLimit;
+      const condition = Math.max(15, Math.min(100, Number(activeJobMission?.vehicle?.condition ?? 100)));
+      const conditionFactor = .62 + .38 * (condition / 100);
+      const fuel = Math.max(0, Number(activeJobMission?.vehicle?.fuel ?? 100));
+      const maxForward = (vehicleMode === 'bike' ? roadZone.bikeLimit : roadZone.taxiLimit) * conditionFactor * (fuel <= .05 ? 0 : 1);
       const maxReverse = Math.min(vehicleMode === 'bike' ? 2.6 : 2.4, maxForward * .48);
       const targetSpeed = runHeld ? 0 : (throttle >= 0 ? throttle * maxForward : throttle * maxReverse);
       const response = runHeld ? 9 : (Math.abs(throttle) > .01 ? 2.25 : 3.6);
@@ -1384,9 +1485,13 @@ try {
         const vehicleRadius = vehicleMode === 'taxi' ? .95 : .62;
         const beforeX = player.position.x;
         const beforeZ = player.position.z;
+        const impactSpeed = Math.abs(driveSpeed);
         const collided = moveWithCollision(player, dx, dz, vehicleRadius);
         const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
-        if (collided) driveSpeed *= movedDistance > .001 ? .42 : .12;
+        if (collided) {
+          reportVehicleImpact(impactSpeed);
+          driveSpeed *= movedDistance > .001 ? .42 : .12;
+        }
         movingNow = movedDistance > .0005;
       }
       if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 2.5);
@@ -1740,6 +1845,8 @@ function buildWorld(scene) {
   addBird(scene, 42.4, 5.4, 42.6, -.45);
   addPond(scene, 39, -4);
   addBench(scene, -10, -10);
+  addFuelStation(scene, 11, -12);
+  addServiceGarage(scene, -36, -15);
   addPhotoVillager(scene, -6, -50, 11, .55, 0, .78);
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
   addPhotoVillager(scene, -9, 19, 8, .5, 4, .75);
