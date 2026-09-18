@@ -585,7 +585,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       toast(`${result.completed.title} salary credited · ${formatCash(result.reward)}`);
     }
   }
-  window.addEventListener('kerala-job-interact', () => run(performWorldJobInteraction, jobsError));
+  window.addEventListener('kerala-job-interact', () => run(performWorldJobInteraction));
 
   function startJobsTimer() {
     if (jobsTimer) clearInterval(jobsTimer);
