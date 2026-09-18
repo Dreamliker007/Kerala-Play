@@ -437,3 +437,63 @@ test('jobs require job vehicles, real world checkpoints, server salary, cooldown
   assert.equal(shopPaid.data.reward, 140);
   assert.equal(shopPaid.data.wallet.balance, 1040);
 });
+
+
+test('job vehicle fuel damage refuel and repair stay server controlled', async t => {
+  const app = await setup(t), alice = app.client();
+  await signup(alice, 'VehicleAlice');
+
+  const started = await alice('/api/jobs/delivery/start', {});
+  assert.equal(started.status, 201);
+  let active = started.data.active;
+  assert.equal(active.vehicle.fuel, 100);
+  assert.equal(active.vehicle.condition, 100);
+  assert.equal(active.vehicle.stations.fuel.label, 'Kerala Fuel Station');
+  assert.equal(active.vehicle.stations.service.label, 'Village Service Garage');
+
+  app.advance(1_000);
+  assert.equal((await alice('/api/world/move', { x: active.vehicle.x, z: active.vehicle.z, rotation: 0, moving: true })).status, 200);
+  let vehicle = await alice('/api/jobs/delivery/vehicle', { taskId: active.taskId, action: 'enter' });
+  assert.equal(vehicle.status, 200);
+  active = vehicle.data.active;
+
+  assert.equal((await alice('/api/jobs/delivery/vehicle/service', { taskId: active.taskId, action: 'refuel' })).status, 409, 'Refuel must require the fuel station');
+
+  app.advance(2_000);
+  let moved = await alice('/api/world/move', { x: 6, z: -12, rotation: 0, moving: true, mode: 'bike' });
+  assert.equal(moved.status, 200);
+  assert.ok(moved.data.vehicle.fuel < 100, 'Driving must burn fuel on the server');
+  assert.ok(moved.data.vehicle.fuel > 90, 'Normal short driving should use only part of the tank');
+
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x: 6, z: -12, rotation: 0, moving: false, mode: 'bike' })).status, 200);
+  const refueled = await alice('/api/jobs/delivery/vehicle/service', { taskId: active.taskId, action: 'refuel' });
+  assert.equal(refueled.status, 200);
+  assert.equal(refueled.data.vehicle.fuel, 100);
+  assert.equal(refueled.data.transaction.kind, 'fuel');
+  assert.ok(refueled.data.service.cost > 0);
+  const balanceAfterFuel = refueled.data.wallet.balance;
+  assert.ok(balanceAfterFuel < 500);
+
+  const impact = await alice('/api/jobs/delivery/vehicle/impact', { taskId: active.taskId, severity: 3 });
+  assert.equal(impact.status, 200);
+  assert.equal(impact.data.damage, 9);
+  assert.equal(impact.data.vehicle.condition, 91);
+  assert.equal((await alice('/api/jobs/delivery/vehicle/impact', { taskId: active.taskId, severity: 3 })).status, 409, 'Impact damage must be throttled');
+
+  app.advance(2_000);
+  moved = await alice('/api/world/move', { x: -15, z: -17, rotation: 0, moving: true, mode: 'bike' });
+  assert.equal(moved.status, 200);
+  app.advance(2_000);
+  moved = await alice('/api/world/move', { x: -36, z: -22, rotation: 0, moving: true, mode: 'bike' });
+  assert.equal(moved.status, 200);
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x: -36, z: -22, rotation: 0, moving: false, mode: 'bike' })).status, 200);
+
+  const repaired = await alice('/api/jobs/delivery/vehicle/service', { taskId: active.taskId, action: 'repair' });
+  assert.equal(repaired.status, 200);
+  assert.equal(repaired.data.vehicle.condition, 100);
+  assert.equal(repaired.data.transaction.kind, 'repair');
+  assert.equal(repaired.data.service.cost, 9);
+  assert.equal(repaired.data.wallet.balance, balanceAfterFuel - 9);
+});
