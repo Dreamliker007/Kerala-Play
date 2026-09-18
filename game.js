@@ -82,6 +82,7 @@ let vehicleMode = 'walk';
 let driveSpeed = 0;
 let headlightsOn = false;
 let hornReadyAt = 0;
+let hornPulseUntil = 0;
 let driveAudioContext = null;
 let profile = null;
 let progress = newProgress();
@@ -248,6 +249,7 @@ function ensureDriveAudio() {
 function playVehicleHorn() {
   if (vehicleMode === 'walk' || performance.now() < hornReadyAt) return;
   hornReadyAt = performance.now() + 420;
+  hornPulseUntil = performance.now() + 1100;
   const context = ensureDriveAudio();
   if (!context) return;
   const start = context.currentTime;
@@ -306,7 +308,8 @@ function updateDriveHud() {
   if (!driving || !playerRef) return;
   const zone = roadZoneAt(playerRef.position.x, playerRef.position.z);
   const speedKmh = Math.round(Math.abs(driveSpeed) * 6);
-  roadStatus.textContent = `${zone.label} · LIMIT ${zone.displayLimit} · ${speedKmh} km/h`;
+  const parkHint = Math.abs(driveSpeed) < .18 ? (zone.id === 'main' ? ' · STOPPED' : ' · PARK OK') : '';
+  roadStatus.textContent = `${zone.label} · LIMIT ${zone.displayLimit} · ${speedKmh} km/h${parkHint}`;
 }
 
 hornAction?.addEventListener('pointerdown', event => {
@@ -442,7 +445,7 @@ function updateVehicleAction() {
     vehicleAction.classList.add('exit');
     const moving = Math.abs(driveSpeed) > .8;
     vehicleAction.disabled = moving;
-    vehicleAction.textContent = moving ? 'STOP TO EXIT' : `EXIT ${vehicle.kind === 'bike' ? 'BIKE' : 'TAXI'}`;
+    vehicleAction.textContent = moving ? 'STOP TO PARK' : `PARK ${vehicle.kind === 'bike' ? 'BIKE' : 'TAXI'}`;
     return;
   }
   const distance = Math.hypot(Number(vehicle.x) - playerRef.position.x, Number(vehicle.z) - playerRef.position.z);
@@ -1900,6 +1903,7 @@ function updateTraffic(delta) {
       if (playerDistance < 3.8) targetSpeed = 0;
       else if (playerDistance < 6.2) targetSpeed = Math.min(targetSpeed, baseSpeed * .18);
       else if (playerDistance < 9.5) targetSpeed = Math.min(targetSpeed, baseSpeed * .52);
+      if (performance.now() < hornPulseUntil && playerDistance < 11) targetSpeed = Math.min(targetSpeed, baseSpeed * .22);
     }
 
     for (const other of traffic) {
