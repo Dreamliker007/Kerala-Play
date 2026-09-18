@@ -604,6 +604,19 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   window.addEventListener('kerala-job-vehicle', event => run(() => performJobVehicleAction(event.detail?.action)));
 
+  async function performVehicleService(action) {
+    const active = jobsSnapshot?.active;
+    if (!user || !active?.vehicle || !['refuel', 'repair'].includes(action)) return;
+    const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle/service`, { taskId: active.taskId, action });
+    renderJobs(result.jobs);
+    renderWallet(result.wallet);
+    const service = result.service;
+    toast(action === 'refuel'
+      ? `Fuel tank full · ${formatCash(service.cost)} paid`
+      : `Vehicle repaired · condition 100% · ${formatCash(service.cost)} paid`);
+  }
+  window.addEventListener('kerala-vehicle-service', event => run(() => performVehicleService(event.detail?.action)));
+
   function startJobsTimer() {
     if (jobsTimer) clearInterval(jobsTimer);
     jobsTimer = setInterval(() => {
