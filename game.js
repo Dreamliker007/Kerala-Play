@@ -291,7 +291,7 @@ function clearJobVehicleVisual() {
 function syncJobVehicleVisual() {
   if (!sceneRef || !playerRef) return;
   const vehicle = activeJobMission?.vehicle;
-  const signature = vehicle ? [activeJobMission.taskId, vehicle.kind, vehicle.entered, vehicle.x, vehicle.z].join('|') : '';
+  const signature = vehicle ? [activeJobMission.taskId, vehicle.kind, vehicle.entered, vehicle.entered ? 'driving' : vehicle.x, vehicle.entered ? 'driving' : vehicle.z].join('|') : '';
   if (signature === jobVehicleSignature) return;
   clearJobVehicleVisual();
   jobVehicleSignature = signature;
@@ -419,6 +419,7 @@ function updateWorldInteract() {
   const active = activeJobMission;
 
   if (active.phase === 'travel' && active.target) {
+    if (active.vehicle && !active.vehicle.entered) return;
     const distance = Math.hypot(Number(active.target.x) - playerRef.position.x, Number(active.target.z) - playerRef.position.z);
     const radius = Number(active.target.radius || 5.5);
     if (distance <= radius + .35) {
@@ -530,6 +531,7 @@ function acceptUser(user) {
     updateNameLabel(playerRef, user?.username || '', user?.id);
   }
   if (!user) {
+    applyJobMission(null);
     connectionReady = false;
     lastMovementMoving = false;
     synchronizePlayers([]);
