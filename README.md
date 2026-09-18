@@ -73,3 +73,8 @@ World jobs now have visible mission objects and on-site interaction. Delivery mi
 Delivery Rider missions now spawn a dedicated delivery bike and Taxi Driver missions spawn a Kerala taxi. Players must walk to the assigned job vehicle, enter it, and complete the route while driving. Vehicle entry/exit and movement mode are server-authoritative; bike/taxi speed limits are validated by the backend, and vehicle distance does not count toward walking-task progress. The RUN control becomes BRAKE while driving.
 
 V54 also tightens input stability with a joystick dead zone, tracked pointer capture/release, global pointer-up cleanup, blur/visibility input reset, smoothed acceleration/braking and steering, and camera auto-follow while driving. No new Supabase migration is required because vehicle state lives inside the existing persisted job state.
+
+
+## Walking Stability Hotfix (V56)
+
+Avatar movement now uses smoothed walking velocity instead of applying joystick direction directly every frame. Small stick movement produces a slower walk, acceleration and deceleration ramp smoothly, turning follows the smoothed travel direction, and the camera no longer fights manual look input while walking. Run speed and turn response are also reduced for more controllable movement. Walking inertia is cleared whenever the player enters a vehicle or the game loses focus.
