@@ -10,7 +10,7 @@
     "start:production": "node production-server.mjs",
     "production:check": "node scripts/check-production-env.mjs",
     "production:import-local": "node scripts/import-local-game.mjs",
-    "test": "node --test tests/server.test.mjs",
+    "test": "node --test server.test.mjs",
     "mobile:prepare": "node scripts/prepare-mobile.mjs",
     "mobile:add": "npm run mobile:prepare && npx cap add android",
     "mobile:sync": "npm run mobile:prepare && npx cap sync android",
