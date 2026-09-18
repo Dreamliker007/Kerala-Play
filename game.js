@@ -302,6 +302,7 @@ function synchronizePlayers(players) {
       (data.z - remote.userData.target.z) / networkDelta
     );
     if (!data.moving) remote.userData.velocity.set(0, 0, 0);
+    else if (remote.userData.velocity.lengthSq() > 81) remote.userData.velocity.setLength(9);
     remote.userData.target.set(data.x, 0, data.z);
     remote.userData.targetAt = receivedAt;
     remote.userData.yaw = Number(data.rotation) || 0;
@@ -608,7 +609,10 @@ try {
   buildLandmarkWorld(scene);
   buildPlayer(player);
   player.visible = !!profile;
-  if (profile) placePlayerAtDistrict(profile.district);
+  if (profile && Number.isFinite(profile.x) && Number.isFinite(profile.z)) {
+    player.position.set(profile.x, 0, profile.z);
+    if (Number.isFinite(profile.rotation)) player.rotation.y = profile.rotation;
+  } else if (profile) placePlayerAtDistrict(profile.district);
   wireInterface();
   updateMapPlayer(player);
 
@@ -625,7 +629,7 @@ try {
   let lastLookY = 0;
   let inputX = 0;
   let inputY = 0;
-  let cameraYaw = Math.PI * .75;
+  let cameraYaw = player.rotation.y + Math.PI;
   let cameraPitch = .31;
   let runHeld = false;
   let walkPhase = 0;
