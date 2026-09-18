@@ -1299,7 +1299,18 @@ try {
   }
   window.addEventListener('keydown', event => {
     if (typingIntoField(event) || !profile || document.querySelector('[aria-modal="true"]:not([hidden])')) return;
-    keys.add(event.key.toLowerCase());
+    const key = event.key.toLowerCase();
+    if (vehicleMode !== 'walk' && key === 'h' && !event.repeat) {
+      playVehicleHorn();
+      event.preventDefault();
+      return;
+    }
+    if (vehicleMode !== 'walk' && key === 'l' && !event.repeat) {
+      toggleVehicleHeadlights();
+      event.preventDefault();
+      return;
+    }
+    keys.add(key);
     if (event.key === 'Shift') setRun(true);
   });
   window.addEventListener('keyup', event => {
@@ -1355,8 +1366,9 @@ try {
         : (Math.abs(rawSteering) - steeringDeadzone) / (1 - steeringDeadzone);
       const throttle = Math.sign(rawThrottle) * Math.pow(throttleMagnitude, 1.8);
       const steering = Math.sign(rawSteering) * Math.pow(steeringMagnitude, 1.35);
-      const maxForward = vehicleMode === 'bike' ? 7.4 : 6.6;
-      const maxReverse = vehicleMode === 'bike' ? 2.6 : 2.4;
+      const roadZone = roadZoneAt(player.position.x, player.position.z);
+      const maxForward = vehicleMode === 'bike' ? roadZone.bikeLimit : roadZone.taxiLimit;
+      const maxReverse = Math.min(vehicleMode === 'bike' ? 2.6 : 2.4, maxForward * .48);
       const targetSpeed = runHeld ? 0 : (throttle >= 0 ? throttle * maxForward : throttle * maxReverse);
       const response = runHeld ? 9 : (Math.abs(throttle) > .01 ? 2.25 : 3.6);
       driveSpeed += (targetSpeed - driveSpeed) * Math.min(1, delta * response);
@@ -1438,6 +1450,7 @@ try {
     camera.lookAt(cameraTarget);
     updateRemotePlayers(delta, camera);
     updateVehicleAction();
+    updateDriveHud();
     sendMovement(player, movingNow);
     atmosphere.update(delta, villageTime, { moving: movingNow, running: vehicleMode === 'walk' && runHeld, nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13, inChallenge: !!challengeRound });
     renderer.render(scene, camera);
