@@ -1030,6 +1030,8 @@ try {
   const cameraPosition = new THREE.Vector3();
   const worldUp = new THREE.Vector3(0, 1, 0);
   const desiredMove = new THREE.Vector3();
+  const walkVelocity = new THREE.Vector3();
+  const targetWalkVelocity = new THREE.Vector3();
 
   scene.add(player);
   playerRef = player;
@@ -1184,6 +1186,8 @@ try {
     runPointerId = null;
     lookPointerId = null;
     driveSpeed = 0;
+    walkVelocity.set(0, 0, 0);
+    targetWalkVelocity.set(0, 0, 0);
   }
   window.addEventListener('keydown', event => {
     if (typingIntoField(event) || !profile || document.querySelector('[aria-modal="true"]:not([hidden])')) return;
@@ -1259,26 +1263,43 @@ try {
       if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 2.5);
       animatePlayer(player, walkPhase, 0);
       if (mapAccumulator >= .12) { updateMapPlayer(player); mapAccumulator = 0; }
-    } else if (controlLength > .06) {
-      driveSpeed = 0;
-      moveForward.set(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
-      moveRight.set(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
-      desiredMove.copy(moveForward).multiplyScalar(-controlY).addScaledVector(moveRight, controlX).normalize();
-      const speed = runHeld ? 7.2 : 3.8;
-      player.position.addScaledVector(desiredMove, speed * controlLength * delta);
-      addWalkProgress(speed * controlLength * delta);
-      player.position.x = THREE.MathUtils.clamp(player.position.x, -110, 110);
-      player.position.z = THREE.MathUtils.clamp(player.position.z, -110, 110);
-      const desiredYaw = Math.atan2(desiredMove.x, desiredMove.z);
-      player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * 11);
-      cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 1.4);
-      walkPhase += delta * (runHeld ? 15 : 9) * controlLength;
-      animatePlayer(player, walkPhase, controlLength);
-      movingNow = true;
-      if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
     } else {
       driveSpeed = 0;
-      animatePlayer(player, walkPhase, 0);
+      const walkingInput = controlLength > .08;
+      if (walkingInput) {
+        moveForward.set(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
+        moveRight.set(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
+        desiredMove.copy(moveForward).multiplyScalar(-controlY).addScaledVector(moveRight, controlX);
+        if (desiredMove.lengthSq() > .0001) desiredMove.normalize();
+        const inputCurve = Math.pow(controlLength, 1.55);
+        const maxWalkSpeed = runHeld ? 5.4 : 3.05;
+        targetWalkVelocity.copy(desiredMove).multiplyScalar(maxWalkSpeed * inputCurve);
+      } else {
+        targetWalkVelocity.set(0, 0, 0);
+      }
+
+      const walkResponse = walkingInput ? (runHeld ? 5.2 : 6.8) : 11.5;
+      walkVelocity.lerp(targetWalkVelocity, 1 - Math.exp(-delta * walkResponse));
+      if (!walkingInput && walkVelocity.lengthSq() < .0016) walkVelocity.set(0, 0, 0);
+
+      const walkSpeed = walkVelocity.length();
+      if (walkSpeed > .035) {
+        player.position.addScaledVector(walkVelocity, delta);
+        addWalkProgress(walkSpeed * delta);
+        player.position.x = THREE.MathUtils.clamp(player.position.x, -110, 110);
+        player.position.z = THREE.MathUtils.clamp(player.position.z, -110, 110);
+        const desiredYaw = Math.atan2(walkVelocity.x, walkVelocity.z);
+        const turnSpeed = runHeld ? 5.6 : 6.8;
+        player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
+        if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
+        const animationAmount = Math.min(1, walkSpeed / (runHeld ? 5.4 : 3.05));
+        walkPhase += delta * (runHeld ? 12 : 8) * Math.max(.22, animationAmount);
+        animatePlayer(player, walkPhase, animationAmount);
+        movingNow = true;
+        if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
+      } else {
+        animatePlayer(player, walkPhase, 0);
+      }
     }
 
     cameraTarget.set(player.position.x, player.position.y + (vehicleMode === 'taxi' ? 1.35 : 1.45), player.position.z);
