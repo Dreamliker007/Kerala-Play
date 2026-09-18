@@ -61,3 +61,8 @@ Phase 1 now includes a server-verified job board with three repeatable jobs:
 Only one job can be active at a time. The backend creates a unique task ID, enforces minimum work time and cooldowns, rejects replayed/expired task IDs, and credits the server-defined salary directly to the Kerala Cash wallet. Client-supplied salary values are ignored. Active-job state, cooldowns and completion counts persist across backend restarts.
 
 For an existing Supabase production project, run `supabase/jobs-v1.sql` once, then rerun `supabase/production-persistence-rpc.sql` and `supabase/production-service-role-grants.sql` before deploying V51.
+
+
+## Interactive Job Objects (V53)
+
+World jobs now have visible mission objects and on-site interaction. Delivery missions render a parcel at pickup and carry the parcel after collection, Taxi missions render a waiting passenger and keep the passenger with the player until drop-off, and Shop Worker missions render a temporary village-shop interaction point. When the player is within the server-defined checkpoint radius, an INTERACT button appears in the world HUD so pickup, drop-off, check-in and salary collection can be completed without opening the Jobs panel. Server-side position checks, cooldowns and salary validation remain authoritative. No new Supabase migration is required for V53.

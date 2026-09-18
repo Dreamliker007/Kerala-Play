@@ -8,6 +8,7 @@ const joystickBase = document.querySelector('#joystick-base');
 const joystickKnob = document.querySelector('#joystick-knob');
 const cameraZone = document.querySelector('#camera-zone');
 const runButton = document.querySelector('#run');
+const worldInteract = document.querySelector('#world-interact');
 const profileName = document.querySelector('#profile-name');
 const profileDistrict = document.querySelector('#profile-district');
 const profileChip = document.querySelector('#profile-chip');
@@ -66,6 +67,9 @@ let selectedLandmark = null;
 let mapLabelsVisible = false;
 let activeDmContact = null;
 let activeJobMission = null;
+let jobWorldVisual = null;
+let jobCarryVisual = null;
+let jobVisualSignature = '';
 let profile = null;
 let progress = newProgress();
 let social = null;
@@ -107,9 +111,234 @@ const taskCatalog = [
 ];
 
 
+function disposeMissionObject(object) {
+  if (!object) return;
+  const geometries = new Set(), materials = new Set(), textures = new Set();
+  object.traverse(child => {
+    if (child.geometry) geometries.add(child.geometry);
+    for (const material of Array.isArray(child.material) ? child.material : [child.material]) {
+      if (!material) continue;
+      materials.add(material);
+      if (material.map) textures.add(material.map);
+    }
+  });
+  textures.forEach(texture => texture.dispose());
+  geometries.forEach(geometry => geometry.dispose());
+  materials.forEach(material => material.dispose());
+}
+
+function clearJobMissionVisual() {
+  if (jobWorldVisual) {
+    sceneRef?.remove(jobWorldVisual);
+    disposeMissionObject(jobWorldVisual);
+    jobWorldVisual = null;
+  }
+  if (jobCarryVisual) {
+    playerRef?.remove(jobCarryVisual);
+    disposeMissionObject(jobCarryVisual);
+    jobCarryVisual = null;
+  }
+  jobVisualSignature = '';
+}
+
+function missionTag(text, background = '#155b3d') {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const context = canvas.getContext('2d');
+  context.fillStyle = background;
+  context.fillRect(2, 8, 252, 48);
+  context.strokeStyle = 'rgba(255,255,255,.9)';
+  context.lineWidth = 3;
+  context.strokeRect(3.5, 9.5, 249, 45);
+  context.fillStyle = '#fff';
+  context.font = '800 22px system-ui, sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(String(text).slice(0, 22).toUpperCase(), 128, 33);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
+  sprite.scale.set(4.2, 1.05, 1);
+  sprite.position.y = 3.15;
+  return sprite;
+}
+
+function missionMarker(color = 0x65e69b) {
+  const group = new THREE.Group();
+  const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .85, side: THREE.DoubleSide, depthWrite: false });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.35, 28), material);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = .035;
+  const arrow = new THREE.Mesh(new THREE.ConeGeometry(.24, .62, 10), material.clone());
+  arrow.rotation.z = Math.PI;
+  arrow.position.y = 2.45;
+  group.add(ring, arrow);
+  group.userData.ring = ring;
+  group.userData.arrow = arrow;
+  return group;
+}
+
+function parcelVisual() {
+  const group = new THREE.Group();
+  const boxMaterial = new THREE.MeshStandardMaterial({ color: 0xb77b3d, roughness: .88 });
+  const tapeMaterial = new THREE.MeshStandardMaterial({ color: 0xe8d19a, roughness: .72 });
+  const box = new THREE.Mesh(new THREE.BoxGeometry(.78, .52, .58), boxMaterial);
+  box.position.y = .36;
+  const tape = new THREE.Mesh(new THREE.BoxGeometry(.13, .535, .595), tapeMaterial);
+  tape.position.y = .36;
+  group.add(box, tape);
+  return group;
+}
+
+function passengerVisual() {
+  const group = new THREE.Group();
+  const human = createHuman({ gender: 'female', shirt: 0xc97987, trousers: 0x27354a, skin: 0xa96d4c, hair: 0x171311, shoes: 0x2c2825, accent: 0xf0d06f });
+  human.scale.setScalar(.82);
+  group.add(human);
+  group.userData.passengerHuman = human;
+  return group;
+}
+
+function shopVisual() {
+  const group = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({ color: 0x7a4c2d, roughness: .92 });
+  const counterMat = new THREE.MeshStandardMaterial({ color: 0xe0c796, roughness: .88 });
+  const canopyMat = new THREE.MeshStandardMaterial({ color: 0x2f7e58, roughness: .82 });
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(2.7, .9, .72), counterMat);
+  counter.position.set(0, .48, 0);
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.2, .16, 1.5), canopyMat);
+  canopy.position.set(0, 2.45, 0);
+  [-1.35, 1.35].forEach(x => {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(.12, 2.4, .12), wood);
+    post.position.set(x, 1.2, 0);
+    group.add(post);
+  });
+  group.add(counter, canopy, missionTag('Village Shop', '#235641'));
+  return group;
+}
+
+function addCarryVisual(kind) {
+  if (!playerRef) return;
+  if (kind === 'parcel') {
+    jobCarryVisual = parcelVisual();
+    jobCarryVisual.scale.setScalar(.65);
+    jobCarryVisual.position.set(0, 1.28, -.42);
+  } else if (kind === 'passenger') {
+    jobCarryVisual = passengerVisual();
+    jobCarryVisual.scale.setScalar(.72);
+    jobCarryVisual.position.set(.88, 0, .18);
+  }
+  if (jobCarryVisual) playerRef.add(jobCarryVisual);
+}
+
+function syncJobWorldVisual() {
+  if (!sceneRef || !playerRef) return;
+  const active = activeJobMission;
+  const target = active?.target;
+  const signature = active ? [active.taskId, active.jobId, active.phase, active.stepIndex, target?.x, target?.z].join('|') : '';
+  if (signature === jobVisualSignature) return;
+  clearJobMissionVisual();
+  jobVisualSignature = signature;
+  if (!active) return;
+
+  if (active.phase === 'travel' && target) {
+    const root = new THREE.Group();
+    root.position.set(Number(target.x) || 0, 0, Number(target.z) || 0);
+    const marker = missionMarker(active.jobId === 'taxi' ? 0x6fc8ff : active.jobId === 'delivery' ? 0xf4c95d : 0x65e69b);
+    root.add(marker);
+    root.userData.marker = marker;
+
+    if (active.jobId === 'delivery') {
+      if (Number(active.stepIndex || 0) === 0) {
+        const parcel = parcelVisual();
+        parcel.position.y = .04;
+        root.add(parcel, missionTag('Parcel Pickup', '#805321'));
+      } else {
+        root.add(missionTag('Customer Drop-off', '#805321'));
+        addCarryVisual('parcel');
+      }
+    } else if (active.jobId === 'taxi') {
+      if (Number(active.stepIndex || 0) === 0) {
+        const passenger = passengerVisual();
+        passenger.position.set(0, .03, 0);
+        root.add(passenger, missionTag('Passenger', '#245b75'));
+      } else {
+        root.add(missionTag('Taxi Drop-off', '#245b75'));
+        addCarryVisual('passenger');
+      }
+    } else if (active.jobId === 'shop') {
+      root.add(shopVisual());
+    }
+    sceneRef.add(root);
+    jobWorldVisual = root;
+  } else if (active.phase === 'working' && target && active.jobId === 'shop') {
+    const root = new THREE.Group();
+    root.position.set(Number(target.x) || 0, 0, Number(target.z) || 0);
+    const marker = missionMarker(0x65e69b);
+    root.add(marker, shopVisual());
+    root.userData.marker = marker;
+    sceneRef.add(root);
+    jobWorldVisual = root;
+  }
+}
+
+function updateWorldInteract() {
+  if (!worldInteract) return;
+  worldInteract.hidden = true;
+  worldInteract.disabled = false;
+  if (!profile || !playerRef || !activeJobMission) return;
+  const active = activeJobMission;
+
+  if (active.phase === 'travel' && active.target) {
+    const distance = Math.hypot(Number(active.target.x) - playerRef.position.x, Number(active.target.z) - playerRef.position.z);
+    const radius = Number(active.target.radius || 5.5);
+    if (distance <= radius + .35) {
+      worldInteract.textContent = active.target.action || 'INTERACT';
+      worldInteract.hidden = false;
+    }
+    return;
+  }
+  if (active.phase === 'working') {
+    if (active.target) {
+      const distance = Math.hypot(Number(active.target.x) - playerRef.position.x, Number(active.target.z) - playerRef.position.z);
+      if (distance > Number(active.target.radius || 5.5) + .35) return;
+    }
+    const seconds = Math.max(0, Math.ceil((Number(active.readyAt || 0) - Date.now()) / 1000));
+    worldInteract.hidden = false;
+    worldInteract.disabled = seconds > 0;
+    worldInteract.textContent = seconds > 0 ? `WORKING · ${seconds}s` : 'FINISH SHIFT';
+    return;
+  }
+  if (active.phase === 'ready') {
+    worldInteract.hidden = false;
+    worldInteract.textContent = 'COLLECT SALARY';
+  }
+}
+
+function animateJobMissionVisual(time) {
+  const marker = jobWorldVisual?.userData.marker;
+  if (marker) {
+    marker.userData.ring.rotation.z = time * .55;
+    marker.userData.arrow.position.y = 2.45 + Math.sin(time * 3.2) * .18;
+  }
+  const passenger = jobCarryVisual?.userData.passengerHuman;
+  if (passenger) animateHuman(passenger, time * 2, 0);
+}
+
+worldInteract?.addEventListener('click', () => {
+  if (!activeJobMission || worldInteract.disabled) return;
+  worldInteract.disabled = true;
+  window.dispatchEvent(new CustomEvent('kerala-job-interact'));
+  setTimeout(() => { if (worldInteract && !worldInteract.hidden) worldInteract.disabled = false; }, 900);
+});
+
+
+
 
 function applyJobMission(active) {
   activeJobMission = active || null;
+  syncJobWorldVisual();
+  updateWorldInteract();
   if (playerRef) updateMapPlayer(playerRef);
   if (!activeJobMission) {
     if (!selectedLandmark) {
@@ -666,6 +895,7 @@ try {
   buildWorld(scene);
   buildLandmarkWorld(scene);
   buildPlayer(player);
+  syncJobWorldVisual();
   player.visible = !!profile;
   if (profile && Number.isFinite(profile.x) && Number.isFinite(profile.z)) {
     player.position.set(profile.x, 0, profile.z);
@@ -812,6 +1042,8 @@ try {
     npcAccumulator += delta; trafficAccumulator += delta; mapAccumulator += delta;
     if (npcAccumulator >= (isMobile ? .10 : .05)) { updateVillagers(villageTime); npcAccumulator = 0; }
     if (trafficAccumulator >= (isMobile ? .05 : .025)) { updateTraffic(trafficAccumulator); trafficAccumulator = 0; }
+    animateJobMissionVisual(villageTime);
+    updateWorldInteract();
     const keyboardX = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
     const keyboardY = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
     const controlX = Math.abs(keyboardX) > 0 ? keyboardX : inputX;
