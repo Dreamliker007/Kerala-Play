@@ -373,6 +373,12 @@ function restorePlayerVehiclePose() {
 
 function clearJobVehicleVisual() {
   if (jobVehicleVisual) {
+    const beam = jobVehicleVisual.userData.headlightBeam;
+    if (beam) {
+      jobVehicleVisual.remove(beam.light, beam.target);
+      beam.light.dispose?.();
+      jobVehicleVisual.userData.headlightBeam = null;
+    }
     jobVehicleVisual.parent?.remove(jobVehicleVisual);
     disposeMissionObject(jobVehicleVisual);
     jobVehicleVisual = null;
@@ -1694,6 +1700,12 @@ function buildWorld(scene) {
   sideRoad.position.set(-28, .017, -22);
   scene.add(sideRoad);
   addRoadEdges(scene, -28, -22, 88, 12);
+  for (let x = -68; x <= 12; x += 9) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(4.2, .18), lineMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(x, .031, -22);
+    scene.add(line);
+  }
   addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737 });
   addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -76, max: 76, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d });
   addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5 });
@@ -1823,7 +1835,13 @@ function createRoadVehicle(kind, color) {
   cabin.position.y = isBus ? 1.64 : 1.12;
   const windscreen = new THREE.Mesh(new THREE.BoxGeometry(width - .27, isBus ? .42 : .30, .055), glass);
   windscreen.position.set(0, isBus ? 1.63 : 1.12, length / 2 + .03);
-  vehicle.add(body, cabin, windscreen);
+  const headlightMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0b8, emissive: 0xffd56b, emissiveIntensity: .22, roughness: .42 });
+  const leftLamp = new THREE.Mesh(new THREE.SphereGeometry(isBus ? .10 : .085, 7, 6), headlightMaterial);
+  const rightLamp = leftLamp.clone();
+  leftLamp.position.set(-width * .29, isBus ? .82 : .62, length / 2 + .08);
+  rightLamp.position.set(width * .29, isBus ? .82 : .62, length / 2 + .08);
+  vehicle.add(body, cabin, windscreen, leftLamp, rightLamp);
+  vehicle.userData.headlightMaterials = [headlightMaterial];
   if (isBus) {
     for (let row = -1.25; row <= 1.25; row += .82) {
       const window = new THREE.Mesh(new THREE.BoxGeometry(.045, .34, .56), glass);
@@ -1846,7 +1864,7 @@ function createRoadVehicle(kind, color) {
 
 function addRoadVehicle(scene, config) {
   const vehicle = createRoadVehicle(config.kind, config.color);
-  vehicle.userData.traffic = { ...config };
+  vehicle.userData.traffic = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
   if (config.axis === 'z') {
     vehicle.position.set(config.fixed, 0, config.progress);
     vehicle.rotation.y = config.direction > 0 ? 0 : Math.PI;
@@ -1861,9 +1879,46 @@ function addRoadVehicle(scene, config) {
 function updateTraffic(delta) {
   traffic.forEach(vehicle => {
     const config = vehicle.userData.traffic;
-    config.progress += config.direction * config.speed * delta;
-    if (config.direction > 0 && config.progress > config.max) config.progress = config.min;
-    if (config.direction < 0 && config.progress < config.min) config.progress = config.max;
+    const baseSpeed = Number(config.baseSpeed || config.speed || 0);
+    let targetSpeed = baseSpeed;
+
+    if (playerRef && vehicleMode !== 'walk') {
+      const playerDistance = Math.hypot(playerRef.position.x - vehicle.position.x, playerRef.position.z - vehicle.position.z);
+      if (playerDistance < 3.8) targetSpeed = 0;
+      else if (playerDistance < 6.2) targetSpeed = Math.min(targetSpeed, baseSpeed * .18);
+      else if (playerDistance < 9.5) targetSpeed = Math.min(targetSpeed, baseSpeed * .52);
+    }
+
+    for (const other of traffic) {
+      if (other === vehicle) continue;
+      const otherConfig = other.userData.traffic;
+      if (otherConfig.axis !== config.axis || Math.abs(Number(otherConfig.fixed) - Number(config.fixed)) > 1.1) continue;
+      const gap = (Number(otherConfig.progress) - Number(config.progress)) * Number(config.direction);
+      if (gap > 0 && gap < 4.4) targetSpeed = 0;
+      else if (gap >= 4.4 && gap < 8) targetSpeed = Math.min(targetSpeed, baseSpeed * .35);
+    }
+
+    if (config.axis === 'x') {
+      const distanceToCrossing = (0 - Number(config.progress)) * Number(config.direction);
+      const mainRoadTrafficNear = traffic.some(other => {
+        const otherConfig = other.userData.traffic;
+        return otherConfig.axis === 'z' && Math.abs(other.position.z + 24.5) < 7.5;
+      });
+      if (distanceToCrossing > 1.5 && distanceToCrossing < 11 && mainRoadTrafficNear) targetSpeed = 0;
+    }
+
+    const response = targetSpeed < Number(config.currentSpeed) ? 4.6 : 1.9;
+    config.currentSpeed += (targetSpeed - Number(config.currentSpeed)) * Math.min(1, delta * response);
+    if (Math.abs(config.currentSpeed) < .03) config.currentSpeed = 0;
+    config.progress += config.direction * config.currentSpeed * delta;
+    if (config.direction > 0 && config.progress > config.max) {
+      config.progress = config.min;
+      config.currentSpeed = baseSpeed;
+    }
+    if (config.direction < 0 && config.progress < config.min) {
+      config.progress = config.max;
+      config.currentSpeed = baseSpeed;
+    }
     if (config.axis === 'z') vehicle.position.z = config.progress;
     else vehicle.position.x = config.progress;
   });
