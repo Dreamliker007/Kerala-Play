@@ -27,7 +27,8 @@
     .drive-tool { width:58px; height:58px; border:1px solid rgba(255,255,255,.5); border-radius:50%; color:#fff; background:rgba(12,44,54,.76); box-shadow:0 4px 14px rgba(0,0,0,.24); font:800 9px/1 system-ui,sans-serif; touch-action:manipulation; cursor:pointer; }
     .drive-tool span { display:block; margin-bottom:2px; font-size:18px; line-height:1; }
     .drive-tool.active { background:rgba(185,137,33,.9); border-color:#fff0a5; }
-    #road-status { position:absolute; z-index:5; left:50%; bottom:calc(env(safe-area-inset-bottom) + 24px); transform:translateX(-50%); min-width:120px; padding:7px 10px; border:1px solid rgba(255,255,255,.26); border-radius:10px; color:#f4fff8; background:rgba(8,35,43,.7); text-align:center; font:800 10px/1.25 system-ui,sans-serif; letter-spacing:.3px; pointer-events:none; }
+    #road-status { position:absolute; z-index:5; left:50%; bottom:calc(env(safe-area-inset-bottom) + 24px); transform:translateX(-50%); min-width:180px; max-width:58vw; padding:7px 10px; border:1px solid rgba(255,255,255,.26); border-radius:10px; color:#f4fff8; background:rgba(8,35,43,.7); text-align:center; font:800 10px/1.25 system-ui,sans-serif; letter-spacing:.3px; pointer-events:none; }
+    #road-status.warning { color:#ffe8a6; border-color:rgba(255,218,104,.65); background:rgba(99,65,12,.8); }
     #camera-zone { position: absolute; right: 0; bottom: 0; width: 52vw; height: 100vh; pointer-events: auto; touch-action: none; }
     #camera-note { position: absolute; z-index:2; right: 122px; bottom: calc(env(safe-area-inset-bottom) + 65px); color: rgba(255,255,255,.87); background: rgba(11,35,45,.42); padding: 6px 8px; border-radius: 8px; font-size: 11px; pointer-events:none; }
     #fallback { display: none; position: fixed; inset: 0; z-index: 5; place-items: center; padding: 24px; background: #16323f; color: white; text-align: center; line-height: 1.5; }
@@ -128,7 +129,7 @@
       #drive-tools { right:92px; bottom:calc(env(safe-area-inset-bottom) + 28px); gap:6px; }
       .drive-tool { width:48px; height:48px; font-size:7px; }
       .drive-tool span { font-size:15px; }
-      #road-status { bottom:calc(env(safe-area-inset-bottom) + 10px); min-width:98px; padding:5px 7px; font-size:8px; }
+      #road-status { bottom:calc(env(safe-area-inset-bottom) + 10px); min-width:150px; max-width:52vw; padding:5px 7px; font-size:8px; }
       #joystick-zone:active #joystick-base, #run:active { opacity:.88; }
       #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #jobs-panel, #dm-panel { right:58px; width:min(286px,calc(100vw - 74px)); max-height:58dvh; }
     }
@@ -138,7 +139,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V58</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V59</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
