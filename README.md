@@ -90,3 +90,10 @@ The world now has a lightweight mobile-friendly collision layer for houses, palm
 Driving now reacts to the road type. The main road, village side road and off-road areas have separate speed limits and vehicle caps, shown in the driving HUD with the current simulated km/h. The side road now has lane markings. Traffic vehicles use smoother acceleration/deceleration, keep distance from the player and same-lane vehicles, and the side-road traffic yields at the main-road crossing.
 
 Job vehicles now include a HORN control and toggleable headlights. Nearby AI traffic slows/yields briefly to the player's horn. Headlights use visible emissive lamps plus one lightweight forward beam on the active player vehicle. Keyboard users can use H for horn and L for lights. A stopped job vehicle can be parked by exiting it and re-entered later. No new Supabase migration is required.
+
+
+## Fuel + Damage + Service System (V59)
+
+Active Delivery Bike and Kerala Taxi missions now track server-persisted fuel and vehicle condition. Driving distance burns fuel on the backend, collision impacts apply capped condition damage, and condition can reduce maximum vehicle performance. The driving HUD and Jobs panel show Fuel and Condition percentages.
+
+A Kerala Fuel Station and Village Service Garage are now placed in the world. Stop the active vehicle near the correct station to get a REFUEL or REPAIR interaction. Refuel and repair costs are deducted from Kerala Cash by the server and appear in wallet transaction history. Fuel, condition, service costs, station proximity and impact throttling are all validated server-side. No new Supabase migration is required because vehicle state continues to live inside the persisted job_state JSON.

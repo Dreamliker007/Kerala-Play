@@ -522,6 +522,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const meta = node('div', 'job-meta');
       const missionLabel = job.missionType === 'shift' ? `On-site ${Math.ceil(Number(job.durationMs || 0) / 1000)}s` : 'World route';
       meta.append(node('span', '', missionLabel), node('span', '', `Completed ${Number(job.completedCount || 0)}`));
+      if (isActive && active?.vehicle) {
+        meta.append(node('span', '', `Fuel ${Math.round(Number(active.vehicle.fuel ?? 100))}%`), node('span', '', `Condition ${Math.round(Number(active.vehicle.condition ?? 100))}%`));
+      }
       const action = document.createElement('button');
       action.type = 'button'; action.dataset.jobId = job.id;
       let missionNote = null;
@@ -603,6 +606,19 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     toast(action === 'enter' ? `${active.vehicle.label} ready · drive to the mission marker` : `${active.vehicle.label} parked`);
   }
   window.addEventListener('kerala-job-vehicle', event => run(() => performJobVehicleAction(event.detail?.action)));
+
+  async function performVehicleService(action) {
+    const active = jobsSnapshot?.active;
+    if (!user || !active?.vehicle || !['refuel', 'repair'].includes(action)) return;
+    const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle/service`, { taskId: active.taskId, action });
+    renderJobs(result.jobs);
+    renderWallet(result.wallet);
+    const service = result.service;
+    toast(action === 'refuel'
+      ? `Fuel tank full · ${formatCash(service.cost)} paid`
+      : `Vehicle repaired · condition 100% · ${formatCash(service.cost)} paid`);
+  }
+  window.addEventListener('kerala-vehicle-service', event => run(() => performVehicleService(event.detail?.action)));
 
   function startJobsTimer() {
     if (jobsTimer) clearInterval(jobsTimer);
