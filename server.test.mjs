@@ -333,7 +333,7 @@ test('Kerala Cash wallet uses server prices, prevents replay/overspend, keeps hi
 });
 
 
-test('jobs require real world checkpoints, server salary, shift time, cooldowns and persistence', async t => {
+test('jobs require job vehicles, real world checkpoints, server salary, cooldowns and persistence', async t => {
   const app = await setup(t), alice = app.client();
   await signup(alice, 'JobAlice');
 
@@ -341,6 +341,8 @@ test('jobs require real world checkpoints, server salary, shift time, cooldowns 
   assert.equal(jobs.jobs.length, 3);
   assert.deepEqual(jobs.jobs.map(job => job.id).sort(), ['delivery', 'shop', 'taxi']);
   assert.equal(jobs.walletBalance, 500);
+  assert.equal(jobs.jobs.find(job => job.id === 'delivery').vehicle, 'bike');
+  assert.equal(jobs.jobs.find(job => job.id === 'taxi').vehicle, 'taxi');
 
   const started = await alice('/api/jobs/delivery/start', { reward: 999999 });
   assert.equal(started.status, 201);
@@ -348,19 +350,29 @@ test('jobs require real world checkpoints, server salary, shift time, cooldowns 
   assert.equal(deliveryTask.jobId, 'delivery');
   assert.equal(deliveryTask.phase, 'travel');
   assert.equal(deliveryTask.target.action, 'Collect parcel');
+  assert.equal(deliveryTask.vehicle.kind, 'bike');
+  assert.equal(deliveryTask.vehicle.entered, false);
   assert.equal((await alice('/api/jobs/taxi/start', {})).status, 409, 'Only one job may be active at a time');
   assert.equal((await alice('/api/jobs/delivery/complete', { taskId: deliveryTask.taskId, reward: 999999 })).status, 409, 'Route cannot be paid before checkpoints');
   assert.equal((await alice('/api/jobs/delivery/checkpoint', { taskId: deliveryTask.taskId })).status, 409, 'Remote checkpoint claims must fail');
+  assert.equal((await alice('/api/world/move', { x: deliveryTask.vehicle.x, z: deliveryTask.vehicle.z, rotation: 0, moving: true, mode: 'bike' })).status, 409, 'Vehicle movement must fail before entering');
 
   app.advance(1_000);
-  assert.equal((await alice('/api/world/move', { x: deliveryTask.target.x, z: deliveryTask.target.z, rotation: 0, moving: true })).status, 200);
+  assert.equal((await alice('/api/world/move', { x: deliveryTask.vehicle.x, z: deliveryTask.vehicle.z, rotation: 0, moving: true })).status, 200);
+  let vehicle = await alice('/api/jobs/delivery/vehicle', { taskId: deliveryTask.taskId, action: 'enter' });
+  assert.equal(vehicle.status, 200);
+  deliveryTask = vehicle.data.active;
+  assert.equal(deliveryTask.vehicle.entered, true);
+
+  app.advance(1_000);
+  assert.equal((await alice('/api/world/move', { x: deliveryTask.target.x, z: deliveryTask.target.z, rotation: 0, moving: true, mode: 'bike' })).status, 200);
   let checked = await alice('/api/jobs/delivery/checkpoint', { taskId: deliveryTask.taskId });
   assert.equal(checked.status, 200);
   deliveryTask = checked.data.active;
   assert.equal(deliveryTask.target.action, 'Deliver parcel');
 
   app.advance(2_000);
-  assert.equal((await alice('/api/world/move', { x: deliveryTask.target.x, z: deliveryTask.target.z, rotation: 0, moving: true })).status, 200);
+  assert.equal((await alice('/api/world/move', { x: deliveryTask.target.x, z: deliveryTask.target.z, rotation: 0, moving: true, mode: 'bike' })).status, 200);
   checked = await alice('/api/jobs/delivery/checkpoint', { taskId: deliveryTask.taskId });
   assert.equal(checked.status, 200);
   assert.equal(checked.data.active.phase, 'ready');
@@ -370,6 +382,7 @@ test('jobs require real world checkpoints, server salary, shift time, cooldowns 
   assert.equal(paid.data.reward, 180, 'Salary must come from the server job definition');
   assert.equal(paid.data.wallet.balance, 680);
   assert.equal(paid.data.transaction.amount, 180);
+  assert.ok((await alice('/api/session')).data.user.walkMeters < 8, 'Driving distance must not count as walking progress');
   assert.equal((await alice('/api/jobs/delivery/complete', { taskId: deliveryTask.taskId })).status, 409, 'Completed task token cannot be replayed');
   assert.equal((await alice('/api/jobs/delivery/start', {})).status, 409, 'Job cooldown must be enforced');
 
@@ -377,6 +390,8 @@ test('jobs require real world checkpoints, server salary, shift time, cooldowns 
   assert.equal(taxi.status, 201);
   const taxiTaskId = taxi.data.active.taskId;
   const firstTaxiTarget = taxi.data.active.target;
+  const firstTaxiVehicle = taxi.data.active.vehicle;
+  assert.equal(firstTaxiVehicle.kind, 'taxi');
 
   await app.restart();
   assert.equal((await alice('/api/session')).data.user, null);
@@ -384,14 +399,21 @@ test('jobs require real world checkpoints, server salary, shift time, cooldowns 
   jobs = (await alice('/api/jobs')).data;
   assert.equal(jobs.active.taskId, taxiTaskId, 'Active mission should survive a server restart');
   assert.deepEqual({ x: jobs.active.target.x, z: jobs.active.target.z }, { x: firstTaxiTarget.x, z: firstTaxiTarget.z }, 'Mission checkpoint should persist');
+  assert.deepEqual({ x: jobs.active.vehicle.x, z: jobs.active.vehicle.z }, { x: firstTaxiVehicle.x, z: firstTaxiVehicle.z }, 'Parked job vehicle should persist');
 
   app.advance(1_000);
-  assert.equal((await alice('/api/world/move', { x: jobs.active.target.x, z: jobs.active.target.z, rotation: 0, moving: true })).status, 200);
+  assert.equal((await alice('/api/world/move', { x: jobs.active.vehicle.x, z: jobs.active.vehicle.z, rotation: 0, moving: true })).status, 200);
+  vehicle = await alice('/api/jobs/taxi/vehicle', { taskId: taxiTaskId, action: 'enter' });
+  assert.equal(vehicle.status, 200);
+  jobs = vehicle.data.jobs;
+
+  app.advance(1_000);
+  assert.equal((await alice('/api/world/move', { x: jobs.active.target.x, z: jobs.active.target.z, rotation: 0, moving: true, mode: 'taxi' })).status, 200);
   checked = await alice('/api/jobs/taxi/checkpoint', { taskId: taxiTaskId });
   assert.equal(checked.status, 200);
   const taxiDrop = checked.data.active.target;
   app.advance(2_000);
-  assert.equal((await alice('/api/world/move', { x: taxiDrop.x, z: taxiDrop.z, rotation: 0, moving: true })).status, 200);
+  assert.equal((await alice('/api/world/move', { x: taxiDrop.x, z: taxiDrop.z, rotation: 0, moving: true, mode: 'taxi' })).status, 200);
   checked = await alice('/api/jobs/taxi/checkpoint', { taskId: taxiTaskId });
   assert.equal(checked.data.active.phase, 'ready');
   const taxiPaid = await alice('/api/jobs/taxi/complete', { taskId: taxiTaskId, reward: 1 });
@@ -402,6 +424,7 @@ test('jobs require real world checkpoints, server salary, shift time, cooldowns 
   const shop = await alice('/api/jobs/shop/start', {});
   assert.equal(shop.status, 201);
   const shopTask = shop.data.active;
+  assert.equal(shopTask.vehicle, null);
   app.advance(2_000);
   assert.equal((await alice('/api/world/move', { x: shopTask.target.x, z: shopTask.target.z, rotation: 0, moving: true })).status, 200);
   checked = await alice('/api/jobs/shop/checkpoint', { taskId: shopTask.taskId });
