@@ -1233,6 +1233,8 @@ try {
     let movingNow = false;
 
     if (vehicleMode !== 'walk') {
+      walkVelocity.set(0, 0, 0);
+      targetWalkVelocity.set(0, 0, 0);
       const rawThrottle = paused ? 0 : THREE.MathUtils.clamp(-controlY, -1, 1);
       const rawSteering = paused ? 0 : THREE.MathUtils.clamp(controlX, -1, 1);
       const throttleDeadzone = .18;
