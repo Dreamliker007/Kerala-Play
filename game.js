@@ -57,6 +57,7 @@ const toast = document.querySelector('#toast');
 document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
 const villagers = [];
 const traffic = [];
+const staticColliders = [];
 const fruitGeometry = new THREE.SphereGeometry(.14, 6, 5);
 const fruitMaterial = new THREE.MeshStandardMaterial({ color: 0xe4a737, roughness: .72 });
 const birdBodyGeometry = new THREE.SphereGeometry(.10, 6, 5);
@@ -1256,12 +1257,16 @@ try {
       const speedRatio = Math.min(1, Math.abs(driveSpeed) / maxForward);
       if (Math.abs(driveSpeed) > .035) {
         player.rotation.y -= steering * delta * (.72 + speedRatio * .9) * (driveSpeed >= 0 ? 1 : -1);
-        player.position.x += Math.sin(player.rotation.y) * driveSpeed * delta;
-        player.position.z += Math.cos(player.rotation.y) * driveSpeed * delta;
-        movingNow = true;
+        const dx = Math.sin(player.rotation.y) * driveSpeed * delta;
+        const dz = Math.cos(player.rotation.y) * driveSpeed * delta;
+        const vehicleRadius = vehicleMode === 'taxi' ? .95 : .62;
+        const beforeX = player.position.x;
+        const beforeZ = player.position.z;
+        const collided = moveWithCollision(player, dx, dz, vehicleRadius);
+        const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
+        if (collided) driveSpeed *= movedDistance > .001 ? .42 : .12;
+        movingNow = movedDistance > .0005;
       }
-      player.position.x = THREE.MathUtils.clamp(player.position.x, -110, 110);
-      player.position.z = THREE.MathUtils.clamp(player.position.z, -110, 110);
       if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 2.5);
       animatePlayer(player, walkPhase, 0);
       if (mapAccumulator >= .12) { updateMapPlayer(player); mapAccumulator = 0; }
@@ -1286,19 +1291,29 @@ try {
 
       const walkSpeed = walkVelocity.length();
       if (walkSpeed > .035) {
-        player.position.addScaledVector(walkVelocity, delta);
-        addWalkProgress(walkSpeed * delta);
-        player.position.x = THREE.MathUtils.clamp(player.position.x, -110, 110);
-        player.position.z = THREE.MathUtils.clamp(player.position.z, -110, 110);
-        const desiredYaw = Math.atan2(walkVelocity.x, walkVelocity.z);
-        const turnSpeed = runHeld ? 5.6 : 6.8;
-        player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
-        if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
-        const animationAmount = Math.min(1, walkSpeed / (runHeld ? 5.4 : 3.05));
-        walkPhase += delta * (runHeld ? 12 : 8) * Math.max(.22, animationAmount);
-        animatePlayer(player, walkPhase, animationAmount);
-        movingNow = true;
-        if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
+        const dx = walkVelocity.x * delta;
+        const dz = walkVelocity.z * delta;
+        const beforeX = player.position.x;
+        const beforeZ = player.position.z;
+        moveWithCollision(player, dx, dz, .43);
+        const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
+        addWalkProgress(movedDistance);
+        if (movedDistance > .0005) {
+          const actualX = player.position.x - beforeX;
+          const actualZ = player.position.z - beforeZ;
+          const desiredYaw = Math.atan2(actualX, actualZ);
+          const turnSpeed = runHeld ? 5.6 : 6.8;
+          player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
+          if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
+          const animationAmount = Math.min(1, movedDistance / Math.max(.0001, (runHeld ? 5.4 : 3.05) * delta));
+          walkPhase += delta * (runHeld ? 12 : 8) * Math.max(.22, animationAmount);
+          animatePlayer(player, walkPhase, animationAmount);
+          movingNow = true;
+          if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
+        } else {
+          walkVelocity.multiplyScalar(.35);
+          animatePlayer(player, walkPhase, 0);
+        }
       } else {
         animatePlayer(player, walkPhase, 0);
       }
@@ -1504,7 +1519,52 @@ function updateVillagers(time) {
   });
 }
 
+function addBoxCollider(x, z, halfWidth, halfDepth, kind = 'structure') {
+  staticColliders.push({ type: 'box', x, z, halfWidth, halfDepth, kind });
+}
+
+function addCircleCollider(x, z, radius, kind = 'obstacle') {
+  staticColliders.push({ type: 'circle', x, z, radius, kind });
+}
+
+function positionBlocked(x, z, radius = .45) {
+  for (const collider of staticColliders) {
+    if (collider.type === 'circle') {
+      const limit = collider.radius + radius;
+      if ((x - collider.x) ** 2 + (z - collider.z) ** 2 < limit * limit) return true;
+      continue;
+    }
+    const closestX = THREE.MathUtils.clamp(x, collider.x - collider.halfWidth, collider.x + collider.halfWidth);
+    const closestZ = THREE.MathUtils.clamp(z, collider.z - collider.halfDepth, collider.z + collider.halfDepth);
+    if ((x - closestX) ** 2 + (z - closestZ) ** 2 < radius * radius) return true;
+  }
+
+  for (const vehicle of traffic) {
+    if (!vehicle?.visible) continue;
+    const config = vehicle.userData?.traffic;
+    if (!config) continue;
+    const trafficRadius = config.kind === 'bus' ? 1.85 : 1.08;
+    const limit = trafficRadius + radius;
+    if ((x - vehicle.position.x) ** 2 + (z - vehicle.position.z) ** 2 < limit * limit) return true;
+  }
+  return false;
+}
+
+function moveWithCollision(object, dx, dz, radius) {
+  if (!object || (!dx && !dz)) return false;
+  let collided = false;
+  const nextX = THREE.MathUtils.clamp(object.position.x + dx, -110, 110);
+  if (!positionBlocked(nextX, object.position.z, radius)) object.position.x = nextX;
+  else collided = true;
+
+  const nextZ = THREE.MathUtils.clamp(object.position.z + dz, -110, 110);
+  if (!positionBlocked(object.position.x, nextZ, radius)) object.position.z = nextZ;
+  else collided = true;
+  return collided;
+}
+
 function buildWorld(scene) {
+  staticColliders.length = 0;
   const groundCanvas = document.createElement('canvas'); groundCanvas.width = groundCanvas.height = 128;
   const groundContext = groundCanvas.getContext('2d');
   groundContext.fillStyle = '#65854a'; groundContext.fillRect(0, 0, 128, 128);
@@ -1574,6 +1634,7 @@ function landmarkBeacon(scene, x, z, color) {
 }
 
 function addFortLandmark(scene, x, z) {
+  addBoxCollider(x, z, 4.5, .82, 'fort');
   const group = new THREE.Group();
   const stone = new THREE.MeshStandardMaterial({ color: 0x777167, roughness: 1 });
   const grassStone = new THREE.MeshStandardMaterial({ color: 0x5d6651, roughness: 1 });
@@ -1586,6 +1647,7 @@ function addFortLandmark(scene, x, z) {
 }
 
 function addTeaHills(scene, x, z) {
+  addCircleCollider(x, z, 2.7, 'hill');
   const group = new THREE.Group();
   const hillMat = new THREE.MeshStandardMaterial({ color: 0x497a45, roughness: 1 });
   [[0,0,4.5],[-3,1,2.8],[3,-1,3.2]].forEach(([px,pz,radius]) => {
@@ -1595,6 +1657,7 @@ function addTeaHills(scene, x, z) {
 }
 
 function addPalaceLandmark(scene, x, z) {
+  addBoxCollider(x, z, 3.65, 2.45, 'palace');
   const group = new THREE.Group();
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xb99667, roughness: .9 });
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x7d3f2e, roughness: .95 });
@@ -1604,6 +1667,7 @@ function addPalaceLandmark(scene, x, z) {
 }
 
 function addBackwaterHouseboat(scene, x, z) {
+  addBoxCollider(x, z, 3.05, 1.2, 'houseboat');
   const group = new THREE.Group();
   const water = new THREE.Mesh(new THREE.CircleGeometry(7, 32), new THREE.MeshStandardMaterial({ color: 0x287d94, roughness: .28, metalness: .1 }));
   water.rotation.x = -Math.PI / 2; water.position.y = .03;
@@ -1623,6 +1687,7 @@ function addPaddyFields(scene, x, z) {
 }
 
 function addTempleLandmark(scene, x, z) {
+  addBoxCollider(x, z, 3.5, 2.9, 'temple');
   const group = new THREE.Group();
   const stone = new THREE.MeshStandardMaterial({ color: 0xc8b58b, roughness: .9 });
   const wood = new THREE.MeshStandardMaterial({ color: 0x693d24, roughness: .92 });
@@ -1739,6 +1804,7 @@ function addPhotoHouse(scene, x, z) { addHouse(scene, x, z, 0xf0e5d1, 0x9e533a);
 
 
 function addHouse(scene, x, z, wallColor, roofColor) {
+  addBoxCollider(x, z, 4.45, 3.95, 'house');
   const group = new THREE.Group();
   const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: .9 });
   const roofMat = new THREE.MeshStandardMaterial({ color: roofColor, roughness: .98 });
@@ -1798,6 +1864,7 @@ function addHouse(scene, x, z, wallColor, roofColor) {
 }
 
 function addShop(scene, x, z) {
+  addBoxCollider(x, z, 4.8, 3.0, 'shop');
   const group = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(9.4, 3.8, 5.8), new THREE.MeshStandardMaterial({ color: 0xf1e7d2, roughness: .92 }));
   body.position.y = 1.9;
@@ -1813,6 +1880,7 @@ function addShop(scene, x, z) {
 }
 
 function addTree(scene, x, z, scale, withFruit = false) {
+  addCircleCollider(x, z, Math.max(.42, .58 * scale), 'tree');
   const group = new THREE.Group();
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x65442e, roughness: 1 });
   const branchMat = new THREE.MeshStandardMaterial({ color: 0x77503a, roughness: 1 });
@@ -1840,6 +1908,7 @@ function addTree(scene, x, z, scale, withFruit = false) {
 }
 
 function addPalm(scene, x, z, scale) {
+  addCircleCollider(x + .2 * scale, z, Math.max(.34, .42 * scale), 'palm');
   const palm = new THREE.Group();
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x84735a, roughness: 1 });
   const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x357b32, roughness: .82, side: THREE.DoubleSide });
@@ -1882,6 +1951,7 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
 
 
 function addPond(scene, x, z) {
+  addCircleCollider(x, z, 8.65, 'water');
   const bank = new THREE.Mesh(new THREE.CircleGeometry(9.8, 40), new THREE.MeshStandardMaterial({ color: 0x907e55, roughness: 1 }));
   bank.rotation.x = -Math.PI / 2;
   bank.position.set(x, .012, z);
@@ -1892,6 +1962,7 @@ function addPond(scene, x, z) {
 }
 
 function addBench(scene, x, z) {
+  addBoxCollider(x, z, 1.45, .48, 'bench');
   const group = new THREE.Group();
   const wood = new THREE.MeshStandardMaterial({ color: 0x74462e, roughness: .9 });
   const metal = new THREE.MeshStandardMaterial({ color: 0x32383a, roughness: .75, metalness: .35 });

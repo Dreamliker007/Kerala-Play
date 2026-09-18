@@ -78,3 +78,8 @@ V54 also tightens input stability with a joystick dead zone, tracked pointer cap
 ## Walking Stability Hotfix (V56)
 
 Avatar movement now uses smoothed walking velocity instead of applying joystick direction directly every frame. Small stick movement produces a slower walk, acceleration and deceleration ramp smoothly, turning follows the smoothed travel direction, and the camera no longer fights manual look input while walking. Run speed and turn response are also reduced for more controllable movement. Walking inertia is cleared whenever the player enters a vehicle or the game loses focus.
+
+
+## World Collision + Safer Movement (V57)
+
+The world now has a lightweight mobile-friendly collision layer for houses, palms, trees, the pond, benches, and major landmark structures. Walking uses axis-separated collision resolution so the avatar slides along obstacle edges instead of passing through them. Delivery bikes and taxis use larger collision radii, lose speed on impact, and stop cleanly when fully blocked. Moving traffic is also treated as a live obstacle. Collision movement only reports actual travelled distance, so walking progress and multiplayer movement sync stay accurate. No new Supabase migration is required.
