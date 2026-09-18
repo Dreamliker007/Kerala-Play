@@ -61,6 +61,30 @@ function mapUserFromRow(row) {
   };
 }
 
+function mapWorldStateToRow(user) {
+  const x = Number(user.worldX), z = Number(user.worldZ), rotation = Number(user.worldRotation);
+  if (!Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) > 110.01 || Math.abs(z) > 110.01) return null;
+  return {
+    user_id: user.id,
+    x,
+    z,
+    rotation: Number.isFinite(rotation) ? rotation : 0,
+    updated_at: iso(user.worldUpdatedAt),
+  };
+}
+
+function applyWorldState(user, row) {
+  if (!row) return user;
+  const x = Number(row.x), z = Number(row.z), rotation = Number(row.rotation);
+  if (Number.isFinite(x) && Number.isFinite(z) && Math.abs(x) <= 110.01 && Math.abs(z) <= 110.01) {
+    user.worldX = x;
+    user.worldZ = z;
+    user.worldRotation = Number.isFinite(rotation) ? rotation : 0;
+    user.worldUpdatedAt = Date.parse(row.updated_at) || Date.now();
+  }
+  return user;
+}
+
 function mapMessageToRow(message) {
   const inlineVoice = typeof message.audio === 'string' && message.audio.length > 0;
   const storedVoice = !inlineVoice && typeof message.audioPath === 'string' && message.audioPath.length > 0;
@@ -107,6 +131,9 @@ export function createSupabaseStore({
   const key = required(serviceRoleKey, 'SUPABASE_SERVICE_ROLE_KEY');
   if (typeof fetchImpl !== 'function') throw new Error('A fetch implementation is required. Use Node.js 20 or later.');
 
+  let worldStateAvailable = true;
+  let worldStateWarningShown = false;
+
   async function request(path, { method = 'GET', body } = {}) {
     const response = await fetchImpl(`${baseUrl}/rest/v1/${path}`, {
       method,
@@ -128,16 +155,35 @@ export function createSupabaseStore({
     try { return JSON.parse(text); } catch { return text; }
   }
 
+  async function optionalWorldRequest(path, options) {
+    if (!worldStateAvailable) return null;
+    try { return await request(path, options); }
+    catch (error) {
+      const message = String(error?.message || error);
+      if (/kp_world_state|kp_replace_world_state|PGRST202|PGRST205/i.test(message)) {
+        worldStateAvailable = false;
+        if (!worldStateWarningShown) {
+          worldStateWarningShown = true;
+          console.warn('[Kerala Play] world-position persistence is waiting for supabase/virtual-world-core-v1.sql.');
+        }
+        return null;
+      }
+      throw error;
+    }
+  }
+
   async function load() {
-    const [users, follows, blocks, messages] = await Promise.all([
+    const [users, follows, blocks, messages, worldStates] = await Promise.all([
       request('kp_users?select=*&order=created_at.asc'),
       request('kp_follows?select=*&order=created_at.asc'),
       request('kp_blocks?select=*&order=created_at.asc'),
       request('kp_messages?select=*&order=created_at.asc'),
+      optionalWorldRequest('kp_world_state?select=*&order=updated_at.asc'),
     ]);
+    const worldByUser = new Map((worldStates || []).map(row => [row.user_id, row]));
     return {
       version: 1,
-      users: (users || []).map(mapUserFromRow),
+      users: (users || []).map(row => applyWorldState(mapUserFromRow(row), worldByUser.get(row.id))),
       follows: (follows || []).map(row => ({ from: row.from_id, to: row.to_id, status: row.status })),
       blocks: (blocks || []).map(row => ({ from: row.from_id, to: row.to_id })),
       messages: (messages || []).map(mapMessageFromRow),
@@ -154,6 +200,8 @@ export function createSupabaseStore({
       messages: (db.messages || []).map(mapMessageToRow),
     };
     await request('rpc/kp_replace_snapshot', { method: 'POST', body: { payload } });
+    const worldPayload = (db.users || []).map(mapWorldStateToRow).filter(Boolean);
+    await optionalWorldRequest('rpc/kp_replace_world_state', { method: 'POST', body: { payload: worldPayload } });
   }
 
   return { load, save };

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
-import { createGameServer } from '../server.mjs';
+import { createGameServer } from './server.mjs';
 
 async function setup(t) {
   const dataDir = await mkdtemp(join(tmpdir(), 'kerala-play-test-'));
@@ -220,7 +220,11 @@ test('task rewards validate movement and acceptance; rewards and game rounds can
   assert.equal((await alice('/api/games/coconut/finish', badRound)).status, 409);
   await app.restart();
   assert.equal((await alice('/api/session')).data.user, null);
-  assert.equal((await alice('/api/auth/login', { username: 'Alice', password: 'test-password-2026' })).data.user.points, 105);
+  const restored = (await alice('/api/auth/login', { username: 'Alice', password: 'test-password-2026' })).data.user;
+  assert.equal(restored.points, 105);
+  assert.equal(restored.x, -26);
+  assert.equal(restored.z, 6);
+  assert.equal(restored.rotation, 0);
   assert.equal((await alice('/api/tasks/open-map/claim', {})).status, 409);
 });
 

@@ -90,12 +90,22 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (outgoing?.status === 'pending') return 'outgoing';
     return 'none';
   }
+  function spawnFor(user) {
+    const [landmarkX, z] = DISTRICTS[user.district];
+    return { x: landmarkX + 12, z };
+  }
+  function savedPosition(user) {
+    const spawn = spawnFor(user);
+    const x = Number(user.worldX), z = Number(user.worldZ), rotation = Number(user.worldRotation);
+    const valid = Number.isFinite(x) && Number.isFinite(z) && Math.abs(x) <= 110.01 && Math.abs(z) <= 110.01;
+    return { x: valid ? x : spawn.x, z: valid ? z : spawn.z, rotation: Number.isFinite(rotation) ? rotation : 0, valid };
+  }
   function publicUser(user) {
-    const position = presence.get(user.id), [spawnX, spawnZ] = DISTRICTS[user.district];
+    const position = presence.get(user.id), saved = savedPosition(user);
     let level = 1, remaining = user.points, next = 100;
     while (remaining >= next) { remaining -= next; level++; next = 100 + (level - 1) * 50; }
     const displayName = user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username);
-    return { id: user.id, username: displayName, name: displayName, district: user.district, gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? spawnX + 12, z: position?.z ?? spawnZ };
+    return { id: user.id, username: displayName, name: displayName, district: user.district, gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
   }
   function blockedUser(user) { const displayName = user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username); return { id: user.id, username: displayName, name: displayName, blocked: true }; }
   function online(id) { return !!presence.get(id) && now() - presence.get(id).lastSeen < 20000; }
@@ -118,10 +128,18 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       return { id, username: user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username), gender: user.gender, district: user.district, x: state.x, z: state.z, rotation: state.rotation, moving: state.moving };
     }) };
   }
-  function place(user) {
-    const [landmarkX, z] = DISTRICTS[user.district];
-    const x = landmarkX + 12; // Spawn beside landmarks, outside their buildings.
-    const state = { x, z, rotation: 0, moving: false, lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now() };
+  function place(user, { reset = false } = {}) {
+    const spawn = spawnFor(user);
+    const saved = savedPosition(user);
+    const useSaved = !reset && saved.valid;
+    const x = useSaved ? saved.x : spawn.x;
+    const z = useSaved ? saved.z : spawn.z;
+    const rotation = useSaved ? saved.rotation : 0;
+    if (!useSaved) {
+      user.worldX = x; user.worldZ = z; user.worldRotation = rotation; user.worldUpdatedAt = now();
+      dirty = true;
+    }
+    const state = { x, z, rotation, moving: false, lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now() };
     presence.set(user.id, state); worldDirty = true;
     return state;
   }
@@ -228,7 +246,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(!db.users.some(candidate => (email && candidate.email === email) || (mobile && candidate.mobile === mobile)), 409, 'That email or mobile is already in use.');
         const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
         requireValue(/^[A-Za-z][A-Za-z '-]{1,39}$/.test(firstName), 400, 'Enter a valid first name.');
-        const user = { id: randomUUID(), firstName, username, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0 };
+        const [spawnX, spawnZ] = DISTRICTS[district];
+        const user = { id: randomUUID(), firstName, username, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, worldX: spawnX + 12, worldZ: spawnZ, worldRotation: 0, worldUpdatedAt: now() };
         db.users.push(user); await persist(); startSession(user, response, request); socialChanged();
         send(response, 201, { user: publicUser(user) }); return;
       }
@@ -275,7 +294,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         if (body.district !== undefined) user.district = body.district;
         if (body.gender !== undefined) user.gender = body.gender;
         if (body.bio !== undefined) user.bio = body.bio.trim();
-        if (relocate) place(user);
+        if (relocate) place(user, { reset: true });
         await persist(); profileChanged(user); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
       }
@@ -394,12 +413,15 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const credit = Math.min(24, state.movementCredit + elapsed * 8.5);
         const distance = Math.hypot(body.x - state.x, body.z - state.z);
         if (distance > credit + 0.01) throw new ApiError(409, 'Movement was too fast. Your avatar needs to resync.', { x: state.x, z: state.z });
+        const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
         state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving;
+        user.worldX = state.x; user.worldZ = state.z; user.worldRotation = state.rotation; user.worldUpdatedAt = now();
         user.walkMeters += distance;
         let discovered = false;
         for (const [id, x, z] of LANDMARKS) if (Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
-        dirty = dirty || distance > 0 || discovered; worldDirty = true;
+        const turn = Math.abs(Math.atan2(Math.sin(state.rotation - previousRotation), Math.cos(state.rotation - previousRotation)));
+        dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
         send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks }); return;
       }

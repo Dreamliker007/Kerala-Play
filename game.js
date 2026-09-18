@@ -73,6 +73,7 @@ let connectionReady = false;
 const remotePlayers = new Map();
 const claimPending = new Set();
 let lastMovementSend = 0;
+let lastMovementMoving = false;
 let movementPending = false;
 let lastProgressRefresh = 0;
 let lastMoveError = 0;
@@ -129,11 +130,13 @@ function acceptUser(user) {
     if (user && (!previous || previous.id !== user.id || previous.district !== user.district)) {
       if (Number.isFinite(user.x) && Number.isFinite(user.z)) playerRef.position.set(user.x, 0, user.z);
       else placePlayerAtDistrict(user.district);
+      if (Number.isFinite(user.rotation)) playerRef.rotation.y = user.rotation;
     }
     updateNameLabel(playerRef, user?.username || '', user?.id);
   }
   if (!user) {
     connectionReady = false;
+    lastMovementMoving = false;
     synchronizePlayers([]);
     challengeGeneration++;
     challengeRound = null;
@@ -282,10 +285,26 @@ function synchronizePlayers(players) {
       const avatar = createHuman({ gender: data.gender, shirt: data.gender === 'female' ? 0xc57e93 : 0x569bb5,
         trousers: 0x293b50, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x2c2825, accent: 0xe5bb51 });
       remote.add(avatar); remote.position.set(data.x, 0, data.z);
-      remote.userData = { avatar, gender: data.gender, phase: 0, target: new THREE.Vector3() };
+      remote.userData = {
+        avatar, gender: data.gender, phase: 0,
+        target: new THREE.Vector3(data.x, 0, data.z),
+        predicted: new THREE.Vector3(data.x, 0, data.z),
+        velocity: new THREE.Vector3(),
+        targetAt: performance.now()
+      };
       sceneRef.add(remote); remotePlayers.set(data.id, remote);
     }
+    const receivedAt = performance.now();
+    const networkDelta = Math.max(.05, Math.min(1, (receivedAt - remote.userData.targetAt) / 1000));
+    remote.userData.velocity.set(
+      (data.x - remote.userData.target.x) / networkDelta,
+      0,
+      (data.z - remote.userData.target.z) / networkDelta
+    );
+    if (!data.moving) remote.userData.velocity.set(0, 0, 0);
+    else if (remote.userData.velocity.lengthSq() > 81) remote.userData.velocity.setLength(9);
     remote.userData.target.set(data.x, 0, data.z);
+    remote.userData.targetAt = receivedAt;
     remote.userData.yaw = Number(data.rotation) || 0;
     remote.userData.moving = !!data.moving;
     updateNameLabel(remote, data.username, data.id);
@@ -296,8 +315,13 @@ function synchronizePlayers(players) {
 }
 
 function updateRemotePlayers(delta, camera) {
+  const networkNow = performance.now();
   for (const remote of remotePlayers.values()) {
-    remote.position.lerp(remote.userData.target, 1 - Math.exp(-delta * 12));
+    const predictionAge = remote.userData.moving ? Math.min(.28, Math.max(0, (networkNow - remote.userData.targetAt) / 1000)) : 0;
+    remote.userData.predicted.copy(remote.userData.target).addScaledVector(remote.userData.velocity, predictionAge);
+    remote.userData.predicted.x = THREE.MathUtils.clamp(remote.userData.predicted.x, -110, 110);
+    remote.userData.predicted.z = THREE.MathUtils.clamp(remote.userData.predicted.z, -110, 110);
+    remote.position.lerp(remote.userData.predicted, 1 - Math.exp(-delta * 10));
     remote.rotation.y = rotateTowards(remote.rotation.y, remote.userData.yaw, delta * 12);
     remote.userData.phase += delta * 9;
     animatePlayer(remote, remote.userData.phase, remote.userData.moving ? 1 : 0);
@@ -318,12 +342,14 @@ function updateRemotePlayers(delta, camera) {
 
 async function sendMovement(player, moving) {
   const now = performance.now();
-  if (!profile || !connectionReady || document.hidden || movementPending || now - lastMovementSend < (moving ? 250 : 1500)) return;
+  const stateChanged = moving !== lastMovementMoving;
+  if (!profile || !connectionReady || document.hidden || movementPending || (!stateChanged && now - lastMovementSend < (moving ? 250 : 1500))) return;
   movementPending = true; lastMovementSend = now;
   const userId = profile.id;
   try {
     const result = await api('/api/world/move', { x: player.position.x, z: player.position.z, rotation: player.rotation.y, moving });
     if (profile?.id !== userId) return;
+    lastMovementMoving = moving;
     if (result.user) acceptUser(result.user);
     if (now - lastProgressRefresh > 3000) {
       lastProgressRefresh = now;
@@ -344,6 +370,18 @@ async function sendMovement(player, moving) {
     if (now - lastMoveError > 10000) { showToast('World sync: ' + error.message); lastMoveError = now; }
   } finally { movementPending = false; }
 }
+
+function flushMovement() {
+  if (!profile || !playerRef) return;
+  fetch('/api/world/move', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ x: playerRef.position.x, z: playerRef.position.z, rotation: playerRef.rotation.y, moving: false }),
+    keepalive: true
+  }).catch(() => {});
+}
+window.addEventListener('pagehide', flushMovement);
 
 
 
@@ -571,7 +609,10 @@ try {
   buildLandmarkWorld(scene);
   buildPlayer(player);
   player.visible = !!profile;
-  if (profile) placePlayerAtDistrict(profile.district);
+  if (profile && Number.isFinite(profile.x) && Number.isFinite(profile.z)) {
+    player.position.set(profile.x, 0, profile.z);
+    if (Number.isFinite(profile.rotation)) player.rotation.y = profile.rotation;
+  } else if (profile) placePlayerAtDistrict(profile.district);
   wireInterface();
   updateMapPlayer(player);
 
@@ -588,7 +629,7 @@ try {
   let lastLookY = 0;
   let inputX = 0;
   let inputY = 0;
-  let cameraYaw = Math.PI * .75;
+  let cameraYaw = player.rotation.y + Math.PI;
   let cameraPitch = .31;
   let runHeld = false;
   let walkPhase = 0;

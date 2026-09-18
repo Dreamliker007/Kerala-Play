@@ -17,6 +17,18 @@ Run these files in the Supabase SQL Editor, in this order:
 
 The second file creates the server-only transactional function used to persist a complete durable snapshot.
 
+## Virtual World Core V1 position persistence
+
+Player coordinates and facing are now stored separately in `kp_world_state`. This keeps live presence in memory while making the last accepted world position durable across logout, backend restarts, and Android/web sessions.
+
+For an **existing** production Supabase project, run this once before relying on durable positions:
+
+```text
+supabase/virtual-world-core-v1.sql
+```
+
+The backend is backward compatible if the migration has not been run yet: accounts/social/gameplay continue working, but player positions fall back to district spawn points after a backend restart. After the migration is applied and the backend is restarted, world positions are loaded and saved automatically.
+
 ## First production persistence slice
 
 `production-server.mjs` is the production entry point. On startup it:
