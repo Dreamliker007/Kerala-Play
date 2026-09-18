@@ -529,10 +529,18 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         action.dataset.taskId = active.taskId;
         if (active.phase === 'travel' && active.target) {
           const distance = Math.max(0, Math.ceil(Number(active.target.distance || 0)));
-          missionNote = node('p', 'job-mission-note', `${active.target.action} · ${active.target.name} · ${distance} m away`);
-          action.dataset.jobAction = 'checkpoint';
-          action.disabled = !active.target.withinRange;
-          action.textContent = active.target.withinRange ? `Check in · ${active.target.action}` : `Go to ${active.target.name} · ${distance} m`;
+          if (active.vehicle && !active.vehicle.entered) {
+            const vehicleDistance = Math.max(0, Math.ceil(Number(active.vehicle.distance || 0)));
+            missionNote = node('p', 'job-mission-note', `${active.vehicle.label} · ${vehicleDistance} m away · enter the vehicle in the world`);
+            action.dataset.jobAction = 'checkpoint';
+            action.disabled = true;
+            action.textContent = `Enter ${active.vehicle.kind === 'bike' ? 'bike' : 'taxi'} first`;
+          } else {
+            missionNote = node('p', 'job-mission-note', `${active.target.action} · ${active.target.name} · ${distance} m away`);
+            action.dataset.jobAction = 'checkpoint';
+            action.disabled = !active.target.withinRange;
+            action.textContent = active.target.withinRange ? `Check in · ${active.target.action}` : `Go to ${active.target.name} · ${distance} m`;
+          }
         } else if (active.phase === 'working') {
           const wait = secondsRemaining(active.readyAt);
           missionNote = node('p', 'job-mission-note', `Checked in at ${active.target?.name || 'Village Shop'} · stay nearby until the shift ends`);
@@ -586,6 +594,15 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     }
   }
   window.addEventListener('kerala-job-interact', () => run(performWorldJobInteraction));
+
+  async function performJobVehicleAction(action) {
+    const active = jobsSnapshot?.active;
+    if (!user || !active?.vehicle || !['enter', 'exit'].includes(action)) return;
+    const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle`, { taskId: active.taskId, action });
+    renderJobs(result.jobs);
+    toast(action === 'enter' ? `${active.vehicle.label} ready · drive to the mission marker` : `${active.vehicle.label} parked`);
+  }
+  window.addEventListener('kerala-job-vehicle', event => run(() => performJobVehicleAction(event.detail?.action)));
 
   function startJobsTimer() {
     if (jobsTimer) clearInterval(jobsTimer);
