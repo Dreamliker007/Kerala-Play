@@ -16,6 +16,7 @@ const onlineCount = document.querySelector('#online-count');
 const mapLayer = document.querySelector('#landmark-layer');
 const mapPlayer = document.querySelector('#map-player');
 const mapRoute = document.querySelector('#map-route');
+const jobMapMarker = document.querySelector('#job-map-marker');
 const mapStatus = document.querySelector('#map-status');
 const minimap = document.querySelector('#minimap');
 const mapOpen = document.querySelector('#map-open');
@@ -64,6 +65,7 @@ let playerRef = null;
 let selectedLandmark = null;
 let mapLabelsVisible = false;
 let activeDmContact = null;
+let activeJobMission = null;
 let profile = null;
 let progress = newProgress();
 let social = null;
@@ -104,6 +106,32 @@ const taskCatalog = [
   { id: 'social', title: 'Make an accepted connection', target: 1, reward: 35 }
 ];
 
+
+
+function applyJobMission(active) {
+  activeJobMission = active || null;
+  if (playerRef) updateMapPlayer(playerRef);
+  if (!activeJobMission) {
+    if (!selectedLandmark) {
+      missionText.textContent = 'Explore Kerala landmarks';
+      landmarkStatus.textContent = 'Tap TASKS for rewards';
+    }
+    return;
+  }
+  if (activeJobMission.phase === 'travel' && activeJobMission.target) {
+    missionText.textContent = `${activeJobMission.title}: ${activeJobMission.target.action}`;
+    const distance = playerRef ? Math.ceil(Math.hypot(activeJobMission.target.x - playerRef.position.x, activeJobMission.target.z - playerRef.position.z)) : Math.ceil(Number(activeJobMission.target.distance || 0));
+    landmarkStatus.textContent = `${activeJobMission.target.name} · ${Math.max(0, distance)} m`;
+  } else if (activeJobMission.phase === 'working') {
+    const seconds = Math.max(0, Math.ceil((Number(activeJobMission.readyAt || 0) - Date.now()) / 1000));
+    missionText.textContent = `${activeJobMission.title}: on-site shift`;
+    landmarkStatus.textContent = seconds > 0 ? `Working · ${seconds}s remaining` : 'Shift complete · open JOBS';
+  } else {
+    missionText.textContent = `${activeJobMission.title}: route complete`;
+    landmarkStatus.textContent = 'Open JOBS to collect salary';
+  }
+}
+window.addEventListener('kerala-job-mission', event => applyJobMission(event.detail));
 
 window.addEventListener('error', event => {
   console.error(event.error || event.message);
@@ -446,6 +474,36 @@ function updateMapPlayer(player) {
   const point = worldToKeralaMap(player.position.x, player.position.z);
   const angle = player.rotation.y * 180 / Math.PI;
   mapPlayer.setAttribute('transform', `translate(${point.x} ${point.y}) rotate(${angle})`);
+  if (activeJobMission?.phase === 'travel' && activeJobMission.target) {
+    const target = worldToKeralaMap(activeJobMission.target.x, activeJobMission.target.z);
+    mapRoute.setAttribute('x1', point.x); mapRoute.setAttribute('y1', point.y);
+    mapRoute.setAttribute('x2', target.x); mapRoute.setAttribute('y2', target.y);
+    mapRoute.hidden = false;
+    if (jobMapMarker) {
+      jobMapMarker.hidden = false;
+      jobMapMarker.setAttribute('transform', `translate(${target.x} ${target.y})`);
+    }
+    const distance = Math.hypot(activeJobMission.target.x - player.position.x, activeJobMission.target.z - player.position.z);
+    missionText.textContent = `${activeJobMission.title}: ${activeJobMission.target.action}`;
+    landmarkStatus.textContent = `${activeJobMission.target.name} · ${Math.ceil(distance)} m`;
+    mapStatus.textContent = `${activeJobMission.target.name} · ${Math.ceil(distance)} m`;
+    return;
+  }
+  if (jobMapMarker) jobMapMarker.hidden = true;
+  if (activeJobMission) {
+    mapRoute.hidden = true;
+    if (activeJobMission.phase === 'working') {
+      const seconds = Math.max(0, Math.ceil((Number(activeJobMission.readyAt || 0) - Date.now()) / 1000));
+      missionText.textContent = `${activeJobMission.title}: on-site shift`;
+      landmarkStatus.textContent = seconds > 0 ? `Working · ${seconds}s remaining` : 'Shift complete · open JOBS';
+      mapStatus.textContent = `${activeJobMission.title} · in progress`;
+    } else {
+      missionText.textContent = `${activeJobMission.title}: route complete`;
+      landmarkStatus.textContent = 'Open JOBS to collect salary';
+      mapStatus.textContent = `${activeJobMission.title} · salary ready`;
+    }
+    return;
+  }
   if (selectedLandmark) {
     const activeLandmark = selectedLandmark;
     const target = worldToKeralaMap(activeLandmark.x, activeLandmark.z);
@@ -553,7 +611,7 @@ function wireInterface() {
   taskToggle.addEventListener('click', () => setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'));
   fullscreenToggle?.addEventListener('click', async () => { try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); else await document.exitFullscreen(); } catch { showToast('Fullscreen is unavailable in this browser'); } });
   taskClose.addEventListener('click', () => setOpenPanel());
-  missionCard.addEventListener('click', () => setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'));
+  missionCard.addEventListener('click', () => { if (activeJobMission) document.querySelector('#jobs-toggle')?.click(); else setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'); });
   challengePlay.addEventListener('click', playCoconutChallenge);
   document.querySelector('#npc-profile .panel-close').addEventListener('click', () => { document.querySelector('#npc-profile').hidden = true; });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { setOpenPanel(); document.querySelector('#npc-profile').hidden = true; } });
