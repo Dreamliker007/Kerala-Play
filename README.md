@@ -66,3 +66,10 @@ For an existing Supabase production project, run `supabase/jobs-v1.sql` once, th
 ## Interactive Job Objects (V53)
 
 World jobs now have visible mission objects and on-site interaction. Delivery missions render a parcel at pickup and carry the parcel after collection, Taxi missions render a waiting passenger and keep the passenger with the player until drop-off, and Shop Worker missions render a temporary village-shop interaction point. When the player is within the server-defined checkpoint radius, an INTERACT button appears in the world HUD so pickup, drop-off, check-in and salary collection can be completed without opening the Jobs panel. Server-side position checks, cooldowns and salary validation remain authoritative. No new Supabase migration is required for V53.
+
+
+## Drivable Job Vehicles + Control Stability (V54)
+
+Delivery Rider missions now spawn a dedicated delivery bike and Taxi Driver missions spawn a Kerala taxi. Players must walk to the assigned job vehicle, enter it, and complete the route while driving. Vehicle entry/exit and movement mode are server-authoritative; bike/taxi speed limits are validated by the backend, and vehicle distance does not count toward walking-task progress. The RUN control becomes BRAKE while driving.
+
+V54 also tightens input stability with a joystick dead zone, tracked pointer capture/release, global pointer-up cleanup, blur/visibility input reset, smoothed acceleration/braking and steering, and camera auto-follow while driving. No new Supabase migration is required because vehicle state lives inside the existing persisted job state.
