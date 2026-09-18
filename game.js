@@ -10,6 +10,10 @@ const cameraZone = document.querySelector('#camera-zone');
 const runButton = document.querySelector('#run');
 const worldInteract = document.querySelector('#world-interact');
 const vehicleAction = document.querySelector('#vehicle-action');
+const driveTools = document.querySelector('#drive-tools');
+const hornAction = document.querySelector('#horn-action');
+const lightsAction = document.querySelector('#lights-action');
+const roadStatus = document.querySelector('#road-status');
 const profileName = document.querySelector('#profile-name');
 const profileDistrict = document.querySelector('#profile-district');
 const profileChip = document.querySelector('#profile-chip');
@@ -76,6 +80,9 @@ let jobVehicleVisual = null;
 let jobVehicleSignature = '';
 let vehicleMode = 'walk';
 let driveSpeed = 0;
+let headlightsOn = false;
+let hornReadyAt = 0;
+let driveAudioContext = null;
 let profile = null;
 let progress = newProgress();
 let social = null;
@@ -223,6 +230,91 @@ function shopVisual() {
   return group;
 }
 
+function roadZoneAt(x, z) {
+  if (Math.abs(x) <= 7.75) return { id: 'main', label: 'MAIN ROAD', displayLimit: 40, bikeLimit: 6.6, taxiLimit: 6.4 };
+  if (x >= -72 && x <= 16 && Math.abs(z + 22) <= 5.75) return { id: 'village', label: 'VILLAGE ROAD', displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 };
+  return { id: 'offroad', label: 'OFF ROAD', displayLimit: 20, bikeLimit: 3.25, taxiLimit: 3.0 };
+}
+
+function ensureDriveAudio() {
+  if (!driveAudioContext) {
+    const Context = window.AudioContext || window.webkitAudioContext;
+    if (Context) driveAudioContext = new Context();
+  }
+  if (driveAudioContext?.state === 'suspended') driveAudioContext.resume().catch(() => {});
+  return driveAudioContext;
+}
+
+function playVehicleHorn() {
+  if (vehicleMode === 'walk' || performance.now() < hornReadyAt) return;
+  hornReadyAt = performance.now() + 420;
+  const context = ensureDriveAudio();
+  if (!context) return;
+  const start = context.currentTime;
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(.0001, start);
+  gain.gain.exponentialRampToValueAtTime(.16, start + .018);
+  gain.gain.setValueAtTime(.16, start + .12);
+  gain.gain.exponentialRampToValueAtTime(.0001, start + .24);
+  gain.connect(context.destination);
+  [310, 390].forEach((frequency, index) => {
+    const oscillator = context.createOscillator();
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(frequency, start);
+    oscillator.detune.setValueAtTime(index ? -7 : 5, start);
+    oscillator.connect(gain);
+    oscillator.start(start);
+    oscillator.stop(start + .25);
+  });
+}
+
+function applyVehicleHeadlights() {
+  if (!jobVehicleVisual) return;
+  const enabled = vehicleMode !== 'walk' && headlightsOn;
+  for (const material of jobVehicleVisual.userData.headlightMaterials || []) {
+    material.emissiveIntensity = enabled ? 2.8 : .28;
+  }
+  const oldBeam = jobVehicleVisual.userData.headlightBeam;
+  if (oldBeam) {
+    jobVehicleVisual.remove(oldBeam.light, oldBeam.target);
+    oldBeam.light.dispose?.();
+    jobVehicleVisual.userData.headlightBeam = null;
+  }
+  if (enabled) {
+    const light = new THREE.SpotLight(0xfff1c5, 3.1, 20, Math.PI / 7, .52, 1.35);
+    light.position.set(0, vehicleMode === 'bike' ? 1.03 : .92, .72);
+    const target = new THREE.Object3D();
+    target.position.set(0, .28, 9);
+    jobVehicleVisual.add(light, target);
+    light.target = target;
+    jobVehicleVisual.userData.headlightBeam = { light, target };
+  }
+  lightsAction?.classList.toggle('active', enabled);
+  lightsAction?.setAttribute('aria-pressed', String(enabled));
+}
+
+function toggleVehicleHeadlights() {
+  if (vehicleMode === 'walk') return;
+  headlightsOn = !headlightsOn;
+  applyVehicleHeadlights();
+}
+
+function updateDriveHud() {
+  const driving = vehicleMode !== 'walk' && !!activeJobMission?.vehicle?.entered;
+  if (driveTools) driveTools.hidden = !driving;
+  if (roadStatus) roadStatus.hidden = !driving;
+  if (!driving || !playerRef) return;
+  const zone = roadZoneAt(playerRef.position.x, playerRef.position.z);
+  const speedKmh = Math.round(Math.abs(driveSpeed) * 6);
+  roadStatus.textContent = `${zone.label} · LIMIT ${zone.displayLimit} · ${speedKmh} km/h`;
+}
+
+hornAction?.addEventListener('pointerdown', event => {
+  event.preventDefault();
+  playVehicleHorn();
+});
+lightsAction?.addEventListener('click', toggleVehicleHeadlights);
+
 function createDeliveryBike() {
   const bike = new THREE.Group();
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x2d6f55, roughness: .78 });
@@ -244,11 +336,13 @@ function createDeliveryBike() {
   front.rotation.x = -.12;
   const handle = new THREE.Mesh(new THREE.BoxGeometry(.72, .07, .07), metalMat);
   handle.position.set(0, 1.08, .58);
-  const lamp = new THREE.Mesh(new THREE.SphereGeometry(.12, 8, 7), new THREE.MeshStandardMaterial({ color: 0xffe9a2, emissive: 0x5a4816, emissiveIntensity: .35 }));
+  const lampMaterial = new THREE.MeshStandardMaterial({ color: 0xffe9a2, emissive: 0xffd66b, emissiveIntensity: .28 });
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(.12, 8, 7), lampMaterial);
   lamp.position.set(0, .94, .73);
   const carrier = new THREE.Mesh(new THREE.BoxGeometry(.55, .08, .46), metalMat);
   carrier.position.set(0, .82, -.68);
   bike.add(frame, seat, front, handle, lamp, carrier);
+  bike.userData.headlightMaterials = [lampMaterial];
   bike.scale.setScalar(1.12);
   return bike;
 }
@@ -287,6 +381,11 @@ function clearJobVehicleVisual() {
   jobVehicleSignature = '';
   vehicleMode = 'walk';
   driveSpeed = 0;
+  headlightsOn = false;
+  if (driveTools) driveTools.hidden = true;
+  if (roadStatus) roadStatus.hidden = true;
+  lightsAction?.classList.remove('active');
+  lightsAction?.setAttribute('aria-pressed', 'false');
 }
 
 function syncJobVehicleVisual() {
@@ -313,6 +412,8 @@ function syncJobVehicleVisual() {
       }
     }
     runButton.textContent = 'BRAKE';
+    applyVehicleHeadlights();
+    updateDriveHud();
   } else {
     vehicleMode = 'walk';
     jobVehicleVisual.position.set(Number(vehicle.x) || 0, 0, Number(vehicle.z) || 0);
