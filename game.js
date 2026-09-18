@@ -1260,9 +1260,12 @@ try {
         const dx = Math.sin(player.rotation.y) * driveSpeed * delta;
         const dz = Math.cos(player.rotation.y) * driveSpeed * delta;
         const vehicleRadius = vehicleMode === 'taxi' ? .95 : .62;
+        const beforeX = player.position.x;
+        const beforeZ = player.position.z;
         const collided = moveWithCollision(player, dx, dz, vehicleRadius);
-        if (collided) driveSpeed *= .12;
-        movingNow = Math.abs(dx) + Math.abs(dz) > .0001 && !collided;
+        const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
+        if (collided) driveSpeed *= movedDistance > .001 ? .42 : .12;
+        movingNow = movedDistance > .0005;
       }
       if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 2.5);
       animatePlayer(player, walkPhase, 0);
@@ -1295,15 +1298,22 @@ try {
         moveWithCollision(player, dx, dz, .43);
         const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
         addWalkProgress(movedDistance);
-        const desiredYaw = Math.atan2(walkVelocity.x, walkVelocity.z);
-        const turnSpeed = runHeld ? 5.6 : 6.8;
-        player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
-        if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
-        const animationAmount = Math.min(1, walkSpeed / (runHeld ? 5.4 : 3.05));
-        walkPhase += delta * (runHeld ? 12 : 8) * Math.max(.22, animationAmount);
-        animatePlayer(player, walkPhase, animationAmount);
-        movingNow = true;
-        if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
+        if (movedDistance > .0005) {
+          const actualX = player.position.x - beforeX;
+          const actualZ = player.position.z - beforeZ;
+          const desiredYaw = Math.atan2(actualX, actualZ);
+          const turnSpeed = runHeld ? 5.6 : 6.8;
+          player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
+          if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
+          const animationAmount = Math.min(1, movedDistance / Math.max(.0001, (runHeld ? 5.4 : 3.05) * delta));
+          walkPhase += delta * (runHeld ? 12 : 8) * Math.max(.22, animationAmount);
+          animatePlayer(player, walkPhase, animationAmount);
+          movingNow = true;
+          if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
+        } else {
+          walkVelocity.multiplyScalar(.35);
+          animatePlayer(player, walkPhase, 0);
+        }
       } else {
         animatePlayer(player, walkPhase, 0);
       }
