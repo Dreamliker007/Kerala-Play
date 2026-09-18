@@ -28,6 +28,16 @@ const JOB_DEFINITIONS = Object.freeze({
 });
 const JOB_MISSION_RADIUS = 5.5;
 const JOB_VEHICLE_RADIUS = 4.5;
+const VEHICLE_FUEL_MAX = 100;
+const VEHICLE_CONDITION_MAX = 100;
+const VEHICLE_SPECS = Object.freeze({
+  bike: { fuelBurnPerMeter: 0.16, fuelPricePerPoint: 1, repairPricePerPoint: 1 },
+  taxi: { fuelBurnPerMeter: 0.22, fuelPricePerPoint: 1, repairPricePerPoint: 2 },
+});
+const VEHICLE_STATIONS = Object.freeze({
+  fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 6, z: -12, radius: 7 },
+  service: { id: 'service', label: 'Village Service Garage', x: -36, z: -22, radius: 7 },
+});
 const MOVEMENT_PROFILES = Object.freeze({
   walk: { rate: 8.5, maxCredit: 24 },
   bike: { rate: 16, maxCredit: 40 },
@@ -252,6 +262,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       const job = JOB_DEFINITIONS[active.jobId];
       if (job?.vehicle) {
         if (typeof active.vehicleEntered !== 'boolean') { active.vehicleEntered = false; dirty = true; }
+        if (!Number.isFinite(Number(active.vehicleFuel))) { active.vehicleFuel = VEHICLE_FUEL_MAX; dirty = true; }
+        active.vehicleFuel = Math.max(0, Math.min(VEHICLE_FUEL_MAX, Number(active.vehicleFuel)));
+        if (!Number.isFinite(Number(active.vehicleCondition))) { active.vehicleCondition = VEHICLE_CONDITION_MAX; dirty = true; }
+        active.vehicleCondition = Math.max(15, Math.min(VEHICLE_CONDITION_MAX, Number(active.vehicleCondition)));
+        if (!Number.isFinite(Number(active.vehicleLastImpactAt))) active.vehicleLastImpactAt = 0;
         if (!Number.isFinite(Number(active.vehicleX)) || !Number.isFinite(Number(active.vehicleZ))) {
           const position = savedPosition(user);
           active.vehicleX = missionCoordinate(position.x, 2.8);
@@ -320,6 +335,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           radius: JOB_VEHICLE_RADIUS,
           distance: vehicleDistance === null ? null : Math.round(vehicleDistance * 10) / 10,
           withinRange: vehicleDistance !== null && vehicleDistance <= JOB_VEHICLE_RADIUS,
+          fuel: Math.round(Math.max(0, Math.min(VEHICLE_FUEL_MAX, Number(source.vehicleFuel))) * 10) / 10,
+          fuelMax: VEHICLE_FUEL_MAX,
+          condition: Math.round(Math.max(15, Math.min(VEHICLE_CONDITION_MAX, Number(source.vehicleCondition)))),
+          conditionMax: VEHICLE_CONDITION_MAX,
+          stations: VEHICLE_STATIONS,
         } : null,
       };
     }
@@ -498,6 +518,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           vehicleEntered: false,
           vehicleX: job.vehicle ? missionCoordinate(position.x, 2.8) : null,
           vehicleZ: job.vehicle ? missionCoordinate(position.z, 1.5) : null,
+          vehicleFuel: job.vehicle ? VEHICLE_FUEL_MAX : null,
+          vehicleCondition: job.vehicle ? VEHICLE_CONDITION_MAX : null,
+          vehicleLastImpactAt: 0,
         };
         await persist();
         const summary = jobsSummary(user);
@@ -538,6 +561,70 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const summary = jobsSummary(user);
         send(response, 200, { jobs: summary, active: summary.active }); return;
       }
+      const jobVehicleImpactMatch = path.match(/^\/api\/jobs\/([^/]+)\/vehicle\/impact$/);
+      if (jobVehicleImpactMatch && request.method === 'POST') {
+        limited(`job-vehicle-impact:${user.id}`, 20, 60000);
+        const body = await jsonBody(request);
+        const jobId = jobVehicleImpactMatch[1];
+        const job = JOB_DEFINITIONS[jobId];
+        requireValue(job?.vehicle, 404, 'This job does not use a vehicle.');
+        const state = jobStateFor(user);
+        const active = state.active;
+        requireValue(active && active.jobId === jobId && active.vehicleEntered, 409, 'Enter the active job vehicle first.');
+        requireValue(typeof body.taskId === 'string' && body.taskId === active.taskId, 409, 'This job task is no longer valid.');
+        const severity = Number(body.severity);
+        requireValue(Number.isInteger(severity) && severity >= 1 && severity <= 3, 400, 'Invalid impact severity.');
+        const timestamp = now();
+        requireValue(timestamp - Number(active.vehicleLastImpactAt || 0) >= 900, 409, 'Impact already registered.');
+        active.vehicleLastImpactAt = timestamp;
+        const damage = [0, 2, 5, 9][severity];
+        active.vehicleCondition = Math.max(15, Number(active.vehicleCondition) - damage);
+        dirty = true;
+        await persist();
+        const summary = jobsSummary(user);
+        send(response, 200, { jobs: summary, active: summary.active, damage, vehicle: summary.active?.vehicle || null }); return;
+      }
+
+      const jobVehicleServiceMatch = path.match(/^\/api\/jobs\/([^/]+)\/vehicle\/service$/);
+      if (jobVehicleServiceMatch && request.method === 'POST') {
+        limited(`job-vehicle-service:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const jobId = jobVehicleServiceMatch[1];
+        const job = JOB_DEFINITIONS[jobId];
+        requireValue(job?.vehicle, 404, 'This job does not use a vehicle.');
+        const state = jobStateFor(user);
+        const active = state.active;
+        requireValue(active && active.jobId === jobId && active.vehicleEntered, 409, 'Enter the active job vehicle first.');
+        requireValue(typeof body.taskId === 'string' && body.taskId === active.taskId, 409, 'This job task is no longer valid.');
+        requireValue(body.action === 'refuel' || body.action === 'repair', 400, 'Choose refuel or repair.');
+        const live = presence.get(user.id) || place(user);
+        requireValue(!live.moving, 409, 'Stop the vehicle before using this service.');
+        const station = body.action === 'refuel' ? VEHICLE_STATIONS.fuel : VEHICLE_STATIONS.service;
+        requireValue(Math.hypot(live.x - station.x, live.z - station.z) <= station.radius, 409, `Move closer to ${station.label}.`);
+        const spec = VEHICLE_SPECS[job.vehicle];
+        let amount, cost, description;
+        if (body.action === 'refuel') {
+          const missing = Math.max(0, VEHICLE_FUEL_MAX - Number(active.vehicleFuel));
+          requireValue(missing >= .5, 409, 'Fuel tank is already full.');
+          amount = Math.ceil(missing * 10) / 10;
+          cost = Math.max(1, Math.ceil(amount * spec.fuelPricePerPoint));
+          description = `${job.vehicleLabel} fuel · ${amount.toFixed(1)} units`;
+          active.vehicleFuel = VEHICLE_FUEL_MAX;
+        } else {
+          const missing = Math.max(0, VEHICLE_CONDITION_MAX - Number(active.vehicleCondition));
+          requireValue(missing >= 1, 409, 'Vehicle condition is already 100%.');
+          amount = Math.ceil(missing);
+          cost = Math.max(1, Math.ceil(amount * spec.repairPricePerPoint));
+          description = `${job.vehicleLabel} repair · ${amount} condition`;
+          active.vehicleCondition = VEHICLE_CONDITION_MAX;
+        }
+        const transaction = walletTransaction(user, -cost, body.action === 'refuel' ? 'fuel' : 'repair', description);
+        dirty = true;
+        await persist();
+        const summary = jobsSummary(user);
+        send(response, 200, { jobs: summary, wallet: walletSummary(user), active: summary.active, vehicle: summary.active?.vehicle || null, service: { action: body.action, amount, cost, station: station.label }, transaction }); return;
+      }
+
       const jobCheckpointMatch = path.match(/^\/api\/jobs\/([^/]+)\/checkpoint$/);
       if (jobCheckpointMatch && request.method === 'POST') {
         limited(`job-checkpoint:${user.id}`, 40, 60000);
@@ -737,17 +824,26 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const credit = Math.min(movement.maxCredit, state.movementCredit + elapsed * movement.rate);
         const distance = Math.hypot(body.x - state.x, body.z - state.z);
         if (distance > credit + 0.01) throw new ApiError(409, 'Movement was too fast. Your avatar needs to resync.', { x: state.x, z: state.z });
+        if (requestedMode !== 'walk' && distance > .01) {
+          requireValue(Number(active?.vehicleFuel) > .05, 409, 'Vehicle fuel is empty. Refuel at Kerala Fuel Station.');
+        }
         const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
         state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving; state.mode = requestedMode;
         user.worldX = state.x; user.worldZ = state.z; user.worldRotation = state.rotation; user.worldUpdatedAt = now();
         if (requestedMode === 'walk') user.walkMeters += distance;
+        else if (active && activeJob?.vehicle && distance > 0) {
+          const spec = VEHICLE_SPECS[activeJob.vehicle];
+          active.vehicleFuel = Math.max(0, Number(active.vehicleFuel) - distance * spec.fuelBurnPerMeter);
+          dirty = true;
+        }
         let discovered = false;
         for (const [id, x, z] of LANDMARKS) if (Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
         const turn = Math.abs(Math.atan2(Math.sin(state.rotation - previousRotation), Math.cos(state.rotation - previousRotation)));
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
-        send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks }); return;
+        const activeVehicle = active && activeJob?.vehicle ? jobsSummary(user).active?.vehicle || null : null;
+        send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks, vehicle: activeVehicle }); return;
       }
       const voiceMatch = path.match(/^\/api\/voice\/signal\/([^/]+)$/);
       if (voiceMatch && request.method === 'POST') {
