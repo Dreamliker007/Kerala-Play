@@ -32,6 +32,14 @@ create table if not exists public.kp_users (
   check (mobile is null or mobile ~ '^\+?[0-9 ()-]{7,20}$')
 );
 
+create table if not exists public.kp_world_state (
+  user_id uuid primary key references public.kp_users(id) on delete cascade,
+  x double precision not null check (x between -110.01 and 110.01),
+  z double precision not null check (z between -110.01 and 110.01),
+  rotation double precision not null default 0 check (rotation between -100000 and 100000),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.kp_follows (
   from_id uuid not null references public.kp_users(id) on delete cascade,
   to_id uuid not null references public.kp_users(id) on delete cascade,
@@ -137,6 +145,7 @@ for each row execute function public.kp_cleanup_follows_after_block();
 
 -- These tables are server-owned. Browser/mobile clients continue to use /api.
 alter table public.kp_users enable row level security;
+alter table public.kp_world_state enable row level security;
 alter table public.kp_follows enable row level security;
 alter table public.kp_blocks enable row level security;
 alter table public.kp_messages enable row level security;
@@ -144,6 +153,7 @@ alter table public.kp_sessions enable row level security;
 alter table public.kp_password_resets enable row level security;
 
 revoke all on public.kp_users from anon, authenticated;
+revoke all on public.kp_world_state from anon, authenticated;
 revoke all on public.kp_follows from anon, authenticated;
 revoke all on public.kp_blocks from anon, authenticated;
 revoke all on public.kp_messages from anon, authenticated;
