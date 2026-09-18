@@ -565,6 +565,28 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     renderJobs(summary);
     return summary;
   }
+  async function performWorldJobInteraction() {
+    const active = jobsSnapshot?.active;
+    if (!user || !active) return;
+    if (active.phase === 'travel') {
+      const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/checkpoint`, { taskId: active.taskId });
+      renderJobs(result.jobs);
+      toast(`${result.checkpoint.action} complete · next mission step ready`);
+      return;
+    }
+    if (active.phase === 'working') {
+      const wait = secondsRemaining(active.readyAt);
+      if (wait > 0) { toast(`Shift in progress · ${wait}s remaining`); return; }
+    }
+    if (active.phase === 'working' || active.phase === 'ready') {
+      const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/complete`, { taskId: active.taskId });
+      renderJobs(result.jobs);
+      renderWallet(result.wallet);
+      toast(`${result.completed.title} salary credited · ${formatCash(result.reward)}`);
+    }
+  }
+  window.addEventListener('kerala-job-interact', () => run(performWorldJobInteraction, jobsError));
+
   function startJobsTimer() {
     if (jobsTimer) clearInterval(jobsTimer);
     jobsTimer = setInterval(() => {
