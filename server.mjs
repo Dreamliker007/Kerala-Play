@@ -12,6 +12,23 @@ const DISTRICTS = {
 };
 const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
 const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250': 75, 'discover-3': 100, 'walk-500': 150, 'discover-5': 200, social: 35 };
+const STARTER_BALANCE = 500;
+const STARTER_JOB_REWARD = 250;
+const WALLET_LIMIT = 2_000_000_000;
+const SHOP_ITEMS = Object.freeze({
+  water: { name: 'Water', price: 15 },
+  tea: { name: 'Tea', price: 20 },
+  snack: { name: 'Snack', price: 35 },
+  meal: { name: 'Kerala Meal', price: 80 },
+});
+const JOB_DEFINITIONS = Object.freeze({
+  delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Collect a parcel, travel to the customer and check in at both locations.', missionType: 'route' },
+  taxi: { title: 'Taxi Driver', reward: 220, durationMs: 0, cooldownMs: 35_000, description: 'Reach the passenger pickup point, then drive to the destination.', missionType: 'route' },
+  shop: { title: 'Shop Worker', reward: 140, durationMs: 10_000, cooldownMs: 25_000, description: 'Travel to the village shop, check in and complete a short on-site shift.', missionType: 'shift' },
+});
+const JOB_MISSION_RADIUS = 5.5;
+const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
+function freshJobState() { return { active: null, cooldowns: {}, completed: {} }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -55,9 +72,25 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (error.code !== 'ENOENT') throw new Error(`Cannot read saved game data: ${error.message}`);
     db = { version: 1, users: [], follows: [], blocks: [], messages: [] };
   }
-  if (db.version !== 1 || !['users', 'follows', 'blocks', 'messages'].every(key => Array.isArray(db[key]))) throw new Error('Unsupported saved game data.');
+  if (db.version !== 1 || !['users', 'follows', 'blocks', 'messages'].every(key => Array.isArray(db[key])) || (db.transactions !== undefined && !Array.isArray(db.transactions))) throw new Error('Unsupported saved game data.');
+  let migrated = false;
+  if (!Array.isArray(db.transactions)) { db.transactions = []; migrated = true; }
+  for (const user of db.users) {
+    if (!Number.isInteger(user.walletBalance) || user.walletBalance < 0 || user.walletBalance > WALLET_LIMIT) {
+      user.walletBalance = STARTER_BALANCE; migrated = true;
+    }
+    if (!Array.isArray(user.economyActions)) { user.economyActions = []; migrated = true; }
+    if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) { user.jobState = freshJobState(); migrated = true; }
+    if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) { user.jobState.cooldowns = {}; migrated = true; }
+    if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) { user.jobState.completed = {}; migrated = true; }
+    if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
+    if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
+      db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
+      migrated = true;
+    }
+  }
   const sessions = new Map(), clients = new Map(), presence = new Map(), rounds = new Map(), rates = new Map(), resetTokens = new Map();
-  let dirty = false, worldDirty = false, saveQueue = Promise.resolve();
+  let dirty = migrated, worldDirty = false, saveQueue = Promise.resolve();
   function persist() {
     const snapshot = JSON.stringify(db);
     dirty = false;
@@ -186,6 +219,93 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     await persist(); profileChanged(user);
     return { user: publicUser(user), reward: amount };
   }
+  function walletSummary(user) {
+    const transactions = db.transactions.filter(transaction => transaction.userId === user.id).slice(-30).reverse();
+    return { balance: user.walletBalance, currency: 'KCR', currencyName: 'Kerala Cash', starterJobCompleted: user.economyActions.includes('starter-delivery'), transactions };
+  }
+  function walletTransaction(user, amount, kind, description) {
+    requireValue(Number.isInteger(amount) && amount !== 0, 500, 'Invalid wallet transaction.');
+    const balanceAfter = user.walletBalance + amount;
+    requireValue(Number.isSafeInteger(balanceAfter) && balanceAfter >= 0 && balanceAfter <= WALLET_LIMIT, amount < 0 ? 409 : 500, amount < 0 ? 'Not enough Kerala Cash.' : 'Wallet limit reached.');
+    user.walletBalance = balanceAfter;
+    const transaction = { id: randomUUID(), userId: user.id, type: amount > 0 ? 'credit' : 'debit', amount: Math.abs(amount), balanceAfter, kind, description, createdAt: now() };
+    db.transactions.push(transaction); dirty = true;
+    return transaction;
+  }
+  function jobStateFor(user) {
+    if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
+    if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
+    if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) user.jobState.completed = {};
+    const active = user.jobState.active;
+    if (active && (!Array.isArray(active.checkpoints) || Number(active.expiresAt) <= now())) { user.jobState.active = null; dirty = true; }
+    return user.jobState;
+  }
+  function jobPosition(user) {
+    const live = presence.get(user.id);
+    if (live && Number.isFinite(live.x) && Number.isFinite(live.z)) return { x: live.x, z: live.z };
+    const saved = savedPosition(user);
+    return { x: saved.x, z: saved.z };
+  }
+  function missionCoordinate(value, delta) {
+    let next = value + delta;
+    if (next > 104 || next < -104) next = value - delta;
+    return Math.max(-104, Math.min(104, next));
+  }
+  function buildJobCheckpoints(user, jobId) {
+    const base = jobPosition(user);
+    const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinate(base.x, dx), z: missionCoordinate(base.z, dz) });
+    if (jobId === 'delivery') return [point('Village Parcel Hub', 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
+    if (jobId === 'taxi') return [point('Passenger Pickup', 'Pick up passenger', -7, 5), point('Town Junction', 'Drop off passenger', -20, -7)];
+    return [point('Village Shop', 'Check in for shift', 9, -5)];
+  }
+  function jobsSummary(user) {
+    const state = jobStateFor(user);
+    const timestamp = now();
+    let active = null;
+    if (state.active) {
+      const source = state.active;
+      const job = JOB_DEFINITIONS[source.jobId];
+      const current = source.phase === 'travel' ? source.checkpoints[source.stepIndex] : (source.phase === 'working' ? source.checkpoints[source.checkpoints.length - 1] : null);
+      const position = jobPosition(user);
+      const distance = current ? Math.hypot(current.x - position.x, current.z - position.z) : null;
+      const readyAt = Number(source.readyAt || 0);
+      const ready = source.phase === 'ready' || (source.phase === 'working' && timestamp >= readyAt);
+      active = {
+        taskId: source.taskId,
+        jobId: source.jobId,
+        title: job.title,
+        startedAt: Number(source.startedAt),
+        readyAt,
+        expiresAt: Number(source.expiresAt),
+        phase: source.phase,
+        stepIndex: Number(source.stepIndex || 0),
+        totalSteps: source.checkpoints.length,
+        ready,
+        remainingMs: source.phase === 'working' ? Math.max(0, readyAt - timestamp) : 0,
+        target: current ? { ...current, radius: JOB_MISSION_RADIUS, distance: Math.round(distance * 10) / 10, withinRange: distance <= JOB_MISSION_RADIUS } : null,
+      };
+    }
+    return {
+      active,
+      walletBalance: user.walletBalance,
+      jobs: Object.entries(JOB_DEFINITIONS).map(([id, job]) => {
+        const cooldownUntil = Number(state.cooldowns[id] || 0);
+        return {
+          id,
+          title: job.title,
+          description: job.description,
+          reward: job.reward,
+          durationMs: job.durationMs,
+          missionType: job.missionType,
+          cooldownMs: job.cooldownMs,
+          cooldownUntil,
+          cooldownRemainingMs: Math.max(0, cooldownUntil - timestamp),
+          completedCount: Math.max(0, Number(state.completed[id] || 0)),
+          canStart: !active && cooldownUntil <= timestamp,
+        };
+      }),
+    };
+  }
   const server = http.createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'same-origin');
@@ -247,8 +367,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
         requireValue(/^[A-Za-z][A-Za-z '-]{1,39}$/.test(firstName), 400, 'Enter a valid first name.');
         const [spawnX, spawnZ] = DISTRICTS[district];
-        const user = { id: randomUUID(), firstName, username, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, worldX: spawnX + 12, worldZ: spawnZ, worldRotation: 0, worldUpdatedAt: now() };
-        db.users.push(user); await persist(); startSession(user, response, request); socialChanged();
+        const user = { id: randomUUID(), firstName, username, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldX: spawnX + 12, worldZ: spawnZ, worldRotation: 0, worldUpdatedAt: now() };
+        db.users.push(user); walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash'); await persist(); startSession(user, response, request); socialChanged();
         send(response, 201, { user: publicUser(user) }); return;
       }
       if (path === '/api/auth/login' && request.method === 'POST') {
@@ -297,6 +417,109 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         if (relocate) place(user, { reset: true });
         await persist(); profileChanged(user); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
+      }
+      if (path === '/api/wallet' && request.method === 'GET') {
+        send(response, 200, walletSummary(user)); return;
+      }
+      if (path === '/api/jobs/starter-delivery/complete' && request.method === 'POST') {
+        limited(`wallet-job:${user.id}`, 10, 60000);
+        await jsonBody(request);
+        requireValue(!user.economyActions.includes('starter-delivery'), 409, 'Starter Delivery salary was already claimed.');
+        user.economyActions.push('starter-delivery');
+        const transaction = walletTransaction(user, STARTER_JOB_REWARD, 'salary', 'Starter Delivery salary');
+        await persist();
+        send(response, 200, { wallet: walletSummary(user), reward: STARTER_JOB_REWARD, transaction }); return;
+      }
+      if (path === '/api/jobs' && request.method === 'GET') {
+        send(response, 200, jobsSummary(user)); return;
+      }
+      const jobStartMatch = path.match(/^\/api\/jobs\/([^/]+)\/start$/);
+      if (jobStartMatch && request.method === 'POST') {
+        limited(`job-start:${user.id}`, 20, 60000);
+        await jsonBody(request);
+        const jobId = jobStartMatch[1];
+        const job = JOB_DEFINITIONS[jobId];
+        requireValue(job, 404, 'Job not found.');
+        const state = jobStateFor(user);
+        requireValue(!state.active, 409, 'Finish your active job before starting another one.');
+        const timestamp = now();
+        const cooldownUntil = Number(state.cooldowns[jobId] || 0);
+        requireValue(cooldownUntil <= timestamp, 409, 'This job is cooling down. Try again shortly.');
+        state.active = { taskId: randomUUID(), jobId, startedAt: timestamp, readyAt: 0, expiresAt: timestamp + JOB_EXPIRY_GRACE, phase: 'travel', stepIndex: 0, checkpoints: buildJobCheckpoints(user, jobId) };
+        await persist();
+        const summary = jobsSummary(user);
+        send(response, 201, { jobs: summary, active: summary.active }); return;
+      }
+      const jobCheckpointMatch = path.match(/^\/api\/jobs\/([^/]+)\/checkpoint$/);
+      if (jobCheckpointMatch && request.method === 'POST') {
+        limited(`job-checkpoint:${user.id}`, 40, 60000);
+        const body = await jsonBody(request);
+        const jobId = jobCheckpointMatch[1];
+        const job = JOB_DEFINITIONS[jobId];
+        requireValue(job, 404, 'Job not found.');
+        const state = jobStateFor(user);
+        const active = state.active;
+        requireValue(active && active.jobId === jobId, 409, 'This job is not active.');
+        requireValue(typeof body.taskId === 'string' && body.taskId === active.taskId, 409, 'This job task is no longer valid.');
+        requireValue(active.phase === 'travel', 409, active.phase === 'working' ? 'Your shift is already in progress.' : 'No mission checkpoint is waiting.');
+        const target = active.checkpoints[active.stepIndex];
+        requireValue(target, 409, 'No mission checkpoint is waiting.');
+        const position = jobPosition(user);
+        const distance = Math.hypot(target.x - position.x, target.z - position.z);
+        requireValue(distance <= JOB_MISSION_RADIUS, 409, `Move closer to ${target.name} before checking in.`);
+        const timestamp = now();
+        requireValue(timestamp <= Number(active.expiresAt), 409, 'This job task expired. Start a new one.');
+        if (active.stepIndex < active.checkpoints.length - 1) {
+          active.stepIndex += 1;
+        } else if (job.missionType === 'shift') {
+          active.phase = 'working';
+          active.readyAt = timestamp + job.durationMs;
+        } else {
+          active.phase = 'ready';
+          active.readyAt = timestamp;
+        }
+        dirty = true;
+        await persist();
+        const summary = jobsSummary(user);
+        send(response, 200, { jobs: summary, active: summary.active, checkpoint: { name: target.name, action: target.action } }); return;
+      }
+      const jobCompleteMatch = path.match(/^\/api\/jobs\/([^/]+)\/complete$/);
+      if (jobCompleteMatch && request.method === 'POST') {
+        limited(`job-complete:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const jobId = jobCompleteMatch[1];
+        const job = JOB_DEFINITIONS[jobId];
+        requireValue(job, 404, 'Job not found.');
+        const state = jobStateFor(user);
+        const active = state.active;
+        requireValue(active && active.jobId === jobId, 409, 'This job is not active.');
+        requireValue(typeof body.taskId === 'string' && body.taskId === active.taskId, 409, 'This job task is no longer valid.');
+        const timestamp = now();
+        requireValue(timestamp <= Number(active.expiresAt), 409, 'This job task expired. Start a new one.');
+        if (job.missionType === 'shift') {
+          requireValue(active.phase === 'working', 409, 'Check in at the shop before starting your shift.');
+          requireValue(timestamp >= Number(active.readyAt), 409, 'The job is still in progress.');
+          const shop = active.checkpoints[active.checkpoints.length - 1];
+          const position = jobPosition(user);
+          requireValue(Math.hypot(shop.x - position.x, shop.z - position.z) <= JOB_MISSION_RADIUS, 409, 'Return to the village shop to complete your shift.');
+        } else {
+          requireValue(active.phase === 'ready', 409, 'Complete all mission checkpoints first.');
+        }
+        state.active = null;
+        state.cooldowns[jobId] = timestamp + job.cooldownMs;
+        state.completed[jobId] = Math.max(0, Number(state.completed[jobId] || 0)) + 1;
+        const transaction = walletTransaction(user, job.reward, 'salary', `${job.title} salary`);
+        await persist();
+        send(response, 200, { jobs: jobsSummary(user), wallet: walletSummary(user), reward: job.reward, transaction, completed: { jobId, title: job.title, count: state.completed[jobId] } }); return;
+      }
+      if (path === '/api/shop/purchase' && request.method === 'POST') {
+        limited(`wallet-shop:${user.id}`, 60, 60000);
+        const body = await jsonBody(request);
+        const item = typeof body.itemId === 'string' ? SHOP_ITEMS[body.itemId] : null;
+        requireValue(item, 404, 'Shop item not found.');
+        const transaction = walletTransaction(user, -item.price, 'purchase', item.name);
+        await persist();
+        send(response, 200, { wallet: walletSummary(user), purchase: { itemId: body.itemId, name: item.name, price: item.price }, transaction }); return;
       }
       if (path === '/api/people' && request.method === 'GET') {
         const people = db.users.filter(peer => peer.id !== user.id && (!blocked(user.id, peer.id) || ownBlock(user.id, peer.id))).map(peer => ({ ...(blocked(user.id, peer.id) ? blockedUser(peer) : publicUser(peer)), relationship: relation(user.id, peer.id), blocked: ownBlock(user.id, peer.id), online: !blocked(user.id, peer.id) && online(peer.id), canMessage: !blocked(user.id, peer.id) && accepted(user.id, peer.id) }));
@@ -348,6 +571,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           db.follows = db.follows.filter(follow => !((follow.from === user.id && follow.to === peer.id) || (follow.from === peer.id && follow.to === user.id)));
           emit(peer.id, 'signal', { from: user.id, data: { type: 'disabled' } });
           emit(user.id, 'signal', { from: peer.id, data: { type: 'disabled' } });
+          emit(peer.id, 'proximity-signal', { from: user.id, data: { type: 'disabled' } });
+          emit(user.id, 'proximity-signal', { from: peer.id, data: { type: 'disabled' } });
         }
         await persist(); socialChanged(); profileChanged(user); profileChanged(peer);
         send(response, 200, { user: publicUser(user), blocked: body.blocked, relationship: relation(user.id, peer.id) }); return;
@@ -436,6 +661,24 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         if (['offer', 'answer'].includes(data.type)) requireValue(typeof data.sdp === 'string' && data.sdp.length <= 24000, 400, 'Invalid voice description.');
         if (data.type === 'candidate') requireValue(data.candidate && typeof data.candidate === 'object' && JSON.stringify(data.candidate).length <= 3000, 400, 'Invalid voice connection candidate.');
         emit(peer.id, 'signal', { from: user.id, data });
+        send(response, 200, { ok: true, online: !!clients.get(peer.id)?.size }); return;
+      }
+      const proximityVoiceMatch = path.match(/^\/api\/proximity\/signal\/([^/]+)$/);
+      if (proximityVoiceMatch && request.method === 'POST') {
+        limited(`proximity-voice:${user.id}`, 360, 60000);
+        const peer = requirePeer(user, proximityVoiceMatch[1]);
+        requireValue(!blocked(user.id, peer.id), 403, 'This player is unavailable.');
+        const { data } = await jsonBody(request);
+        requireValue(data && typeof data === 'object' && !Array.isArray(data) && ['ready', 'disabled', 'offer', 'answer', 'candidate', 'end'].includes(data.type) && JSON.stringify(data).length <= 32000, 400, 'Invalid proximity voice signal.');
+        requireValue(data.callId === undefined || (typeof data.callId === 'string' && data.callId.length <= 100), 400, 'Invalid call identifier.');
+        if (['offer', 'answer'].includes(data.type)) requireValue(typeof data.sdp === 'string' && data.sdp.length <= 24000, 400, 'Invalid voice description.');
+        if (data.type === 'candidate') requireValue(data.candidate && typeof data.candidate === 'object' && JSON.stringify(data.candidate).length <= 3000, 400, 'Invalid voice connection candidate.');
+        if (!['end', 'disabled'].includes(data.type)) {
+          const selfState = presence.get(user.id), peerState = presence.get(peer.id);
+          requireValue(selfState && peerState && online(user.id) && online(peer.id), 409, 'Both players must be online for nearby voice.');
+          requireValue(Math.hypot(selfState.x - peerState.x, selfState.z - peerState.z) <= 28, 403, 'This player is too far away for nearby voice.');
+        }
+        emit(peer.id, 'proximity-signal', { from: user.id, data });
         send(response, 200, { ok: true, online: !!clients.get(peer.id)?.size }); return;
       }
       const taskMatch = path.match(/^\/api\/tasks\/([^/]+)\/claim$/);

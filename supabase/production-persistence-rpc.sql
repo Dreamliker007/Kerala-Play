@@ -16,7 +16,7 @@ begin
 
   insert into public.kp_users (
     id, first_name, username, email, mobile, password_hash, password_salt,
-    district, gender, bio, points, completed_tasks, walk_meters,
+    district, gender, bio, points, wallet_balance, economy_actions, job_state, completed_tasks, walk_meters,
     visited_landmarks, game_day, game_wins, created_at
   )
   select
@@ -31,6 +31,12 @@ begin
     item->>'gender',
     coalesce(item->>'bio', ''),
     coalesce((item->>'points')::integer, 0),
+    coalesce((item->>'wallet_balance')::bigint, 500),
+    coalesce((
+      select array_agg(action.value)
+      from jsonb_array_elements_text(coalesce(item->'economy_actions', '[]'::jsonb)) as action(value)
+    ), '{}'::text[]),
+    coalesce(item->'job_state', '{"active":null,"cooldowns":{},"completed":{}}'::jsonb),
     coalesce((
       select array_agg(task.value)
       from jsonb_array_elements_text(coalesce(item->'completed_tasks', '[]'::jsonb)) as task(value)
@@ -55,6 +61,9 @@ begin
     gender = excluded.gender,
     bio = excluded.bio,
     points = excluded.points,
+    wallet_balance = excluded.wallet_balance,
+    economy_actions = excluded.economy_actions,
+    job_state = excluded.job_state,
     completed_tasks = excluded.completed_tasks,
     walk_meters = excluded.walk_meters,
     visited_landmarks = excluded.visited_landmarks,
@@ -65,6 +74,7 @@ begin
   -- observe a partially-written social/message snapshot. Supabase projects can
   -- enable safe-update checks, so use explicit WHERE predicates for full-table
   -- deletes rather than a bare DELETE statement.
+  delete from public.kp_wallet_transactions where true;
   delete from public.kp_messages where true;
   delete from public.kp_blocks where true;
   delete from public.kp_follows where true;
@@ -95,6 +105,20 @@ begin
     nullif(item->>'audio_duration', '')::real,
     coalesce(nullif(item->>'created_at', '')::timestamptz, now())
   from jsonb_array_elements(coalesce(payload->'messages', '[]'::jsonb)) item;
+
+  insert into public.kp_wallet_transactions (
+    id, user_id, type, amount, balance_after, kind, description, created_at
+  )
+  select
+    (item->>'id')::uuid,
+    (item->>'user_id')::uuid,
+    item->>'type',
+    (item->>'amount')::bigint,
+    (item->>'balance_after')::bigint,
+    coalesce(nullif(item->>'kind', ''), 'other'),
+    coalesce(item->>'description', ''),
+    coalesce(nullif(item->>'created_at', '')::timestamptz, now())
+  from jsonb_array_elements(coalesce(payload->'transactions', '[]'::jsonb)) item;
 
   -- Remove accounts no longer present in the authoritative snapshot.
   delete from public.kp_users existing

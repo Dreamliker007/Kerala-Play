@@ -6,6 +6,7 @@
 grant usage on schema public to service_role;
 
 grant select, insert, update, delete on table public.kp_users to service_role;
+grant select, insert, update, delete on table public.kp_wallet_transactions to service_role;
 grant select, insert, update, delete on table public.kp_world_state to service_role;
 grant select, insert, update, delete on table public.kp_follows to service_role;
 grant select, insert, update, delete on table public.kp_blocks to service_role;

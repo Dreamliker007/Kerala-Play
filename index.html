@@ -22,7 +22,7 @@
     #camera-note { position: absolute; z-index:2; right: 122px; bottom: calc(env(safe-area-inset-bottom) + 65px); color: rgba(255,255,255,.87); background: rgba(11,35,45,.42); padding: 6px 8px; border-radius: 8px; font-size: 11px; pointer-events:none; }
     #fallback { display: none; position: fixed; inset: 0; z-index: 5; place-items: center; padding: 24px; background: #16323f; color: white; text-align: center; line-height: 1.5; }
     #camera-zone { z-index: 1; }
-    #profile-chip, #progress-chip, #online-chip, #mission-card, #quick-actions, #minimap, #chat-panel, #people-panel, #task-panel, #dm-panel, #asset-notice, #toast { z-index: 5; pointer-events: auto; }
+    #profile-chip, #progress-chip, #online-chip, #mission-card, #quick-actions, #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #jobs-panel, #dm-panel, #asset-notice, #toast { z-index: 5; pointer-events: auto; }
     #profile-chip { position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:176px; max-width:180px; padding:8px 10px; border:1px solid rgba(255,255,255,.22); border-radius:11px; background:rgba(8,29,34,.67); color:#fff; font-size:11px; line-height:1.25; cursor:pointer; touch-action:manipulation; }
     #profile-name { display:block; font-weight:800; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     #profile-district { display:block; margin-top:2px; color:#bde7d0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -36,10 +36,11 @@
     .hud-icon { width:48px; height:48px; border:1px solid rgba(255,255,255,.36); border-radius:14px; color:#fff; background:rgba(8,35,43,.78); box-shadow:0 4px 14px rgba(0,0,0,.18); font-size:20px; cursor:pointer; touch-action:manipulation; }
     .hud-icon span { display:block; margin-top:-1px; font-size:8px; font-weight:900; letter-spacing:.4px; }
     .hud-icon[aria-expanded="true"] { background:rgba(38,133,91,.95); border-color:#b9ffe1; }
+    .hud-icon[aria-pressed="true"] { background:rgba(38,133,91,.95); border-color:#b9ffe1; box-shadow:0 0 0 2px rgba(105,255,184,.16),0 4px 14px rgba(0,0,0,.18); }
     #chat-toggle.unread { position:relative; }
     #chat-toggle.unread::after { content:''; position:absolute; top:5px; right:5px; width:10px; height:10px; border-radius:50%; background:#ff5d67; box-shadow:0 0 0 2px #08232b; }
-    #minimap, #chat-panel, #people-panel, #task-panel, #dm-panel { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:72px; width:min(310px, calc(100vw - 90px)); max-height:min(58dvh, 380px); overflow-y:auto; padding:11px; border:1px solid rgba(255,255,255,.3); border-radius:15px; background:rgba(7,24,30,.94); color:#fff; box-shadow:0 9px 26px rgba(0,0,0,.32); touch-action:pan-y; }
-    #minimap.open, #chat-panel.open, #people-panel.open, #task-panel.open, #dm-panel.open { display:block; z-index:7; }
+    #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #jobs-panel, #dm-panel { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:72px; width:min(310px, calc(100vw - 90px)); max-height:min(58dvh, 380px); overflow-y:auto; padding:11px; border:1px solid rgba(255,255,255,.3); border-radius:15px; background:rgba(7,24,30,.94); color:#fff; box-shadow:0 9px 26px rgba(0,0,0,.32); touch-action:pan-y; }
+    #minimap.open, #chat-panel.open, #people-panel.open, #task-panel.open, #wallet-panel.open, #jobs-panel.open, #dm-panel.open { display:block; z-index:7; }
     .panel-heading, .map-header, .chat-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#fff; font-size:13px; font-weight:900; }
     .panel-heading small { color:#abd7c1; font-size:10px; font-weight:600; }
     .panel-close, #map-label-toggle { border:0; border-radius:7px; color:#fff; background:rgba(255,255,255,.13); padding:4px 7px; font:inherit; font-size:12px; cursor:pointer; touch-action:manipulation; }
@@ -48,6 +49,8 @@
     #kerala-outline { fill:rgba(48,119,79,.88); stroke:#d9f2c8; stroke-width:1.5; }
     .district-lines path { fill:none; stroke:rgba(228,255,225,.30); stroke-width:.65; }
     #map-route { stroke:#f5d566; stroke-width:1.2; stroke-dasharray:2 2; }
+    #job-map-marker circle { fill:#65e69b; stroke:#102831; stroke-width:1.3; }
+    #job-map-marker text { fill:#102831; font-size:7px; font-weight:900; text-anchor:middle; dominant-baseline:central; }
     .landmark-marker { cursor:pointer; pointer-events:all; }
     .landmark-marker .pin { fill:#f5c95c; stroke:#162b32; stroke-width:1.2; }
     .landmark-marker text { fill:#102831; font-size:7px; font-weight:800; text-anchor:middle; dominant-baseline:central; pointer-events:none; }
@@ -90,7 +93,7 @@
     .profile-card input, .profile-card select { width:100%; padding:11px; border:1px solid rgba(255,255,255,.24); border-radius:9px; color:#fff; background:#18363d; font:inherit; }
     #profile-submit { width:100%; margin-top:17px; border:0; border-radius:10px; padding:12px; color:#062019; background:#50c980; font-weight:900; font-size:14px; cursor:pointer; }
     #profile-error { min-height:17px; margin-top:8px; color:#ffd996; font-size:11px; }
-    @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #progress-chip { top:calc(env(safe-area-inset-top) + 105px); left:16px; max-width:165px; } #mission-card { top:calc(env(safe-area-inset-top) + 144px); width:166px; } #online-chip { top:calc(env(safe-area-inset-top) + 242px); right:14px; max-width:118px; } #hint { display:none; } #minimap, #chat-panel, #people-panel, #task-panel, #dm-panel { width:min(284px, calc(100vw - 88px)); max-height:min(56dvh, 350px); } #kerala-map { height:220px; } }
+    @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #progress-chip { top:calc(env(safe-area-inset-top) + 105px); left:16px; max-width:165px; } #mission-card { top:calc(env(safe-area-inset-top) + 144px); width:166px; } #online-chip { top:calc(env(safe-area-inset-top) + 242px); right:14px; max-width:118px; } #hint { display:none; } #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #jobs-panel, #dm-panel { width:min(284px, calc(100vw - 88px)); max-height:min(56dvh, 350px); } #kerala-map { height:220px; } }
     @media (min-width: 740px) { #joystick-zone { width: 330px; height: 330px; } #joystick-base { left: 44px; bottom: 38px; } #run { right: 44px; bottom: 46px; } }
     @media (max-width: 560px) {
       #brand { padding:7px 9px; font-size:13px; }
@@ -111,7 +114,7 @@
       #joystick-base { opacity:.45; }
       #run { width:68px; height:68px; right:16px; bottom:calc(env(safe-area-inset-bottom) + 30px); opacity:.72; }
       #joystick-zone:active #joystick-base, #run:active { opacity:.88; }
-      #minimap, #chat-panel, #people-panel, #task-panel, #dm-panel { right:58px; width:min(286px,calc(100vw - 74px)); max-height:58dvh; }
+      #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #jobs-panel, #dm-panel { right:58px; width:min(286px,calc(100vw - 74px)); max-height:58dvh; }
     }
   </style>
   <link rel="stylesheet" href="./social.css">
@@ -119,7 +122,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V48</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V52</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -135,6 +138,9 @@
       <button id="map-open" class="hud-icon" type="button" aria-label="Open Kerala map" aria-controls="minimap" aria-expanded="false">🗺<span>MAP</span></button>
       <button id="people-toggle" class="hud-icon" type="button" aria-label="Open people" aria-controls="people-panel" aria-expanded="false">👥<span>PEOPLE</span></button>
       <button id="chat-toggle" class="hud-icon" type="button" aria-label="Open chat" aria-controls="chat-panel" aria-expanded="false">💬<span>CHAT</span></button>
+      <button id="proximity-voice-toggle" class="hud-icon" type="button" aria-label="Turn on nearby voice" aria-pressed="false">🎙<span>VOICE</span></button>
+      <button id="wallet-toggle" class="hud-icon" type="button" aria-label="Open Kerala Cash wallet" aria-controls="wallet-panel" aria-expanded="false">💰<span>WALLET</span></button>
+      <button id="jobs-toggle" class="hud-icon" type="button" aria-label="Open jobs" aria-controls="jobs-panel" aria-expanded="false">💼<span>JOBS</span></button>
       <button id="task-toggle" class="hud-icon" type="button" aria-label="Open tasks" aria-controls="task-panel" aria-expanded="false">★<span>TASKS</span></button>
       <button id="fullscreen-toggle" class="hud-icon" type="button" aria-label="Enter fullscreen">⛶<span>FULL</span></button>
     </div>
@@ -147,13 +153,30 @@
         <g id="district-labels" aria-label="Kerala districts">
           <text class="district-label" x="58" y="18">Kasaragod</text><text class="district-label" x="55" y="32">Kannur</text><text class="district-label" x="58" y="48">Wayanad</text><text class="district-label" x="56" y="64">Kozhikode</text><text class="district-label" x="58" y="82">Malappuram</text><text class="district-label" x="61" y="101">Palakkad</text><text class="district-label" x="58" y="120">Thrissur</text><text class="district-label" x="57" y="141">Ernakulam</text><text class="district-label" x="57" y="160">Idukki</text><text class="district-label" x="57" y="179">Kottayam</text><text class="district-label" x="57" y="198">Pathanamthitta</text><text class="district-label" x="57" y="218">Alappuzha</text><text class="district-label" x="56" y="240">Kollam</text><text class="district-label" x="57" y="266">Thiruvananthapuram</text>
         </g>
-        <line id="map-route" hidden /><g id="landmark-layer"></g><g id="map-player" aria-label="Your location"><circle r="6.4"></circle><path d="M0 -5 L4 5 L0 2.4 L-4 5 Z"></path></g>
+        <line id="map-route" hidden /><g id="landmark-layer"></g><g id="job-map-marker" hidden aria-label="Job mission target"><circle r="6.3"></circle><text>J</text></g><g id="map-player" aria-label="Your location"><circle r="6.4"></circle><path d="M0 -5 L4 5 L0 2.4 L-4 5 Z"></path></g>
       </svg>
       <output id="map-status" aria-live="polite">Village · You</output>
     </aside>
     <section id="chat-panel" aria-label="Regional text chat"><div class="chat-heading"><span>Regional Chat</span><button id="chat-close" class="panel-close" type="button" aria-label="Close chat">×</button></div><select id="chat-channel" aria-label="Chat channel"></select><div id="chat-note">Select an accepted connection to chat privately.</div><div id="chat-log" aria-live="polite"></div><form id="chat-form"><input id="chat-input" maxlength="240" autocomplete="off" placeholder="Write a message"><button id="chat-send" type="submit">Send</button></form></section>
     <section id="people-panel" aria-label="People and follows"><div class="panel-heading"><span>People</span><button id="people-close" class="panel-close" type="button" aria-label="Close people">×</button></div><p class="panel-note"><strong id="people-online-label">1 online · you</strong><br>Find players, accept follow requests and manage your connections.</p><div id="people-list"></div></section>
     <section id="task-panel" aria-label="Tasks and challenges"><div class="panel-heading"><span>Tasks &amp; Challenges</span><button id="task-close" class="panel-close" type="button" aria-label="Close tasks">×</button></div><p class="panel-note">Earn points from completed tasks. Each account starts at 0. Level requirements increase as you explore.</p><div id="task-list"></div><div class="challenge-box"><strong>🥥 Coconut Memory</strong><p>Watch the four symbols and repeat their order. Win 20 points, up to five wins per day.</p><button id="challenge-play" type="button">Start memory game</button><div id="coconut-keys" aria-label="Memory game choices"></div><output id="challenge-result" aria-live="polite"></output></div></section>
+    <section id="wallet-panel" aria-label="Kerala Cash wallet">
+      <div class="panel-heading"><span>Kerala Cash</span><button id="wallet-close" class="panel-close" type="button" aria-label="Close wallet">×</button></div>
+      <div class="wallet-balance-card"><small>AVAILABLE BALANCE</small><strong id="wallet-balance">₹0</strong><span>Kerala Cash · virtual in-game money</span></div>
+      <div class="wallet-section"><strong>Starter Job</strong><p class="panel-note">Complete the first delivery once and earn ₹250 Kerala Cash.</p><button id="starter-delivery" class="action-button" type="button">Complete Starter Delivery · +₹250</button></div>
+      <div class="wallet-section"><strong>Village Shop</strong><p class="panel-note">Prices are verified by the server.</p><div id="wallet-shop" class="wallet-shop-grid">
+        <button type="button" data-item-id="water">💧 Water <small>₹15</small></button><button type="button" data-item-id="tea">☕ Tea <small>₹20</small></button><button type="button" data-item-id="snack">🥨 Snack <small>₹35</small></button><button type="button" data-item-id="meal">🍛 Kerala Meal <small>₹80</small></button>
+      </div></div>
+      <div class="wallet-section"><div class="wallet-history-heading"><strong>Transactions</strong><button id="wallet-refresh" type="button">Refresh</button></div><div id="wallet-transactions" aria-live="polite"></div></div>
+      <div id="wallet-error" class="social-error" role="status"></div>
+    </section>
+    <section id="jobs-panel" aria-label="Jobs and salaries">
+      <div class="panel-heading"><span>Jobs &amp; Salary</span><button id="jobs-close" class="panel-close" type="button" aria-label="Close jobs">×</button></div>
+      <p class="panel-note">Start one mission at a time. Travel to the real in-world checkpoints; the server verifies your location, salary and cooldowns.</p>
+      <div class="jobs-summary"><strong>Phase 1 Job Board</strong><span>Delivery · Taxi · Shop</span><button id="jobs-refresh" type="button">Refresh</button></div>
+      <div id="jobs-list" aria-live="polite"></div>
+      <div id="jobs-error" class="social-error" role="status"></div>
+    </section>
     <section id="dm-panel" aria-label="Direct message"><div class="panel-heading"><span id="dm-title">Direct message</span><button id="dm-close" class="panel-close" type="button" aria-label="Close direct message">×</button></div><p id="dm-note" class="panel-note">Direct messages unlock after a follow request is accepted.</p><div id="dm-log" aria-live="polite"></div><form id="dm-form"><input id="dm-input" maxlength="240" autocomplete="off" placeholder="Write a direct message"><button class="action-button" type="submit">Send</button></form></section>
     <div id="asset-notice" role="status"></div>
     <div id="toast" role="status" aria-live="polite"></div>

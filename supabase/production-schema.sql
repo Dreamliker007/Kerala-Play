@@ -32,6 +32,25 @@ create table if not exists public.kp_users (
   check (mobile is null or mobile ~ '^\+?[0-9 ()-]{7,20}$')
 );
 
+-- Wallet V1 fields are added with ALTER so existing production projects upgrade safely.
+alter table public.kp_users add column if not exists wallet_balance bigint not null default 500 check (wallet_balance between 0 and 2000000000);
+alter table public.kp_users add column if not exists economy_actions text[] not null default '{}';
+alter table public.kp_users add column if not exists job_state jsonb not null default '{"active":null,"cooldowns":{},"completed":{}}'::jsonb;
+
+create table if not exists public.kp_wallet_transactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.kp_users(id) on delete cascade,
+  type text not null check (type in ('credit', 'debit')),
+  amount bigint not null check (amount > 0 and amount <= 2000000000),
+  balance_after bigint not null check (balance_after between 0 and 2000000000),
+  kind text not null default 'other' check (char_length(kind) between 1 and 40),
+  description text not null default '' check (char_length(description) <= 120),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists kp_wallet_transactions_user_created_idx
+  on public.kp_wallet_transactions(user_id, created_at desc);
+
 create table if not exists public.kp_world_state (
   user_id uuid primary key references public.kp_users(id) on delete cascade,
   x double precision not null check (x between -110.01 and 110.01),
@@ -145,6 +164,7 @@ for each row execute function public.kp_cleanup_follows_after_block();
 
 -- These tables are server-owned. Browser/mobile clients continue to use /api.
 alter table public.kp_users enable row level security;
+alter table public.kp_wallet_transactions enable row level security;
 alter table public.kp_world_state enable row level security;
 alter table public.kp_follows enable row level security;
 alter table public.kp_blocks enable row level security;
@@ -153,6 +173,7 @@ alter table public.kp_sessions enable row level security;
 alter table public.kp_password_resets enable row level security;
 
 revoke all on public.kp_users from anon, authenticated;
+revoke all on public.kp_wallet_transactions from anon, authenticated;
 revoke all on public.kp_world_state from anon, authenticated;
 revoke all on public.kp_follows from anon, authenticated;
 revoke all on public.kp_blocks from anon, authenticated;

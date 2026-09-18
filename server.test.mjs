@@ -122,6 +122,25 @@ test('a receiver must accept a follow before text, voice messages or live voice;
   assert.equal((await alice('/api/session')).data.user.following, 0);
 });
 
+test('nearby voice works without follows, enforces distance and respects blocks', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  const a = await signup(alice, 'Alice'), b = await signup(bob, 'Bob');
+  const bobEvents = await bob.events();
+  t.after(() => bobEvents.close());
+  await bobEvents.next('world');
+  const ready = await alice(`/api/proximity/signal/${b.id}`, { data: { type: 'ready' } });
+  assert.equal(ready.status, 200);
+  const signal = await bobEvents.next('proximity-signal', value => value.from === a.id && value.data?.type === 'ready');
+  assert.equal(signal.from, a.id);
+
+  assert.equal((await bob('/api/profile', { district: 'Thiruvananthapuram' }, 'PATCH')).status, 200);
+  assert.equal((await alice(`/api/proximity/signal/${b.id}`, { data: { type: 'ready' } })).status, 403);
+
+  assert.equal((await bob('/api/profile', { district: 'Ernakulam' }, 'PATCH')).status, 200);
+  assert.equal((await bob(`/api/blocks/${a.id}`, { blocked: true })).status, 200);
+  assert.equal((await alice(`/api/proximity/signal/${b.id}`, { data: { type: 'ready' } })).status, 403);
+});
+
 test('a reciprocal block cannot reveal the blocking player profile or live location', async t => {
   const app = await setup(t), alice = app.client(), bob = app.client();
   const a = await signup(alice, 'Alice'), b = await signup(bob, 'Bob');
@@ -271,4 +290,127 @@ test('game rewards cap at five per day, expired rounds fail, and levels use incr
   app.advance(121000);
   assert.equal((await alice('/api/games/coconut/finish', expired)).status, 409);
   assert.equal((await alice('/api/session')).data.user.points, 300);
+});
+
+test('Kerala Cash wallet uses server prices, prevents replay/overspend, keeps history and persists', async t => {
+  const app = await setup(t), alice = app.client();
+  await signup(alice, 'WalletAlice');
+  let wallet = (await alice('/api/wallet')).data;
+  assert.equal(wallet.balance, 500);
+  assert.equal(wallet.currency, 'KCR');
+  assert.equal(wallet.starterJobCompleted, false);
+  assert.equal(wallet.transactions[0].amount, 500);
+  assert.equal(wallet.transactions[0].type, 'credit');
+
+  const salary = await alice('/api/jobs/starter-delivery/complete', {});
+  assert.equal(salary.status, 200);
+  assert.equal(salary.data.reward, 250);
+  assert.equal(salary.data.wallet.balance, 750);
+  assert.equal((await alice('/api/jobs/starter-delivery/complete', {})).status, 409);
+
+  const tampered = await alice('/api/shop/purchase', { itemId: 'meal', price: 1, amount: 1 });
+  assert.equal(tampered.status, 200);
+  assert.equal(tampered.data.purchase.price, 80, 'Client-supplied price must be ignored');
+  assert.equal(tampered.data.wallet.balance, 670);
+  assert.equal(tampered.data.transaction.balanceAfter, 670);
+  assert.equal((await alice('/api/shop/purchase', { itemId: 'not-real' })).status, 404);
+
+  for (let i = 0; i < 8; i++) assert.equal((await alice('/api/shop/purchase', { itemId: 'meal' })).status, 200);
+  assert.equal((await alice('/api/wallet')).data.balance, 30);
+  assert.equal((await alice('/api/shop/purchase', { itemId: 'meal' })).status, 409);
+  wallet = (await alice('/api/wallet')).data;
+  assert.equal(wallet.balance, 30);
+  assert.equal(wallet.transactions[0].type, 'debit');
+  assert.equal(wallet.transactions[0].balanceAfter, 30);
+
+  await app.restart();
+  assert.equal((await alice('/api/session')).data.user, null);
+  assert.equal((await alice('/api/auth/login', { identifier: 'WalletAlice', password: 'test-password-2026' })).status, 200);
+  wallet = (await alice('/api/wallet')).data;
+  assert.equal(wallet.balance, 30);
+  assert.equal(wallet.starterJobCompleted, true);
+  assert.equal((await alice('/api/jobs/starter-delivery/complete', {})).status, 409);
+});
+
+
+test('jobs require real world checkpoints, server salary, shift time, cooldowns and persistence', async t => {
+  const app = await setup(t), alice = app.client();
+  await signup(alice, 'JobAlice');
+
+  let jobs = (await alice('/api/jobs')).data;
+  assert.equal(jobs.jobs.length, 3);
+  assert.deepEqual(jobs.jobs.map(job => job.id).sort(), ['delivery', 'shop', 'taxi']);
+  assert.equal(jobs.walletBalance, 500);
+
+  const started = await alice('/api/jobs/delivery/start', { reward: 999999 });
+  assert.equal(started.status, 201);
+  let deliveryTask = started.data.active;
+  assert.equal(deliveryTask.jobId, 'delivery');
+  assert.equal(deliveryTask.phase, 'travel');
+  assert.equal(deliveryTask.target.action, 'Collect parcel');
+  assert.equal((await alice('/api/jobs/taxi/start', {})).status, 409, 'Only one job may be active at a time');
+  assert.equal((await alice('/api/jobs/delivery/complete', { taskId: deliveryTask.taskId, reward: 999999 })).status, 409, 'Route cannot be paid before checkpoints');
+  assert.equal((await alice('/api/jobs/delivery/checkpoint', { taskId: deliveryTask.taskId })).status, 409, 'Remote checkpoint claims must fail');
+
+  app.advance(1_000);
+  assert.equal((await alice('/api/world/move', { x: deliveryTask.target.x, z: deliveryTask.target.z, rotation: 0, moving: true })).status, 200);
+  let checked = await alice('/api/jobs/delivery/checkpoint', { taskId: deliveryTask.taskId });
+  assert.equal(checked.status, 200);
+  deliveryTask = checked.data.active;
+  assert.equal(deliveryTask.target.action, 'Deliver parcel');
+
+  app.advance(2_000);
+  assert.equal((await alice('/api/world/move', { x: deliveryTask.target.x, z: deliveryTask.target.z, rotation: 0, moving: true })).status, 200);
+  checked = await alice('/api/jobs/delivery/checkpoint', { taskId: deliveryTask.taskId });
+  assert.equal(checked.status, 200);
+  assert.equal(checked.data.active.phase, 'ready');
+
+  const paid = await alice('/api/jobs/delivery/complete', { taskId: deliveryTask.taskId, reward: 999999 });
+  assert.equal(paid.status, 200);
+  assert.equal(paid.data.reward, 180, 'Salary must come from the server job definition');
+  assert.equal(paid.data.wallet.balance, 680);
+  assert.equal(paid.data.transaction.amount, 180);
+  assert.equal((await alice('/api/jobs/delivery/complete', { taskId: deliveryTask.taskId })).status, 409, 'Completed task token cannot be replayed');
+  assert.equal((await alice('/api/jobs/delivery/start', {})).status, 409, 'Job cooldown must be enforced');
+
+  const taxi = await alice('/api/jobs/taxi/start', {});
+  assert.equal(taxi.status, 201);
+  const taxiTaskId = taxi.data.active.taskId;
+  const firstTaxiTarget = taxi.data.active.target;
+
+  await app.restart();
+  assert.equal((await alice('/api/session')).data.user, null);
+  assert.equal((await alice('/api/auth/login', { identifier: 'JobAlice', password: 'test-password-2026' })).status, 200);
+  jobs = (await alice('/api/jobs')).data;
+  assert.equal(jobs.active.taskId, taxiTaskId, 'Active mission should survive a server restart');
+  assert.deepEqual({ x: jobs.active.target.x, z: jobs.active.target.z }, { x: firstTaxiTarget.x, z: firstTaxiTarget.z }, 'Mission checkpoint should persist');
+
+  app.advance(1_000);
+  assert.equal((await alice('/api/world/move', { x: jobs.active.target.x, z: jobs.active.target.z, rotation: 0, moving: true })).status, 200);
+  checked = await alice('/api/jobs/taxi/checkpoint', { taskId: taxiTaskId });
+  assert.equal(checked.status, 200);
+  const taxiDrop = checked.data.active.target;
+  app.advance(2_000);
+  assert.equal((await alice('/api/world/move', { x: taxiDrop.x, z: taxiDrop.z, rotation: 0, moving: true })).status, 200);
+  checked = await alice('/api/jobs/taxi/checkpoint', { taskId: taxiTaskId });
+  assert.equal(checked.data.active.phase, 'ready');
+  const taxiPaid = await alice('/api/jobs/taxi/complete', { taskId: taxiTaskId, reward: 1 });
+  assert.equal(taxiPaid.status, 200);
+  assert.equal(taxiPaid.data.reward, 220);
+  assert.equal(taxiPaid.data.wallet.balance, 900);
+
+  const shop = await alice('/api/jobs/shop/start', {});
+  assert.equal(shop.status, 201);
+  const shopTask = shop.data.active;
+  app.advance(2_000);
+  assert.equal((await alice('/api/world/move', { x: shopTask.target.x, z: shopTask.target.z, rotation: 0, moving: true })).status, 200);
+  checked = await alice('/api/jobs/shop/checkpoint', { taskId: shopTask.taskId });
+  assert.equal(checked.status, 200);
+  assert.equal(checked.data.active.phase, 'working');
+  assert.equal((await alice('/api/jobs/shop/complete', { taskId: shopTask.taskId })).status, 409, 'Shop shift must run for its server-defined duration');
+  app.advance(10_000);
+  const shopPaid = await alice('/api/jobs/shop/complete', { taskId: shopTask.taskId, reward: 999999 });
+  assert.equal(shopPaid.status, 200);
+  assert.equal(shopPaid.data.reward, 140);
+  assert.equal(shopPaid.data.wallet.balance, 1040);
 });

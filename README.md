@@ -1,6 +1,6 @@
 # Kerala Play
 
-A Kerala village game with accounts, accepted follows, private messages, shared avatars and server-owned rewards.
+A Kerala village game with accounts, accepted follows, private messages, shared avatars, nearby voice, server-owned rewards and a persistent Kerala Cash wallet.
 
 ## Run
 
@@ -12,7 +12,7 @@ npm start
 
 Open **http://localhost:3000**. No npm install or cloud account is required. Three.js 0.160.1 and its license are included in `vendor/`.
 
-Create a username (3–24 letters, numbers or underscores) and a password of at least 8 characters. Each new account starts at **0 points, level 1**. Account data is stored in `.data/`; preserve that folder when updating the game. Old browser-only demo profiles are not accounts and are not imported.
+Create a username (3–24 letters, numbers or underscores) and a password of at least 8 characters. Each new account starts at **0 points, level 1 and ₹500 Kerala Cash**. Account data is stored in `.data/`; preserve that folder when updating the game. Old browser-only demo profiles are not accounts and are not imported.
 
 Use separate browsers or browser profiles to test two people. Tabs in the same browser share the login cookie. Both players must connect to the same running server.
 
@@ -22,11 +22,12 @@ Use separate browsers or browser profiles to test two people. Tabs in the same b
 - Select a username or click an avatar to open its profile. Village guides have an NPC profile; real players have follow and messaging controls.
 - In People, send a follow request. The recipient must accept before either person can send private messages. Blocking removes the connection and prevents messages and voice.
 - Complete exploration tasks for one-time points. Coconut Memory gives 20 points for repeating a pattern, with a maximum of five wins per day. Each round can be submitted only once.
+- Open **WALLET** to see Kerala Cash and transaction history. The one-time Starter Delivery credits ₹250. Village Shop prices are server-owned, so the browser cannot choose its own price or spend below zero.
 - The sky runs through a shared 24-minute day, evening and night. Enable Sound for synthesized birds, water, night ambience and music. Quality controls adjust resolution and shadows.
 
 ## Voice and multiplayer
 
-Private voice messages use microphone recording, with a 30-second limit. Walkie-talkie uses WebRTC with an explicit listening control and push-to-talk. The browser asks for microphone permission when you use these controls.
+Private voice messages use microphone recording, with a 30-second limit. Walkie-talkie uses WebRTC with an explicit listening control and push-to-talk. **Nearby Voice** is a separate opt-in mode: tap the VOICE button to enable your microphone, and players within roughly 22 metres connect automatically; their volume fades with distance and the connection closes after about 27 metres. Blocks also disable nearby voice. The browser asks for microphone permission when you use these controls.
 
 Microphones require localhost or HTTPS. For access from other devices, host the application behind an HTTPS reverse proxy. This repository runs a single Node process with file persistence; it does not include public hosting, HTTPS certificates, a TURN relay, email recovery or large-scale infrastructure. Some networks require a TURN server for WebRTC audio to connect.
 
@@ -42,4 +43,21 @@ The included male/female avatars, vehicles, Kerala-style houses, coconut palms a
 npm test
 ```
 
-The API integration suite covers account/session rules, accepted follows and blocks, private message permissions, rewards, persistence and protected files. Real microphones and two-device WebRTC audio should also be checked on the intended deployment network.
+The API integration suite covers account/session rules, accepted follows and blocks, private message permissions, nearby voice, rewards, Kerala Cash wallet validation/persistence and protected files. Real microphones and two-device WebRTC audio should also be checked on the intended deployment network.
+
+
+## World Job Missions V2 (V52)
+
+The three Phase 1 jobs now use server-verified world checkpoints instead of timer-only completion. Delivery Rider requires parcel pickup and customer drop-off, Taxi Driver requires passenger pickup and destination drop-off, and Shop Worker requires travel to the shop plus a short on-site shift. The HUD and Kerala map show the current job destination, while salary, cooldowns and checkpoint validation remain server-authoritative. Existing `job_state` JSON storage is reused, so no new Supabase table migration is required beyond the V51 jobs migration.
+
+## Jobs + Salary V1 (V51)
+
+Phase 1 now includes a server-verified job board with three repeatable jobs:
+
+- Delivery Rider — 180 Kerala Cash after a 12-second work window, then 30-second cooldown.
+- Taxi Driver — 220 Kerala Cash after a 15-second work window, then 35-second cooldown.
+- Shop Worker — 140 Kerala Cash after a 10-second work window, then 25-second cooldown.
+
+Only one job can be active at a time. The backend creates a unique task ID, enforces minimum work time and cooldowns, rejects replayed/expired task IDs, and credits the server-defined salary directly to the Kerala Cash wallet. Client-supplied salary values are ignored. Active-job state, cooldowns and completion counts persist across backend restarts.
+
+For an existing Supabase production project, run `supabase/jobs-v1.sql` once, then rerun `supabase/production-persistence-rpc.sql` and `supabase/production-service-role-grants.sql` before deploying V51.

@@ -84,6 +84,16 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const receiversReady = new Set();
   const peers = new Map();
   const earlyCandidates = new Map();
+  const proximityPeers = new Map();
+  const proximityCandidates = new Map();
+  const proximityRetryAt = new Map();
+  const worldPlayers = new Map();
+  let proximityEnabled = false;
+  let proximityStream = null;
+  let proximityStarting = false;
+  const PROXIMITY_FULL_VOLUME = 4;
+  const PROXIMITY_START_DISTANCE = 22;
+  const PROXIMITY_STOP_DISTANCE = 27;
   const listeners = new Set();
   const $ = id => document.getElementById(id);
   const peoplePanel = $('people-panel');
@@ -91,6 +101,24 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const chatPanel = $('chat-panel');
   const peopleToggle = $('people-toggle');
   const chatToggle = $('chat-toggle');
+  const proximityVoiceToggle = $('proximity-voice-toggle');
+  const walletPanel = $('wallet-panel');
+  const walletToggle = $('wallet-toggle');
+  const walletClose = $('wallet-close');
+  const walletBalance = $('wallet-balance');
+  const walletTransactions = $('wallet-transactions');
+  const walletError = $('wallet-error');
+  const starterDelivery = $('starter-delivery');
+  const walletRefresh = $('wallet-refresh');
+  const walletShop = $('wallet-shop');
+  const jobsPanel = $('jobs-panel');
+  const jobsToggle = $('jobs-toggle');
+  const jobsClose = $('jobs-close');
+  const jobsList = $('jobs-list');
+  const jobsError = $('jobs-error');
+  const jobsRefresh = $('jobs-refresh');
+  let jobsSnapshot = null;
+  let jobsTimer = null;
   const profileChip = $('profile-chip');
 
   function toast(message) { onToast(message); }
@@ -125,9 +153,12 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function closePanels() {
     cancelRecording(); stopTalking();
-    for (const panel of [peoplePanel, dmPanel, chatPanel]) panel?.classList.remove('open');
+    for (const panel of [peoplePanel, dmPanel, chatPanel, walletPanel, jobsPanel]) panel?.classList.remove('open');
     peopleToggle?.setAttribute('aria-expanded', 'false');
     chatToggle?.setAttribute('aria-expanded', 'false');
+    walletToggle?.setAttribute('aria-expanded', 'false');
+    jobsToggle?.setAttribute('aria-expanded', 'false');
+    if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
   }
   function showPanel(panel) {
     closePanels();
@@ -139,6 +170,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (panel === chatPanel || panel === dmPanel) chatToggle?.classList.remove('unread');
     peopleToggle?.setAttribute('aria-expanded', String(panel === peoplePanel));
     chatToggle?.setAttribute('aria-expanded', String(panel === dmPanel || panel === chatPanel));
+    walletToggle?.setAttribute('aria-expanded', String(panel === walletPanel));
+    jobsToggle?.setAttribute('aria-expanded', String(panel === jobsPanel));
   }
   function panelHeader(title, panel, id) {
     const header = node('div', 'panel-heading');
@@ -439,6 +472,111 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     return user;
   }
   function requireUser() { if (user) return true; renderAuth(); return false; }
+  function formatCash(value) { return `₹${Number(value || 0).toLocaleString('en-IN')}`; }
+  function renderWallet(wallet) {
+    if (!wallet) return;
+    if (walletBalance) walletBalance.textContent = formatCash(wallet.balance);
+    if (starterDelivery) {
+      starterDelivery.disabled = !!wallet.starterJobCompleted;
+      starterDelivery.textContent = wallet.starterJobCompleted ? 'Starter Delivery · Salary received' : 'Complete Starter Delivery · +₹250';
+    }
+    if (walletTransactions) {
+      walletTransactions.replaceChildren();
+      const transactions = Array.isArray(wallet.transactions) ? wallet.transactions : [];
+      if (!transactions.length) walletTransactions.append(node('p', 'social-empty', 'No transactions yet.'));
+      for (const transaction of transactions) {
+        const row = node('div', `wallet-transaction ${transaction.type === 'debit' ? 'debit' : 'credit'}`);
+        const title = node('strong', '', transaction.description || transaction.kind || 'Transaction');
+        const amount = node('b', '', `${transaction.type === 'debit' ? '−' : '+'}${formatCash(transaction.amount)}`);
+        const created = new Date(transaction.createdAt);
+        const detail = node('small', '', `${Number.isNaN(created.getTime()) ? '' : created.toLocaleString()} · Balance ${formatCash(transaction.balanceAfter)}`);
+        row.append(title, amount, detail); walletTransactions.append(row);
+      }
+    }
+  }
+  async function refreshWallet() {
+    if (!user) return null;
+    const wallet = await api('/api/wallet');
+    renderWallet(wallet);
+    return wallet;
+  }
+  function openWallet() {
+    if (!requireUser()) return;
+    showPanel(walletPanel);
+    run(refreshWallet, walletError);
+  }
+  function secondsRemaining(timestamp) { return Math.max(0, Math.ceil((Number(timestamp || 0) - Date.now()) / 1000)); }
+  function renderJobs(summary) {
+    jobsSnapshot = summary || null;
+    window.dispatchEvent(new CustomEvent('kerala-job-mission', { detail: summary?.active || null }));
+    if (!jobsList) return;
+    jobsList.replaceChildren();
+    const jobs = Array.isArray(summary?.jobs) ? summary.jobs : [];
+    if (!jobs.length) { jobsList.append(node('p', 'social-empty', 'No jobs available.')); return; }
+    const active = summary?.active || null;
+    for (const job of jobs) {
+      const isActive = active?.jobId === job.id;
+      const card = node('article', `job-card${isActive ? ' active' : ''}`);
+      const head = node('div', 'job-card-head');
+      head.append(node('h3', '', job.title), node('span', 'job-pay', `+${formatCash(job.reward)}`));
+      const meta = node('div', 'job-meta');
+      const missionLabel = job.missionType === 'shift' ? `On-site ${Math.ceil(Number(job.durationMs || 0) / 1000)}s` : 'World route';
+      meta.append(node('span', '', missionLabel), node('span', '', `Completed ${Number(job.completedCount || 0)}`));
+      const action = document.createElement('button');
+      action.type = 'button'; action.dataset.jobId = job.id;
+      let missionNote = null;
+      if (isActive) {
+        action.dataset.taskId = active.taskId;
+        if (active.phase === 'travel' && active.target) {
+          const distance = Math.max(0, Math.ceil(Number(active.target.distance || 0)));
+          missionNote = node('p', 'job-mission-note', `${active.target.action} · ${active.target.name} · ${distance} m away`);
+          action.dataset.jobAction = 'checkpoint';
+          action.disabled = !active.target.withinRange;
+          action.textContent = active.target.withinRange ? `Check in · ${active.target.action}` : `Go to ${active.target.name} · ${distance} m`;
+        } else if (active.phase === 'working') {
+          const wait = secondsRemaining(active.readyAt);
+          missionNote = node('p', 'job-mission-note', `Checked in at ${active.target?.name || 'Village Shop'} · stay nearby until the shift ends`);
+          action.dataset.jobAction = 'complete';
+          action.disabled = wait > 0;
+          action.textContent = wait > 0 ? `Working… ${wait}s` : `Complete shift · +${formatCash(job.reward)}`;
+          if (!wait) action.classList.add('complete-ready');
+        } else {
+          missionNote = node('p', 'job-mission-note', 'All route checkpoints complete. Salary is ready to claim.');
+          action.dataset.jobAction = 'complete';
+          action.textContent = `Complete job · +${formatCash(job.reward)}`;
+          action.classList.add('complete-ready');
+        }
+      } else if (active) {
+        action.disabled = true; action.textContent = 'Another job is active';
+      } else {
+        const cooldown = secondsRemaining(job.cooldownUntil);
+        action.dataset.jobAction = 'start'; action.disabled = cooldown > 0;
+        action.textContent = cooldown > 0 ? `Cooldown · ${cooldown}s` : 'Start mission';
+      }
+      card.append(head, node('p', '', job.description || ''), meta);
+      if (missionNote) card.append(missionNote);
+      card.append(action);
+      jobsList.append(card);
+    }
+  }
+  async function refreshJobs() {
+    if (!user) return null;
+    const summary = await api('/api/jobs');
+    renderJobs(summary);
+    return summary;
+  }
+  function startJobsTimer() {
+    if (jobsTimer) clearInterval(jobsTimer);
+    jobsTimer = setInterval(() => {
+      if (!jobsPanel?.classList.contains('open')) { clearInterval(jobsTimer); jobsTimer = null; return; }
+      run(refreshJobs, jobsError);
+    }, 1500);
+  }
+  function openJobs() {
+    if (!requireUser()) return;
+    showPanel(jobsPanel);
+    run(refreshJobs, jobsError).then(() => startJobsTimer());
+  }
   function openPeople() {
     if (!requireUser()) return;
     closeProfile(); showPanel(peoplePanel);
@@ -632,6 +770,172 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     recordingStream?.getTracks().forEach(track => track.stop());
     if (!recording) { recordButton.textContent = 'Record voice message'; recordCancel.hidden = true; }
   }
+  function proximityDistance(peerId) {
+    const self = worldPlayers.get(user?.id), peer = worldPlayers.get(peerId);
+    if (!self || !peer || !Number.isFinite(self.x) || !Number.isFinite(self.z) || !Number.isFinite(peer.x) || !Number.isFinite(peer.z)) return Infinity;
+    return Math.hypot(self.x - peer.x, self.z - peer.z);
+  }
+  function proximityVolume(distance) {
+    if (distance <= PROXIMITY_FULL_VOLUME) return 1;
+    if (distance >= PROXIMITY_STOP_DISTANCE) return 0;
+    const linear = 1 - (distance - PROXIMITY_FULL_VOLUME) / (PROXIMITY_STOP_DISTANCE - PROXIMITY_FULL_VOLUME);
+    return Math.max(0, Math.min(1, linear * linear));
+  }
+  function updateProximityButton() {
+    if (!proximityVoiceToggle) return;
+    proximityVoiceToggle.setAttribute('aria-pressed', proximityEnabled ? 'true' : 'false');
+    proximityVoiceToggle.setAttribute('aria-label', proximityEnabled ? 'Turn off nearby voice' : 'Turn on nearby voice');
+    const label = proximityVoiceToggle.querySelector('span');
+    if (label) label.textContent = proximityEnabled ? 'VOICE ON' : 'VOICE';
+  }
+  async function sendProximitySignal(peerId, data) {
+    if (!user || !connected) return;
+    return api(`/api/proximity/signal/${encodeURIComponent(peerId)}`, { data });
+  }
+  function closeProximityPeer(peerId, callId) {
+    const connection = proximityPeers.get(peerId);
+    if (!connection || (callId && connection.callId !== callId)) return;
+    proximityPeers.delete(peerId);
+    try { connection.pc.close(); } catch { /* already closed */ }
+    connection.audio.pause();
+    connection.audio.srcObject = null;
+    connection.audio.remove();
+    proximityCandidates.delete(`${peerId}:${connection.callId}`);
+  }
+  function makeProximityPeer(peerId, callId) {
+    closeProximityPeer(peerId);
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const audio = document.createElement('audio');
+    audio.autoplay = true; audio.playsInline = true; audio.style.display = 'none';
+    audio.setAttribute('aria-label', 'Nearby player voice');
+    const connection = { pc, audio, callId };
+    proximityPeers.set(peerId, connection);
+    pc.onicecandidate = event => {
+      if (!event.candidate) return;
+      sendProximitySignal(peerId, { type: 'candidate', callId, candidate: event.candidate.toJSON() }).catch(() => closeProximityPeer(peerId, callId));
+    };
+    pc.ontrack = event => {
+      const distance = proximityDistance(peerId);
+      if (!proximityEnabled || distance > PROXIMITY_STOP_DISTANCE) { closeProximityPeer(peerId, callId); return; }
+      audio.srcObject = event.streams[0] || new MediaStream([event.track]);
+      audio.volume = proximityVolume(distance);
+      document.body.append(audio);
+      audio.play().catch(() => toast('Tap the VOICE button once to allow nearby audio playback.'));
+    };
+    pc.onconnectionstatechange = () => {
+      if (['failed', 'closed'].includes(pc.connectionState)) closeProximityPeer(peerId, callId);
+    };
+    return connection;
+  }
+  async function flushProximityCandidates(peerId, connection) {
+    const key = `${peerId}:${connection.callId}`;
+    const candidates = proximityCandidates.get(key) || [];
+    proximityCandidates.delete(key);
+    for (const candidate of candidates) if (connection.pc.signalingState !== 'closed') await connection.pc.addIceCandidate(candidate);
+  }
+  async function ensureProximityOffer(peerId, force = false) {
+    if (!proximityEnabled || !proximityStream || !connected || !window.RTCPeerConnection || !user || user.id.localeCompare(peerId) >= 0) return;
+    const distance = proximityDistance(peerId);
+    if (distance > PROXIMITY_START_DISTANCE) return;
+    const existing = proximityPeers.get(peerId);
+    if (existing) { existing.audio.volume = proximityVolume(distance); return; }
+    if (!force && (proximityRetryAt.get(peerId) || 0) > Date.now()) return;
+    const callId = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+    const connection = makeProximityPeer(peerId, callId);
+    for (const track of proximityStream.getAudioTracks()) connection.pc.addTrack(track, proximityStream);
+    try {
+      const offer = await connection.pc.createOffer();
+      if (!proximityEnabled || proximityDistance(peerId) > PROXIMITY_STOP_DISTANCE || proximityPeers.get(peerId) !== connection) { closeProximityPeer(peerId, callId); return; }
+      await connection.pc.setLocalDescription(offer);
+      await sendProximitySignal(peerId, { type: 'offer', callId, sdp: offer.sdp });
+    } catch {
+      closeProximityPeer(peerId, callId);
+      proximityRetryAt.set(peerId, Date.now() + 5000);
+    }
+  }
+  function updateProximityWorld(players) {
+    worldPlayers.clear();
+    for (const player of players) if (player?.id) worldPlayers.set(player.id, player);
+    for (const [peerId, connection] of [...proximityPeers]) {
+      const distance = proximityDistance(peerId);
+      if (!proximityEnabled || distance > PROXIMITY_STOP_DISTANCE) {
+        closeProximityPeer(peerId);
+        if (connected) sendProximitySignal(peerId, { type: 'end', callId: connection.callId }).catch(() => {});
+      } else connection.audio.volume = proximityVolume(distance);
+    }
+    if (!proximityEnabled || !proximityStream) return;
+    for (const player of players) {
+      if (!player?.id || player.id === user?.id || proximityDistance(player.id) > PROXIMITY_START_DISTANCE) continue;
+      if (user.id.localeCompare(player.id) < 0) ensureProximityOffer(player.id).catch(() => {});
+    }
+  }
+  async function startProximityVoice() {
+    if (proximityEnabled || proximityStarting) return;
+    if (!user || !connected) { toast('Connect to the world before turning on nearby voice.'); return; }
+    if (!supportsMicrophone() || !window.RTCPeerConnection) { toast('Nearby voice needs microphone access on HTTPS or localhost.'); return; }
+    proximityStarting = true;
+    try {
+      const accountId = user.id;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      if (!user || user.id !== accountId || !connected) { stream.getTracks().forEach(track => track.stop()); return; }
+      proximityStream = stream; proximityEnabled = true; updateProximityButton();
+      toast('Nearby voice is on. Players close to you can hear you.');
+      const nearby = [...worldPlayers.values()].filter(player => player.id !== user.id && proximityDistance(player.id) <= PROXIMITY_START_DISTANCE);
+      await Promise.allSettled(nearby.map(player => sendProximitySignal(player.id, { type: 'ready' })));
+      updateProximityWorld([...worldPlayers.values()]);
+    } catch (error) {
+      toast(error.name === 'NotAllowedError' ? 'Microphone permission was denied.' : 'Could not start nearby voice.');
+    } finally { proximityStarting = false; updateProximityButton(); }
+  }
+  function stopProximityVoice(notifyPeers = true) {
+    const ids = [...proximityPeers.keys()];
+    proximityEnabled = false; proximityStarting = false;
+    proximityStream?.getTracks().forEach(track => track.stop()); proximityStream = null;
+    for (const peerId of ids) {
+      const callId = proximityPeers.get(peerId)?.callId;
+      closeProximityPeer(peerId);
+      if (notifyPeers && connected) sendProximitySignal(peerId, { type: 'disabled', callId }).catch(() => {});
+    }
+    proximityCandidates.clear(); proximityRetryAt.clear(); updateProximityButton();
+  }
+  async function handleProximitySignal({ from, data }) {
+    if (!user || !from || !data) return;
+    if (data.type === 'ready') {
+      proximityRetryAt.delete(from);
+      if (proximityEnabled && proximityDistance(from) <= PROXIMITY_START_DISTANCE && user.id.localeCompare(from) < 0) await ensureProximityOffer(from, true);
+      return;
+    }
+    if (data.type === 'disabled') { closeProximityPeer(from, data.callId); proximityRetryAt.set(from, Date.now() + 5000); return; }
+    if (data.type === 'end') { closeProximityPeer(from, data.callId); return; }
+    if (!data.callId) return;
+    const distance = proximityDistance(from);
+    if (!proximityEnabled || !proximityStream || distance > PROXIMITY_STOP_DISTANCE) {
+      await sendProximitySignal(from, { type: 'disabled', callId: data.callId }).catch(() => {});
+      closeProximityPeer(from, data.callId); return;
+    }
+    if (data.type === 'offer') {
+      const connection = makeProximityPeer(from, data.callId);
+      for (const track of proximityStream.getAudioTracks()) connection.pc.addTrack(track, proximityStream);
+      await connection.pc.setRemoteDescription({ type: 'offer', sdp: data.sdp });
+      await flushProximityCandidates(from, connection);
+      const answer = await connection.pc.createAnswer();
+      await connection.pc.setLocalDescription(answer);
+      await sendProximitySignal(from, { type: 'answer', callId: data.callId, sdp: answer.sdp });
+    } else if (data.type === 'answer') {
+      const connection = proximityPeers.get(from);
+      if (!connection || connection.callId !== data.callId || connection.pc.signalingState !== 'have-local-offer') return;
+      await connection.pc.setRemoteDescription({ type: 'answer', sdp: data.sdp });
+      await flushProximityCandidates(from, connection);
+    } else if (data.type === 'candidate' && data.candidate) {
+      const connection = proximityPeers.get(from);
+      if (connection?.callId === data.callId && connection.pc.remoteDescription) await connection.pc.addIceCandidate(data.candidate);
+      else {
+        const key = `${from}:${data.callId}`;
+        const pending = proximityCandidates.get(key) || [];
+        if (pending.length < 50 && proximityCandidates.size < 50) { pending.push(data.candidate); proximityCandidates.set(key, pending); }
+      }
+    }
+  }
   async function sendSignal(peerId, data) { if (!user || !connected) return; return api(`/api/voice/signal/${encodeURIComponent(peerId)}`, { data }); }
   function closePeer(peerId, callId) {
     const connection = peers.get(peerId);
@@ -733,10 +1037,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     }
   }
   function cleanupVoice() {
-    cancelRecording(); stopTalking();
+    cancelRecording(); stopTalking(); stopProximityVoice(false);
     for (const peerId of [...peers.keys()]) closePeer(peerId);
-    earlyCandidates.clear(); receiving.clear(); receiversReady.clear();
-    audioMount.replaceChildren(); updateVoiceControls();
+    earlyCandidates.clear(); receiving.clear(); receiversReady.clear(); worldPlayers.clear();
+    audioMount.replaceChildren(); updateVoiceControls(); updateProximityButton();
   }
   function startEvents() {
     source?.close();
@@ -760,6 +1064,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       let changed = false;
       people.forEach(person => { const isOnline = online.has(person.id); if (person.online !== isOnline) changed = true; person.online = isOnline; });
       if (changed) renderPeople();
+      updateProximityWorld(players);
       onPlayers(players);
     });
     listen('social', async () => { await refreshPeople(); await refreshUser(); if (!profileModal.hidden && profileId && profileId !== user?.id) await openProfile(profileId, true); });
@@ -769,6 +1074,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     });
     listen('profile', value => { if (value.user?.id === user?.id) setUser(value.user); run(refreshPeople, peopleError); });
     listen('signal', handleSignal);
+    listen('proximity-signal', handleProximitySignal);
   }
   async function beginSession(next) {
     if (!next) { renderAuth(); return; }
@@ -785,6 +1091,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     setConnection(false);
     startEvents();
     await run(refreshPeople, peopleError);
+    await run(refreshJobs, jobsError);
   }
   function endSession(message = '') {
     sessionVersion++;
@@ -794,15 +1101,58 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     people = []; peopleSignature = ''; activePeer = null; profileId = null;
     closePanels(); closeProfile();
     setUser(null); setConnection(false); onPlayers([]); onDisconnect();
+    if (walletBalance) walletBalance.textContent = '₹0';
+    walletTransactions?.replaceChildren();
+    if (starterDelivery) { starterDelivery.disabled = false; starterDelivery.textContent = 'Complete Starter Delivery · +₹250'; }
+    jobsSnapshot = null; jobsList?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-job-mission', { detail: null })); if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
     dmInput.value = ''; dmLog.replaceChildren();
     renderPeople(); renderAuth('login', message);
   }
   profileChip?.addEventListener('click', () => openProfile());
   peopleToggle?.addEventListener('click', () => peoplePanel.classList.contains('open') ? closePanels() : openPeople());
   chatToggle?.addEventListener('click', () => chatPanel.classList.contains('open') || dmPanel.classList.contains('open') ? closePanels() : openChat());
+  walletToggle?.addEventListener('click', () => walletPanel?.classList.contains('open') ? closePanels() : openWallet());
+  walletClose?.addEventListener('click', () => { closePanels(); walletToggle?.focus(); });
+  walletRefresh?.addEventListener('click', () => run(refreshWallet, walletError));
+  jobsToggle?.addEventListener('click', () => jobsPanel?.classList.contains('open') ? closePanels() : openJobs());
+  jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
+  jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
+  jobsList?.addEventListener('click', event => {
+    const action = event.target.closest('button[data-job-action]');
+    if (!action || action.disabled) return;
+    run(async () => {
+      action.disabled = true;
+      if (action.dataset.jobAction === 'start') {
+        const result = await api(`/api/jobs/${encodeURIComponent(action.dataset.jobId)}/start`, {});
+        renderJobs(result.jobs); toast(`${result.jobs.jobs.find(job => job.id === action.dataset.jobId)?.title || 'Job'} started · follow the mission route`);
+      } else if (action.dataset.jobAction === 'checkpoint') {
+        const result = await api(`/api/jobs/${encodeURIComponent(action.dataset.jobId)}/checkpoint`, { taskId: action.dataset.taskId });
+        renderJobs(result.jobs); toast(`${result.checkpoint.action} complete · next mission step ready`);
+      } else {
+        const result = await api(`/api/jobs/${encodeURIComponent(action.dataset.jobId)}/complete`, { taskId: action.dataset.taskId, reward: 999999 });
+        renderJobs(result.jobs); renderWallet(result.wallet); toast(`${result.completed.title} salary credited · ${formatCash(result.reward)}`);
+      }
+    }, jobsError).finally(() => { if (jobsPanel?.classList.contains('open')) run(refreshJobs, jobsError); });
+  });
+  starterDelivery?.addEventListener('click', () => run(async () => {
+    starterDelivery.disabled = true;
+    const result = await api('/api/jobs/starter-delivery/complete', {});
+    renderWallet(result.wallet); toast(`Starter Delivery salary credited · ${formatCash(result.reward)}`);
+  }, walletError).finally(() => { if (starterDelivery && !starterDelivery.textContent.includes('received')) starterDelivery.disabled = false; }));
+  walletShop?.addEventListener('click', event => {
+    const purchaseButton = event.target.closest('button[data-item-id]');
+    if (!purchaseButton) return;
+    run(async () => {
+      purchaseButton.disabled = true;
+      const result = await api('/api/shop/purchase', { itemId: purchaseButton.dataset.itemId });
+      renderWallet(result.wallet); toast(`${result.purchase.name} purchased · ${formatCash(result.purchase.price)}`);
+    }, walletError).finally(() => { purchaseButton.disabled = false; });
+  });
+  proximityVoiceToggle?.addEventListener('click', () => proximityEnabled ? stopProximityVoice() : startProximityVoice());
   window.addEventListener('blur', () => { stopTalking(); cancelRecording(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { stopTalking(); cancelRecording(); } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { stopTalking(); cancelRecording(); stopProximityVoice(); } });
   window.addEventListener('pagehide', () => { cleanupVoice(); clearMessageURLs(); source?.close(); });
+  updateProximityButton();
   setConnection(false);
   const initialVersion = sessionVersion;
   run(async () => {

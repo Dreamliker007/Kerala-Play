@@ -30,6 +30,9 @@ function mapUserToRow(user) {
     gender: user.gender,
     bio: user.bio || '',
     points: Number(user.points || 0),
+    wallet_balance: Number(user.walletBalance || 0),
+    economy_actions: Array.isArray(user.economyActions) ? user.economyActions : [],
+    job_state: user.jobState && typeof user.jobState === 'object' ? user.jobState : { active: null, cooldowns: {}, completed: {} },
     completed_tasks: Array.isArray(user.completedTasks) ? user.completedTasks : [],
     walk_meters: Number(user.walkMeters || 0),
     visited_landmarks: Array.isArray(user.visitedLandmarks) ? user.visitedLandmarks : [],
@@ -52,6 +55,9 @@ function mapUserFromRow(row) {
     gender: row.gender,
     bio: row.bio || '',
     points: Number(row.points || 0),
+    walletBalance: Number(row.wallet_balance ?? 500),
+    economyActions: row.economy_actions || [],
+    jobState: row.job_state && typeof row.job_state === 'object' ? row.job_state : { active: null, cooldowns: {}, completed: {} },
     completedTasks: row.completed_tasks || [],
     walkMeters: Number(row.walk_meters || 0),
     visitedLandmarks: row.visited_landmarks || [],
@@ -122,6 +128,32 @@ function mapMessageFromRow(row) {
   return message;
 }
 
+function mapWalletTransactionToRow(transaction) {
+  return {
+    id: transaction.id,
+    user_id: transaction.userId,
+    type: transaction.type,
+    amount: Number(transaction.amount || 0),
+    balance_after: Number(transaction.balanceAfter || 0),
+    kind: transaction.kind || 'other',
+    description: transaction.description || '',
+    created_at: iso(transaction.createdAt),
+  };
+}
+
+function mapWalletTransactionFromRow(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    amount: Number(row.amount || 0),
+    balanceAfter: Number(row.balance_after || 0),
+    kind: row.kind || 'other',
+    description: row.description || '',
+    createdAt: Date.parse(row.created_at) || Date.now(),
+  };
+}
+
 export function createSupabaseStore({
   url = process.env.SUPABASE_URL,
   serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -173,11 +205,12 @@ export function createSupabaseStore({
   }
 
   async function load() {
-    const [users, follows, blocks, messages, worldStates] = await Promise.all([
+    const [users, follows, blocks, messages, transactions, worldStates] = await Promise.all([
       request('kp_users?select=*&order=created_at.asc'),
       request('kp_follows?select=*&order=created_at.asc'),
       request('kp_blocks?select=*&order=created_at.asc'),
       request('kp_messages?select=*&order=created_at.asc'),
+      request('kp_wallet_transactions?select=*&order=created_at.asc'),
       optionalWorldRequest('kp_world_state?select=*&order=updated_at.asc'),
     ]);
     const worldByUser = new Map((worldStates || []).map(row => [row.user_id, row]));
@@ -187,6 +220,7 @@ export function createSupabaseStore({
       follows: (follows || []).map(row => ({ from: row.from_id, to: row.to_id, status: row.status })),
       blocks: (blocks || []).map(row => ({ from: row.from_id, to: row.to_id })),
       messages: (messages || []).map(mapMessageFromRow),
+      transactions: (transactions || []).map(mapWalletTransactionFromRow),
     };
   }
 
@@ -198,6 +232,7 @@ export function createSupabaseStore({
       follows: (db.follows || []).map(follow => ({ from_id: follow.from, to_id: follow.to, status: follow.status })),
       blocks: (db.blocks || []).map(block => ({ from_id: block.from, to_id: block.to })),
       messages: (db.messages || []).map(mapMessageToRow),
+      transactions: (db.transactions || []).map(mapWalletTransactionToRow),
     };
     await request('rpc/kp_replace_snapshot', { method: 'POST', body: { payload } });
     const worldPayload = (db.users || []).map(mapWorldStateToRow).filter(Boolean);
