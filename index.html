@@ -33,7 +33,7 @@
     #camera-note { position: absolute; z-index:2; right: 122px; bottom: calc(env(safe-area-inset-bottom) + 65px); color: rgba(255,255,255,.87); background: rgba(11,35,45,.42); padding: 6px 8px; border-radius: 8px; font-size: 11px; pointer-events:none; }
     #fallback { display: none; position: fixed; inset: 0; z-index: 5; place-items: center; padding: 24px; background: #16323f; color: white; text-align: center; line-height: 1.5; }
     #camera-zone { z-index: 1; }
-    #profile-chip, #progress-chip, #online-chip, #mission-card, #quick-actions, #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #jobs-panel, #dm-panel, #asset-notice, #toast { z-index: 5; pointer-events: auto; }
+    #profile-chip, #progress-chip, #online-chip, #mission-card, #quick-actions, #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #garage-panel, #jobs-panel, #dm-panel, #asset-notice, #toast { z-index: 5; pointer-events: auto; }
     #profile-chip { position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:176px; max-width:180px; padding:8px 10px; border:1px solid rgba(255,255,255,.22); border-radius:11px; background:rgba(8,29,34,.67); color:#fff; font-size:11px; line-height:1.25; cursor:pointer; touch-action:manipulation; }
     #profile-name { display:block; font-weight:800; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     #profile-district { display:block; margin-top:2px; color:#bde7d0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -131,7 +131,7 @@
       .drive-tool span { font-size:15px; }
       #road-status { bottom:calc(env(safe-area-inset-bottom) + 10px); min-width:150px; max-width:52vw; padding:5px 7px; font-size:8px; }
       #joystick-zone:active #joystick-base, #run:active { opacity:.88; }
-      #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #jobs-panel, #dm-panel { right:58px; width:min(286px,calc(100vw - 74px)); max-height:58dvh; }
+      #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #garage-panel, #jobs-panel, #dm-panel { right:58px; width:min(286px,calc(100vw - 74px)); max-height:58dvh; }
     }
   </style>
   <link rel="stylesheet" href="./social.css">
@@ -139,7 +139,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V60</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V61</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -164,6 +164,7 @@
       <button id="chat-toggle" class="hud-icon" type="button" aria-label="Open chat" aria-controls="chat-panel" aria-expanded="false">💬<span>CHAT</span></button>
       <button id="proximity-voice-toggle" class="hud-icon" type="button" aria-label="Turn on nearby voice" aria-pressed="false">🎙<span>VOICE</span></button>
       <button id="wallet-toggle" class="hud-icon" type="button" aria-label="Open Kerala Cash wallet" aria-controls="wallet-panel" aria-expanded="false">💰<span>WALLET</span></button>
+      <button id="garage-toggle" class="hud-icon" type="button" aria-label="Open personal garage" aria-controls="garage-panel" aria-expanded="false">🚘<span>GARAGE</span></button>
       <button id="jobs-toggle" class="hud-icon" type="button" aria-label="Open jobs" aria-controls="jobs-panel" aria-expanded="false">💼<span>JOBS</span></button>
       <button id="task-toggle" class="hud-icon" type="button" aria-label="Open tasks" aria-controls="task-panel" aria-expanded="false">★<span>TASKS</span></button>
       <button id="fullscreen-toggle" class="hud-icon" type="button" aria-label="Enter fullscreen">⛶<span>FULL</span></button>
@@ -193,6 +194,14 @@
       </div></div>
       <div class="wallet-section"><div class="wallet-history-heading"><strong>Transactions</strong><button id="wallet-refresh" type="button">Refresh</button></div><div id="wallet-transactions" aria-live="polite"></div></div>
       <div id="wallet-error" class="social-error" role="status"></div>
+    </section>
+    <section id="garage-panel" aria-label="Personal vehicle garage">
+      <div class="panel-heading"><span>My Garage</span><button id="garage-close" class="panel-close" type="button" aria-label="Close garage">×</button></div>
+      <p class="panel-note">Buy personal vehicles with Kerala Cash. Retrieve one vehicle at a time, then enter it in the world.</p>
+      <div class="jobs-summary"><strong>Personal Vehicles</strong><span id="garage-summary">0 owned · none outside</span><button id="garage-refresh" type="button">Refresh</button></div>
+      <div id="garage-list" aria-live="polite"></div>
+      <div class="wallet-section"><strong>Vehicle Showroom</strong><p class="panel-note">Purchases are permanent and server verified.</p><div id="garage-catalog"></div></div>
+      <div id="garage-error" class="social-error" role="status"></div>
     </section>
     <section id="jobs-panel" aria-label="Jobs and salaries">
       <div class="panel-heading"><span>Jobs &amp; Salary</span><button id="jobs-close" class="panel-close" type="button" aria-label="Close jobs">×</button></div>
