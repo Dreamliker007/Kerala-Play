@@ -1,0 +1,10 @@
+{
+  "name": "Kerala Play",
+  "short_name": "Kerala Play",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#16323f",
+  "theme_color": "#4a8cda"
+}
