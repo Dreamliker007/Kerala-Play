@@ -15,7 +15,9 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   let quality = QUALITY_LEVELS.includes(preferences.quality) ? preferences.quality : (coarsePointer ? 'low' : 'balanced');
   let disposed = false;
   let lastHudMinute = -1;
+  let lastHudWeather = '';
   let materialTimer = 1;
+  let currentWeather = { daylight: 1, hour: 12, rain: 0, overcast: 0, weather: 'Clear', needsLights: false };
   let audioEnabled = false;
   let soundscape = null;
   const disposables = [];
@@ -94,6 +96,36 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   sky.add(clouds);
   disposables.push(cloudMaterial);
 
+  // Lightweight local rain field. A single LineSegments draw call follows the camera.
+  const maxRainDrops = 420;
+  const rainPositions = new Float32Array(maxRainDrops * 6);
+  const rainDrops = [];
+  for (let index = 0; index < maxRainDrops; index++) {
+    rainDrops.push({
+      x: (random() - .5) * 42,
+      y: 2 + random() * 25,
+      z: (random() - .5) * 42,
+      speed: 14 + random() * 11,
+    });
+  }
+  const rainGeometry = new THREE.BufferGeometry();
+  const rainAttribute = new THREE.BufferAttribute(rainPositions, 3);
+  rainAttribute.setUsage(THREE.DynamicDrawUsage);
+  rainGeometry.setAttribute('position', rainAttribute);
+  const rainMaterial = new THREE.LineBasicMaterial({
+    color: 0xc9def0,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    fog: true,
+  });
+  const rainField = new THREE.LineSegments(rainGeometry, rainMaterial);
+  rainField.name = 'Local rain field';
+  rainField.frustumCulled = false;
+  rainField.visible = false;
+  scene.add(rainField);
+  disposables.push(rainGeometry, rainMaterial);
+
   const moonLight = new THREE.DirectionalLight(0x8cacff, .35);
   scene.add(moonLight, moonLight.target);
   const originalSun = sun ? {
@@ -128,6 +160,8 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   const whiteColor = new THREE.Color(0xfff2d9);
   const groundDay = new THREE.Color(0x647d42);
   const groundNight = new THREE.Color(0x3b4b55);
+  const rainSky = new THREE.Color(0x647682);
+  const stormCloud = new THREE.Color(0x77828a);
   const lightDirection = new THREE.Vector3();
   const target = new THREE.Vector3();
 
@@ -247,7 +281,8 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     renderer.toneMappingExposure = quality === 'high' ? 1.22 : quality === 'balanced' ? 1.2 : 1.17;
     if (sun) sun.castShadow = quality === 'high';
     stars.visible = quality !== 'low';
-    clouds.visible = quality !== 'low';
+    clouds.visible = quality !== 'low' || currentWeather.overcast > .3;
+    rainGeometry.setDrawRange(0, (quality === 'high' ? 420 : quality === 'balanced' ? 280 : 150) * 2);
     qualitySelect.value = quality;
   }
   function setQuality(value) {
@@ -301,58 +336,104 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   applyQuality();
 
   function update(delta, time, { moving = false, running = false, nearWater = false, inChallenge = false } = {}) {
-    if (disposed) return;
+    if (disposed) return currentWeather;
     const worldMinute = ((Date.now() % DAY_LENGTH_MS) + DAY_LENGTH_MS) % DAY_LENGTH_MS / 1000;
     const hour = worldMinute / 60;
     const angle = (hour - 6) / 24 * Math.PI * 2;
     const elevation = Math.sin(angle);
     const daylight = THREE.MathUtils.smoothstep(elevation, -.15, .28);
     const twilight = Math.max(0, 1 - Math.abs(elevation) / .42) * .58;
-    scene.background.copy(nightSky).lerp(daySky, daylight).lerp(duskSky, twilight);
+
+    // Deterministic shared monsoon cycle: roughly one rain band every five real minutes.
+    const weatherPhase = ((worldMinute + 41) % 300) / 300;
+    const cloudBuild = THREE.MathUtils.smoothstep(weatherPhase, .10, .27)
+      * (1 - THREE.MathUtils.smoothstep(weatherPhase, .76, .92));
+    const rainRise = THREE.MathUtils.smoothstep(weatherPhase, .26, .36);
+    const rainFall = 1 - THREE.MathUtils.smoothstep(weatherPhase, .60, .74);
+    const rain = THREE.MathUtils.clamp(rainRise * rainFall, 0, 1);
+    const overcast = THREE.MathUtils.clamp(Math.max(rain * .95, cloudBuild * .62), 0, 1);
+    const weather = rain > .68 ? 'Heavy rain' : rain > .12 ? 'Rain' : overcast > .30 ? 'Cloudy' : 'Clear';
+    const needsLights = daylight < .38 || overcast > .58;
+
+    currentWeather = { daylight, hour, rain, overcast, weather, needsLights };
+
+    scene.background.copy(nightSky).lerp(daySky, daylight).lerp(duskSky, twilight).lerp(rainSky, overcast * .58);
     scene.fog.color.copy(scene.background);
-    scene.fog.near = 48 + daylight * 14;
-    scene.fog.far = 138 + daylight * 34;
+    scene.fog.near = 48 + daylight * 14 - overcast * 10;
+    scene.fog.far = 138 + daylight * 34 - overcast * 48;
     sky.position.copy(camera.position);
     lightDirection.set(Math.cos(angle) * .84, elevation, Math.cos(angle) * .54).normalize();
     sunDisc.position.copy(lightDirection).multiplyScalar(120);
     moonDisc.position.copy(lightDirection).multiplyScalar(-120);
     sunDisc.visible = elevation > -.08;
     moonDisc.visible = elevation < .08;
-    starMaterial.opacity = (1 - daylight) * .88;
-    clouds.rotation.y = worldMinute / 1440 * Math.PI * 2;
-    cloudMaterial.color.copy(nightLightColor).lerp(whiteColor, daylight).lerp(warmColor, twilight).multiplyScalar(.35 + daylight * .65);
+    starMaterial.opacity = (1 - daylight) * .88 * (1 - overcast);
+    clouds.visible = quality !== 'low' || overcast > .3;
+    clouds.rotation.y = worldMinute / 1440 * Math.PI * 2 + time * .002 * (1 + overcast * 1.8);
+    cloudMaterial.opacity = .45 + overcast * .43;
+    cloudMaterial.color.copy(nightLightColor).lerp(whiteColor, daylight).lerp(warmColor, twilight).lerp(stormCloud, overcast * .76).multiplyScalar(.35 + daylight * .65);
+
+    const rainLimit = quality === 'high' ? 420 : quality === 'balanced' ? 280 : 150;
+    rainField.visible = rain > .035;
+    rainMaterial.opacity = rain * (quality === 'low' ? .46 : .62);
+    rainField.position.set(camera.position.x, 0, camera.position.z);
+    if (rainField.visible) {
+      const wind = .75 + overcast * 1.3;
+      for (let index = 0; index < rainLimit; index++) {
+        const drop = rainDrops[index];
+        drop.y -= drop.speed * delta * (.65 + rain * .72);
+        drop.x -= wind * delta;
+        if (drop.y < .2) {
+          drop.y = 19 + random() * 10;
+          drop.x = (random() - .5) * 42;
+          drop.z = (random() - .5) * 42;
+        }
+        const offset = index * 6;
+        rainPositions[offset] = drop.x;
+        rainPositions[offset + 1] = drop.y;
+        rainPositions[offset + 2] = drop.z;
+        rainPositions[offset + 3] = drop.x - .10 - wind * .025;
+        rainPositions[offset + 4] = drop.y - (.55 + rain * .38);
+        rainPositions[offset + 5] = drop.z + .03;
+      }
+      rainAttribute.needsUpdate = true;
+    }
+
     target.set(camera.position.x, 0, camera.position.z);
     if (sun) {
       sun.color.copy(whiteColor).lerp(warmColor, twilight);
-      sun.intensity = Math.max(0, elevation) * 1.7 + daylight * .28;
+      sun.intensity = (Math.max(0, elevation) * 1.7 + daylight * .28) * (1 - overcast * .62);
       sun.position.copy(target).addScaledVector(lightDirection, 75);
       // Keep its shadow camera above ground while the light fades out at the horizon.
       sun.position.y = Math.max(8, sun.position.y);
       sun.target.position.copy(target);
     }
     if (hemi) {
-      hemi.intensity = .84 + daylight * 1.34;
-      hemi.color.copy(nightLightColor).lerp(daylightColor, daylight);
+      hemi.intensity = (.84 + daylight * 1.34) * (1 - overcast * .22);
+      hemi.color.copy(nightLightColor).lerp(daylightColor, daylight).lerp(rainSky, overcast * .35);
       hemi.groundColor.copy(groundNight).lerp(groundDay, daylight);
     }
-    moonLight.intensity = (1 - daylight) * .56;
+    moonLight.intensity = (1 - daylight) * .56 * (1 - overcast * .45);
     moonLight.position.copy(target).addScaledVector(lightDirection, -70);
     moonLight.position.y = Math.max(15, moonLight.position.y);
     moonLight.target.position.copy(target);
     materialTimer += delta;
     if (materialTimer >= .4) {
       materialTimer = 0;
-      for (const [material, color] of unlitMaterials) material.color.copy(color).multiplyScalar(.5 + daylight * .5);
-      for (const [material, intensity] of emissiveMaterials) material.emissiveIntensity = intensity + (1 - daylight) * .65;
+      for (const [material, color] of unlitMaterials) material.color.copy(color).multiplyScalar(.5 + daylight * .5 - overcast * .08);
+      for (const [material, intensity] of emissiveMaterials) material.emissiveIntensity = intensity + Math.max(1 - daylight, overcast * .72) * .65;
     }
     const minute = Math.floor(worldMinute);
-    if (minute !== lastHudMinute) {
+    if (minute !== lastHudMinute || weather !== lastHudWeather) {
       lastHudMinute = minute;
+      lastHudWeather = weather;
       const period = hour < 5 || hour >= 19 ? 'Night' : hour < 8 ? 'Dawn' : hour < 16.5 ? 'Day' : 'Evening';
-      const icon = period === 'Night' ? '☾' : period === 'Day' ? '☀' : '◐';
-      clockOutput.textContent = `${icon} ${period} · ${String(Math.floor(hour)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+      const icon = rain > .12 ? '☂' : overcast > .30 ? '☁' : period === 'Night' ? '☾' : period === 'Day' ? '☀' : '◐';
+      const weatherText = weather === 'Clear' ? '' : ` · ${weather}`;
+      clockOutput.textContent = `${icon} ${period}${weatherText} · ${String(Math.floor(hour)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
     }
-    if (audioEnabled && !document.hidden) soundscape?.update({ daylight, moving, running, nearWater, inChallenge });
+    if (audioEnabled && !document.hidden) soundscape?.update({ daylight, rain, moving, running, nearWater, inChallenge });
+    return currentWeather;
   }
   update(0, 0);
 
@@ -368,7 +449,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       quickActions.append(fullscreenButton);
     }
     settingsToggle.remove(); settings.remove(); clockOutput.remove(); style.remove();
-    scene.remove(sky, moonLight, moonLight.target);
+    scene.remove(sky, rainField, moonLight, moonLight.target);
     for (const item of disposables) item.dispose();
     for (const { object, cast, receive } of shadowObjects) { object.castShadow = cast; object.receiveShadow = receive; }
     for (const [material, color] of unlitMaterials) material.color.copy(color);
@@ -396,7 +477,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     }
     if (hemi && originalHemi) { hemi.intensity = originalHemi.intensity; hemi.color.copy(originalHemi.color); hemi.groundColor.copy(originalHemi.groundColor); }
   }
-  return { update, dispose, setQuality, applyQuality, get quality() { return quality; } };
+  return { update, dispose, setQuality, applyQuality, getState: () => ({ ...currentWeather }), get quality() { return quality; } };
 }
 
 function createSoundscape() {
@@ -432,6 +513,12 @@ function createSoundscape() {
   const wind = context.createGain();
   wind.gain.value = .06;
   noise.connect(windFilter).connect(wind).connect(master);
+  const rainFilter = context.createBiquadFilter();
+  rainFilter.type = 'highpass';
+  rainFilter.frequency.value = 1450;
+  const rainNoise = context.createGain();
+  rainNoise.gain.value = 0;
+  noise.connect(rainFilter).connect(rainNoise).connect(master);
   noise.start();
   const active = new Set();
   let nextBird = 0;
@@ -457,19 +544,20 @@ function createSoundscape() {
     oscillator.start(start);
     oscillator.stop(start + duration + .02);
   }
-  function update({ daylight, moving, running, nearWater, inChallenge }) {
+  function update({ daylight, rain = 0, moving, running, nearWater, inChallenge }) {
     if (closed || context.state !== 'running') return;
     const now = context.currentTime;
     water.gain.setTargetAtTime(nearWater ? .65 : 0, now, .8);
-    wind.gain.setTargetAtTime(running && moving ? .09 : .045, now, .7);
-    if (daylight > .45 && now >= nextBird) {
+    wind.gain.setTargetAtTime((running && moving ? .09 : .045) + rain * .035, now, .7);
+    rainNoise.gain.setTargetAtTime(rain * .15, now, .55);
+    if (daylight > .45 && rain < .38 && now >= nextBird) {
       const pitch = 1800 + Math.random() * 1100;
       note(pitch, .18, .085 * daylight, 0, pitch * 1.35);
       note(pitch * 1.25, .22, .06 * daylight, .2, pitch * .82);
       nextBird = now + 3 + Math.random() * 5;
     }
-    if (daylight < .55 && now >= nextCricket) {
-      for (let count = 0; count < 3; count++) note(3800, .08, .048 * (1 - daylight), count * .15, 3650);
+    if (daylight < .55 && rain < .55 && now >= nextCricket) {
+      for (let count = 0; count < 3; count++) note(3800, .08, .048 * (1 - daylight) * (1 - rain), count * .15, 3650);
       nextCricket = now + 1.3 + Math.random() * 1.8;
     }
     if (now >= nextNote) {
