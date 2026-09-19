@@ -453,6 +453,168 @@
       #world-interact { right:calc(env(safe-area-inset-right) + 14px); bottom:calc(env(safe-area-inset-bottom) + 102px); }
       #vehicle-action { right:calc(env(safe-area-inset-right) + 14px); bottom:calc(env(safe-area-inset-bottom) + 138px); }
     }
+    /* V72 minimal always-on HUD */
+    #progress-chip, #mission-card { display:none!important; }
+
+    #brand {
+      top:calc(env(safe-area-inset-top) + 8px);
+      left:calc(env(safe-area-inset-left) + 10px);
+      padding:5px 8px;
+      border-radius:999px;
+      font-size:10px;
+      background:rgba(7,18,28,.52);
+      box-shadow:0 4px 14px rgba(0,0,0,.10);
+    }
+    #profile-chip {
+      top:calc(env(safe-area-inset-top) + 40px);
+      left:calc(env(safe-area-inset-left) + 10px);
+      max-width:118px;
+      padding:5px 7px;
+      border-radius:10px;
+      background:rgba(7,18,28,.50);
+      box-shadow:0 4px 14px rgba(0,0,0,.09);
+      line-height:1.12;
+    }
+    #profile-name { font-size:10px; }
+    #profile-district { margin-top:1px; font-size:7px; }
+
+    #quick-actions {
+      padding:0;
+      gap:2px;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      box-shadow:none;
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+    }
+    .hud-icon {
+      width:36px;
+      height:36px;
+      flex:0 0 36px;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:11px;
+      background:rgba(7,18,28,.46);
+      box-shadow:0 4px 12px rgba(0,0,0,.09);
+      font-size:15px;
+    }
+    .hud-icon span { display:none; }
+
+    #online-chip {
+      top:calc(env(safe-area-inset-top) + 8px);
+      right:calc(env(safe-area-inset-right) + 10px);
+      max-width:72px;
+      padding:4px 6px;
+      gap:4px;
+      border-radius:999px;
+      background:rgba(7,18,28,.48);
+      box-shadow:0 4px 12px rgba(0,0,0,.08);
+      font-size:7px;
+    }
+    #online-chip i { width:6px; height:6px; }
+    #online-chip span { max-width:50px; overflow:hidden; text-overflow:ellipsis; }
+
+    #needs-hud {
+      top:calc(env(safe-area-inset-top) + 8px);
+      right:calc(env(safe-area-inset-right) + 90px);
+      left:auto;
+      bottom:auto;
+      transform:none;
+      gap:2px;
+      padding:3px 5px;
+      border-radius:999px;
+      background:rgba(7,18,28,.48);
+      box-shadow:0 4px 12px rgba(0,0,0,.08);
+      font-size:8px;
+    }
+    #needs-hud span { min-width:29px; gap:2px; }
+    #needs-hud b { font-size:8px; }
+
+    #joystick-base {
+      width:92px;
+      height:92px;
+      left:calc(env(safe-area-inset-left) + 20px);
+      bottom:calc(env(safe-area-inset-bottom) + 18px);
+      opacity:.30;
+    }
+    #joystick-knob {
+      width:40px;
+      height:40px;
+      left:24px;
+      top:24px;
+    }
+
+    #road-status {
+      min-width:0;
+      padding:4px 7px;
+      font-size:7px;
+      border-radius:999px;
+      background:rgba(7,18,28,.52);
+    }
+
+    @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) {
+      #brand {
+        top:calc(env(safe-area-inset-top) + 6px);
+        left:calc(env(safe-area-inset-left) + 8px);
+        padding:4px 7px;
+        font-size:9px;
+      }
+      #profile-chip {
+        top:calc(env(safe-area-inset-top) + 34px);
+        left:calc(env(safe-area-inset-left) + 8px);
+        max-width:106px;
+        padding:4px 6px;
+      }
+      #profile-name { font-size:9px; }
+      #profile-district { font-size:6.5px; }
+
+      #quick-actions {
+        top:calc(env(safe-area-inset-top) + 6px);
+        left:50%;
+        right:auto;
+        transform:translateX(-50%);
+        max-width:calc(100vw - 370px);
+      }
+      .hud-icon {
+        width:33px;
+        height:33px;
+        flex-basis:33px;
+        border-radius:10px;
+        font-size:14px;
+      }
+
+      #online-chip {
+        top:calc(env(safe-area-inset-top) + 6px);
+        right:calc(env(safe-area-inset-right) + 8px);
+        max-width:65px;
+        padding:3px 5px;
+        font-size:6.5px;
+      }
+      #needs-hud {
+        top:calc(env(safe-area-inset-top) + 6px);
+        right:calc(env(safe-area-inset-right) + 82px);
+        gap:1px;
+        padding:3px 4px;
+      }
+      #needs-hud span { min-width:27px; }
+      #needs-hud b { font-size:7px; }
+
+      #joystick-base {
+        width:88px;
+        height:88px;
+        left:calc(env(safe-area-inset-left) + 18px);
+        bottom:calc(env(safe-area-inset-bottom) + 16px);
+        opacity:.28;
+      }
+      #joystick-knob { width:38px; height:38px; left:23px; top:23px; }
+
+      #minimap, #chat-panel, #people-panel, #task-panel, #phone-panel, #wallet-panel, #home-panel, #garage-panel, #jobs-panel, #dm-panel {
+        right:calc(env(safe-area-inset-right) + 8px);
+        width:min(260px,calc(100vw - 70px));
+        padding:9px;
+        border-radius:15px;
+      }
+    }
   </style>
   <link rel="stylesheet" href="./social.css">
   <link rel="stylesheet" href="./game.css">
@@ -467,7 +629,7 @@
     </div>
   </div>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.72">V71</span></div>
+    <div id="brand">Kerala Play <span style="font-size:10px;opacity:.68">V72</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -489,9 +651,9 @@
       <span id="need-energy" title="Energy">⚡ <b>100</b></span>
     </div>
     <button id="profile-chip" type="button" aria-label="Edit profile"><span id="profile-name">Explorer</span><span id="profile-district">Choose district</span></button>
-    <output id="progress-chip" aria-live="polite">Lv. 1 · 0 points</output>
+    <output id="progress-chip" aria-live="polite" hidden>Lv. 1 · 0 points</output>
     <output id="online-chip" aria-live="polite"><i></i><span id="online-count">Connecting…</span></output>
-    <button id="mission-card" type="button" aria-label="Open tasks"><strong>● Current Mission</strong><span id="mission-text">Explore Kerala landmarks</span><br><span id="landmark-status">Tap TASKS for rewards</span></button>
+    <button id="mission-card" type="button" aria-label="Open tasks" hidden><strong>● Current Mission</strong><span id="mission-text">Explore Kerala landmarks</span><br><span id="landmark-status">Tap TASKS for rewards</span></button>
     <div id="quick-actions" aria-label="Expandable game panels">
       <button id="map-open" class="hud-icon" type="button" aria-label="Open Kerala map" aria-controls="minimap" aria-expanded="false">🗺<span>MAP</span></button>
       <button id="people-toggle" class="hud-icon" type="button" aria-label="Open people" aria-controls="people-panel" aria-expanded="false">👥<span>PEOPLE</span></button>
