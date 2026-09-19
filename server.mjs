@@ -332,6 +332,74 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { listings: listings.slice(0, 50) };
   }
 
+  function trafficZoneAt(x, z) {
+    if (Math.abs(x) <= 7.75) return { id: 'main', label: 'Main Road', limit: 40 };
+    if (x >= -72 && x <= 16 && Math.abs(z + 22) <= 5.75) return { id: 'village', label: 'Village Road', limit: 30 };
+    return { id: 'offroad', label: 'Off Road', limit: 20 };
+  }
+
+  function createTrafficChallan(user, vehicle, kind, source, details = {}) {
+    const amount = TRAFFIC_CHALLAN_AMOUNTS[kind];
+    requireValue(Number.isInteger(amount) && amount > 0, 500, 'Traffic challan configuration is invalid.');
+    const traffic = jobStateFor(user).traffic;
+    if (kind === 'insurance_expired') {
+      const existing = traffic.challans.find(challan => challan.vehicleId === vehicle.id && challan.kind === kind && !Number(challan.paidAt));
+      if (existing) return { challan: existing, created: false };
+    }
+    const description = kind === 'insurance_expired'
+      ? `Expired insurance · ${vehicle.registration}`
+      : `Speeding · ${vehicle.registration} · ${details.speedKmh || '?'} / ${details.limit || '?'} km/h`;
+    const challan = {
+      id: randomUUID(),
+      vehicleId: vehicle.id,
+      registration: vehicle.registration,
+      kind,
+      amount,
+      description,
+      source,
+      zone: details.zone || null,
+      speedKmh: Number(details.speedKmh) || 0,
+      limit: Number(details.limit) || 0,
+      createdAt: now(),
+      paidAt: 0,
+    };
+    traffic.challans.push(challan);
+    if (traffic.challans.length > 80) traffic.challans = traffic.challans.slice(-80);
+    dirty = true;
+    return { challan, created: true };
+  }
+
+  function trafficSummary(user) {
+    const state = jobStateFor(user);
+    const challans = [...state.traffic.challans]
+      .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
+      .map(challan => ({ ...challan, paid: Number(challan.paidAt) > 0 }));
+    const documents = state.garage.owned.map(vehicle => {
+      const model = GARAGE_CATALOG[vehicle.modelId];
+      return {
+        vehicleId: vehicle.id,
+        label: model.label,
+        kind: model.kind,
+        registration: vehicle.registration,
+        rcValid: true,
+        ...vehicleInsuranceSummary(vehicle),
+      };
+    });
+    const unpaid = challans.filter(challan => !challan.paid);
+    return {
+      checkpoint: TRAFFIC_CHECKPOINT,
+      documents,
+      challans,
+      unpaidCount: unpaid.length,
+      unpaidTotal: unpaid.reduce((sum, challan) => sum + Number(challan.amount || 0), 0),
+      rules: {
+        title: 'Kerala Play Traffic Rules',
+        insuranceExpiredFine: TRAFFIC_CHALLAN_AMOUNTS.insurance_expired,
+        speedingFine: TRAFFIC_CHALLAN_AMOUNTS.speeding,
+      },
+    };
+  }
+
   function jobStateFor(user) {
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
