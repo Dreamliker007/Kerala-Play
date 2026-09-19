@@ -546,3 +546,12 @@ The optional footstep visual pass is now isolated from the main game loop. If th
 On-foot facing now uses a stronger turn response and immediately corrects large direction reversals. This prevents the avatar from visibly moving backward while the body is still slowly rotating toward the actual movement vector.
 
 No walking/running speed, server movement authority, collisions, economy, backend/database or Supabase behavior changes.
+
+
+## V100.3 Footstep Phase Root Fix
+
+V100.3 fixes the root cause behind the V100 in-game runtime error. The module-level footstep visual helper was reading the game-loop-local `walkPhase` variable, which raised a `ReferenceError` as soon as the on-foot effect tried to evaluate gait state. The loop now passes the current gait phase explicitly into the helper.
+
+The V100.2 safety isolation remains in place, and V100.2's faster facing correction continues to prevent visible backward/moonwalk motion during direction reversals.
+
+No movement speed, server authority, collision, economy, backend/database or Supabase changes.
