@@ -118,11 +118,16 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const garageCatalog = $('garage-catalog');
   const garageMarket = $('garage-market');
   const garageMarketRefresh = $('garage-market-refresh');
+  const trafficDocuments = $('traffic-documents');
+  const trafficChallans = $('traffic-challans');
+  const trafficRefresh = $('traffic-refresh');
+  const trafficCheckpointNote = $('traffic-checkpoint-note');
   const garageError = $('garage-error');
   const garageRefresh = $('garage-refresh');
   const garageSummaryLabel = $('garage-summary');
   let garageSnapshot = null;
   let garageMarketSnapshot = null;
+  let trafficSnapshot = null;
   const jobsPanel = $('jobs-panel');
   const jobsToggle = $('jobs-toggle');
   const jobsClose = $('jobs-close');
@@ -553,6 +558,61 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     }
   }
 
+  function renderTraffic(summary) {
+    trafficSnapshot = summary || null;
+    window.dispatchEvent(new CustomEvent('kerala-traffic-state', { detail: trafficSnapshot }));
+    if (trafficCheckpointNote) {
+      const unpaid = Number(summary?.unpaidCount || 0);
+      const total = Number(summary?.unpaidTotal || 0);
+      trafficCheckpointNote.textContent = unpaid
+        ? `Kerala Play in-game rules · ${unpaid} unpaid challan${unpaid === 1 ? '' : 's'} · ${formatCash(total)} total`
+        : 'Kerala Play in-game rules · no unpaid challans';
+    }
+
+    if (trafficDocuments) {
+      trafficDocuments.replaceChildren();
+      const documents = Array.isArray(summary?.documents) ? summary.documents : [];
+      if (!documents.length) trafficDocuments.append(node('p', 'social-empty', 'Buy a personal vehicle to create RC and insurance documents.'));
+      for (const document of documents) {
+        const card = node('article', 'traffic-doc-card');
+        const top = node('div', 'traffic-challan-row');
+        top.append(node('strong', '', document.label), node('span', 'garage-registration', document.registration || 'KL'));
+        const rc = node('p', 'valid', 'RC · Valid');
+        const insurance = node('p', document.insuranceActive ? 'valid' : 'expired', document.insuranceActive ? insuranceLabel(document) : 'Insurance · Expired');
+        card.append(top, rc, insurance);
+        trafficDocuments.append(card);
+      }
+    }
+
+    if (trafficChallans) {
+      trafficChallans.replaceChildren();
+      const challans = Array.isArray(summary?.challans) ? summary.challans : [];
+      if (!challans.length) trafficChallans.append(node('p', 'social-empty', 'No traffic challans.'));
+      for (const challan of challans.slice(0, 20)) {
+        const card = node('article', `traffic-challan-card ${challan.paid ? 'paid' : 'unpaid'}`);
+        const row = node('div', 'traffic-challan-row');
+        row.append(node('strong', '', challan.description || 'Traffic challan'), node('span', 'garage-price', formatCash(challan.amount)));
+        const detail = node('p', '', `${challan.registration || ''} · ${challan.paid ? 'Paid' : 'Unpaid'} · ${new Date(Number(challan.createdAt)).toLocaleString()}`);
+        card.append(row, detail);
+        if (!challan.paid) {
+          const pay = document.createElement('button');
+          pay.type = 'button';
+          pay.dataset.payChallan = challan.id;
+          pay.textContent = `Pay challan · ${formatCash(challan.amount)}`;
+          card.append(pay);
+        }
+        trafficChallans.append(card);
+      }
+    }
+  }
+
+  async function refreshTraffic() {
+    if (!user) return null;
+    const summary = await api('/api/traffic');
+    renderTraffic(summary);
+    return summary;
+  }
+
   function renderGarage(summary) {
     garageSnapshot = summary || null;
     window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: garageSnapshot }));
@@ -648,9 +708,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
 
   async function refreshGarage() {
     if (!user) return null;
-    const [summary, market] = await Promise.all([api('/api/garage'), api('/api/garage/market')]);
+    const [summary, market, traffic] = await Promise.all([api('/api/garage'), api('/api/garage/market'), api('/api/traffic')]);
     renderGarage(summary);
     renderUsedMarket(market);
+    renderTraffic(traffic);
     return summary;
   }
   function openGarage() {
@@ -1334,7 +1395,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     walletTransactions?.replaceChildren();
     if (starterDelivery) { starterDelivery.disabled = false; starterDelivery.textContent = 'Complete Starter Delivery · +₹250'; }
     jobsSnapshot = null; jobsList?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-job-mission', { detail: null })); if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
-    garageSnapshot = null; garageMarketSnapshot = null; garageList?.replaceChildren(); garageCatalog?.replaceChildren(); garageMarket?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: null }));
+    garageSnapshot = null; garageMarketSnapshot = null; trafficSnapshot = null; garageList?.replaceChildren(); garageCatalog?.replaceChildren(); garageMarket?.replaceChildren(); trafficDocuments?.replaceChildren(); trafficChallans?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: null })); window.dispatchEvent(new CustomEvent('kerala-traffic-state', { detail: null }));
     dmInput.value = ''; dmLog.replaceChildren();
     renderPeople(); renderAuth('login', message);
   }
@@ -1348,6 +1409,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   garageClose?.addEventListener('click', () => { closePanels(); garageToggle?.focus(); });
   garageRefresh?.addEventListener('click', () => run(refreshGarage, garageError));
   garageMarketRefresh?.addEventListener('click', () => run(refreshGarage, garageError));
+  trafficRefresh?.addEventListener('click', () => run(refreshTraffic, garageError));
   jobsToggle?.addEventListener('click', () => jobsPanel?.classList.contains('open') ? closePanels() : openJobs());
   jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
   jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
@@ -1432,6 +1494,29 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       toast(action === 'list' ? `Vehicle listed · ${formatCash(result.listing.price)}` : 'Used-market listing removed');
     }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshGarage, garageError); });
   });
+
+  trafficChallans?.addEventListener('click', event => {
+    const pay = event.target.closest('button[data-pay-challan]');
+    if (!pay || pay.disabled) return;
+    run(async () => {
+      pay.disabled = true;
+      const result = await api('/api/traffic/challan/pay', { challanId: pay.dataset.payChallan });
+      renderTraffic(result.traffic);
+      renderWallet(result.wallet);
+      toast(`Traffic challan paid · ${formatCash(result.transaction.amount)}`);
+    }, garageError);
+  });
+
+  window.addEventListener('kerala-traffic-checkpoint', () => run(async () => {
+    const result = await api('/api/traffic/checkpoint', {});
+    renderTraffic(result.traffic);
+    const inspection = result.inspection;
+    if (inspection.result === 'clear') toast('Checkpoint clear · RC and insurance verified');
+    else if (inspection.challanCreated) toast(`Insurance expired · in-game challan ${formatCash(inspection.challan.amount)} issued`);
+    else toast('Insurance expired · unpaid challan already exists');
+  }, garageError));
+
+  window.addEventListener('kerala-traffic-refresh', () => run(refreshTraffic, garageError));
 
   garageMarket?.addEventListener('click', event => {
     const buy = event.target.closest('button[data-market-buy]');

@@ -74,6 +74,8 @@ let mapLabelsVisible = false;
 let activeDmContact = null;
 let activeJobMission = null;
 let garageSnapshot = null;
+let trafficSnapshot = null;
+let trafficCheckpointVisual = null;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
@@ -260,6 +262,36 @@ function addFuelStation(scene, x, z) {
   addBoxCollider(x, z, 3.2, 2.2, 'fuel-station');
 }
 
+function addTrafficCheckpoint(scene, x, z) {
+  const group = new THREE.Group();
+  const boothBlue = new THREE.MeshStandardMaterial({ color: 0x315b84, roughness: .82 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xf0f2ef, roughness: .84 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x252b30, roughness: .92 });
+  const amber = new THREE.MeshStandardMaterial({ color: 0xffbd4f, emissive: 0x8a4a00, emissiveIntensity: .45, roughness: .6 });
+
+  const booth = new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.4, 1.5), boothBlue);
+  booth.position.set(.3, 1.2, 0);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.05, .18, 1.85), white);
+  roof.position.set(.3, 2.48, 0);
+  const window = new THREE.Mesh(new THREE.BoxGeometry(.9, .62, .06), dark);
+  window.position.set(.3, 1.55, .78);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(.12, 8, 6), amber);
+  beacon.position.set(.3, 2.72, 0);
+
+  const post = new THREE.Mesh(new THREE.BoxGeometry(.12, 1.6, .12), white);
+  post.position.set(-1.15, .8, 0);
+  const barrier = new THREE.Mesh(new THREE.BoxGeometry(2.5, .12, .12), new THREE.MeshStandardMaterial({ color: 0xe7e2d7, roughness: .8 }));
+  barrier.position.set(-2.25, 1.25, 0);
+  barrier.rotation.z = -.18;
+
+  group.add(booth, roof, window, beacon, post, barrier, missionTag('Traffic Check', '#23496f'));
+  group.position.set(x, 0, z);
+  scene.add(group);
+  addBoxCollider(x + .3, z, 1.0, .9, 'traffic-booth');
+  trafficCheckpointVisual = group;
+  return group;
+}
+
 function addServiceGarage(scene, x, z) {
   const group = new THREE.Group();
   const wall = new THREE.MeshStandardMaterial({ color: 0xa8a39a, roughness: .95 });
@@ -389,11 +421,14 @@ function updateDriveHud() {
   if (!driving || !playerRef) return;
   const zone = roadZoneAt(playerRef.position.x, playerRef.position.z);
   const speedKmh = Math.round(Math.abs(driveSpeed) * 6);
-  const fuel = Math.round(Number(currentDriveVehicle()?.fuel ?? 100));
-  const condition = Math.round(Number(currentDriveVehicle()?.condition ?? 100));
+  const driveVehicle = currentDriveVehicle();
+  const fuel = Math.round(Number(driveVehicle?.fuel ?? 100));
+  const condition = Math.round(Number(driveVehicle?.condition ?? 100));
+  const insuranceExpired = currentVehicleSource() === 'personal' && driveVehicle?.insuranceActive === false;
   const parkHint = Math.abs(driveSpeed) < .18 ? (zone.id === 'main' ? ' · STOPPED' : ' · PARK OK') : '';
-  roadStatus.textContent = `${zone.label} · ${speedKmh}/${zone.displayLimit} km/h · FUEL ${fuel}% · COND ${condition}%${parkHint}`;
-  roadStatus.classList.toggle('warning', fuel <= 15 || condition <= 35);
+  const insuranceHint = insuranceExpired ? ' · INS EXPIRED' : '';
+  roadStatus.textContent = `${zone.label} · ${speedKmh}/${zone.displayLimit} km/h · FUEL ${fuel}% · COND ${condition}%${insuranceHint}${parkHint}`;
+  roadStatus.classList.toggle('warning', fuel <= 15 || condition <= 35 || insuranceExpired);
 }
 
 hornAction?.addEventListener('pointerdown', event => {
@@ -646,6 +681,17 @@ function updateWorldInteract() {
   worldInteract.dataset.source = '';
   if (!profile || !playerRef) return;
   const active = activeJobMission;
+  const checkpoint = trafficSnapshot?.checkpoint;
+  const driveVehicle = currentDriveVehicle();
+  if (currentVehicleSource() === 'personal' && driveVehicle?.entered && checkpoint && Math.abs(driveSpeed) < .18) {
+    const checkpointDistance = Math.hypot(playerRef.position.x - Number(checkpoint.x), playerRef.position.z - Number(checkpoint.z));
+    if (checkpointDistance <= Number(checkpoint.radius || 7) + .35) {
+      worldInteract.hidden = false;
+      worldInteract.dataset.mode = 'traffic-checkpoint';
+      worldInteract.textContent = 'CHECK DOCUMENTS';
+      return;
+    }
+  }
   const station = nearestVehicleStation();
   if (station && Math.abs(driveSpeed) < .18) {
     const vehicle = currentDriveVehicle();
@@ -707,6 +753,8 @@ worldInteract?.addEventListener('click', () => {
   worldInteract.disabled = true;
   if (worldInteract.dataset.mode === 'vehicle-service') {
     window.dispatchEvent(new CustomEvent('kerala-vehicle-service', { detail: { action: worldInteract.dataset.service, source: worldInteract.dataset.source || 'job' } }));
+  } else if (worldInteract.dataset.mode === 'traffic-checkpoint') {
+    window.dispatchEvent(new CustomEvent('kerala-traffic-checkpoint'));
   } else {
     window.dispatchEvent(new CustomEvent('kerala-job-interact'));
   }
@@ -757,6 +805,13 @@ window.addEventListener('kerala-garage-state', event => {
   garageSnapshot = event.detail || null;
   syncJobVehicleVisual();
   updateVehicleAction();
+  updateWorldInteract();
+  updateDriveHud();
+});
+window.addEventListener('kerala-traffic-state', event => {
+  trafficSnapshot = event.detail || null;
+  const checkpoint = trafficSnapshot?.checkpoint;
+  if (trafficCheckpointVisual && checkpoint) trafficCheckpointVisual.position.set(Number(checkpoint.x) || 0, 0, Number(checkpoint.z) || 0);
   updateWorldInteract();
   updateDriveHud();
 });
@@ -1017,6 +1072,10 @@ async function sendMovement(player, moving) {
         lastFuelWarningAt = performance.now();
         showToast(Number(result.vehicle.fuel) <= .1 ? 'Fuel empty · go to Kerala Fuel Station' : 'Low fuel · visit Kerala Fuel Station');
       }
+    }
+    if (result.trafficNotice) {
+      showToast(`Traffic challan issued · ₹${Number(result.trafficNotice.amount || 0)} · ${result.trafficNotice.registration || ''}`);
+      window.dispatchEvent(new CustomEvent('kerala-traffic-refresh'));
     }
     if (now - lastProgressRefresh > 3000) {
       lastProgressRefresh = now;
@@ -1997,6 +2056,7 @@ function buildWorld(scene) {
   addBench(scene, -10, -10);
   addFuelStation(scene, 11, -12);
   addServiceGarage(scene, -36, -15);
+  addTrafficCheckpoint(scene, 5.4, 18);
   addPhotoVillager(scene, -6, -50, 11, .55, 0, .78);
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
   addPhotoVillager(scene, -9, 19, 8, .5, 4, .75);

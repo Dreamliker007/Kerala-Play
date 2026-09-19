@@ -118,3 +118,12 @@ Retrieved vehicles appear in the world near the player and use the existing stab
 Personal vehicles now receive a unique Kerala registration number when first purchased or migrated into the V62 garage. New vehicles include 30 days of insurance. The Garage shows registration, insurance status, renewal cost, condition-based resale value and ownership-transfer count. Insurance renewal is server-priced and paid from Kerala Cash.
 
 Stored personal vehicles can be listed on the Used Vehicle Market at a server-calculated resale price based on model value and current condition. Another player can buy the listing with Kerala Cash; the seller is credited, ownership transfers atomically, and the same vehicle keeps its registration, fuel, condition and remaining insurance. Listed vehicles cannot be selected or retrieved until the listing is removed. Market state is stored inside the selling owner's existing persisted job_state JSONB, so V62 requires no new Supabase migration.
+
+
+## Police Traffic Enforcement + Vehicle Documents (V63)
+
+Kerala Play now has an in-game traffic enforcement layer for personal vehicles. Garage > Documents & Traffic shows each owned vehicle's RC status, registration, insurance status, and traffic challan history. These are Kerala Play game rules only and are not real-world legal guidance.
+
+A Kerala Play Traffic Checkpoint is placed on the main road. Stop a personal vehicle at the checkpoint and use CHECK DOCUMENTS. RC is currently always valid for owned vehicles; expired insurance creates one unpaid in-game challan until that challan is paid. Challans are paid from Kerala Cash and appear in wallet transaction history.
+
+The server also measures personal-vehicle movement against Kerala Play road speed zones. Two consecutive samples materially above the in-game road limit can create a speeding challan, with a cooldown to prevent rapid duplicate tickets. Server-side movement validation remains authoritative. Traffic state is stored inside existing job_state JSONB, so V63 requires no new Supabase migration.

@@ -628,3 +628,79 @@ test('vehicle registration insurance resale and used-market ownership transfer s
   assert.equal(afterRestart.owned[0].ownerChanges, 1);
   assert.equal(afterRestart.owned[0].insuranceActive, true);
 });
+
+
+test('traffic checkpoint documents challans payments and speeding stay server controlled', async t => {
+  const app = await setup(t), alice = app.client();
+  await signup(alice, 'TrafficAlice');
+
+  assert.equal((await alice('/api/jobs/starter-delivery/complete', {})).status, 200);
+  const bought = await alice('/api/garage/buy', { modelId: 'kerala_bike' });
+  assert.equal(bought.status, 201);
+  const vehicleId = bought.data.garage.owned[0].id;
+  const registration = bought.data.garage.owned[0].registration;
+  assert.equal(bought.data.wallet.balance, 50);
+
+  let traffic = (await alice('/api/traffic')).data;
+  assert.equal(traffic.documents.length, 1);
+  assert.equal(traffic.documents[0].registration, registration);
+  assert.equal(traffic.documents[0].rcValid, true);
+  assert.equal(traffic.documents[0].insuranceActive, true);
+  assert.equal(traffic.unpaidCount, 0);
+  assert.equal(traffic.rules.insuranceExpiredFine, 40);
+  assert.equal(traffic.rules.speedingFine, 25);
+
+  app.advance(31 * 24 * 60 * 60 * 1000);
+  assert.equal((await alice('/api/auth/login', { identifier: 'TrafficAlice', password: 'test-password-2026' })).status, 200);
+  traffic = (await alice('/api/traffic')).data;
+  assert.equal(traffic.documents[0].insuranceActive, false);
+
+  let retrieved = await alice('/api/garage/vehicle', { action: 'retrieve', vehicleId });
+  assert.equal(retrieved.status, 200);
+  let active = retrieved.data.garage.activeVehicle;
+  app.advance(1_000);
+  assert.equal((await alice('/api/world/move', { x: active.x, z: active.z, rotation: 0, moving: true })).status, 200);
+  assert.equal((await alice('/api/garage/vehicle', { action: 'enter', vehicleId })).status, 200);
+
+  traffic = (await alice('/api/traffic')).data;
+  const checkpoint = traffic.checkpoint;
+  app.advance(2_000);
+  assert.equal((await alice('/api/world/move', { x: checkpoint.x, z: checkpoint.z, rotation: 0, moving: true, mode: 'bike' })).status, 200);
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x: checkpoint.x, z: checkpoint.z, rotation: 0, moving: false, mode: 'bike' })).status, 200);
+
+  let inspection = await alice('/api/traffic/checkpoint', {});
+  assert.equal(inspection.status, 200);
+  assert.equal(inspection.data.inspection.result, 'challan');
+  assert.equal(inspection.data.inspection.challanCreated, true);
+  assert.equal(inspection.data.inspection.challan.kind, 'insurance_expired');
+  assert.equal(inspection.data.inspection.challan.amount, 40);
+  assert.equal(inspection.data.traffic.unpaidCount, 1);
+
+  const duplicate = await alice('/api/traffic/checkpoint', {});
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.data.inspection.challanCreated, false, 'Repeated checkpoint inspection must not duplicate an unpaid insurance challan');
+  assert.equal(duplicate.data.traffic.unpaidCount, 1);
+
+  const paid = await alice('/api/traffic/challan/pay', { challanId: inspection.data.inspection.challan.id, amount: 1 });
+  assert.equal(paid.status, 200);
+  assert.equal(paid.data.transaction.amount, 40, 'Challan amount must be server controlled');
+  assert.equal(paid.data.wallet.balance, 10);
+  assert.equal(paid.data.traffic.unpaidCount, 0);
+
+  app.advance(1_000);
+  let move = await alice('/api/world/move', { x: checkpoint.x, z: checkpoint.z + 12, rotation: 0, moving: true, mode: 'bike' });
+  assert.equal(move.status, 200);
+  assert.equal(move.data.trafficNotice, null, 'One speeding sample should not issue a challan');
+  app.advance(1_000);
+  move = await alice('/api/world/move', { x: checkpoint.x, z: checkpoint.z + 24, rotation: 0, moving: true, mode: 'bike' });
+  assert.equal(move.status, 200);
+  assert.equal(move.data.trafficNotice.kind, 'speeding');
+  assert.equal(move.data.trafficNotice.amount, 25);
+  assert.ok(move.data.trafficNotice.speedKmh > move.data.trafficNotice.limit);
+
+  traffic = (await alice('/api/traffic')).data;
+  assert.equal(traffic.unpaidCount, 1);
+  assert.equal(traffic.challans[0].kind, 'speeding');
+  assert.equal((await alice('/api/traffic/challan/pay', { challanId: traffic.challans[0].id })).status, 409, 'Insufficient Kerala Cash must block challan payment');
+});

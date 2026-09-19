@@ -50,13 +50,15 @@ const VEHICLE_STATIONS = Object.freeze({
   fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 11, z: -12, radius: 7 },
   service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
 });
+const TRAFFIC_CHECKPOINT = Object.freeze({ id: 'main-check', label: 'Kerala Play Traffic Checkpoint', x: 5.4, z: 18, radius: 7 });
+const TRAFFIC_CHALLAN_AMOUNTS = Object.freeze({ insurance_expired: 40, speeding: 25 });
 const MOVEMENT_PROFILES = Object.freeze({
   walk: { rate: 8.5, maxCredit: 24 },
   bike: { rate: 16, maxCredit: 40 },
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [] } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -113,6 +115,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) { user.jobState.completed = {}; migrated = true; }
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) { user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null }; migrated = true; }
     if (!Array.isArray(user.jobState.garage.owned)) { user.jobState.garage.owned = []; migrated = true; }
+    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) { user.jobState.traffic = { challans: [] }; migrated = true; }
+    if (!Array.isArray(user.jobState.traffic.challans)) { user.jobState.traffic.challans = []; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -202,7 +206,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       user.worldX = x; user.worldZ = z; user.worldRotation = rotation; user.worldUpdatedAt = now();
       dirty = true;
     }
-    const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now() };
+    const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now(), trafficSpeedStrikes: 0, trafficLastChallanAt: 0 };
     presence.set(user.id, state);
     const garage = jobStateFor(user).garage;
     const personal = garage.activeVehicleId ? garage.owned.find(vehicle => vehicle.id === garage.activeVehicleId) : null;
@@ -328,11 +332,82 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { listings: listings.slice(0, 50) };
   }
 
+  function trafficZoneAt(x, z) {
+    if (Math.abs(x) <= 7.75) return { id: 'main', label: 'Main Road', limit: 40 };
+    if (x >= -72 && x <= 16 && Math.abs(z + 22) <= 5.75) return { id: 'village', label: 'Village Road', limit: 30 };
+    return { id: 'offroad', label: 'Off Road', limit: 20 };
+  }
+
+  function createTrafficChallan(user, vehicle, kind, source, details = {}) {
+    const amount = TRAFFIC_CHALLAN_AMOUNTS[kind];
+    requireValue(Number.isInteger(amount) && amount > 0, 500, 'Traffic challan configuration is invalid.');
+    const traffic = jobStateFor(user).traffic;
+    if (kind === 'insurance_expired') {
+      const existing = traffic.challans.find(challan => challan.vehicleId === vehicle.id && challan.kind === kind && !Number(challan.paidAt));
+      if (existing) return { challan: existing, created: false };
+    }
+    const description = kind === 'insurance_expired'
+      ? `Expired insurance · ${vehicle.registration}`
+      : `Speeding · ${vehicle.registration} · ${details.speedKmh || '?'} / ${details.limit || '?'} km/h`;
+    const challan = {
+      id: randomUUID(),
+      vehicleId: vehicle.id,
+      registration: vehicle.registration,
+      kind,
+      amount,
+      description,
+      source,
+      zone: details.zone || null,
+      speedKmh: Number(details.speedKmh) || 0,
+      limit: Number(details.limit) || 0,
+      createdAt: now(),
+      paidAt: 0,
+    };
+    traffic.challans.push(challan);
+    if (traffic.challans.length > 80) traffic.challans = traffic.challans.slice(-80);
+    dirty = true;
+    return { challan, created: true };
+  }
+
+  function trafficSummary(user) {
+    const state = jobStateFor(user);
+    const challans = [...state.traffic.challans]
+      .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
+      .map(challan => ({ ...challan, paid: Number(challan.paidAt) > 0 }));
+    const documents = state.garage.owned.map(vehicle => {
+      const model = GARAGE_CATALOG[vehicle.modelId];
+      return {
+        vehicleId: vehicle.id,
+        label: model.label,
+        kind: model.kind,
+        registration: vehicle.registration,
+        rcValid: true,
+        ...vehicleInsuranceSummary(vehicle),
+      };
+    });
+    const unpaid = challans.filter(challan => !challan.paid);
+    return {
+      checkpoint: TRAFFIC_CHECKPOINT,
+      documents,
+      challans,
+      unpaidCount: unpaid.length,
+      unpaidTotal: unpaid.reduce((sum, challan) => sum + Number(challan.amount || 0), 0),
+      rules: {
+        title: 'Kerala Play Traffic Rules',
+        insuranceExpiredFine: TRAFFIC_CHALLAN_AMOUNTS.insurance_expired,
+        speedingFine: TRAFFIC_CHALLAN_AMOUNTS.speeding,
+      },
+    };
+  }
+
   function jobStateFor(user) {
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) user.jobState.completed = {};
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null };
+    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [] };
+    if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
+    user.jobState.traffic.challans = user.jobState.traffic.challans.filter(challan => challan && typeof challan === 'object' && typeof challan.id === 'string');
     const garage = user.jobState.garage;
     if (!Array.isArray(garage.owned)) garage.owned = [];
     garage.owned = garage.owned.filter(vehicle => vehicle && typeof vehicle === 'object' && GARAGE_CATALOG[vehicle.modelId]);
@@ -664,6 +739,58 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       }
       if (path === '/api/garage' && request.method === 'GET') {
         send(response, 200, garageSummary(user)); return;
+      }
+      if (path === '/api/traffic' && request.method === 'GET') {
+        send(response, 200, trafficSummary(user)); return;
+      }
+      if (path === '/api/traffic/checkpoint' && request.method === 'POST') {
+        limited(`traffic-checkpoint:${user.id}`, 20, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        const vehicle = state.garage.activeVehicleId ? state.garage.owned.find(item => item.id === state.garage.activeVehicleId) : null;
+        requireValue(vehicle && vehicle.entered, 409, 'Enter your personal vehicle before document inspection.');
+        const live = presence.get(user.id) || place(user);
+        requireValue(!live.moving, 409, 'Stop the vehicle at the checkpoint.');
+        requireValue(Math.hypot(live.x - TRAFFIC_CHECKPOINT.x, live.z - TRAFFIC_CHECKPOINT.z) <= TRAFFIC_CHECKPOINT.radius, 409, 'Move closer to the traffic checkpoint.');
+        const insurance = vehicleInsuranceSummary(vehicle);
+        let result = 'clear', challan = null, created = false;
+        if (!insurance.insuranceActive) {
+          const createdResult = createTrafficChallan(user, vehicle, 'insurance_expired', 'checkpoint');
+          challan = createdResult.challan;
+          created = createdResult.created;
+          result = 'challan';
+        }
+        vehicle.lastDocumentCheckAt = now();
+        dirty = true;
+        await persist();
+        send(response, 200, {
+          inspection: {
+            result,
+            registration: vehicle.registration,
+            rcValid: true,
+            insuranceActive: insurance.insuranceActive,
+            challan,
+            challanCreated: created,
+            checkedAt: vehicle.lastDocumentCheckAt,
+          },
+          traffic: trafficSummary(user),
+        }); return;
+      }
+      if (path === '/api/traffic/challan/pay' && request.method === 'POST') {
+        limited(`traffic-payment:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const state = jobStateFor(user);
+        const challan = state.traffic.challans.find(item => item.id === body.challanId);
+        requireValue(challan, 404, 'Traffic challan not found.');
+        requireValue(!Number(challan.paidAt), 409, 'This traffic challan is already paid.');
+        const amount = Number(challan.amount);
+        requireValue(Number.isInteger(amount) && amount > 0, 409, 'Traffic challan amount is invalid.');
+        const transaction = walletTransaction(user, -amount, 'traffic_challan', challan.description || 'Kerala Play traffic challan');
+        challan.paidAt = now();
+        challan.transactionId = transaction.id;
+        dirty = true;
+        await persist();
+        send(response, 200, { traffic: trafficSummary(user), wallet: walletSummary(user), challan: { ...challan, paid: true }, transaction }); return;
       }
       if (path === '/api/garage/market' && request.method === 'GET') {
         send(response, 200, usedMarketSummary(user)); return;
@@ -1243,6 +1370,26 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           const fuel = active?.vehicleEntered ? Number(active.vehicleFuel) : Number(personal?.fuel);
           requireValue(fuel > .05, 409, 'Vehicle fuel is empty. Refuel at Kerala Fuel Station.');
         }
+        let trafficNotice = null;
+        if (personal?.entered && personalModel && elapsed >= .12 && elapsed <= 1.5 && distance > .25) {
+          const midpointX = (state.x + body.x) / 2;
+          const midpointZ = (state.z + body.z) / 2;
+          const zone = trafficZoneAt(midpointX, midpointZ);
+          const speedKmh = Math.round((distance / Math.max(.05, elapsed)) * 6);
+          if (speedKmh > zone.limit + 4) {
+            state.trafficSpeedStrikes = Math.min(4, Number(state.trafficSpeedStrikes || 0) + 1);
+            if (state.trafficSpeedStrikes >= 2 && now() - Number(state.trafficLastChallanAt || 0) >= 45000) {
+              const createdResult = createTrafficChallan(user, personal, 'speeding', 'server-speed-check', { speedKmh, limit: zone.limit, zone: zone.label });
+              if (createdResult.created) trafficNotice = createdResult.challan;
+              state.trafficLastChallanAt = now();
+              state.trafficSpeedStrikes = 0;
+            }
+          } else {
+            state.trafficSpeedStrikes = Math.max(0, Number(state.trafficSpeedStrikes || 0) - 1);
+          }
+        } else if (requestedMode === 'walk' || distance <= .05) {
+          state.trafficSpeedStrikes = 0;
+        }
         const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
         state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving; state.mode = requestedMode;
@@ -1263,7 +1410,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
         const activeVehicle = active && activeJob?.vehicle ? jobsSummary(user).active?.vehicle || null : (personal?.entered ? garageSummary(user).activeVehicle : null);
-        send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks, vehicle: activeVehicle }); return;
+        send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks, vehicle: activeVehicle, trafficNotice }); return;
       }
       const voiceMatch = path.match(/^\/api\/voice\/signal\/([^/]+)$/);
       if (voiceMatch && request.method === 'POST') {
