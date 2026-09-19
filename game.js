@@ -67,6 +67,10 @@ document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
 const villagers = [];
 const traffic = [];
 const staticColliders = [];
+const streetLampMaterials = [];
+const ambientVehicleLightMaterials = [];
+const weatherRoadSurfaces = [];
+const puddleMaterials = [];
 const fruitGeometry = new THREE.SphereGeometry(.14, 6, 5);
 const fruitMaterial = new THREE.MeshStandardMaterial({ color: 0xe4a737, roughness: .72 });
 const birdBodyGeometry = new THREE.SphereGeometry(.10, 6, 5);
@@ -98,6 +102,8 @@ let vehicleSafeReady = false;
 let vehicleCollisionFrames = 0;
 let lastVehicleRecoveryNotice = 0;
 let headlightsOn = false;
+let autoHeadlightsOn = false;
+let worldWeatherState = { daylight: 1, hour: 12, rain: 0, overcast: 0, weather: 'Clear', needsLights: false };
 let hornReadyAt = 0;
 let hornPulseUntil = 0;
 let driveAudioContext = null;
@@ -437,7 +443,7 @@ function playVehicleHorn() {
 
 function applyVehicleHeadlights() {
   if (!jobVehicleVisual) return;
-  const enabled = vehicleMode !== 'walk' && headlightsOn;
+  const enabled = vehicleMode !== 'walk' && (headlightsOn || autoHeadlightsOn);
   for (const material of jobVehicleVisual.userData.headlightMaterials || []) {
     material.emissiveIntensity = enabled ? 2.8 : .28;
   }
@@ -458,12 +464,100 @@ function applyVehicleHeadlights() {
   }
   lightsAction?.classList.toggle('active', enabled);
   lightsAction?.setAttribute('aria-pressed', String(enabled));
+  if (lightsAction) {
+    lightsAction.title = autoHeadlightsOn && !headlightsOn ? 'Lights automatically on for darkness or rain' : 'Toggle vehicle lights';
+  }
 }
 
 function toggleVehicleHeadlights() {
   if (vehicleMode === 'walk') return;
   headlightsOn = !headlightsOn;
   applyVehicleHeadlights();
+}
+
+function updateWorldWeatherVisuals(state) {
+  if (!state) return;
+  worldWeatherState = state;
+  const wet = THREE.MathUtils.clamp(Number(state.rain || 0), 0, 1);
+  const lightsNeeded = !!state.needsLights;
+
+  for (const surface of weatherRoadSurfaces) {
+    surface.material.roughness = surface.baseRoughness - wet * .43;
+    surface.material.metalness = surface.baseMetalness + wet * .13;
+    surface.material.color.copy(surface.baseColor).multiplyScalar(1 - wet * .16);
+  }
+  for (const material of puddleMaterials) {
+    material.opacity = wet * .48;
+    material.roughness = .22 - wet * .08;
+  }
+  for (const material of streetLampMaterials) {
+    material.emissiveIntensity = lightsNeeded ? 1.45 : .12;
+  }
+  for (const material of ambientVehicleLightMaterials) {
+    material.emissiveIntensity = lightsNeeded ? 1.35 : .24;
+  }
+
+  if (autoHeadlightsOn !== lightsNeeded) {
+    autoHeadlightsOn = lightsNeeded;
+    applyVehicleHeadlights();
+  }
+}
+
+function updateVehicleRainSpray(delta) {
+  if (!jobVehicleVisual) return;
+  let spray = jobVehicleVisual.userData.rainSpray;
+  if (!spray) {
+    const count = 18;
+    const positions = new Float32Array(count * 3);
+    const geometry = new THREE.BufferGeometry();
+    const attribute = new THREE.BufferAttribute(positions, 3);
+    attribute.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('position', attribute);
+    const material = new THREE.PointsMaterial({
+      color: 0xd4e5ec,
+      size: .085,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const points = new THREE.Points(geometry, material);
+    points.frustumCulled = false;
+    const particles = [];
+    for (let index = 0; index < count; index++) {
+      particles.push({
+        x: (index % 2 ? .38 : -.38) + (Math.random() - .5) * .18,
+        y: .12 + Math.random() * .22,
+        z: -.55 - Math.random() * .95,
+        life: Math.random(),
+      });
+    }
+    jobVehicleVisual.add(points);
+    spray = jobVehicleVisual.userData.rainSpray = { points, geometry, attribute, material, positions, particles };
+  }
+
+  const speedRatio = Math.min(1, Math.abs(driveSpeed) / 7);
+  const strength = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0) * speedRatio, 0, 1);
+  spray.points.visible = vehicleMode !== 'walk' && strength > .06;
+  spray.material.opacity = strength * .62;
+  if (!spray.points.visible) return;
+
+  spray.particles.forEach((particle, index) => {
+    particle.life -= delta * (1.7 + speedRatio * 2.2);
+    if (particle.life <= 0) {
+      particle.life = .65 + Math.random() * .55;
+      particle.x = (index % 2 ? .38 : -.38) + (Math.random() - .5) * .22;
+      particle.y = .10 + Math.random() * .18;
+      particle.z = -.50 - Math.random() * .30;
+    }
+    particle.y += delta * (.40 + speedRatio * .55);
+    particle.z -= delta * (1.2 + speedRatio * 2.8);
+    particle.x += (Math.random() - .5) * delta * .35;
+    const offset = index * 3;
+    spray.positions[offset] = particle.x;
+    spray.positions[offset + 1] = particle.y;
+    spray.positions[offset + 2] = particle.z;
+  });
+  spray.attribute.needsUpdate = true;
 }
 
 function updateDriveHud() {
@@ -1943,7 +2037,14 @@ try {
     updateVehicleAction();
     updateDriveHud();
     sendMovement(player, movingNow);
-    atmosphere.update(delta, villageTime, { moving: movingNow, running: vehicleMode === 'walk' && runHeld && needsSnapshot?.canRun !== false, nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13, inChallenge: !!challengeRound });
+    const weatherState = atmosphere.update(delta, villageTime, {
+      moving: movingNow,
+      running: vehicleMode === 'walk' && runHeld && needsSnapshot?.canRun !== false,
+      nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13,
+      inChallenge: !!challengeRound,
+    });
+    updateWorldWeatherVisuals(weatherState);
+    updateVehicleRainSpray(delta);
     renderer.render(scene, camera);
     if (isMobile && !atmosphere) {
       perfFrames++; const now = performance.now();
@@ -2289,6 +2390,15 @@ function updateVillagers(time) {
     const data = villager.userData;
     const human = data.human;
     if (!human) return;
+    const rainReaction = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+    const applyRainPosture = () => {
+      const parts = human.userData.parts;
+      if (!parts || rainReaction <= .08) return;
+      if (parts.head) parts.head.rotation.x = rainReaction * .10;
+      if (parts.torso) parts.torso.rotation.x = rainReaction * .035;
+      if (parts.leftArm) parts.leftArm.rotation.z = -.055 + rainReaction * .045;
+      if (parts.rightArm) parts.rightArm.rotation.z = .055 - rainReaction * .045;
+    };
 
     if (data.behavior === 'idle') {
       villager.position.set(data.startX, 0, data.startZ);
@@ -2299,10 +2409,12 @@ function updateVillagers(time) {
       const torso = human.userData.parts?.torso;
       if (torso) torso.rotation.y = Math.sin(time * .32 + data.offset) * .025;
       data.crossingActive = false;
+      applyRainPosture();
       return;
     }
 
-    const motion = npcPingPongState(time, data.speed, data.offset);
+    const weatherSpeed = data.speed * (1 - rainReaction * .24);
+    const motion = npcPingPongState(time, weatherSpeed, data.offset);
     if (data.behavior === 'crossing') {
       const fromX = Number(data.crossFromX);
       const toX = Number(data.crossToX);
@@ -2310,7 +2422,8 @@ function updateVillagers(time) {
       villager.position.z = data.startZ;
       villager.rotation.y = motion.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
       data.crossingActive = motion.moving > 0 && Math.abs(villager.position.x) < 8.45;
-      animateHuman(human, time * data.speed * 7.5, motion.moving ? .86 : 0);
+      animateHuman(human, time * weatherSpeed * 7.5, motion.moving ? .86 * (1 - rainReaction * .20) : 0);
+      applyRainPosture();
       return;
     }
 
@@ -2319,7 +2432,8 @@ function updateVillagers(time) {
     villager.position.z = data.startZ + routeOffset;
     villager.rotation.y = motion.direction > 0 ? 0 : Math.PI;
     data.crossingActive = false;
-    animateHuman(human, time * data.speed * 7, motion.moving ? .72 : 0);
+    animateHuman(human, time * weatherSpeed * 7, motion.moving ? .72 * (1 - rainReaction * .18) : 0);
+    applyRainPosture();
 
     if (!motion.moving) {
       const head = human.userData.parts?.head;
@@ -2562,6 +2676,36 @@ function addRoadSurfaceDetails(scene) {
   }
 }
 
+function addWeatherRoadDetails(scene) {
+  const puddleGeometry = new THREE.CircleGeometry(1, 18);
+  const puddles = [
+    [-5.9, -38, 1.7, .55, .18],
+    [5.8, -5, 1.35, .46, -.12],
+    [-5.7, 21, 1.55, .50, .08],
+    [5.9, 47, 1.8, .58, -.2],
+    [-40, -26.8, 1.45, .48, .12],
+    [-22, -17.1, 1.25, .43, -.08],
+  ];
+  puddles.forEach(([x, z, scaleX, scaleZ, rotation]) => {
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x31454d,
+      roughness: .20,
+      metalness: .10,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const puddle = new THREE.Mesh(puddleGeometry, material);
+    puddle.rotation.x = -Math.PI / 2;
+    puddle.rotation.z = rotation;
+    puddle.scale.set(scaleX, scaleZ, 1);
+    puddle.position.set(x, .047, z);
+    puddle.renderOrder = 1;
+    puddleMaterials.push(material);
+    scene.add(puddle);
+  });
+}
+
 function addStreetLight(scene, x, z, side = 1, rotation = 0) {
   const group = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({ color: 0x444b4e, roughness: .7, metalness: .32 });
@@ -2577,6 +2721,7 @@ function addStreetLight(scene, x, z, side = 1, rotation = 0) {
   arm.position.set(0, 4.65, side * .48);
   const lamp = new THREE.Mesh(new THREE.BoxGeometry(.32, .10, .48), lampMaterial);
   lamp.position.set(0, 4.58, side * .98);
+  streetLampMaterials.push(lampMaterial);
   group.add(pole, arm, lamp);
   group.position.set(x, 0, z);
   group.rotation.y = rotation;
@@ -2828,6 +2973,12 @@ function buildWorld(scene) {
 
   const roadTexture = createRoadSurfaceTexture();
   const roadMat = new THREE.MeshStandardMaterial({ map: roadTexture, color: 0xb9bec0, roughness: .91, metalness: .015 });
+  weatherRoadSurfaces.push({
+    material: roadMat,
+    baseRoughness: .91,
+    baseMetalness: .015,
+    baseColor: roadMat.color.clone(),
+  });
   const road = new THREE.Mesh(new THREE.PlaneGeometry(16, 160), roadMat);
   road.rotation.x = -Math.PI / 2;
   road.position.y = .016;
@@ -2852,6 +3003,7 @@ function buildWorld(scene) {
     scene.add(line);
   }
   addRoadSurfaceDetails(scene);
+  addWeatherRoadDetails(scene);
   addRoadsideLife(scene);
   addTownStreetDetails(scene);
   addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737 });
@@ -3214,6 +3366,7 @@ function updateJunctionSignal(state) {
 
 function addParkedVehicle(scene, kind, color, x, z, rotation = 0) {
   const vehicle = createRoadVehicle(kind, color);
+  ambientVehicleLightMaterials.push(...(vehicle.userData.headlightMaterials || []));
   vehicle.position.set(x, 0, z);
   vehicle.rotation.y = rotation;
   vehicle.scale.setScalar(kind === 'bus' ? .96 : .92);
@@ -3231,6 +3384,7 @@ function addParkedVehicle(scene, kind, color, x, z, rotation = 0) {
 
 function addRoadVehicle(scene, config) {
   const vehicle = createRoadVehicle(config.kind, config.color);
+  ambientVehicleLightMaterials.push(...(vehicle.userData.headlightMaterials || []));
   vehicle.userData.traffic = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
   if (config.axis === 'z') {
     vehicle.position.set(config.fixed, 0, config.progress);

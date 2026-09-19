@@ -269,3 +269,18 @@ Ambient traffic now reacts to the world. Main-road vehicles yield while the pede
 The town bus now approaches both V76 bus stops more slowly, pauses briefly at the stop, then continues its route and can service the stops again on later route laps. Two static parked cars add roadside activity while also acting as physical obstacles.
 
 All behavior is deterministic and local to the visual simulation. V77 does not add server AI, database changes, economy changes or a Supabase migration, and existing server-authoritative player movement and vehicle rules remain unchanged.
+
+
+## Weather + Day/Night Living World (V78)
+
+V78 extends the existing 24-minute shared day/night clock with a deterministic Kerala-monsoon-style visual weather cycle. Weather moves through clear, cloudy, rain and heavier-rain phases without relying on an external weather API, so all clients can render the same lightweight cycle from the shared clock.
+
+Rain uses one camera-following LineSegments field with graphics-quality-dependent drop counts. Overcast weather darkens the sky and clouds, reduces sun/moon intensity, increases fog density and hides stars naturally. The compact world-time HUD now includes Cloudy/Rain/Heavy rain status. Optional world sound also gains filtered rain noise while birds and crickets reduce during stronger rain.
+
+Road asphalt becomes darker, smoother and more reflective as rain builds. Lightweight puddle meshes fade in along the roads, and a driven vehicle gets a tiny local wheel-spray particle effect based on rain strength and speed.
+
+Street lamps and ambient vehicle lamps switch on automatically when the world becomes dark or sufficiently overcast. A player's current vehicle also gets automatic headlights in darkness/heavy overcast while preserving the existing manual light toggle.
+
+NPC movement slows slightly in rain and characters adopt a subtle rain posture rather than continuing exactly as in clear weather.
+
+The weather system is visual/local simulation only. It does not change server-authoritative movement, traffic rules, fuel, economy, jobs, ownership or persistence, and V78 requires no database or Supabase migration.
