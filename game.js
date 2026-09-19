@@ -557,13 +557,15 @@ function updateVehicleAction() {
     vehicleAction.classList.add('exit');
     const moving = Math.abs(driveSpeed) > .8;
     vehicleAction.disabled = moving;
-    vehicleAction.textContent = moving ? 'STOP TO PARK' : `PARK ${vehicle.kind === 'bike' ? 'BIKE' : 'TAXI'}`;
+    const vehicleLabel = vehicle.kind === 'bike' ? 'BIKE' : (currentVehicleSource() === 'personal' ? 'CAR' : 'TAXI');
+    vehicleAction.textContent = moving ? 'STOP TO PARK' : `PARK ${vehicleLabel}`;
     return;
   }
   const distance = Math.hypot(Number(vehicle.x) - playerRef.position.x, Number(vehicle.z) - playerRef.position.z);
   if (distance <= Number(vehicle.radius || 4.5) + .35) {
     vehicleAction.hidden = false;
-    vehicleAction.textContent = `ENTER ${vehicle.kind === 'bike' ? 'BIKE' : 'TAXI'}`;
+    const vehicleLabel = vehicle.kind === 'bike' ? 'BIKE' : (currentVehicleSource() === 'personal' ? 'CAR' : 'TAXI');
+    vehicleAction.textContent = `ENTER ${vehicleLabel}`;
   }
 }
 
@@ -640,11 +642,12 @@ function updateWorldInteract() {
   worldInteract.disabled = false;
   worldInteract.dataset.mode = '';
   worldInteract.dataset.service = '';
+  worldInteract.dataset.source = '';
   if (!profile || !playerRef) return;
   const active = activeJobMission;
   const station = nearestVehicleStation();
   if (station && Math.abs(driveSpeed) < .18) {
-    const vehicle = active.vehicle;
+    const vehicle = currentDriveVehicle();
     const needed = station.action === 'refuel' ? Number(vehicle.fuel) < Number(vehicle.fuelMax || 100) - .5 : Number(vehicle.condition) < Number(vehicle.conditionMax || 100) - 1;
     if (needed) {
       worldInteract.hidden = false;
