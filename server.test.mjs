@@ -1014,3 +1014,71 @@ test('Kerala Bank cash movement UPI transfers and persistence stay server contro
   assert.equal((await bob('/api/wallet')).data.balance, 525);
   assert.ok(bobAfterRestart.transactions.some(transaction => transaction.kind === 'upi_received'));
 });
+
+
+test('phone notifications persist events dedupe live reminders and support read state', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  await signup(alice, 'NotifyAlice');
+  await signup(bob, 'NotifyBob');
+
+  let alerts = (await alice('/api/notifications')).data;
+  assert.equal(alerts.unreadCount, 0);
+  assert.deepEqual(alerts.items, []);
+
+  const starter = await alice('/api/jobs/starter-delivery/complete', {});
+  assert.equal(starter.status, 200);
+  alerts = (await alice('/api/notifications')).data;
+  assert.equal(alerts.unreadCount, 1);
+  const salary = alerts.items.find(item => item.sourceKey === `salary:${starter.data.transaction.id}`);
+  assert.ok(salary);
+  assert.equal(salary.title, 'Salary credited');
+  assert.equal(salary.target, 'wallet');
+  assert.equal(salary.read, false);
+
+  const readOne = await alice('/api/notifications/read', { id: salary.id });
+  assert.equal(readOne.status, 200);
+  assert.equal(readOne.data.unreadCount, 0);
+  assert.equal(readOne.data.items.find(item => item.id === salary.id).read, true);
+
+  const bought = await alice('/api/garage/buy', { modelId: 'kerala_bike' });
+  assert.equal(bought.status, 201);
+  const vehicle = bought.data.garage.owned[0];
+
+  assert.equal((await bob('/api/bank/cash', { action: 'deposit', amount: 100 })).status, 200);
+  const upi = await bob('/api/bank/upi', { recipient: 'NotifyAlice@keralapay', amount: 50 });
+  assert.equal(upi.status, 200);
+
+  alerts = (await alice('/api/notifications')).data;
+  const received = alerts.items.find(item => item.sourceKey === `upi:${upi.data.transferId}:received`);
+  assert.ok(received);
+  assert.equal(received.title, 'UPI received');
+  assert.equal(received.target, 'wallet');
+  assert.equal(received.read, false);
+
+  app.advance(31 * 24 * 60 * 60 * 1000);
+  alerts = (await alice('/api/notifications')).data;
+  const insurance = alerts.items.find(item => item.id === `reminder:insurance:${vehicle.id}:${vehicle.insuranceUntil}`);
+  assert.ok(insurance);
+  assert.equal(insurance.live, true);
+  assert.equal(insurance.severity, 'critical');
+  assert.equal(insurance.target, 'garage');
+  const homeBlocked = alerts.items.find(item => item.title === 'Home access needs attention');
+  assert.ok(homeBlocked);
+  assert.equal(homeBlocked.severity, 'critical');
+  assert.ok(alerts.unreadCount >= 3);
+
+  const markAll = await alice('/api/notifications/read', { all: true });
+  assert.equal(markAll.status, 200);
+  assert.equal(markAll.data.unreadCount, 0);
+  const stable = await alice('/api/notifications');
+  assert.equal(stable.data.unreadCount, 0, 'Live reminders must not become unread again on refresh');
+  assert.equal(stable.data.items.filter(item => item.id === insurance.id).length, 1, 'Live reminders must stay deduplicated');
+
+  await app.restart();
+  assert.equal((await alice('/api/auth/login', { identifier: 'NotifyAlice', password: 'test-password-2026' })).status, 200);
+  alerts = (await alice('/api/notifications')).data;
+  assert.equal(alerts.unreadCount, 0);
+  assert.ok(alerts.items.some(item => item.sourceKey === `salary:${starter.data.transaction.id}`));
+  assert.ok(alerts.items.some(item => item.sourceKey === `upi:${upi.data.transferId}:received`));
+  assert.ok(alerts.items.some(item => item.id === insurance.id));
+});
