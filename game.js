@@ -14,6 +14,10 @@ const driveTools = document.querySelector('#drive-tools');
 const hornAction = document.querySelector('#horn-action');
 const lightsAction = document.querySelector('#lights-action');
 const roadStatus = document.querySelector('#road-status');
+const needsHud = document.querySelector('#needs-hud');
+const needHunger = document.querySelector('#need-hunger');
+const needThirst = document.querySelector('#need-thirst');
+const needEnergy = document.querySelector('#need-energy');
 const profileName = document.querySelector('#profile-name');
 const profileDistrict = document.querySelector('#profile-district');
 const profileChip = document.querySelector('#profile-chip');
@@ -75,6 +79,7 @@ let activeDmContact = null;
 let activeJobMission = null;
 let garageSnapshot = null;
 let trafficSnapshot = null;
+let needsSnapshot = null;
 let trafficCheckpointVisual = null;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
@@ -94,6 +99,7 @@ let hornPulseUntil = 0;
 let driveAudioContext = null;
 let lastImpactReportAt = 0;
 let lastFuelWarningAt = 0;
+let lastNeedsWarningAt = 0;
 let profile = null;
 let progress = newProgress();
 let social = null;
@@ -134,6 +140,48 @@ const taskCatalog = [
   { id: 'social', title: 'Make an accepted connection', target: 1, reward: 35 }
 ];
 
+
+function updateNeedsHud() {
+  if (!needsHud) return;
+  const visible = !!profile && !!needsSnapshot;
+  needsHud.hidden = !visible;
+  if (!visible) return;
+
+  const entries = [
+    [needHunger, Number(needsSnapshot.hunger ?? 100)],
+    [needThirst, Number(needsSnapshot.thirst ?? 100)],
+    [needEnergy, Number(needsSnapshot.energy ?? 100)],
+  ];
+  for (const [element, value] of entries) {
+    if (!element) continue;
+    const rounded = Math.max(0, Math.min(100, Math.round(value)));
+    const target = element.querySelector('b');
+    if (target) target.textContent = String(rounded);
+    element.classList.toggle('warning', rounded <= 25 && rounded > 10);
+    element.classList.toggle('critical', rounded <= 10);
+  }
+  if (runButton) {
+    const runBlocked = vehicleMode === 'walk' && needsSnapshot.canRun === false;
+    runButton.setAttribute('aria-disabled', String(runBlocked));
+    runButton.title = runBlocked ? 'Restore hunger, thirst or energy to run' : '';
+  }
+}
+
+function applyNeedsState(summary, { warn = true } = {}) {
+  needsSnapshot = summary || null;
+  updateNeedsHud();
+  updateWorldInteract();
+  if (!warn || !needsSnapshot || performance.now() - lastNeedsWarningAt < 12000) return;
+  const low = [
+    ['Thirst', Number(needsSnapshot.thirst)],
+    ['Energy', Number(needsSnapshot.energy)],
+    ['Hunger', Number(needsSnapshot.hunger)],
+  ].sort((a, b) => a[1] - b[1])[0];
+  if (low && low[1] <= 15) {
+    lastNeedsWarningAt = performance.now();
+    showToast(`Low ${low[0].toLowerCase()} · use the Village Shop${low[0] === 'Energy' ? ' or Rest Bench' : ''}`);
+  }
+}
 
 function disposeMissionObject(object) {
   if (!object) return;
@@ -712,6 +760,17 @@ function updateWorldInteract() {
     }
   }
 
+  if (!active && vehicleMode === 'walk' && needsSnapshot?.restPoint) {
+    const rest = needsSnapshot.restPoint;
+    const distance = Math.hypot(playerRef.position.x - Number(rest.x), playerRef.position.z - Number(rest.z));
+    if (distance <= Number(rest.radius || 5.2) + .3) {
+      worldInteract.hidden = false;
+      worldInteract.dataset.mode = 'needs-rest';
+      worldInteract.textContent = `REST · ENERGY ${Math.round(Number(needsSnapshot.energy ?? 100))}%`;
+      return;
+    }
+  }
+
   if (!active) return;
 
   if (active.phase === 'travel' && active.target) {
@@ -761,6 +820,8 @@ worldInteract?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('kerala-vehicle-service', { detail: { action: worldInteract.dataset.service, source: worldInteract.dataset.source || 'job' } }));
   } else if (worldInteract.dataset.mode === 'traffic-checkpoint') {
     window.dispatchEvent(new CustomEvent('kerala-traffic-checkpoint'));
+  } else if (worldInteract.dataset.mode === 'needs-rest') {
+    window.dispatchEvent(new CustomEvent('kerala-needs-rest'));
   } else {
     window.dispatchEvent(new CustomEvent('kerala-job-interact'));
   }
@@ -821,6 +882,7 @@ window.addEventListener('kerala-traffic-state', event => {
   updateWorldInteract();
   updateDriveHud();
 });
+window.addEventListener('kerala-needs-state', event => applyNeedsState(event.detail, { warn: false }));
 
 window.addEventListener('error', event => {
   console.error(event.error || event.message);
@@ -1079,6 +1141,7 @@ async function sendMovement(player, moving) {
         showToast(Number(result.vehicle.fuel) <= .1 ? 'Fuel empty · go to Kerala Fuel Station' : 'Low fuel · visit Kerala Fuel Station');
       }
     }
+    if (result.needs) applyNeedsState(result.needs);
     if (result.trafficNotice) {
       showToast(`Traffic challan issued · ₹${Number(result.trafficNotice.amount || 0)} · ${result.trafficNotice.registration || ''}`);
       window.dispatchEvent(new CustomEvent('kerala-traffic-refresh'));
@@ -1480,6 +1543,7 @@ try {
   cameraZone.addEventListener('lostpointercapture', clearLook);
 
   function setRun(value) {
+    if (value && vehicleMode === 'walk' && needsSnapshot?.canRun === false) value = false;
     runHeld = value;
     runButton.classList.toggle('active', value);
   }
@@ -1646,19 +1710,21 @@ try {
     } else {
       driveSpeed = 0;
       const walkingInput = controlLength > .08;
+      const runningNow = runHeld && needsSnapshot?.canRun !== false;
+      const needsFactor = Math.max(.55, Math.min(1, Number(needsSnapshot?.movementFactor || 1)));
       if (walkingInput) {
         moveForward.set(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
         moveRight.set(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
         desiredMove.copy(moveForward).multiplyScalar(-controlY).addScaledVector(moveRight, controlX);
         if (desiredMove.lengthSq() > .0001) desiredMove.normalize();
         const inputCurve = Math.pow(controlLength, 1.55);
-        const maxWalkSpeed = runHeld ? 5.4 : 3.05;
+        const maxWalkSpeed = (runningNow ? 5.4 : 3.05) * needsFactor;
         targetWalkVelocity.copy(desiredMove).multiplyScalar(maxWalkSpeed * inputCurve);
       } else {
         targetWalkVelocity.set(0, 0, 0);
       }
 
-      const walkResponse = walkingInput ? (runHeld ? 5.2 : 6.8) : 11.5;
+      const walkResponse = walkingInput ? (runningNow ? 5.2 : 6.8) : 11.5;
       walkVelocity.lerp(targetWalkVelocity, 1 - Math.exp(-delta * walkResponse));
       if (!walkingInput && walkVelocity.lengthSq() < .0016) walkVelocity.set(0, 0, 0);
 
@@ -1675,11 +1741,11 @@ try {
           const actualX = player.position.x - beforeX;
           const actualZ = player.position.z - beforeZ;
           const desiredYaw = Math.atan2(actualX, actualZ);
-          const turnSpeed = runHeld ? 5.6 : 6.8;
+          const turnSpeed = runningNow ? 5.6 : 6.8;
           player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
           if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
-          const animationAmount = Math.min(1, movedDistance / Math.max(.0001, (runHeld ? 5.4 : 3.05) * delta));
-          walkPhase += delta * (runHeld ? 12 : 8) * Math.max(.22, animationAmount);
+          const animationAmount = Math.min(1, movedDistance / Math.max(.0001, ((runningNow ? 5.4 : 3.05) * needsFactor) * delta));
+          walkPhase += delta * (runningNow ? 12 : 8) * Math.max(.22, animationAmount);
           animatePlayer(player, walkPhase, animationAmount);
           movingNow = true;
           if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
@@ -1706,7 +1772,7 @@ try {
     updateVehicleAction();
     updateDriveHud();
     sendMovement(player, movingNow);
-    atmosphere.update(delta, villageTime, { moving: movingNow, running: vehicleMode === 'walk' && runHeld, nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13, inChallenge: !!challengeRound });
+    atmosphere.update(delta, villageTime, { moving: movingNow, running: vehicleMode === 'walk' && runHeld && needsSnapshot?.canRun !== false, nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13, inChallenge: !!challengeRound });
     renderer.render(scene, camera);
     if (isMobile && !atmosphere) {
       perfFrames++; const now = performance.now();
@@ -2482,7 +2548,7 @@ function addBench(scene, x, z) {
     leg.position.set(xPos, .34, 0);
     group.add(leg);
   });
-  group.add(seat, back);
+  group.add(seat, back, missionTag('Rest Bench', '#3b6652'));
   group.position.set(x, 0, z);
   scene.add(group);
 }

@@ -16,11 +16,17 @@ const STARTER_BALANCE = 500;
 const STARTER_JOB_REWARD = 250;
 const WALLET_LIMIT = 2_000_000_000;
 const SHOP_ITEMS = Object.freeze({
-  water: { name: 'Water', price: 15 },
-  tea: { name: 'Tea', price: 20 },
-  snack: { name: 'Snack', price: 35 },
-  meal: { name: 'Kerala Meal', price: 80 },
+  water: { name: 'Water', price: 15, needs: { thirst: 35, energy: 1 } },
+  tea: { name: 'Tea', price: 20, needs: { thirst: 16, energy: 10 } },
+  snack: { name: 'Snack', price: 35, needs: { hunger: 22, energy: 5 } },
+  meal: { name: 'Kerala Meal', price: 80, needs: { hunger: 48, thirst: 6, energy: 8 } },
 });
+const NEEDS_MAX = 100;
+const NEEDS_DECAY_PER_MINUTE = Object.freeze({ hunger: 0.28, thirst: 0.4, energy: 0.22 });
+const NEEDS_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
+const NEEDS_REST_POINT = Object.freeze({ id: 'village-bench', label: 'Village Rest Bench', x: -10, z: -10, radius: 5.2 });
+const NEEDS_REST_ENERGY = 35;
+const NEEDS_REST_COOLDOWN_MS = 30_000;
 const JOB_DEFINITIONS = Object.freeze({
   delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Take the delivery bike, collect a parcel, then ride to the customer.', missionType: 'route', vehicle: 'bike', vehicleLabel: 'Delivery Bike' },
   taxi: { title: 'Taxi Driver', reward: 220, durationMs: 0, cooldownMs: 35_000, description: 'Enter the taxi, reach the passenger pickup point, then drive to the destination.', missionType: 'route', vehicle: 'taxi', vehicleLabel: 'Kerala Taxi' },
@@ -60,7 +66,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -120,6 +126,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) { user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }; migrated = true; }
     if (!Array.isArray(user.jobState.traffic.challans)) { user.jobState.traffic.challans = []; migrated = true; }
     if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) { user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 }; migrated = true; }
+    if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) { user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 }; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -440,13 +447,78 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     };
   }
 
+  function needsMovementFactor(needs) {
+    let factor = 1;
+    if (needs.energy <= 8) factor = Math.min(factor, .62);
+    else if (needs.energy <= 20) factor = Math.min(factor, .78);
+    if (needs.hunger <= 8) factor = Math.min(factor, .72);
+    else if (needs.hunger <= 18) factor = Math.min(factor, .86);
+    if (needs.thirst <= 5) factor = Math.min(factor, .62);
+    else if (needs.thirst <= 15) factor = Math.min(factor, .8);
+    return Math.max(.55, factor);
+  }
+
+  function applyNeedsDecay(user) {
+    const state = jobStateFor(user);
+    const needs = state.needs;
+    const timestamp = now();
+    const elapsedMs = Math.max(0, Math.min(timestamp - Number(needs.updatedAt || timestamp), NEEDS_MAX_CATCHUP_MS));
+    if (elapsedMs >= 1000) {
+      const minutes = elapsedMs / 60000;
+      needs.hunger = Math.max(0, Number(needs.hunger) - NEEDS_DECAY_PER_MINUTE.hunger * minutes);
+      needs.thirst = Math.max(0, Number(needs.thirst) - NEEDS_DECAY_PER_MINUTE.thirst * minutes);
+      needs.energy = Math.max(0, Number(needs.energy) - NEEDS_DECAY_PER_MINUTE.energy * minutes);
+      needs.updatedAt = timestamp;
+      dirty = true;
+    } else if (!Number(needs.updatedAt)) {
+      needs.updatedAt = timestamp;
+      dirty = true;
+    }
+    return needs;
+  }
+
+  function needsSummary(user) {
+    const needs = applyNeedsDecay(user);
+    const factor = needsMovementFactor(needs);
+    return {
+      hunger: Math.round(Number(needs.hunger) * 10) / 10,
+      thirst: Math.round(Number(needs.thirst) * 10) / 10,
+      energy: Math.round(Number(needs.energy) * 10) / 10,
+      movementFactor: factor,
+      canRun: factor >= .78 && Number(needs.energy) > 12 && Number(needs.hunger) > 5 && Number(needs.thirst) > 5,
+      restPoint: NEEDS_REST_POINT,
+      restEnergy: NEEDS_REST_ENERGY,
+      restReadyAt: Number(needs.lastRestAt || 0) + NEEDS_REST_COOLDOWN_MS,
+      updatedAt: Number(needs.updatedAt || now()),
+    };
+  }
+
+  function applyNeedsEffect(user, effect = {}) {
+    const needs = applyNeedsDecay(user);
+    for (const key of ['hunger', 'thirst', 'energy']) {
+      if (!Number.isFinite(Number(effect[key])) || Number(effect[key]) === 0) continue;
+      needs[key] = Math.max(0, Math.min(NEEDS_MAX, Number(needs[key]) + Number(effect[key])));
+    }
+    needs.updatedAt = now();
+    dirty = true;
+    return needsSummary(user);
+  }
+
   function jobStateFor(user) {
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) user.jobState.completed = {};
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null };
     if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } };
+    if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 };
     if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
+    const needs = user.jobState.needs;
+    for (const key of ['hunger', 'thirst', 'energy']) {
+      if (!Number.isFinite(Number(needs[key]))) needs[key] = 100;
+      needs[key] = Math.max(0, Math.min(NEEDS_MAX, Number(needs[key])));
+    }
+    if (!Number.isFinite(Number(needs.updatedAt)) || Number(needs.updatedAt) <= 0) needs.updatedAt = now();
+    if (!Number.isFinite(Number(needs.lastRestAt))) needs.lastRestAt = 0;
     if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 };
     const licence = user.jobState.traffic.licence;
     if (!['none', 'learner', 'full'].includes(licence.type)) licence.type = 'none';
@@ -773,6 +845,32 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       }
       if (path === '/api/wallet' && request.method === 'GET') {
         send(response, 200, walletSummary(user)); return;
+      }
+      if (path === '/api/needs' && request.method === 'GET') {
+        send(response, 200, needsSummary(user)); return;
+      }
+      if (path === '/api/needs/rest' && request.method === 'POST') {
+        limited(`needs-rest:${user.id}`, 20, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
+        requireValue(!state.active?.vehicleEntered && !personal?.entered, 409, 'Park and exit the vehicle before resting.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before resting.');
+        requireValue(Math.hypot(live.x - NEEDS_REST_POINT.x, live.z - NEEDS_REST_POINT.z) <= NEEDS_REST_POINT.radius, 409, 'Move closer to the Village Rest Bench.');
+        const current = needsSummary(user);
+        if (current.energy >= 99) {
+          send(response, 200, { rested: false, message: 'Energy is already full.', needs: current }); return;
+        }
+        const needs = state.needs;
+        const timestamp = now();
+        requireValue(timestamp >= Number(needs.lastRestAt || 0) + NEEDS_REST_COOLDOWN_MS, 409, 'Rest is still cooling down.');
+        needs.energy = Math.min(NEEDS_MAX, Number(needs.energy) + NEEDS_REST_ENERGY);
+        needs.lastRestAt = timestamp;
+        needs.updatedAt = timestamp;
+        dirty = true;
+        await persist();
+        send(response, 200, { rested: true, restored: NEEDS_REST_ENERGY, needs: needsSummary(user) }); return;
       }
       if (path === '/api/jobs/starter-delivery/complete' && request.method === 'POST') {
         limited(`wallet-job:${user.id}`, 10, 60000);
@@ -1337,8 +1435,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const item = typeof body.itemId === 'string' ? SHOP_ITEMS[body.itemId] : null;
         requireValue(item, 404, 'Shop item not found.');
         const transaction = walletTransaction(user, -item.price, 'purchase', item.name);
+        const needs = applyNeedsEffect(user, item.needs);
         await persist();
-        send(response, 200, { wallet: walletSummary(user), purchase: { itemId: body.itemId, name: item.name, price: item.price }, transaction }); return;
+        send(response, 200, {
+          wallet: walletSummary(user),
+          needs,
+          purchase: { itemId: body.itemId, name: item.name, price: item.price, needs: item.needs },
+          transaction,
+        }); return;
       }
       if (path === '/api/people' && request.method === 'GET') {
         const people = db.users.filter(peer => peer.id !== user.id && (!blocked(user.id, peer.id) || ownBlock(user.id, peer.id))).map(peer => ({ ...(blocked(user.id, peer.id) ? blockedUser(peer) : publicUser(peer)), relationship: relation(user.id, peer.id), blocked: ownBlock(user.id, peer.id), online: !blocked(user.id, peer.id) && online(peer.id), canMessage: !blocked(user.id, peer.id) && accepted(user.id, peer.id) }));
@@ -1463,8 +1567,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(requestedMode === expectedMode, 409, 'Movement mode is out of sync. Re-enter the active vehicle if needed.');
         const state = presence.get(user.id) || place(user);
         const movement = MOVEMENT_PROFILES[requestedMode];
+        const needsBeforeMove = needsSummary(user);
+        const needsFactor = requestedMode === 'walk' ? Number(needsBeforeMove.movementFactor || 1) : 1;
         const elapsed = Math.max(0, Math.min((now() - state.movedAt) / 1000, 3));
-        const credit = Math.min(movement.maxCredit, state.movementCredit + elapsed * movement.rate);
+        const credit = Math.min(movement.maxCredit * needsFactor, state.movementCredit + elapsed * movement.rate * needsFactor);
         const distance = Math.hypot(body.x - state.x, body.z - state.z);
         if (distance > credit + 0.01) throw new ApiError(409, 'Movement was too fast. Your avatar needs to resync.', { x: state.x, z: state.z });
         if (requestedMode !== 'walk' && distance > .01) {
@@ -1512,8 +1618,17 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
         state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving; state.mode = requestedMode;
         user.worldX = state.x; user.worldZ = state.z; user.worldRotation = state.rotation; user.worldUpdatedAt = now();
-        if (requestedMode === 'walk') user.walkMeters += distance;
-        else if (active && activeJob?.vehicle && distance > 0) {
+        if (requestedMode === 'walk') {
+          user.walkMeters += distance;
+          if (distance > 0) {
+            const needs = stateForMove.needs;
+            needs.energy = Math.max(0, Number(needs.energy) - distance * .02);
+            needs.thirst = Math.max(0, Number(needs.thirst) - distance * .005);
+            needs.hunger = Math.max(0, Number(needs.hunger) - distance * .002);
+            needs.updatedAt = now();
+            dirty = true;
+          }
+        } else if (active && activeJob?.vehicle && distance > 0) {
           const spec = VEHICLE_SPECS[activeJob.vehicle];
           active.vehicleFuel = Math.max(0, Number(active.vehicleFuel) - distance * spec.fuelBurnPerMeter);
           dirty = true;
@@ -1528,7 +1643,15 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
         const activeVehicle = active && activeJob?.vehicle ? jobsSummary(user).active?.vehicle || null : (personal?.entered ? garageSummary(user).activeVehicle : null);
-        send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks, vehicle: activeVehicle, trafficNotice }); return;
+        send(response, 200, {
+          ok: true,
+          user: publicUser(user),
+          walkMeters: Math.floor(user.walkMeters),
+          visitedLandmarks: user.visitedLandmarks,
+          vehicle: activeVehicle,
+          trafficNotice,
+          needs: needsSummary(user),
+        }); return;
       }
       const voiceMatch = path.match(/^\/api\/voice\/signal\/([^/]+)$/);
       if (voiceMatch && request.method === 'POST') {

@@ -128,6 +128,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   let garageSnapshot = null;
   let garageMarketSnapshot = null;
   let trafficSnapshot = null;
+  let needsSnapshot = null;
   const jobsPanel = $('jobs-panel');
   const jobsToggle = $('jobs-toggle');
   const jobsClose = $('jobs-close');
@@ -518,6 +519,16 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     const wallet = await api('/api/wallet');
     renderWallet(wallet);
     return wallet;
+  }
+  function renderNeeds(summary) {
+    needsSnapshot = summary || null;
+    window.dispatchEvent(new CustomEvent('kerala-needs-state', { detail: needsSnapshot }));
+  }
+  async function refreshNeeds() {
+    if (!user) return null;
+    const summary = await api('/api/needs');
+    renderNeeds(summary);
+    return summary;
   }
   function openWallet() {
     if (!requireUser()) return;
@@ -1414,6 +1425,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     await run(refreshPeople, peopleError);
     await run(refreshJobs, jobsError);
     await run(refreshGarage, garageError);
+    await run(refreshNeeds, walletError);
   }
   function endSession(message = '') {
     sessionVersion++;
@@ -1427,7 +1439,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     walletTransactions?.replaceChildren();
     if (starterDelivery) { starterDelivery.disabled = false; starterDelivery.textContent = 'Complete Starter Delivery · +₹250'; }
     jobsSnapshot = null; jobsList?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-job-mission', { detail: null })); if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
-    garageSnapshot = null; garageMarketSnapshot = null; trafficSnapshot = null; garageList?.replaceChildren(); garageCatalog?.replaceChildren(); garageMarket?.replaceChildren(); trafficDocuments?.replaceChildren(); trafficChallans?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: null })); window.dispatchEvent(new CustomEvent('kerala-traffic-state', { detail: null }));
+    garageSnapshot = null; garageMarketSnapshot = null; trafficSnapshot = null; needsSnapshot = null; garageList?.replaceChildren(); garageCatalog?.replaceChildren(); garageMarket?.replaceChildren(); trafficDocuments?.replaceChildren(); trafficChallans?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: null })); window.dispatchEvent(new CustomEvent('kerala-traffic-state', { detail: null })); window.dispatchEvent(new CustomEvent('kerala-needs-state', { detail: null }));
     dmInput.value = ''; dmLog.replaceChildren();
     renderPeople(); renderAuth('login', message);
   }
@@ -1473,7 +1485,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     run(async () => {
       purchaseButton.disabled = true;
       const result = await api('/api/shop/purchase', { itemId: purchaseButton.dataset.itemId });
-      renderWallet(result.wallet); toast(`${result.purchase.name} purchased · ${formatCash(result.purchase.price)}`);
+      renderWallet(result.wallet);
+      if (result.needs) renderNeeds(result.needs);
+      const effects = result.purchase?.needs || {};
+      const restored = [effects.hunger ? `Hunger +${effects.hunger}` : '', effects.thirst ? `Thirst +${effects.thirst}` : '', effects.energy ? `Energy +${effects.energy}` : ''].filter(Boolean).join(' · ');
+      toast(`${result.purchase.name} · ${formatCash(result.purchase.price)}${restored ? ` · ${restored}` : ''}`);
     }, walletError).finally(() => { purchaseButton.disabled = false; });
   });
   garageCatalog?.addEventListener('click', event => {
@@ -1570,6 +1586,12 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }, garageError));
 
   window.addEventListener('kerala-traffic-refresh', () => run(refreshTraffic, garageError));
+  window.addEventListener('kerala-needs-rest', () => run(async () => {
+    const result = await api('/api/needs/rest', {});
+    if (result.needs) renderNeeds(result.needs);
+    toast(result.rested ? `Rest complete · Energy +${result.restored}` : (result.message || 'Energy is already full'));
+  }, walletError));
+
 
   garageMarket?.addEventListener('click', event => {
     const buy = event.target.closest('button[data-market-buy]');

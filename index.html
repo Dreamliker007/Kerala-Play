@@ -105,6 +105,13 @@
     #profile-submit { width:100%; margin-top:17px; border:0; border-radius:10px; padding:12px; color:#062019; background:#50c980; font-weight:900; font-size:14px; cursor:pointer; }
     #profile-error { min-height:17px; margin-top:8px; color:#ffd996; font-size:11px; }
     @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #progress-chip { top:calc(env(safe-area-inset-top) + 105px); left:16px; max-width:165px; } #mission-card { top:calc(env(safe-area-inset-top) + 144px); width:166px; } #online-chip { top:calc(env(safe-area-inset-top) + 242px); right:14px; max-width:118px; } #hint { display:none; } #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #garage-panel, #jobs-panel, #dm-panel { width:min(284px, calc(100vw - 88px)); max-height:min(56dvh, 350px); } #kerala-map { height:220px; } }
+    #needs-hud { position:fixed; left:50%; bottom:48px; z-index:6; transform:translateX(-50%); display:flex; gap:6px; padding:5px 7px; border:1px solid rgba(255,255,255,.14); border-radius:10px; background:rgba(7,20,25,.78); backdrop-filter:blur(7px); font:800 9px system-ui,sans-serif; color:#eaf7ef; pointer-events:none; }
+    #needs-hud[hidden] { display:none; }
+    #needs-hud span { display:inline-flex; align-items:center; gap:3px; min-width:42px; justify-content:center; }
+    #needs-hud span.warning { color:#ffd08a; }
+    #needs-hud span.critical { color:#ff9c86; }
+    #needs-hud b { font-size:9px; }
+    @media (max-width:560px) { #needs-hud { bottom:calc(env(safe-area-inset-bottom) + 52px); gap:4px; padding:4px 6px; font-size:8px; opacity:.9; } #needs-hud span { min-width:36px; } }
     @media (min-width: 740px) { #joystick-zone { width: 330px; height: 330px; } #joystick-base { left: 44px; bottom: 38px; } #run { right: 44px; bottom: 46px; } }
     @media (max-width: 560px) {
       #brand { padding:7px 9px; font-size:13px; }
@@ -139,7 +146,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V64</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V65</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -154,6 +161,11 @@
       <button id="lights-action" class="drive-tool" type="button" aria-label="Toggle headlights" aria-pressed="false"><span>💡</span>LIGHTS</button>
     </div>
     <output id="road-status" hidden aria-live="polite">ROAD · 40</output>
+    <div id="needs-hud" hidden aria-label="Daily needs">
+      <span id="need-hunger" title="Hunger">🍛 <b>100</b></span>
+      <span id="need-thirst" title="Thirst">💧 <b>100</b></span>
+      <span id="need-energy" title="Energy">⚡ <b>100</b></span>
+    </div>
     <button id="profile-chip" type="button" aria-label="Edit profile"><span id="profile-name">Explorer</span><span id="profile-district">Choose district</span></button>
     <output id="progress-chip" aria-live="polite">Lv. 1 · 0 points</output>
     <output id="online-chip" aria-live="polite"><i></i><span id="online-count">Connecting…</span></output>
