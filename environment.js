@@ -135,12 +135,12 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   style.textContent = `
     #world-time {
       position:fixed; z-index:5;
-      top:calc(env(safe-area-inset-top) + 15px); left:50%; transform:translateX(-50%);
-      border:1px solid rgba(255,255,255,.14); border-radius:999px;
-      padding:7px 11px; background:rgba(7,18,28,.66); color:#eef8ff;
-      box-shadow:0 8px 24px rgba(0,0,0,.15);
-      backdrop-filter:blur(12px) saturate(1.1); -webkit-backdrop-filter:blur(12px) saturate(1.1);
-      font:700 10px/1.35 system-ui,sans-serif; pointer-events:none; white-space:nowrap;
+      top:calc(env(safe-area-inset-top) + 8px); left:50%; transform:translateX(-50%);
+      border:1px solid rgba(255,255,255,.10); border-radius:999px;
+      padding:4px 7px; background:rgba(7,18,28,.48); color:#eef8ff;
+      box-shadow:0 4px 12px rgba(0,0,0,.08);
+      backdrop-filter:blur(9px) saturate(1.06); -webkit-backdrop-filter:blur(9px) saturate(1.06);
+      font:700 8px/1.25 system-ui,sans-serif; pointer-events:none; white-space:nowrap;
     }
     #world-settings {
       display:none; position:fixed; z-index:12;
@@ -176,11 +176,11 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     .settings-fullscreen { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:800!important; }
     #world-audio-status { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
     @media(max-width:979px) {
-      #world-time { top:calc(env(safe-area-inset-top) + 54px); left:auto; right:12px; transform:none; }
+      #world-time { top:calc(env(safe-area-inset-top) + 34px); left:auto; right:10px; transform:none; }
       #world-settings { top:calc(env(safe-area-inset-top) + 56px); right:10px; }
     }
     @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) {
-      #world-time { top:calc(env(safe-area-inset-top) + 47px); right:calc(env(safe-area-inset-right) + 10px); padding:5px 8px; font-size:8px; }
+      #world-time { top:calc(env(safe-area-inset-top) + 31px); right:calc(env(safe-area-inset-right) + 8px); padding:3px 5px; font-size:7px; }
       #world-settings { top:calc(env(safe-area-inset-top) + 53px); right:calc(env(safe-area-inset-right) + 10px); width:236px; max-height:calc(100dvh - 64px); overflow:auto; padding:10px; }
       .world-setting-row { min-height:39px; padding:6px 8px; }
     }
