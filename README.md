@@ -336,3 +336,16 @@ The road network now includes concrete roadside drainage channels, occasional co
 All new street detail is visual-only. Existing road collision, traffic authority, jobs, economy, ownership and server movement rules are unchanged.
 
 V84 also adds browser-module syntax checks for game.js, environment.js, social.js and boot.js to the core GitHub workflow so future visual changes are less likely to merge with a client-side syntax error.
+
+
+## Kerala Traffic + Street Life Realism (V85)
+
+V85 makes the V84 high-quality village feel more like a lived-in Kerala street.
+
+Ambient traffic now includes a procedural three-wheeler auto-rickshaw and rider-equipped two-wheelers in addition to cars and the bus. Main-road and side-road traffic uses a mixed vehicle flow, while parked bikes and an auto-rickshaw add roadside vehicle variety near shops and side streets.
+
+Traffic vehicles no longer cruise at perfectly identical constant speeds: each vehicle gets a small deterministic speed variation while still obeying the existing traffic signal, zebra-crossing yield, bus-stop service, player-vehicle proximity and same-lane spacing rules. Collision footprints now account for bus, car, auto-rickshaw and bike sizes.
+
+Shop fronts gain lightweight stools, a standing table, produce baskets, sacks and customers/shopkeepers with task or conversation poses. These use the existing lightweight NPC behavior system rather than pathfinding or server AI.
+
+No backend, database, economy, ownership or Supabase migration is required. Traffic remains local ambient simulation and existing server-authoritative player movement/driving rules are unchanged.
