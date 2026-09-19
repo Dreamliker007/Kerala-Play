@@ -966,6 +966,73 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/wallet' && request.method === 'GET') {
         send(response, 200, walletSummary(user)); return;
       }
+      if (path === '/api/bank' && request.method === 'GET') {
+        send(response, 200, bankSummary(user)); return;
+      }
+      if (path === '/api/bank/cash' && request.method === 'POST') {
+        limited(`bank-cash:${user.id}`, 40, 60000);
+        const body = await jsonBody(request);
+        requireValue(body.action === 'deposit' || body.action === 'withdraw', 400, 'Choose deposit or withdraw.');
+        const amount = Number(body.amount);
+        requireValue(Number.isInteger(amount) && amount >= 1 && amount <= BANK_TRANSFER_MAX, 400, `Amount must be between ₹1 and ₹${BANK_TRANSFER_MAX}.`);
+        const state = jobStateFor(user);
+        let walletEntry, bankEntry;
+        if (body.action === 'deposit') {
+          requireValue(Number(state.bank.balance) + amount <= BANK_LIMIT, 409, 'Bank account limit reached.');
+          walletEntry = walletTransaction(user, -amount, 'bank_deposit', 'Deposit to Kerala Bank');
+          bankEntry = bankTransaction(user, amount, 'cash_deposit', 'Wallet → Kerala Bank');
+        } else {
+          requireValue(Number(state.bank.balance) >= amount, 409, 'Not enough money in your Kerala Bank account.');
+          requireValue(user.walletBalance + amount <= WALLET_LIMIT, 409, 'Wallet limit reached.');
+          bankEntry = bankTransaction(user, -amount, 'cash_withdrawal', 'Kerala Bank → Wallet');
+          walletEntry = walletTransaction(user, amount, 'bank_withdrawal', 'Withdraw from Kerala Bank');
+        }
+        await persist();
+        send(response, 200, {
+          action: body.action,
+          amount,
+          bank: bankSummary(user),
+          wallet: walletSummary(user),
+          bankTransaction: bankEntry,
+          walletTransaction: walletEntry,
+        }); return;
+      }
+      if (path === '/api/bank/upi' && request.method === 'POST') {
+        limited(`bank-upi:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const amount = Number(body.amount);
+        requireValue(Number.isInteger(amount) && amount >= 1 && amount <= BANK_TRANSFER_MAX, 400, `UPI amount must be between ₹1 and ₹${BANK_TRANSFER_MAX}.`);
+        const rawRecipient = typeof body.recipient === 'string' ? body.recipient.trim().toLowerCase() : '';
+        const handle = rawRecipient.replace(/@keralapay$/i, '');
+        requireValue(/^(?=.*[a-z])[a-z0-9_]{3,24}$/.test(handle), 400, 'Enter a valid Kerala Pay username or UPI ID.');
+        const recipient = db.users.find(candidate => candidate.username.toLowerCase() === handle);
+        requireValue(recipient, 404, 'Kerala Pay recipient not found.');
+        requireValue(recipient.id !== user.id, 409, 'You cannot send UPI to yourself.');
+        requireValue(!blocked(user.id, recipient.id), 403, 'UPI transfer is unavailable between blocked players.');
+        const senderBank = jobStateFor(user).bank;
+        const recipientBank = jobStateFor(recipient).bank;
+        requireValue(Number(senderBank.balance) >= amount, 409, 'Not enough money in your Kerala Bank account.');
+        requireValue(Number(recipientBank.balance) + amount <= BANK_LIMIT, 409, 'Recipient bank account limit reached.');
+        const transferId = randomUUID();
+        const recipientUpi = bankUpiId(recipient);
+        const senderUpi = bankUpiId(user);
+        const sent = bankTransaction(user, -amount, 'upi_sent', `UPI to ${recipientUpi}`, {
+          transferId, counterparty: recipientUpi,
+        });
+        const received = bankTransaction(recipient, amount, 'upi_received', `UPI from ${senderUpi}`, {
+          transferId, counterparty: senderUpi,
+        });
+        await persist();
+        emit(recipient.id, 'bank', {});
+        send(response, 200, {
+          amount,
+          transferId,
+          recipient: { username: recipient.username, upiId: recipientUpi },
+          bank: bankSummary(user),
+          transaction: sent,
+          receivedTransactionId: received.id,
+        }); return;
+      }
       if (path === '/api/needs' && request.method === 'GET') {
         send(response, 200, needsSummary(user)); return;
       }
