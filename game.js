@@ -3390,6 +3390,8 @@ function addBusStop(scene, x, z, rotation = 0, stopName = 'KERALA PLAY') {
 function addCompoundWall(scene, x, z, width, depth, opening = 'front') {
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xc8bfae, roughness: 1 });
   const capMat = new THREE.MeshStandardMaterial({ color: 0x8e8475, roughness: 1 });
+  const mossMat = new THREE.MeshStandardMaterial({ color: 0x536a45, roughness: 1 });
+  const wallRandom = visualRandom(Math.abs(Math.round(x * 79 + z * 127)) + 4021);
   const wallHeight = .72;
   const thickness = .16;
   const group = new THREE.Group();
@@ -3400,6 +3402,22 @@ function addCompoundWall(scene, x, z, width, depth, opening = 'front') {
     const cap = new THREE.Mesh(new THREE.BoxGeometry(widthValue + .025, .07, depthValue + .025), capMat);
     cap.position.set(px, wallHeight + .035, pz);
     group.add(wall, cap);
+    if (wallRandom() > .28) {
+      const moss = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          Math.max(.08, widthValue * (.45 + wallRandom() * .42)),
+          .022,
+          Math.max(.08, depthValue * (.45 + wallRandom() * .42))
+        ),
+        mossMat
+      );
+      moss.position.set(
+        px + (wallRandom() - .5) * Math.max(0, widthValue - .2) * .22,
+        wallHeight + .082,
+        pz + (wallRandom() - .5) * Math.max(0, depthValue - .2) * .22
+      );
+      group.add(moss);
+    }
   };
 
   addSegment(thickness, depth, -width / 2, 0);
@@ -3441,6 +3459,21 @@ function addUtilityPoles(scene) {
       pole.add(cap);
       wirePoints[index].push(new THREE.Vector3(poleX + xOffset, 5.47, z));
     });
+    if (Math.abs(z) !== 64 && Math.abs(z) !== 62 && Math.abs(z) !== 44) {
+      const posterColors = [0xe8d7a0, 0xdca7a1, 0xa9c8d8];
+      const poster = new THREE.Mesh(
+        new THREE.PlaneGeometry(.34, .46),
+        new THREE.MeshStandardMaterial({
+          color: posterColors[Math.abs(Math.round(z)) % posterColors.length],
+          roughness: .92,
+          side: THREE.DoubleSide,
+        })
+      );
+      poster.position.set(.105, 1.55 + (Math.abs(z) % 3) * .18, .01);
+      poster.rotation.y = Math.PI / 2;
+      poster.rotation.z = ((Math.abs(z) % 5) - 2) * .015;
+      pole.add(poster);
+    }
     pole.position.set(poleX, 0, z);
     scene.add(pole);
   });
@@ -5067,6 +5100,80 @@ function updateAmbientAnimals(time, delta) {
 function addPhotoHouse(scene, x, z) { addHouse(scene, x, z, 0xf0e5d1, 0x9e533a); }
 
 
+function addBuildingWeathering(group, kind, seedValue = 1) {
+  const random = visualRandom(Math.abs(Math.round(seedValue)) + 9901);
+  const mossMat = new THREE.MeshStandardMaterial({
+    color: 0x526b45,
+    roughness: 1,
+    transparent: true,
+    opacity: .46,
+    depthWrite: false,
+  });
+  const dampMat = new THREE.MeshStandardMaterial({
+    color: 0x5a6654,
+    roughness: 1,
+    transparent: true,
+    opacity: .28,
+    depthWrite: false,
+  });
+  const stainMat = new THREE.MeshStandardMaterial({
+    color: 0x6c5c49,
+    roughness: 1,
+    transparent: true,
+    opacity: .22,
+    depthWrite: false,
+  });
+
+  if (kind === 'house') {
+    for (let index = 0; index < 4; index++) {
+      const stain = new THREE.Mesh(new THREE.CircleGeometry(.55 + random() * .38, 12), index % 2 ? dampMat : stainMat);
+      stain.scale.set(.65 + random() * .9, .32 + random() * .36, 1);
+      stain.position.set(-3.4 + random() * 6.8, .72 + random() * .82, 3.826);
+      stain.rotation.z = (random() - .5) * .22;
+      stain.renderOrder = 1;
+      group.add(stain);
+    }
+    const mossBand = new THREE.Mesh(new THREE.PlaneGeometry(7.8, .18), mossMat);
+    mossBand.position.set(0, .72, 3.831);
+    mossBand.rotation.z = (random() - .5) * .025;
+    mossBand.renderOrder = 1;
+    group.add(mossBand);
+  }
+
+  if (kind === 'shop') {
+    const lowerDamp = new THREE.Mesh(new THREE.PlaneGeometry(8.7, .38), dampMat);
+    lowerDamp.position.set(0, .54, 2.966);
+    lowerDamp.renderOrder = 1;
+    group.add(lowerDamp);
+
+    const rustMat = new THREE.MeshStandardMaterial({
+      color: 0x80563b,
+      roughness: .96,
+      transparent: true,
+      opacity: .44,
+      depthWrite: false,
+    });
+    for (let index = 0; index < 5; index++) {
+      const streak = new THREE.Mesh(
+        new THREE.PlaneGeometry(.045 + random() * .055, .55 + random() * .72),
+        rustMat
+      );
+      streak.position.set(-1.8 + random() * 3.6, 1.18 + random() * 1.04, 3.027);
+      streak.rotation.z = (random() - .5) * .035;
+      streak.renderOrder = 2;
+      group.add(streak);
+    }
+
+    for (let index = 0; index < 2; index++) {
+      const wallPatch = new THREE.Mesh(new THREE.CircleGeometry(.50 + random() * .35, 12), dampMat);
+      wallPatch.scale.set(.85 + random() * .65, .38 + random() * .34, 1);
+      wallPatch.position.set((index ? 1 : -1) * (3.0 + random() * .7), 1.0 + random() * .6, 2.928);
+      wallPatch.renderOrder = 1;
+      group.add(wallPatch);
+    }
+  }
+}
+
 function addHouse(scene, x, z, wallColor, roofColor) {
   addBoxCollider(x, z, 4.45, 3.95, 'house');
   const group = new THREE.Group();
@@ -5100,11 +5207,19 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   const ridge = new THREE.Mesh(new THREE.BoxGeometry(9.7, .22, .32), new THREE.MeshStandardMaterial({ color: 0x713a2e, roughness: 1 }));
   ridge.position.y = 6.75;
   group.add(roofA, roofB, ridge);
+  const tileMaterials = [
+    new THREE.MeshStandardMaterial({ color: 0xb46244, roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: 0xa9543d, roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: 0xc06d4d, roughness: 1 }),
+  ];
+  let tileIndex = 0;
   for (let xTile = -4.15; xTile <= 4.15; xTile += 1.18) {
-    const tile = new THREE.Mesh(new THREE.BoxGeometry(.88, .07, 4.45), new THREE.MeshStandardMaterial({ color: 0xb46244, roughness: 1 }));
+    const tileSeed = Math.abs(Math.round(x * 11 + z * 17 + tileIndex * 7));
+    const tile = new THREE.Mesh(new THREE.BoxGeometry(.88, .07, 4.45), tileMaterials[tileSeed % tileMaterials.length]);
     tile.rotation.x = -.52;
     tile.position.set(xTile, 5.71, 1.39);
     group.add(tile);
+    tileIndex++;
   }
 
   const skirting = new THREE.Mesh(
@@ -5223,6 +5338,7 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   );
   roofShadow.position.set(0, 4.92, 3.66);
   group.add(roofShadow);
+  addBuildingWeathering(group, 'house', x * 31 + z * 47);
   group.position.set(x, 0, z);
   scene.add(group);
 }
@@ -5310,6 +5426,7 @@ function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ
   shopReflection.renderOrder = 2;
   wetReflectionMaterials.push(shopReflectionMaterial);
   group.add(shopLamp, shopLight, shopReflection);
+  addBuildingWeathering(group, 'shop', x * 43 + z * 29);
   group.position.set(x, 0, z);
   scene.add(group);
 }
