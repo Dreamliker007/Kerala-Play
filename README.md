@@ -454,3 +454,14 @@ Ambient traffic also drives more cautiously as rain strengthens. Bikes reduce sp
 Brake lights now respond to real ambient deceleration rather than only near-stop states, so approaching signals, traffic, pedestrians and wet-weather slowing are easier to read.
 
 These changes affect local ambient traffic only. Player vehicle physics, server-authoritative movement, traction, braking, economy, backend/database and Supabase behavior are unchanged.
+
+
+## Dynamic Shadow + Contact Depth Realism (V95)
+
+V95 closes a High-quality rendering gap for objects that can be created after the atmosphere renderer has already applied its scene-wide quality pass.
+
+A shared dynamic-quality helper now applies consistent cast/receive-shadow rules and material dithering to replacement player avatars, remote multiplayer avatars, job/personal vehicle visuals, moving traffic, parked vehicles, villagers and ambient animals. Transparent/contact-shadow meshes are intentionally excluded from shadow casting.
+
+Villagers, remote players and village animals gain lightweight elliptical contact shadows at ground level. The local player's existing contact shadow now participates in the same system. Contact-shadow opacity reacts to daylight, overcast and rain so objects keep useful grounding without looking like dark stickers during monsoon/night conditions.
+
+This is a rendering-only depth pass. It does not add collision geometry, change sun shadow resolution, alter player/server movement, traffic authority, economy, backend/database or Supabase behavior.
