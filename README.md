@@ -219,3 +219,14 @@ Changes include richer procedural grass/ground texture, textured asphalt, road s
 The visual pass deliberately keeps lighting and roadside detail lightweight: street lamps use emissive materials instead of many dynamic point lights, and vegetation detail uses instancing. High-quality mode can still use the existing shadow system, while lower graphics levels avoid the heaviest shadow cost.
 
 This is the first environment pass, not the final character/vehicle realism stage. Higher-detail human avatars, vehicle models and larger world assets can be upgraded separately so each change can be tested on Android performance.
+
+
+## Player + NPC Character Visual Upgrade (V74)
+
+V74 replaces the earlier toy-like human silhouette with a more proportioned lightweight procedural character model. Heads are more oval with a separate jaw/chin shape, smaller eyes, brows, ears, a shaped nose and subtler mouth. The torso, shoulders, waist and pelvis are reshaped, while arms and legs now use jointed upper/lower segments instead of single rigid limbs.
+
+Walking and running animation now includes elbow bend, knee lift, mild torso counter-rotation, gentler head movement and reduced vertical bobbing. Player, remote-player and NPC styling receives deterministic variation so characters are less visually identical while remaining stable between renders.
+
+Village NPCs now use different skin tones, clothing palettes and hair/face variants. Player name labels are smaller, more transparent and less dominant over the 3D world.
+
+The V74 pass deliberately stays procedural and lightweight rather than downloading high-poly character assets. This keeps the current web/Android bundle small and leaves a future path for optional rigged GLB characters after mobile performance and asset licensing are ready.

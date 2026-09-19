@@ -1,6 +1,6 @@
 #avatar-labels { position:fixed; inset:0; pointer-events:none; z-index:4; overflow:hidden; }
 #hud { z-index:10; }
-.avatar-name { position:absolute; top:0; left:0; border:1px solid #ffffff65; border-radius:20px; padding:5px 9px; color:white; background:#092d32d9; font:700 11px Arial,sans-serif; white-space:nowrap; pointer-events:auto; cursor:pointer; box-shadow:0 2px 8px #0003; touch-action:manipulation; }
+.avatar-name { position:absolute; top:0; left:0; border:1px solid rgba(255,255,255,.24); border-radius:999px; padding:3px 7px; color:rgba(255,255,255,.94); background:rgba(7,24,30,.68); font:700 9px/1.15 system-ui,sans-serif; white-space:nowrap; pointer-events:auto; cursor:pointer; box-shadow:0 3px 10px rgba(0,0,0,.16); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); touch-action:manipulation; }
 .avatar-name[hidden] { display:none; }
 #npc-profile { position:fixed; z-index:22; top:50%; left:50%; transform:translate(-50%,-50%); width:min(360px,calc(100vw - 32px)); padding:22px; border:1px solid #80bfa680; border-radius:18px; background:#10383ef5; color:white; box-shadow:0 10px 60px #0009; }
 #npc-profile .panel-close { float:right; padding:8px 12px; }
@@ -21,7 +21,7 @@ button:disabled { cursor:default; }
   #brand { font-size:13px; padding:8px 10px; }
   #profile-chip { font-size:10px; }
   #mission-card { width:155px; }
-  .avatar-name { font-size:10px; padding:4px 7px; }
+  .avatar-name { font-size:8px; padding:3px 6px; }
   #task-panel { max-height:72dvh; }
   #camera-note { display:none; }
 }

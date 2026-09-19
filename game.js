@@ -1096,8 +1096,9 @@ function synchronizePlayers(players) {
     }
     if (!remote) {
       remote = new THREE.Group();
+      const remoteSeed = avatarStyleSeed(data.id || data.username);
       const avatar = createHuman({ gender: data.gender, shirt: data.gender === 'female' ? 0xc57e93 : 0x569bb5,
-        trousers: 0x293b50, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x2c2825, accent: 0xe5bb51 });
+        trousers: 0x293b50, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x2c2825, accent: 0xe5bb51, styleSeed: remoteSeed });
       remote.add(avatar); remote.position.set(data.x, 0, data.z);
       remote.userData = {
         avatar, gender: data.gender, phase: 0,
@@ -1891,139 +1892,298 @@ function buildPlayer(player) {
   updateNameLabel(player, profile?.username || '', profile?.id);
 }
 
+function avatarStyleSeed(value) {
+  let hash = 2166136261;
+  for (const char of String(value || 'kerala')) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
 function replacePlayerAvatar(gender) {
   if (!playerRef) return;
   const oldAvatar = playerRef.userData.avatar;
   if (oldAvatar) { playerRef.remove(oldAvatar); disposeObject(oldAvatar); }
+  const styleSeed = avatarStyleSeed(profile?.id || profile?.username || gender);
   const avatarStyle = gender === 'female'
-    ? { gender: 'female', shirt: 0x1e8173, trousers: 0x273253, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x6c3c2c, accent: 0xe5bb51 }
-    : { gender: 'male', shirt: 0x2a759b, trousers: 0x26354a, skin: 0xa96d4c, hair: 0x171616, shoes: 0x27231f, accent: 0x6eaad0 };
+    ? { gender: 'female', shirt: 0x1e8173, trousers: 0x273253, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x6c3c2c, accent: 0xe5bb51, styleSeed }
+    : { gender: 'male', shirt: 0x2a759b, trousers: 0x26354a, skin: 0xa96d4c, hair: 0x171616, shoes: 0x27231f, accent: 0x6eaad0, styleSeed };
   const avatar = createHuman(avatarStyle);
   avatar.position.y = .04;
   playerRef.add(avatar);
   playerRef.userData.avatar = avatar;
 }
 
-function createHuman({ gender = 'male', shirt, trousers, skin, hair, shoes, accent = 0xffffff }) {
+function createHuman({ gender = 'male', shirt, trousers, skin, hair, shoes, accent = 0xffffff, styleSeed = 0 }) {
   const person = new THREE.Group();
   const isFemale = gender === 'female';
-  const shirtMat = new THREE.MeshStandardMaterial({ color: shirt, roughness: .82 });
-  const trouserMat = new THREE.MeshStandardMaterial({ color: trousers, roughness: .9 });
-  const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: .88 });
-  const hairMat = new THREE.MeshStandardMaterial({ color: hair, roughness: 1 });
-  const shoeMat = new THREE.MeshStandardMaterial({ color: shoes, roughness: .95 });
-  const accentMat = new THREE.MeshStandardMaterial({ color: accent, roughness: .8 });
-  const white = new THREE.MeshStandardMaterial({ color: 0xf6f5ec, roughness: .5 });
-  const eye = new THREE.MeshStandardMaterial({ color: 0x251b17, roughness: .55 });
-  const mouthMat = new THREE.MeshStandardMaterial({ color: 0x7d3734, roughness: .65 });
+  const seed = Math.abs(Number(styleSeed) || 0) % 7;
 
-  const hips = new THREE.Mesh(new THREE.CylinderGeometry(isFemale ? .30 : .28, isFemale ? .33 : .31, .27, 10), trouserMat);
-  hips.position.y = .94;
-  person.add(hips);
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(isFemale ? .32 : .34, isFemale ? .58 : .62, 7, 12), shirtMat);
-  torso.scale.set(isFemale ? .94 : 1, 1.08, .82);
-  torso.position.y = 1.37;
-  person.add(torso);
-  if (isFemale) {
-    const kurta = new THREE.Mesh(new THREE.BoxGeometry(.67, .75, .40), shirtMat);
-    kurta.position.set(0, 1.30, .01);
-    const hem = new THREE.Mesh(new THREE.CylinderGeometry(.39, .27, .55, 12), accentMat);
-    hem.position.set(0, .92, .01);
-    const scarf = new THREE.Mesh(new THREE.BoxGeometry(.10, .82, .46), accentMat);
-    scarf.position.set(.30, 1.37, -.03);
-    person.add(kurta, hem, scarf);
-  } else {
-    const belt = new THREE.Mesh(new THREE.BoxGeometry(.60, .08, .38), accentMat);
-    belt.position.y = 1.00;
-    person.add(belt);
-  }
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(.12, .13, .18, 9), skinMat);
-  neck.position.y = 1.87;
-  person.add(neck);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(.265, 14, 11), skinMat);
-  head.scale.set(.88, 1.08, .92);
-  head.position.y = 2.1;
-  person.add(head);
-  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(.277, 14, 10, 0, Math.PI * 2, 0, Math.PI * .55), hairMat);
-  hairCap.scale.set(.9, 1.08, .95);
-  hairCap.position.y = 2.19;
-  person.add(hairCap);
-  if (isFemale) {
-    const hairBack = new THREE.Mesh(new THREE.CapsuleGeometry(.18, .54, 5, 10), hairMat);
-    hairBack.position.set(0, 1.93, -.16);
-    hairBack.scale.set(1.12, 1, .45);
-    const hairLeft = new THREE.Mesh(new THREE.CapsuleGeometry(.075, .38, 5, 8), hairMat);
-    const hairRight = hairLeft.clone();
-    hairLeft.position.set(-.21, 1.99, -.02);
-    hairRight.position.set(.21, 1.99, -.02);
-    person.add(hairBack, hairLeft, hairRight);
-  }
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(.035, 8, 7), skinMat);
-  nose.scale.set(.75, 1.1, 1.3);
-  nose.position.set(0, 2.09, .245);
-  person.add(nose);
-  [-.095, .095].forEach(x => {
-    const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(.045, 8, 7), white);
-    eyeWhite.scale.z = .45;
-    eyeWhite.position.set(x, 2.16, .224);
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(.02, 7, 6), eye);
-    pupil.position.set(x, 2.16, .25);
-    person.add(eyeWhite, pupil);
-  });
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(.09, .018, .012), mouthMat);
-  mouth.position.set(0, 2.0, .25);
-  person.add(mouth);
+  const shirtMat = new THREE.MeshStandardMaterial({ color: shirt, roughness: .78 });
+  const trouserMat = new THREE.MeshStandardMaterial({ color: trousers, roughness: .88 });
+  const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: .84 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: hair, roughness: .96 });
+  const shoeMat = new THREE.MeshStandardMaterial({ color: shoes, roughness: .92 });
+  const accentMat = new THREE.MeshStandardMaterial({ color: accent, roughness: .74 });
+  const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf2eee6, roughness: .48 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x261a15, roughness: .48 });
+  const browMat = new THREE.MeshStandardMaterial({ color: hair, roughness: .92 });
+  const mouthMat = new THREE.MeshStandardMaterial({ color: isFemale ? 0x874a49 : 0x6f3d38, roughness: .62 });
 
   const parts = {};
-  [['leftArm', -.39, -.10], ['rightArm', .39, .10]].forEach(([name, x, tilt]) => {
-    const pivot = new THREE.Group();
-    pivot.name = name;
-    pivot.position.set(x, 1.61, 0);
-    pivot.rotation.z = tilt;
-    const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(.115, isFemale ? .31 : .25, 5, 9), shirtMat);
-    sleeve.position.y = isFemale ? -.19 : -.16;
-    const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(.088, .28, 5, 9), skinMat);
-    forearm.position.y = -.47;
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(.1, 9, 8), skinMat);
-    hand.position.y = -.67;
-    pivot.add(sleeve, forearm, hand);
-    person.add(pivot);
-    parts[name] = pivot;
+
+  // More natural pelvis / torso silhouette while staying lightweight.
+  const hips = new THREE.Mesh(
+    new THREE.CylinderGeometry(isFemale ? .29 : .30, isFemale ? .32 : .33, .25, 12),
+    trouserMat
+  );
+  hips.position.y = .91;
+  hips.scale.z = .78;
+
+  const waist = new THREE.Mesh(
+    new THREE.CylinderGeometry(isFemale ? .255 : .28, isFemale ? .29 : .31, .28, 12),
+    shirtMat
+  );
+  waist.position.y = 1.11;
+  waist.scale.z = .77;
+
+  const torso = new THREE.Mesh(
+    new THREE.CapsuleGeometry(isFemale ? .29 : .31, isFemale ? .52 : .55, 7, 12),
+    shirtMat
+  );
+  torso.scale.set(isFemale ? .94 : 1.04, 1.05, .74);
+  torso.position.y = 1.43;
+
+  const shoulderShape = new THREE.Mesh(new THREE.SphereGeometry(.34, 12, 9), shirtMat);
+  shoulderShape.scale.set(isFemale ? 1.05 : 1.18, .48, .70);
+  shoulderShape.position.y = 1.66;
+
+  person.add(hips, waist, torso, shoulderShape);
+  parts.torso = torso;
+
+  if (isFemale) {
+    const kurtaHem = new THREE.Mesh(new THREE.CylinderGeometry(.355, .285, .52, 12), shirtMat);
+    kurtaHem.position.set(0, 1.02, .005);
+    kurtaHem.scale.z = .74;
+
+    const scarfFront = new THREE.Mesh(new THREE.BoxGeometry(.085, .72, .035), accentMat);
+    scarfFront.position.set(seed % 2 ? -.22 : .22, 1.42, .255);
+    scarfFront.rotation.z = seed % 2 ? -.08 : .08;
+
+    const scarfBack = new THREE.Mesh(new THREE.BoxGeometry(.09, .68, .035), accentMat);
+    scarfBack.position.set(seed % 2 ? .21 : -.21, 1.42, -.245);
+    scarfBack.rotation.z = seed % 2 ? .08 : -.08;
+
+    person.add(kurtaHem, scarfFront, scarfBack);
+  } else {
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(.57, .065, .34), accentMat);
+    belt.position.set(0, 1.00, .015);
+    person.add(belt);
+
+    if (seed % 2 === 0) {
+      for (let y = 1.22; y <= 1.58; y += .12) {
+        const button = new THREE.Mesh(new THREE.SphereGeometry(.014, 6, 5), accentMat);
+        button.position.set(0, y, .245);
+        person.add(button);
+      }
+    }
+  }
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(.105, .12, .18, 10), skinMat);
+  neck.position.y = 1.89;
+  person.add(neck);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.245, 16, 12), skinMat);
+  head.scale.set(.86, 1.12, .90);
+  head.position.y = 2.12;
+  person.add(head);
+  parts.head = head;
+
+  // Subtle jaw/chin shape reduces the spherical toy look.
+  const jaw = new THREE.Mesh(new THREE.SphereGeometry(.205, 14, 10), skinMat);
+  jaw.scale.set(.91, .70, .88);
+  jaw.position.set(0, 2.025, .018);
+  person.add(jaw);
+
+  const hairCap = new THREE.Mesh(
+    new THREE.SphereGeometry(.255, 16, 11, 0, Math.PI * 2, 0, Math.PI * (seed % 3 === 0 ? .58 : .52)),
+    hairMat
+  );
+  hairCap.scale.set(.91, 1.07, .94);
+  hairCap.position.y = 2.205;
+  person.add(hairCap);
+
+  if (isFemale) {
+    const hairBack = new THREE.Mesh(new THREE.CapsuleGeometry(.155, seed % 3 === 0 ? .58 : .48, 5, 10), hairMat);
+    hairBack.position.set(0, 1.95, -.15);
+    hairBack.scale.set(1.08, 1, .48);
+    person.add(hairBack);
+
+    if (seed % 2 === 0) {
+      const braid = new THREE.Mesh(new THREE.CapsuleGeometry(.055, .48, 4, 8), hairMat);
+      braid.position.set(.08, 1.70, -.17);
+      braid.rotation.z = -.08;
+      person.add(braid);
+    }
+  } else {
+    const backHair = new THREE.Mesh(new THREE.SphereGeometry(.19, 12, 9), hairMat);
+    backHair.scale.set(1.02, .68, .58);
+    backHair.position.set(0, 2.13, -.17);
+    person.add(backHair);
+
+    if (seed % 3 === 1) {
+      const fringe = new THREE.Mesh(new THREE.BoxGeometry(.27, .07, .07), hairMat);
+      fringe.position.set(-.03, 2.26, .205);
+      fringe.rotation.z = -.10;
+      person.add(fringe);
+    }
+  }
+
+  // Ears.
+  for (const x of [-.226, .226]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(.042, 8, 6), skinMat);
+    ear.scale.set(.62, 1, .52);
+    ear.position.set(x, 2.105, .002);
+    person.add(ear);
+  }
+
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(.031, .082, 7), skinMat);
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, 2.105, .252);
+  person.add(nose);
+
+  for (const x of [-.085, .085]) {
+    const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(.035, 8, 6), eyeWhiteMat);
+    eyeWhite.scale.set(1.0, .64, .34);
+    eyeWhite.position.set(x, 2.155, .232);
+
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(.014, 7, 5), eyeMat);
+    pupil.scale.z = .55;
+    pupil.position.set(x, 2.155, .257);
+
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(.075, .014, .014), browMat);
+    brow.position.set(x, 2.208, .238);
+    brow.rotation.z = x < 0 ? -.05 : .05;
+    person.add(eyeWhite, pupil, brow);
+  }
+
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(.082, .014, .012), mouthMat);
+  mouth.position.set(0, 2.015, .245);
+  mouth.rotation.z = seed % 2 ? .015 : -.015;
+  person.add(mouth);
+
+  // Jointed arms with upper/lower segments for smoother motion.
+  [['leftArm', -.365, -.055], ['rightArm', .365, .055]].forEach(([name, x, restingTilt]) => {
+    const shoulder = new THREE.Group();
+    shoulder.name = name;
+    shoulder.position.set(x, 1.62, 0);
+    shoulder.rotation.z = restingTilt;
+
+    const upperArm = new THREE.Mesh(
+      new THREE.CapsuleGeometry(isFemale ? .092 : .102, .255, 5, 9),
+      shirtMat
+    );
+    upperArm.position.y = -.205;
+
+    const elbow = new THREE.Group();
+    elbow.position.y = -.42;
+
+    const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(.077, .245, 5, 9), skinMat);
+    forearm.position.y = -.18;
+
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(.083, 9, 7), skinMat);
+    hand.scale.set(.88, 1.12, .72);
+    hand.position.y = -.38;
+
+    elbow.add(forearm, hand);
+    shoulder.add(upperArm, elbow);
+    person.add(shoulder);
+
+    parts[name] = shoulder;
+    parts[name === 'leftArm' ? 'leftElbow' : 'rightElbow'] = elbow;
   });
-  [['leftLeg', -.15], ['rightLeg', .15]].forEach(([name, x]) => {
-    const pivot = new THREE.Group();
-    pivot.name = name;
-    pivot.position.set(x, .9, 0);
-    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(.13, .58, 5, 9), trouserMat);
-    leg.position.y = -.38;
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(.2, .14, .37), shoeMat);
-    foot.position.set(0, -.72, .1);
-    pivot.add(leg, foot);
-    person.add(pivot);
-    parts[name] = pivot;
+
+  // Jointed legs give a softer walk than one rigid capsule per side.
+  [['leftLeg', -.14], ['rightLeg', .14]].forEach(([name, x]) => {
+    const hip = new THREE.Group();
+    hip.name = name;
+    hip.position.set(x, .91, 0);
+
+    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(.115, .34, 5, 9), trouserMat);
+    thigh.position.y = -.25;
+
+    const knee = new THREE.Group();
+    knee.position.y = -.48;
+
+    const shin = new THREE.Mesh(new THREE.CapsuleGeometry(.10, .35, 5, 9), trouserMat);
+    shin.position.y = -.245;
+
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(.185, .12, .34), shoeMat);
+    foot.position.set(0, -.49, .095);
+    foot.rotation.x = -.03;
+
+    knee.add(shin, foot);
+    hip.add(thigh, knee);
+    person.add(hip);
+
+    parts[name] = hip;
+    parts[name === 'leftLeg' ? 'leftKnee' : 'rightKnee'] = knee;
   });
+
   person.userData.parts = parts;
-  person.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+  person.userData.gender = gender;
+  person.userData.styleSeed = seed;
+  person.traverse(object => {
+    if (object.isMesh) {
+      object.castShadow = true;
+      object.receiveShadow = true;
+    }
+  });
   return person;
 }
 
 function animatePlayer(player, phase, moving) {
-  const bob = moving ? Math.abs(Math.sin(phase)) * .035 : 0;
+  const amount = THREE.MathUtils.clamp(Number(moving) || 0, 0, 1);
+  const bob = amount ? Math.abs(Math.sin(phase * 2)) * .022 * amount : 0;
   const avatar = player.userData.avatar;
   if (!avatar) return;
   avatar.position.y = .04 + bob;
-  avatar.rotation.z = moving ? Math.sin(phase * .5) * .012 : 0;
-  player.userData.shadow?.scale.setScalar(1 - bob * 2.3);
-  animateHuman(avatar, phase, moving);
+  avatar.rotation.z = amount ? Math.sin(phase * .5) * .008 * amount : 0;
+  avatar.rotation.x = amount ? -.012 * amount : 0;
+  player.userData.shadow?.scale.setScalar(1 - bob * 1.8);
+  animateHuman(avatar, phase, amount);
 }
 
 function animateHuman(human, phase, moving) {
   const parts = human.userData.parts;
-  const swing = moving ? Math.sin(phase) * .52 : 0;
-  parts.leftArm.rotation.x = swing;
-  parts.rightArm.rotation.x = -swing;
-  parts.leftLeg.rotation.x = -swing;
-  parts.rightLeg.rotation.x = swing;
+  if (!parts) return;
+  const amount = THREE.MathUtils.clamp(Number(moving) || 0, 0, 1);
+  const stride = Math.sin(phase);
+  const opposite = Math.sin(phase + Math.PI);
+  const armSwing = stride * .48 * amount;
+  const legSwing = stride * .54 * amount;
+  const kneeLiftLeft = Math.max(0, opposite) * .28 * amount;
+  const kneeLiftRight = Math.max(0, stride) * .28 * amount;
+
+  parts.leftArm.rotation.x = armSwing;
+  parts.rightArm.rotation.x = -armSwing;
+  parts.leftLeg.rotation.x = -legSwing;
+  parts.rightLeg.rotation.x = legSwing;
+
+  if (parts.leftElbow) parts.leftElbow.rotation.x = .10 + Math.max(0, -stride) * .18 * amount;
+  if (parts.rightElbow) parts.rightElbow.rotation.x = .10 + Math.max(0, stride) * .18 * amount;
+  if (parts.leftKnee) parts.leftKnee.rotation.x = kneeLiftLeft;
+  if (parts.rightKnee) parts.rightKnee.rotation.x = kneeLiftRight;
+
+  if (parts.torso) {
+    parts.torso.rotation.y = Math.sin(phase * .5) * .025 * amount;
+    parts.torso.rotation.z = -stride * .012 * amount;
+  }
+  if (parts.head) {
+    parts.head.rotation.y = -Math.sin(phase * .5) * .018 * amount;
+    parts.head.rotation.z = stride * .006 * amount;
+  }
 }
 
 function updateVillagers(time) {
@@ -2807,12 +2967,22 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
   const index = villagers.length;
   const names = ['Anu', 'Vivek', 'Meera', 'Arun'];
   const gender = index % 2 ? 'male' : 'female';
+  const styles = [
+    { shirt: 0xa95762, trousers: 0x2e3447, skin: 0xa96d4c, hair: 0x171311, shoes: 0x372b26, accent: 0xd8aa55 },
+    { shirt: 0x557a54, trousers: 0x2a3440, skin: 0x915a40, hair: 0x171514, shoes: 0x292522, accent: 0xb88d4c },
+    { shirt: 0x4f728f, trousers: 0x303548, skin: 0xb97a57, hair: 0x221713, shoes: 0x3b2c24, accent: 0xc98f5a },
+    { shirt: 0x875d45, trousers: 0x293139, skin: 0x855137, hair: 0x141312, shoes: 0x292420, accent: 0xd0b26a },
+  ];
+  const style = styles[index % styles.length];
   const villager = new THREE.Group();
-  const human = createHuman({ gender, shirt: index % 2 ? 0x6d8d5a : 0xb36c70, trousers: 0x242b35, skin: 0x9d6245, hair: 0x161310, shoes: 0x2b2723 });
-  human.scale.setScalar(.9 * scale + .2); villager.add(human); villager.position.set(x, 0, z);
+  const human = createHuman({ gender, ...style, styleSeed: index + 1 });
+  human.scale.setScalar(.9 * scale + .2);
+  villager.add(human);
+  villager.position.set(x, 0, z);
   villager.userData = { human, startZ: z, distance, speed, offset, npc: true, name: names[index], gender };
   updateNameLabel(villager, names[index] + ' · Guide', 'npc-' + index);
-  villagers.push(villager); scene.add(villager);
+  villagers.push(villager);
+  scene.add(villager);
 }
 
 
