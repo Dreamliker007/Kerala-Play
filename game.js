@@ -595,7 +595,7 @@ function createJobVehicleVisual(kind, source = 'job') {
   return source === 'personal' ? createPersonalCarVehicle() : createTaxiVehicle();
 }
 
-function animateVehicleVisual(vehicle, delta, speed, steering = 0, speedRatio = 0) {
+function animateVehicleVisual(vehicle, delta, speed, steering = 0, speedRatio = 0, braking = false) {
   if (!vehicle) return;
   const wheelRadius = Math.max(.12, Number(vehicle.userData.wheelRadius || .24));
   const spin = speed / wheelRadius * delta;
@@ -612,11 +612,17 @@ function animateVehicleVisual(vehicle, delta, speed, steering = 0, speedRatio = 
   }
 
   const leanTarget = -THREE.MathUtils.clamp(steering, -1, 1) * Math.min(.06, .018 + speedRatio * .045);
-  const pitchTarget = Math.abs(speed) > .15
-    ? (speed >= 0 ? -.008 : .008) * Math.min(1, speedRatio + .2)
-    : 0;
+  const pitchTarget = braking && Math.abs(speed) > .3
+    ? .018 * Math.min(1, speedRatio + .25)
+    : Math.abs(speed) > .15
+      ? (speed >= 0 ? -.008 : .008) * Math.min(1, speedRatio + .2)
+      : 0;
   vehicle.rotation.z += (leanTarget - vehicle.rotation.z) * Math.min(1, delta * 7);
   vehicle.rotation.x += (pitchTarget - vehicle.rotation.x) * Math.min(1, delta * 6);
+
+  for (const material of vehicle.userData.tailLightMaterials || []) {
+    material.emissiveIntensity = braking ? .75 : .14;
+  }
 }
 
 function restorePlayerVehiclePose() {
@@ -1849,7 +1855,7 @@ try {
       }
 
       if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * (2.0 + speedRatio * 1.15));
-      animateVehicleVisual(jobVehicleVisual, delta, driveSpeed, smoothedDriveSteering, speedRatio);
+      animateVehicleVisual(jobVehicleVisual, delta, driveSpeed, smoothedDriveSteering, speedRatio, runHeld);
       animatePlayer(player, walkPhase, 0);
       if (mapAccumulator >= .12) { updateMapPlayer(player); mapAccumulator = 0; }
     } else {
@@ -2956,6 +2962,9 @@ function updateTraffic(delta) {
     config.progress = nextProgress;
     if (config.axis === 'z') vehicle.position.z = config.progress;
     else vehicle.position.x = config.progress;
+
+    const trafficRatio = baseSpeed > .01 ? Math.min(1, Math.abs(Number(config.currentSpeed)) / baseSpeed) : 0;
+    animateVehicleVisual(vehicle, delta, Number(config.currentSpeed) * Number(config.direction), 0, trafficRatio, targetSpeed < baseSpeed * .18);
   });
 }
 
