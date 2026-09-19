@@ -740,6 +740,58 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/garage' && request.method === 'GET') {
         send(response, 200, garageSummary(user)); return;
       }
+      if (path === '/api/traffic' && request.method === 'GET') {
+        send(response, 200, trafficSummary(user)); return;
+      }
+      if (path === '/api/traffic/checkpoint' && request.method === 'POST') {
+        limited(`traffic-checkpoint:${user.id}`, 20, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        const vehicle = state.garage.activeVehicleId ? state.garage.owned.find(item => item.id === state.garage.activeVehicleId) : null;
+        requireValue(vehicle && vehicle.entered, 409, 'Enter your personal vehicle before document inspection.');
+        const live = presence.get(user.id) || place(user);
+        requireValue(!live.moving, 409, 'Stop the vehicle at the checkpoint.');
+        requireValue(Math.hypot(live.x - TRAFFIC_CHECKPOINT.x, live.z - TRAFFIC_CHECKPOINT.z) <= TRAFFIC_CHECKPOINT.radius, 409, 'Move closer to the traffic checkpoint.');
+        const insurance = vehicleInsuranceSummary(vehicle);
+        let result = 'clear', challan = null, created = false;
+        if (!insurance.insuranceActive) {
+          const createdResult = createTrafficChallan(user, vehicle, 'insurance_expired', 'checkpoint');
+          challan = createdResult.challan;
+          created = createdResult.created;
+          result = 'challan';
+        }
+        vehicle.lastDocumentCheckAt = now();
+        dirty = true;
+        await persist();
+        send(response, 200, {
+          inspection: {
+            result,
+            registration: vehicle.registration,
+            rcValid: true,
+            insuranceActive: insurance.insuranceActive,
+            challan,
+            challanCreated: created,
+            checkedAt: vehicle.lastDocumentCheckAt,
+          },
+          traffic: trafficSummary(user),
+        }); return;
+      }
+      if (path === '/api/traffic/challan/pay' && request.method === 'POST') {
+        limited(`traffic-payment:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const state = jobStateFor(user);
+        const challan = state.traffic.challans.find(item => item.id === body.challanId);
+        requireValue(challan, 404, 'Traffic challan not found.');
+        requireValue(!Number(challan.paidAt), 409, 'This traffic challan is already paid.');
+        const amount = Number(challan.amount);
+        requireValue(Number.isInteger(amount) && amount > 0, 409, 'Traffic challan amount is invalid.');
+        const transaction = walletTransaction(user, -amount, 'traffic_challan', challan.description || 'Kerala Play traffic challan');
+        challan.paidAt = now();
+        challan.transactionId = transaction.id;
+        dirty = true;
+        await persist();
+        send(response, 200, { traffic: trafficSummary(user), wallet: walletSummary(user), challan: { ...challan, paid: true }, transaction }); return;
+      }
       if (path === '/api/garage/market' && request.method === 'GET') {
         send(response, 200, usedMarketSummary(user)); return;
       }
