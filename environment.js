@@ -732,7 +732,7 @@ function createSoundscape() {
 
     if (lightningStrikeId !== null && lightning > .30 && lightningStrikeId !== lastThunderStrikeId) {
       lastThunderStrikeId = lightningStrikeId;
-      thunderClap(lightningStrikeId, THREE.MathUtils.clamp(.55 + rain * .45, 0, 1));
+      thunderClap(lightningStrikeId, Math.max(0, Math.min(1, .55 + rain * .45)));
     }
 
     if (daylight > .42 && rain < .42 && now >= nextBird) {
