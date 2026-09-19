@@ -2681,9 +2681,28 @@ function addHouse(scene, x, z, wallColor, roofColor) {
     group.add(tile);
   }
 
+  const skirting = new THREE.Mesh(
+    new THREE.BoxGeometry(8.75, .42, 7.6),
+    new THREE.MeshStandardMaterial({ color: 0x8c7d69, roughness: 1 })
+  );
+  skirting.position.y = .62;
+  const facadeBand = new THREE.Mesh(
+    new THREE.BoxGeometry(8.25, .16, .11),
+    new THREE.MeshStandardMaterial({ color: 0xd9cbb5, roughness: .92 })
+  );
+  facadeBand.position.set(0, 4.22, 3.82);
+
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.35, 2.35, .12), darkWood);
   door.position.set(0, 1.6, 3.82);
-  group.add(door);
+  const porchLampMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffedc2,
+    emissive: 0xffc66c,
+    emissiveIntensity: .16,
+    roughness: .45,
+  });
+  const porchLamp = new THREE.Mesh(new THREE.SphereGeometry(.12, 10, 8), porchLampMaterial);
+  porchLamp.position.set(.95, 3.22, 3.98);
+  group.add(skirting, facadeBand, door, porchLamp);
   [[-2.75, 3.82], [2.75, 3.82]].forEach(([windowX, windowZ]) => {
     const frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.42, .13), darkWood);
     const glass = new THREE.Mesh(new THREE.BoxGeometry(1.45, 1.17, .145), windowMat);
@@ -2693,7 +2712,9 @@ function addHouse(scene, x, z, wallColor, roofColor) {
     glass.position.set(windowX, 2.65, windowZ + .01);
     vertical.position.set(windowX, 2.65, windowZ + .02);
     horizontal.position.set(windowX, 2.65, windowZ + .02);
-    group.add(frame, glass, vertical, horizontal);
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(1.82, .11, .28), new THREE.MeshStandardMaterial({ color: 0xd7cbb5, roughness: .95 }));
+    sill.position.set(windowX, 1.91, windowZ + .10);
+    group.add(frame, glass, vertical, horizontal, sill);
   });
   [-1.95, 1.95].forEach(columnX => {
     const column = new THREE.Mesh(new THREE.CylinderGeometry(.15, .18, 3.45, 10), new THREE.MeshStandardMaterial({ color: 0xf7f0df, roughness: .86 }));
