@@ -383,6 +383,12 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
 
     currentWeather = { daylight, hour, rain, overcast, weather, needsLights };
 
+    // High-quality exposure follows the world state instead of using one fixed
+    // value. Nights stay readable while monsoon scenes retain contrast.
+    const nightLift = (1 - daylight) * .10;
+    const stormPull = overcast * .055;
+    renderer.toneMappingExposure = THREE.MathUtils.clamp(1.18 + nightLift - stormPull, 1.10, 1.28);
+
     scene.background.copy(nightSky).lerp(daySky, daylight).lerp(duskSky, twilight).lerp(rainSky, overcast * .58);
     scene.fog.color.copy(scene.background);
     scene.fog.near = 48 + daylight * 14 - overcast * 10;
@@ -435,11 +441,11 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       sun.target.position.copy(target);
     }
     if (hemi) {
-      hemi.intensity = (.84 + daylight * 1.34) * (1 - overcast * .22);
-      hemi.color.copy(nightLightColor).lerp(daylightColor, daylight).lerp(rainSky, overcast * .35);
+      hemi.intensity = (.78 + daylight * 1.38) * (1 - overcast * .26);
+      hemi.color.copy(nightLightColor).lerp(daylightColor, daylight).lerp(rainSky, overcast * .40);
       hemi.groundColor.copy(groundNight).lerp(groundDay, daylight);
     }
-    moonLight.intensity = (1 - daylight) * .56 * (1 - overcast * .45);
+    moonLight.intensity = (1 - daylight) * .66 * (1 - overcast * .38) + overcast * (1 - daylight) * .08;
     moonLight.position.copy(target).addScaledVector(lightDirection, -70);
     moonLight.position.y = Math.max(15, moonLight.position.y);
     moonLight.target.position.copy(target);
