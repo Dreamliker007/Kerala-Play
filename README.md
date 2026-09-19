@@ -192,3 +192,12 @@ Account recovery now records a persistent security notification after a password
 The server also supports a controlled world-alert feed for weather notices, emergencies, scheduled events and general world announcements. Alerts can include severity, start/end times, an optional destination panel and optional Kerala-district targeting. Local and production servers can load this feed from the server-only `KP_WORLD_ALERTS_JSON` environment variable. The server validates and limits supplied alert data before it reaches players; world alerts use stable IDs so read state remains stable across refreshes and restarts.
 
 V70 reuses the existing V68 notification/read-state storage inside `job_state`, so no new Supabase migration is required. The world-alert configuration is operational input rather than player-controlled data.
+
+
+## Professional HUD + Driving Pedals (V71)
+
+Kerala Play now uses a cleaner glass-style gameplay HUD designed to keep the 3D world visually dominant. Mobile landscape uses a compact icon dock without large text labels, lighter profile/mission cards, a subtler movement joystick, consistent rounded panels and cleaner driving controls.
+
+World Sound, Graphics quality and Fullscreen are no longer permanent bottom-screen controls. They live inside a dedicated Settings panel opened from the HUD, freeing the lower centre of the screen for gameplay and vehicle status.
+
+Vehicles now have a dedicated on-screen ACCEL pedal while driving. The existing RUN control becomes BRAKE in a vehicle. Holding ACCEL supplies full forward throttle and uses a faster acceleration response, while steering remains available on the left joystick. The accelerator improves pickup but does not raise the road/condition/fuel-derived maximum speed, so existing server movement validation and Kerala Play traffic rules remain authoritative.

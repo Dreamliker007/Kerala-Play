@@ -8,6 +8,7 @@ const joystickBase = document.querySelector('#joystick-base');
 const joystickKnob = document.querySelector('#joystick-knob');
 const cameraZone = document.querySelector('#camera-zone');
 const runButton = document.querySelector('#run');
+const accelerateButton = document.querySelector('#accelerate');
 const worldInteract = document.querySelector('#world-interact');
 const vehicleAction = document.querySelector('#vehicle-action');
 const driveTools = document.querySelector('#drive-tools');
@@ -467,6 +468,8 @@ function updateDriveHud() {
   const driving = vehicleMode !== 'walk' && !!currentDriveVehicle()?.entered;
   if (driveTools) driveTools.hidden = !driving;
   if (roadStatus) roadStatus.hidden = !driving;
+  if (accelerateButton) accelerateButton.hidden = !driving;
+  if (runButton) runButton.classList.toggle('driving', driving);
   if (!driving || !playerRef) return;
   const zone = roadZoneAt(playerRef.position.x, playerRef.position.z);
   const speedKmh = Math.round(Math.abs(driveSpeed) * 6);
@@ -562,7 +565,15 @@ function restorePlayerVehiclePose() {
     avatar.position.set(0, .04, 0);
     avatar.rotation.set(0, 0, 0);
   }
-  if (runButton) runButton.textContent = 'RUN';
+  if (runButton) {
+    runButton.textContent = 'RUN';
+    runButton.classList.remove('driving');
+    runButton.setAttribute('aria-label', 'Hold to run');
+  }
+  if (accelerateButton) {
+    accelerateButton.hidden = true;
+    accelerateButton.classList.remove('active');
+  }
 }
 
 function clearJobVehicleVisual() {
@@ -623,6 +634,8 @@ function syncJobVehicleVisual() {
       }
     }
     runButton.textContent = 'BRAKE';
+    runButton.classList.add('driving');
+    runButton.setAttribute('aria-label', 'Hold to brake');
     applyVehicleHeadlights();
     updateDriveHud();
   } else {
@@ -1491,6 +1504,8 @@ try {
   let cameraPitch = .31;
   let runHeld = false;
   let runPointerId = null;
+  let acceleratorHeld = false;
+  let acceleratorPointerId = null;
   let walkPhase = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
   let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0;
@@ -1593,15 +1608,39 @@ try {
   runButton.addEventListener('pointerup', clearRun);
   runButton.addEventListener('pointercancel', clearRun);
   runButton.addEventListener('lostpointercapture', clearRun);
+
+  function setAccelerator(value) {
+    acceleratorHeld = !!value && vehicleMode !== 'walk';
+    accelerateButton?.classList.toggle('active', acceleratorHeld);
+  }
+  function clearAccelerator(event) {
+    if (!event || acceleratorPointerId === null || event.pointerId === acceleratorPointerId) {
+      acceleratorPointerId = null;
+      setAccelerator(false);
+    }
+  }
+  accelerateButton?.addEventListener('pointerdown', event => {
+    if (acceleratorPointerId !== null || vehicleMode === 'walk') return;
+    acceleratorPointerId = event.pointerId;
+    accelerateButton.setPointerCapture(event.pointerId);
+    setAccelerator(true);
+    event.preventDefault();
+  });
+  accelerateButton?.addEventListener('pointerup', clearAccelerator);
+  accelerateButton?.addEventListener('pointercancel', clearAccelerator);
+  accelerateButton?.addEventListener('lostpointercapture', clearAccelerator);
+
   window.addEventListener('pointerup', event => {
     if (event.pointerId === joystickPointerId) clearJoystick();
     if (event.pointerId === lookPointerId) clearLook(event);
     if (event.pointerId === runPointerId) clearRun(event);
+    if (event.pointerId === acceleratorPointerId) clearAccelerator(event);
   }, true);
   window.addEventListener('pointercancel', event => {
     if (event.pointerId === joystickPointerId) clearJoystick();
     if (event.pointerId === lookPointerId) clearLook(event);
     if (event.pointerId === runPointerId) clearRun(event);
+    if (event.pointerId === acceleratorPointerId) clearAccelerator(event);
   }, true);
 
   function typingIntoField(event) {
@@ -1612,6 +1651,8 @@ try {
     clearJoystick();
     setRun(false);
     runPointerId = null;
+    setAccelerator(false);
+    acceleratorPointerId = null;
     lookPointerId = null;
     driveSpeed = 0;
     walkVelocity.set(0, 0, 0);
@@ -1682,7 +1723,7 @@ try {
         rememberVehicleSafePose(player, vehicleRadius);
       }
 
-      const rawThrottle = paused ? 0 : THREE.MathUtils.clamp(-controlY, -1, 1);
+      const rawThrottle = paused ? 0 : (acceleratorHeld ? 1 : THREE.MathUtils.clamp(-controlY, -1, 1));
       const rawSteering = paused ? 0 : THREE.MathUtils.clamp(controlX, -1, 1);
       const throttleDeadzone = .18;
       const steeringDeadzone = .12;
@@ -1702,7 +1743,7 @@ try {
       const maxForward = (vehicleMode === 'bike' ? roadZone.bikeLimit : roadZone.taxiLimit) * conditionFactor * (fuel <= .05 ? 0 : 1);
       const maxReverse = fuel <= .05 ? 0 : Math.min(vehicleMode === 'bike' ? 2.6 : 2.4, Math.max(.8, maxForward * .48));
       const targetSpeed = runHeld ? 0 : (throttle >= 0 ? throttle * maxForward : throttle * maxReverse);
-      const response = runHeld ? 9 : (Math.abs(throttle) > .01 ? 2.25 : 3.6);
+      const response = runHeld ? 9 : (acceleratorHeld ? 4.8 : (Math.abs(throttle) > .01 ? 2.55 : 3.6));
       driveSpeed += (targetSpeed - driveSpeed) * Math.min(1, delta * response);
       if (Math.abs(driveSpeed) < .03) driveSpeed = 0;
       const speedRatio = maxForward > .01 ? Math.min(1, Math.abs(driveSpeed) / maxForward) : 0;
