@@ -535,3 +535,14 @@ V100.1 fixes a production startup crash introduced by the V99 mobile optimizatio
 A module-level `runtimeIsMobile` flag is now shared by the renderer and the weather-effect update helpers. The browser fallback text was also changed so the production site no longer tells players to run a local npm server.
 
 No gameplay, graphics-quality, movement, economy, backend/database or Supabase behavior changes.
+
+
+## V100.2 Runtime + Movement Hotfix
+
+V100.2 addresses two issues observed in the mobile production build after the V100/V100.1 rollout.
+
+The optional footstep visual pass is now isolated from the main game loop. If that cosmetic subsystem throws on a device, it disables itself for the session instead of interrupting camera/control updates. The global error banner also ignores non-JavaScript browser/resource notices, which prevents harmless browser events from appearing as a fatal game error.
+
+On-foot facing now uses a stronger turn response and immediately corrects large direction reversals. This prevents the avatar from visibly moving backward while the body is still slowly rotating toward the actual movement vector.
+
+No walking/running speed, server movement authority, collisions, economy, backend/database or Supabase behavior changes.
