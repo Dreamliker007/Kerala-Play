@@ -41,8 +41,8 @@
 .social-empty { padding:15px 4px; color:#b4cdc4; font-size:12px; line-height:1.6; }
 .people-tabs { gap:3px; margin:10px 0; padding:3px; }
 .people-tabs .social-button { flex:auto; font-size:10px; padding:7px 5px; }
-#people-panel, #chat-panel, #wallet-panel, #jobs-panel, #dm-panel { max-height:min(76dvh,620px); }
-#people-panel .social-button, #chat-panel .social-button, #wallet-panel .social-button, #jobs-panel .social-button { font-size:11px; }
+#people-panel, #chat-panel, #wallet-panel, #garage-panel, #jobs-panel, #dm-panel { max-height:min(76dvh,620px); }
+#people-panel .social-button, #chat-panel .social-button, #wallet-panel .social-button, #garage-panel .social-button, #jobs-panel .social-button { font-size:11px; }
 #dm-panel #dm-log { min-height:120px; max-height:27dvh; }
 #dm-panel .dm-message { max-width:95%; padding:9px; margin:5px 0 9px; background:#ffffff09; border-radius:8px; overflow-wrap:anywhere; }
 #dm-panel .dm-message.mine { margin-left:auto; background:#35654d66; }
@@ -57,7 +57,7 @@
 .social-live-audio audio { width:100%; height:34px; margin-top:8px; }
 #online-chip.social-offline i { background:#c6a978; box-shadow:none; }
 #auth-modal, #social-profile-modal { overscroll-behavior:contain; }
-@media (max-width:560px) { .social-card { padding:21px; border-radius:18px; } .social-card h1 { font-size:24px; } .social-card input, .social-card select, .social-card textarea, #people-panel input[type="search"], #dm-input { font-size:16px; } .social-fields-row { gap:8px; } #people-panel, #chat-panel, #wallet-panel, #jobs-panel, #dm-panel { width:min(340px,calc(100vw - 86px)); max-height:calc(100dvh - 40px - env(safe-area-inset-top)); } .social-stats strong { font-size:19px; } }
+@media (max-width:560px) { .social-card { padding:21px; border-radius:18px; } .social-card h1 { font-size:24px; } .social-card input, .social-card select, .social-card textarea, #people-panel input[type="search"], #dm-input { font-size:16px; } .social-fields-row { gap:8px; } #people-panel, #chat-panel, #wallet-panel, #garage-panel, #jobs-panel, #dm-panel { width:min(340px,calc(100vw - 86px)); max-height:calc(100dvh - 40px - env(safe-area-inset-top)); } .social-stats strong { font-size:19px; } }
 @media (max-height:580px) { .social-modal { align-items:flex-start; padding-top:12px; padding-bottom:12px; } .social-card { max-height:calc(100dvh - 24px); padding:19px; } .social-card h1 { font-size:21px; } .social-field { margin:10px 0; } .social-tabs { margin:10px 0; } }
 
 .wallet-balance-card { margin:10px 0 12px; padding:15px; border:1px solid #7ec69b55; border-radius:13px; background:linear-gradient(135deg,#1c6049,#12363c); }
@@ -95,3 +95,21 @@
 .job-card button.complete-ready { background:#b48323; }
 
 .job-mission-note { margin:7px 0 !important; padding:7px 8px; border-radius:8px; background:rgba(77,208,139,.10); color:#c9f7dc !important; border:1px solid rgba(101,230,155,.20); }
+
+
+/* Personal Garage V61 */
+#garage-list, #garage-catalog { display:grid; gap:8px; }
+.garage-card { padding:10px; border:1px solid rgba(255,255,255,.12); border-radius:11px; background:rgba(255,255,255,.045); }
+.garage-card.selected { border-color:#70d4a188; background:rgba(66,170,117,.09); }
+.garage-card.active { border-color:#e8cf6f88; background:rgba(215,182,67,.09); }
+.garage-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.garage-card h3 { margin:0; color:#eefcef; font-size:12px; }
+.garage-card .garage-price { color:#f8e28b; font-size:11px; font-weight:900; white-space:nowrap; }
+.garage-card p { margin:5px 0 7px; color:#b9d8cf; font-size:9px; line-height:1.4; }
+.garage-meta { display:flex; flex-wrap:wrap; gap:7px; margin:6px 0 8px; color:#9fbfb4; font-size:9px; }
+.garage-actions { display:flex; gap:6px; }
+.garage-actions button, #garage-catalog button { flex:1; border:0; border-radius:8px; padding:8px 9px; color:#fff; background:#25865c; font:inherit; font-size:10px; font-weight:900; cursor:pointer; }
+.garage-actions button.secondary { background:#304b55; }
+.garage-actions button.danger { background:#744438; }
+.garage-actions button:disabled, #garage-catalog button:disabled { opacity:.52; cursor:not-allowed; }
+#garage-refresh { grid-column:2; grid-row:1 / span 2; border:1px solid rgba(255,255,255,.17); border-radius:8px; padding:6px 8px; color:#fff; background:#283f48; font:inherit; font-size:10px; font-weight:800; cursor:pointer; }

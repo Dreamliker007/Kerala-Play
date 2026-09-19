@@ -73,6 +73,7 @@ let selectedLandmark = null;
 let mapLabelsVisible = false;
 let activeDmContact = null;
 let activeJobMission = null;
+let garageSnapshot = null;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
@@ -277,7 +278,7 @@ function addServiceGarage(scene, x, z) {
 }
 
 function nearestVehicleStation() {
-  const vehicle = activeJobMission?.vehicle;
+  const vehicle = currentDriveVehicle();
   if (!playerRef || !vehicle?.entered || !vehicle.stations) return null;
   for (const [action, station] of Object.entries(vehicle.stations)) {
     const distance = Math.hypot(playerRef.position.x - Number(station.x), playerRef.position.z - Number(station.z));
@@ -287,16 +288,25 @@ function nearestVehicleStation() {
 }
 
 async function reportVehicleImpact(speed) {
-  const active = activeJobMission;
-  if (!active?.vehicle?.entered || performance.now() - lastImpactReportAt < 1200 || speed < 1.4) return;
+  const vehicle = currentDriveVehicle();
+  const source = currentVehicleSource();
+  if (!vehicle?.entered || !source || performance.now() - lastImpactReportAt < 1200 || speed < 1.4) return;
   lastImpactReportAt = performance.now();
   const severity = speed >= 5.4 ? 3 : speed >= 3.2 ? 2 : 1;
   try {
-    const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle/impact`, { taskId: active.taskId, severity });
-    if (result?.vehicle && activeJobMission?.taskId === active.taskId) {
-      activeJobMission.vehicle = { ...activeJobMission.vehicle, ...result.vehicle };
-      updateDriveHud();
+    let result;
+    if (source === 'personal') {
+      result = await api('/api/garage/vehicle/impact', { vehicleId: vehicle.vehicleId, severity });
+      if (result?.garage) {
+        garageSnapshot = result.garage;
+        window.dispatchEvent(new CustomEvent('kerala-garage-state-local', { detail: garageSnapshot }));
+      }
+    } else {
+      const active = activeJobMission;
+      result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle/impact`, { taskId: active.taskId, severity });
+      if (result?.vehicle && activeJobMission?.taskId === active.taskId) activeJobMission.vehicle = { ...activeJobMission.vehicle, ...result.vehicle };
     }
+    updateDriveHud();
   } catch (error) {
     if (error.status !== 409) console.warn('Vehicle impact report failed', error);
   }
@@ -373,14 +383,14 @@ function toggleVehicleHeadlights() {
 }
 
 function updateDriveHud() {
-  const driving = vehicleMode !== 'walk' && !!activeJobMission?.vehicle?.entered;
+  const driving = vehicleMode !== 'walk' && !!currentDriveVehicle()?.entered;
   if (driveTools) driveTools.hidden = !driving;
   if (roadStatus) roadStatus.hidden = !driving;
   if (!driving || !playerRef) return;
   const zone = roadZoneAt(playerRef.position.x, playerRef.position.z);
   const speedKmh = Math.round(Math.abs(driveSpeed) * 6);
-  const fuel = Math.round(Number(activeJobMission?.vehicle?.fuel ?? 100));
-  const condition = Math.round(Number(activeJobMission?.vehicle?.condition ?? 100));
+  const fuel = Math.round(Number(currentDriveVehicle()?.fuel ?? 100));
+  const condition = Math.round(Number(currentDriveVehicle()?.condition ?? 100));
   const parkHint = Math.abs(driveSpeed) < .18 ? (zone.id === 'main' ? ' · STOPPED' : ' · PARK OK') : '';
   roadStatus.textContent = `${zone.label} · ${speedKmh}/${zone.displayLimit} km/h · FUEL ${fuel}% · COND ${condition}%${parkHint}`;
   roadStatus.classList.toggle('warning', fuel <= 15 || condition <= 35);
@@ -434,8 +444,25 @@ function createTaxiVehicle() {
   return taxi;
 }
 
-function createJobVehicleVisual(kind) {
-  return kind === 'bike' ? createDeliveryBike() : createTaxiVehicle();
+function createPersonalCarVehicle() {
+  const car = createRoadVehicle('car', 0x4d7da8);
+  car.scale.setScalar(.94);
+  return car;
+}
+
+function currentDriveVehicle() {
+  return activeJobMission?.vehicle || garageSnapshot?.activeVehicle || null;
+}
+
+function currentVehicleSource() {
+  if (activeJobMission?.vehicle) return 'job';
+  if (garageSnapshot?.activeVehicle) return 'personal';
+  return null;
+}
+
+function createJobVehicleVisual(kind, source = 'job') {
+  if (kind === 'bike') return createDeliveryBike();
+  return source === 'personal' ? createPersonalCarVehicle() : createTaxiVehicle();
 }
 
 function restorePlayerVehiclePose() {
@@ -475,14 +502,16 @@ function clearJobVehicleVisual() {
 
 function syncJobVehicleVisual() {
   if (!sceneRef || !playerRef) return;
-  const vehicle = activeJobMission?.vehicle;
-  const signature = vehicle ? [activeJobMission.taskId, vehicle.kind, vehicle.entered, vehicle.entered ? 'driving' : vehicle.x, vehicle.entered ? 'driving' : vehicle.z].join('|') : '';
+  const vehicle = currentDriveVehicle();
+  const source = currentVehicleSource();
+  const ownerKey = source === 'job' ? activeJobMission?.taskId : vehicle?.vehicleId;
+  const signature = vehicle ? [source, ownerKey, vehicle.kind, vehicle.entered, vehicle.entered ? 'driving' : vehicle.x, vehicle.entered ? 'driving' : vehicle.z].join('|') : '';
   if (signature === jobVehicleSignature) return;
   clearJobVehicleVisual();
   jobVehicleSignature = signature;
   if (!vehicle) return;
 
-  jobVehicleVisual = createJobVehicleVisual(vehicle.kind);
+  jobVehicleVisual = createJobVehicleVisual(vehicle.kind, source);
   if (vehicle.entered) {
     vehicleMode = vehicle.kind;
     driveSpeed = 0;
@@ -520,7 +549,7 @@ function updateVehicleAction() {
   vehicleAction.hidden = true;
   vehicleAction.disabled = false;
   vehicleAction.classList.remove('exit');
-  const vehicle = activeJobMission?.vehicle;
+  const vehicle = currentDriveVehicle();
   if (!profile || !playerRef || !vehicle) return;
 
   if (vehicle.entered) {
@@ -528,13 +557,15 @@ function updateVehicleAction() {
     vehicleAction.classList.add('exit');
     const moving = Math.abs(driveSpeed) > .8;
     vehicleAction.disabled = moving;
-    vehicleAction.textContent = moving ? 'STOP TO PARK' : `PARK ${vehicle.kind === 'bike' ? 'BIKE' : 'TAXI'}`;
+    const vehicleLabel = vehicle.kind === 'bike' ? 'BIKE' : (currentVehicleSource() === 'personal' ? 'CAR' : 'TAXI');
+    vehicleAction.textContent = moving ? 'STOP TO PARK' : `PARK ${vehicleLabel}`;
     return;
   }
   const distance = Math.hypot(Number(vehicle.x) - playerRef.position.x, Number(vehicle.z) - playerRef.position.z);
   if (distance <= Number(vehicle.radius || 4.5) + .35) {
     vehicleAction.hidden = false;
-    vehicleAction.textContent = `ENTER ${vehicle.kind === 'bike' ? 'BIKE' : 'TAXI'}`;
+    const vehicleLabel = vehicle.kind === 'bike' ? 'BIKE' : (currentVehicleSource() === 'personal' ? 'CAR' : 'TAXI');
+    vehicleAction.textContent = `ENTER ${vehicleLabel}`;
   }
 }
 
@@ -611,20 +642,24 @@ function updateWorldInteract() {
   worldInteract.disabled = false;
   worldInteract.dataset.mode = '';
   worldInteract.dataset.service = '';
-  if (!profile || !playerRef || !activeJobMission) return;
+  worldInteract.dataset.source = '';
+  if (!profile || !playerRef) return;
   const active = activeJobMission;
   const station = nearestVehicleStation();
   if (station && Math.abs(driveSpeed) < .18) {
-    const vehicle = active.vehicle;
+    const vehicle = currentDriveVehicle();
     const needed = station.action === 'refuel' ? Number(vehicle.fuel) < Number(vehicle.fuelMax || 100) - .5 : Number(vehicle.condition) < Number(vehicle.conditionMax || 100) - 1;
     if (needed) {
       worldInteract.hidden = false;
       worldInteract.dataset.mode = 'vehicle-service';
       worldInteract.dataset.service = station.action;
+      worldInteract.dataset.source = currentVehicleSource() || 'job';
       worldInteract.textContent = station.action === 'refuel' ? `REFUEL · FUEL ${Math.round(Number(vehicle.fuel))}%` : `REPAIR · COND ${Math.round(Number(vehicle.condition))}%`;
       return;
     }
   }
+
+  if (!active) return;
 
   if (active.phase === 'travel' && active.target) {
     if (active.vehicle && !active.vehicle.entered) return;
@@ -667,10 +702,10 @@ function animateJobMissionVisual(time) {
 }
 
 worldInteract?.addEventListener('click', () => {
-  if (!activeJobMission || worldInteract.disabled) return;
+  if (worldInteract.disabled) return;
   worldInteract.disabled = true;
   if (worldInteract.dataset.mode === 'vehicle-service') {
-    window.dispatchEvent(new CustomEvent('kerala-vehicle-service', { detail: { action: worldInteract.dataset.service } }));
+    window.dispatchEvent(new CustomEvent('kerala-vehicle-service', { detail: { action: worldInteract.dataset.service, source: worldInteract.dataset.source || 'job' } }));
   } else {
     window.dispatchEvent(new CustomEvent('kerala-job-interact'));
   }
@@ -678,10 +713,12 @@ worldInteract?.addEventListener('click', () => {
 });
 
 vehicleAction?.addEventListener('click', () => {
-  const vehicle = activeJobMission?.vehicle;
-  if (!vehicle || vehicleAction.disabled) return;
+  const vehicle = currentDriveVehicle();
+  const source = currentVehicleSource();
+  if (!vehicle || !source || vehicleAction.disabled) return;
   vehicleAction.disabled = true;
-  window.dispatchEvent(new CustomEvent('kerala-job-vehicle', { detail: { action: vehicle.entered ? 'exit' : 'enter' } }));
+  const action = vehicle.entered ? 'exit' : 'enter';
+  window.dispatchEvent(new CustomEvent(source === 'personal' ? 'kerala-personal-vehicle' : 'kerala-job-vehicle', { detail: { action } }));
   setTimeout(() => { if (vehicleAction && !vehicleAction.hidden) vehicleAction.disabled = false; }, 900);
 });
 
@@ -715,6 +752,13 @@ function applyJobMission(active) {
   }
 }
 window.addEventListener('kerala-job-mission', event => applyJobMission(event.detail));
+window.addEventListener('kerala-garage-state', event => {
+  garageSnapshot = event.detail || null;
+  syncJobVehicleVisual();
+  updateVehicleAction();
+  updateWorldInteract();
+  updateDriveHud();
+});
 
 window.addEventListener('error', event => {
   console.error(event.error || event.message);
@@ -964,8 +1008,9 @@ async function sendMovement(player, moving) {
     if (profile?.id !== userId) return;
     lastMovementMoving = moving;
     if (result.user) acceptUser(result.user);
-    if (result.vehicle && activeJobMission?.vehicle) {
-      activeJobMission.vehicle = { ...activeJobMission.vehicle, ...result.vehicle };
+    if (result.vehicle) {
+      if (result.vehicle.source === 'personal' && garageSnapshot?.activeVehicle) garageSnapshot.activeVehicle = { ...garageSnapshot.activeVehicle, ...result.vehicle };
+      else if (activeJobMission?.vehicle) activeJobMission.vehicle = { ...activeJobMission.vehicle, ...result.vehicle };
       updateDriveHud();
       if (Number(result.vehicle.fuel) <= 15 && performance.now() - lastFuelWarningAt > 12000) {
         lastFuelWarningAt = performance.now();
@@ -1490,9 +1535,10 @@ try {
       const throttle = Math.sign(rawThrottle) * Math.pow(throttleMagnitude, 1.8);
       const steering = Math.sign(rawSteering) * Math.pow(steeringMagnitude, 1.35);
       const roadZone = roadZoneAt(player.position.x, player.position.z);
-      const condition = Math.max(15, Math.min(100, Number(activeJobMission?.vehicle?.condition ?? 100)));
+      const driveVehicle = currentDriveVehicle();
+      const condition = Math.max(15, Math.min(100, Number(driveVehicle?.condition ?? 100)));
       const conditionFactor = .62 + .38 * (condition / 100);
-      const fuel = Math.max(0, Number(activeJobMission?.vehicle?.fuel ?? 100));
+      const fuel = Math.max(0, Number(driveVehicle?.fuel ?? 100));
       const maxForward = (vehicleMode === 'bike' ? roadZone.bikeLimit : roadZone.taxiLimit) * conditionFactor * (fuel <= .05 ? 0 : 1);
       const maxReverse = fuel <= .05 ? 0 : Math.min(vehicleMode === 'bike' ? 2.6 : 2.4, Math.max(.8, maxForward * .48));
       const targetSpeed = runHeld ? 0 : (throttle >= 0 ? throttle * maxForward : throttle * maxReverse);
