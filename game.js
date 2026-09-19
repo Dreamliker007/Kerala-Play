@@ -74,6 +74,8 @@ let mapLabelsVisible = false;
 let activeDmContact = null;
 let activeJobMission = null;
 let garageSnapshot = null;
+let trafficSnapshot = null;
+let trafficCheckpointVisual = null;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
@@ -258,6 +260,36 @@ function addFuelStation(scene, x, z) {
   group.position.set(x, 0, z);
   scene.add(group);
   addBoxCollider(x, z, 3.2, 2.2, 'fuel-station');
+}
+
+function addTrafficCheckpoint(scene, x, z) {
+  const group = new THREE.Group();
+  const boothBlue = new THREE.MeshStandardMaterial({ color: 0x315b84, roughness: .82 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xf0f2ef, roughness: .84 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x252b30, roughness: .92 });
+  const amber = new THREE.MeshStandardMaterial({ color: 0xffbd4f, emissive: 0x8a4a00, emissiveIntensity: .45, roughness: .6 });
+
+  const booth = new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.4, 1.5), boothBlue);
+  booth.position.set(.3, 1.2, 0);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.05, .18, 1.85), white);
+  roof.position.set(.3, 2.48, 0);
+  const window = new THREE.Mesh(new THREE.BoxGeometry(.9, .62, .06), dark);
+  window.position.set(.3, 1.55, .78);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(.12, 8, 6), amber);
+  beacon.position.set(.3, 2.72, 0);
+
+  const post = new THREE.Mesh(new THREE.BoxGeometry(.12, 1.6, .12), white);
+  post.position.set(-1.15, .8, 0);
+  const barrier = new THREE.Mesh(new THREE.BoxGeometry(2.5, .12, .12), new THREE.MeshStandardMaterial({ color: 0xe7e2d7, roughness: .8 }));
+  barrier.position.set(-2.25, 1.25, 0);
+  barrier.rotation.z = -.18;
+
+  group.add(booth, roof, window, beacon, post, barrier, missionTag('Traffic Check', '#23496f'));
+  group.position.set(x, 0, z);
+  scene.add(group);
+  addBoxCollider(x + .3, z, 1.0, .9, 'traffic-booth');
+  trafficCheckpointVisual = group;
+  return group;
 }
 
 function addServiceGarage(scene, x, z) {
@@ -1997,6 +2029,7 @@ function buildWorld(scene) {
   addBench(scene, -10, -10);
   addFuelStation(scene, 11, -12);
   addServiceGarage(scene, -36, -15);
+  addTrafficCheckpoint(scene, 5.4, 18);
   addPhotoVillager(scene, -6, -50, 11, .55, 0, .78);
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
   addPhotoVillager(scene, -9, 19, 8, .5, 4, .75);
