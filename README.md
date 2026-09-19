@@ -441,3 +441,16 @@ During heavy-rain/high-overcast windows, the shared weather system now produces 
 When World Sound is enabled, each visible strike schedules a delayed procedural thunder roll. The delay varies deterministically per strike to suggest distance, while a low-pass noise rumble and short low-frequency tones create the thunder without downloaded audio files. Sound-off users still get the visual storm effect.
 
 Lightning does not cast extra shadows and introduces no physics, damage, gameplay, backend, database, economy or Supabase changes.
+
+
+## Wet Traffic + Vehicle Weather Reactions (V94)
+
+V94 makes the local ambient traffic react visibly and behaviorally to the V92/V93 monsoon state.
+
+Moving cars, buses and auto-rickshaws now have animated windshield wipers that activate with rain intensity. All moving ambient vehicles gain lightweight tyre-spray particles, while automatic headlight road glow appears in darkness/overcast weather and becomes slightly more visible on wet roads.
+
+Ambient traffic also drives more cautiously as rain strengthens. Bikes reduce speed the most, followed by auto-rickshaws and cars, while buses use a smaller reduction. Existing traffic lights, zebra-crossing yields, bus stops, same-lane spacing and player-vehicle avoidance still take priority.
+
+Brake lights now respond to real ambient deceleration rather than only near-stop states, so approaching signals, traffic, pedestrians and wet-weather slowing are easier to read.
+
+These changes affect local ambient traffic only. Player vehicle physics, server-authoritative movement, traction, braking, economy, backend/database and Supabase behavior are unchanged.
