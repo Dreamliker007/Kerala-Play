@@ -1601,11 +1601,21 @@ social = initSocial({ onUser: acceptUser, onPlayers: players => { connectionRead
 
 try {
   const isMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
-  const renderer = new THREE.WebGLRenderer({ antialias: !isMobile, powerPreference: 'high-performance', alpha: false });
-  let renderScale = isMobile ? 0.72 : 1;
-  function applyRenderScale() { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? renderScale : 1.25)); renderer.setSize(window.innerWidth, window.innerHeight, false); }
+  // Keep MSAA available on mobile so the High preset can actually remove the
+  // jagged road/wire/vehicle edges seen in landscape playtests. Low/Balanced
+  // still control cost mainly through pixel ratio and disabled shadows.
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: 'high-performance',
+    alpha: false,
+    precision: 'highp',
+  });
+  let renderScale = isMobile ? 0.78 : 1;
+  function applyRenderScale() {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? renderScale : 1.25));
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+  }
   applyRenderScale();
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = false;
   document.body.prepend(renderer.domElement);
