@@ -341,17 +341,52 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { id: 'offroad', label: 'Off Road', limit: 20 };
   }
 
+  function licenceNumberFor(user) {
+    const suffix = String(randomInt(1, 1_000_000)).padStart(6, '0');
+    return `KPDL-${String(user.district || 'KL').slice(0, 3).toUpperCase()}-${suffix}`;
+  }
+
+  function drivingLicenceSummary(user) {
+    const state = jobStateFor(user);
+    const licence = state.traffic.licence;
+    const validUntil = Math.max(0, Number(licence.validUntil) || 0);
+    const active = licence.type !== 'none' && validUntil > now();
+    const remainingMs = Math.max(0, validUntil - now());
+    return {
+      type: licence.type,
+      label: licence.type === 'full' ? 'Full Licence' : licence.type === 'learner' ? 'Learner Permit' : 'No Licence',
+      number: licence.number || '',
+      issuedAt: Math.max(0, Number(licence.issuedAt) || 0),
+      validUntil,
+      active,
+      remainingMs,
+      holderName: user.displayName || user.firstName || user.username,
+      allowedKinds: active ? (licence.type === 'full' ? ['bike', 'taxi'] : ['bike']) : [],
+      canApplyLearner: licence.type === 'none',
+      canUpgradeFull: active && licence.type === 'learner',
+      canRenew: licence.type !== 'none',
+      costs: DRIVING_LICENCE_COSTS,
+    };
+  }
+
+  function licenceAllowsVehicle(user, kind) {
+    const licence = drivingLicenceSummary(user);
+    return licence.active && licence.allowedKinds.includes(kind);
+  }
+
   function createTrafficChallan(user, vehicle, kind, source, details = {}) {
     const amount = TRAFFIC_CHALLAN_AMOUNTS[kind];
     requireValue(Number.isInteger(amount) && amount > 0, 500, 'Traffic challan configuration is invalid.');
     const traffic = jobStateFor(user).traffic;
-    if (kind === 'insurance_expired') {
+    if (kind === 'insurance_expired' || kind === 'licence_invalid') {
       const existing = traffic.challans.find(challan => challan.vehicleId === vehicle.id && challan.kind === kind && !Number(challan.paidAt));
       if (existing) return { challan: existing, created: false };
     }
     const description = kind === 'insurance_expired'
       ? `Expired insurance · ${vehicle.registration}`
-      : `Speeding · ${vehicle.registration} · ${details.speedKmh || '?'} / ${details.limit || '?'} km/h`;
+      : kind === 'licence_invalid'
+        ? `Invalid driving licence · ${vehicle.registration}`
+        : `Speeding · ${vehicle.registration} · ${details.speedKmh || '?'} / ${details.limit || '?'} km/h`;
     const challan = {
       id: randomUUID(),
       vehicleId: vehicle.id,
@@ -391,6 +426,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const unpaid = challans.filter(challan => !challan.paid);
     return {
       checkpoint: TRAFFIC_CHECKPOINT,
+      licence: drivingLicenceSummary(user),
       documents,
       challans,
       unpaidCount: unpaid.length,
@@ -399,6 +435,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         title: 'Kerala Play Traffic Rules',
         insuranceExpiredFine: TRAFFIC_CHALLAN_AMOUNTS.insurance_expired,
         speedingFine: TRAFFIC_CHALLAN_AMOUNTS.speeding,
+        licenceInvalidFine: TRAFFIC_CHALLAN_AMOUNTS.licence_invalid,
       },
     };
   }
