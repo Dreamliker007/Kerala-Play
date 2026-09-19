@@ -5,13 +5,13 @@ import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createGameServer } from './server.mjs';
 
-async function setup(t) {
+async function setup(t, serverOptions = {}) {
   const dataDir = await mkdtemp(join(tmpdir(), 'kerala-play-test-'));
   let timestamp = Date.now();
   let server;
   let origin;
   async function boot() {
-    server = await createGameServer({ dataDir, now: () => timestamp });
+    server = await createGameServer({ ...serverOptions, dataDir, now: () => timestamp });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     origin = `http://127.0.0.1:${server.address().port}`;
   }
@@ -1084,4 +1084,75 @@ test('phone notifications persist events dedupe live reminders and support read 
   assert.ok(alerts.items.some(item => item.sourceKey === `salary:${starter.data.transaction.id}`));
   assert.ok(alerts.items.some(item => item.sourceKey === `upi:${upi.data.transferId}:received`));
   assert.ok(alerts.items.some(item => item.id === insurance.id));
+});
+
+
+test('phone social alerts cover follow requests, accepts and private messages', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  const aliceUser = await signup(alice, 'SocialAlertAlice');
+  const bobUser = await signup(bob, 'SocialAlertBob');
+
+  assert.equal((await alice(`/api/follows/${bobUser.id}`, { action: 'request' })).status, 200);
+  let bobAlerts = (await bob('/api/notifications')).data;
+  const requestAlert = bobAlerts.items.find(item => item.title === 'New follow request');
+  assert.ok(requestAlert);
+  assert.equal(requestAlert.kind, 'social');
+  assert.equal(requestAlert.target, 'people');
+  assert.match(requestAlert.message, /SocialAlertAlice/);
+
+  assert.equal((await bob(`/api/follows/${aliceUser.id}`, { action: 'accept' })).status, 200);
+  const aliceAlerts = (await alice('/api/notifications')).data;
+  const acceptedAlert = aliceAlerts.items.find(item => item.title === 'Follow request accepted');
+  assert.ok(acceptedAlert);
+  assert.equal(acceptedAlert.target, 'people');
+  assert.match(acceptedAlert.message, /SocialAlertBob/);
+
+  const message = await alice(`/api/messages/${bobUser.id}`, { body: 'Phone alert test' });
+  assert.equal(message.status, 201);
+  bobAlerts = (await bob('/api/notifications')).data;
+  const messageAlert = bobAlerts.items.find(item => item.sourceKey === `message:${message.data.message.id}`);
+  assert.ok(messageAlert);
+  assert.equal(messageAlert.title, 'New message');
+  assert.equal(messageAlert.target, 'people');
+});
+
+test('server-owned world alerts are filtered by time and district and keep read state', async t => {
+  const app = await setup(t, {
+    worldAlerts: [
+      {
+        id: 'ernakulam-rain-test',
+        kind: 'weather',
+        title: 'Heavy rain alert',
+        message: 'Use extra care on village roads.',
+        severity: 'warning',
+        districts: ['Ernakulam'],
+      },
+      {
+        id: 'kottayam-only-test',
+        kind: 'event',
+        title: 'Kottayam event',
+        message: 'District-only event.',
+        districts: ['Kottayam'],
+      },
+    ],
+  });
+  const alice = app.client();
+  await signup(alice, 'WorldAlertAlice');
+
+  let alerts = (await alice('/api/notifications')).data;
+  const rain = alerts.items.find(item => item.id === 'world:ernakulam-rain-test');
+  assert.ok(rain);
+  assert.equal(rain.kind, 'weather');
+  assert.equal(rain.severity, 'warning');
+  assert.equal(rain.live, true);
+  assert.equal(alerts.items.some(item => item.id === 'world:kottayam-only-test'), false);
+
+  assert.equal((await alice('/api/notifications/read', { id: rain.id })).status, 200);
+  alerts = (await alice('/api/notifications')).data;
+  assert.equal(alerts.items.find(item => item.id === rain.id).read, true);
+
+  await app.restart();
+  assert.equal((await alice('/api/auth/login', { identifier: 'WorldAlertAlice', password: 'test-password-2026' })).status, 200);
+  alerts = (await alice('/api/notifications')).data;
+  assert.equal(alerts.items.find(item => item.id === rain.id).read, true);
 });
