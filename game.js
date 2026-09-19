@@ -80,6 +80,11 @@ let jobVehicleVisual = null;
 let jobVehicleSignature = '';
 let vehicleMode = 'walk';
 let driveSpeed = 0;
+const vehicleSafePosition = new THREE.Vector3();
+let vehicleSafeRotation = 0;
+let vehicleSafeReady = false;
+let vehicleCollisionFrames = 0;
+let lastVehicleRecoveryNotice = 0;
 let headlightsOn = false;
 let hornReadyAt = 0;
 let hornPulseUntil = 0;
@@ -1755,6 +1760,21 @@ function addCircleCollider(x, z, radius, kind = 'obstacle') {
   staticColliders.push({ type: 'circle', x, z, radius, kind });
 }
 
+function circleHitsBox(x, z, radius, boxX, boxZ, halfWidth, halfDepth) {
+  const closestX = THREE.MathUtils.clamp(x, boxX - halfWidth, boxX + halfWidth);
+  const closestZ = THREE.MathUtils.clamp(z, boxZ - halfDepth, boxZ + halfDepth);
+  return (x - closestX) ** 2 + (z - closestZ) ** 2 < radius * radius;
+}
+
+function trafficFootprint(config) {
+  const bus = config?.kind === 'bus';
+  const halfWidth = bus ? 1.22 : .86;
+  const halfLength = bus ? 2.72 : 1.66;
+  return config?.axis === 'x'
+    ? { halfWidth: halfLength, halfDepth: halfWidth }
+    : { halfWidth, halfDepth: halfLength };
+}
+
 function positionBlocked(x, z, radius = .45) {
   for (const collider of staticColliders) {
     if (collider.type === 'circle') {
@@ -1762,18 +1782,15 @@ function positionBlocked(x, z, radius = .45) {
       if ((x - collider.x) ** 2 + (z - collider.z) ** 2 < limit * limit) return true;
       continue;
     }
-    const closestX = THREE.MathUtils.clamp(x, collider.x - collider.halfWidth, collider.x + collider.halfWidth);
-    const closestZ = THREE.MathUtils.clamp(z, collider.z - collider.halfDepth, collider.z + collider.halfDepth);
-    if ((x - closestX) ** 2 + (z - closestZ) ** 2 < radius * radius) return true;
+    if (circleHitsBox(x, z, radius, collider.x, collider.z, collider.halfWidth, collider.halfDepth)) return true;
   }
 
   for (const vehicle of traffic) {
     if (!vehicle?.visible) continue;
     const config = vehicle.userData?.traffic;
     if (!config) continue;
-    const trafficRadius = config.kind === 'bus' ? 1.85 : 1.08;
-    const limit = trafficRadius + radius;
-    if ((x - vehicle.position.x) ** 2 + (z - vehicle.position.z) ** 2 < limit * limit) return true;
+    const footprint = trafficFootprint(config);
+    if (circleHitsBox(x, z, radius, vehicle.position.x, vehicle.position.z, footprint.halfWidth, footprint.halfDepth)) return true;
   }
   return false;
 }
@@ -1781,14 +1798,71 @@ function positionBlocked(x, z, radius = .45) {
 function moveWithCollision(object, dx, dz, radius) {
   if (!object || (!dx && !dz)) return false;
   let collided = false;
-  const nextX = THREE.MathUtils.clamp(object.position.x + dx, -110, 110);
-  if (!positionBlocked(nextX, object.position.z, radius)) object.position.x = nextX;
-  else collided = true;
+  const distance = Math.hypot(dx, dz);
+  const maxStep = Math.max(.10, Math.min(.28, radius * .38));
+  const steps = Math.max(1, Math.ceil(distance / maxStep));
+  const stepX = dx / steps;
+  const stepZ = dz / steps;
 
-  const nextZ = THREE.MathUtils.clamp(object.position.z + dz, -110, 110);
-  if (!positionBlocked(object.position.x, nextZ, radius)) object.position.z = nextZ;
-  else collided = true;
+  for (let step = 0; step < steps; step++) {
+    const nextX = THREE.MathUtils.clamp(object.position.x + stepX, -110, 110);
+    if (!positionBlocked(nextX, object.position.z, radius)) object.position.x = nextX;
+    else collided = true;
+
+    const nextZ = THREE.MathUtils.clamp(object.position.z + stepZ, -110, 110);
+    if (!positionBlocked(object.position.x, nextZ, radius)) object.position.z = nextZ;
+    else collided = true;
+  }
   return collided;
+}
+
+function rememberVehicleSafePose(object, radius) {
+  if (!object || positionBlocked(object.position.x, object.position.z, radius + .06)) return;
+  vehicleSafePosition.copy(object.position);
+  vehicleSafeRotation = object.rotation.y;
+  vehicleSafeReady = true;
+}
+
+function findVehicleRecoveryPoint(object, radius) {
+  if (vehicleSafeReady && !positionBlocked(vehicleSafePosition.x, vehicleSafePosition.z, radius + .08)) {
+    return { x: vehicleSafePosition.x, z: vehicleSafePosition.z, rotation: vehicleSafeRotation };
+  }
+
+  const backwardsX = -Math.sin(object.rotation.y);
+  const backwardsZ = -Math.cos(object.rotation.y);
+  for (const distance of [.45, .8, 1.2, 1.7, 2.3]) {
+    const x = THREE.MathUtils.clamp(object.position.x + backwardsX * distance, -110, 110);
+    const z = THREE.MathUtils.clamp(object.position.z + backwardsZ * distance, -110, 110);
+    if (!positionBlocked(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
+  }
+
+  for (const ring of [1, 1.6, 2.4, 3.2]) {
+    for (let index = 0; index < 16; index++) {
+      const angle = index / 16 * Math.PI * 2;
+      const x = THREE.MathUtils.clamp(object.position.x + Math.sin(angle) * ring, -110, 110);
+      const z = THREE.MathUtils.clamp(object.position.z + Math.cos(angle) * ring, -110, 110);
+      if (!positionBlocked(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
+    }
+  }
+  return null;
+}
+
+function recoverVehicleOverlap(object, radius) {
+  if (!object || !positionBlocked(object.position.x, object.position.z, radius)) return false;
+  const recovery = findVehicleRecoveryPoint(object, radius);
+  if (!recovery) return false;
+  object.position.set(recovery.x, 0, recovery.z);
+  object.rotation.y = recovery.rotation;
+  vehicleSafePosition.copy(object.position);
+  vehicleSafeRotation = object.rotation.y;
+  vehicleSafeReady = true;
+  vehicleCollisionFrames = 0;
+  driveSpeed = 0;
+  if (performance.now() - lastVehicleRecoveryNotice > 3500) {
+    lastVehicleRecoveryNotice = performance.now();
+    showToast('Vehicle unstuck · safe position restored');
+  }
+  return true;
 }
 
 function buildWorld(scene) {
