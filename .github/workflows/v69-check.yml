@@ -1,0 +1,27 @@
+name: V69 Landscape Mode Checks
+
+on:
+  push:
+    branches:
+      - v69-landscape-mode
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node --check boot.js
+      - run: node --check game.js
+      - run: node --check social.js
+      - run: node --check server.mjs
+      - run: node --check scripts/lock-android-landscape.mjs
+      - run: npm test
+      - run: npm run mobile:prepare
+      - run: npm run mobile:release:check
