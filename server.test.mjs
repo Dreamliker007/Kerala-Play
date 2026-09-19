@@ -1056,6 +1056,7 @@ test('phone notifications persist events dedupe live reminders and support read 
   assert.equal(received.read, false);
 
   app.advance(31 * 24 * 60 * 60 * 1000);
+  assert.equal((await alice('/api/auth/login', { identifier: 'NotifyAlice', password: 'test-password-2026' })).status, 200);
   const reminderResponse = await alice('/api/notifications');
   assert.equal(reminderResponse.status, 200, JSON.stringify(reminderResponse.data));
   alerts = reminderResponse.data;
