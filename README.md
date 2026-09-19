@@ -243,3 +243,16 @@ Vehicle wheels now rotate while moving. Front wheels visually steer, driven vehi
 Driving input now smooths steering rather than applying full joystick direction instantly. Braking response is progressive but stronger at lower speeds, while acceleration remains responsive. The chase camera gains speed-based distance and forward look-ahead so the road ahead is easier to read while moving quickly.
 
 This visual/control pass remains procedural and mobile-oriented: no large external vehicle assets are added, and existing server movement validation, road limits, vehicle condition, fuel use and traffic enforcement stay authoritative.
+
+
+## Kerala Town + Street Realism (V76)
+
+V76 makes the existing Kerala Play village/town environment feel more lived-in without introducing a heavy external asset pack.
+
+The main road now gains two usable roadside shop buildings, two bus-stop shelters, concrete utility poles with crossbars, insulators and lightweight sagging overhead wires, a zebra crossing and junction stop marking, roadside signboards, crates and bins. Existing homes also receive low compound-wall boundaries with open entrances so the residential areas read more clearly from the road.
+
+The pedestrian population is expanded with additional local NPCs using the V74 character system. Their clothing/appearance continues to use lightweight procedural variation, and name labels identify them as locals rather than adding large floating world markers.
+
+Town props are intentionally split between gameplay-solid and visual-only objects. Shops and bus shelters receive collision footprints, while utility wires, compound walls and small roadside clutter remain visual-only so they do not unexpectedly block driving routes. No dynamic lights or large texture downloads are added.
+
+V76 does not alter the backend, economy, traffic authority, vehicle ownership or persistence schema, so no Supabase migration is required.
