@@ -460,13 +460,13 @@ test('job vehicle fuel damage refuel and repair stay server controlled', async t
   assert.equal((await alice('/api/jobs/delivery/vehicle/service', { taskId: active.taskId, action: 'refuel' })).status, 409, 'Refuel must require the fuel station');
 
   app.advance(2_000);
-  let moved = await alice('/api/world/move', { x: 6, z: -12, rotation: 0, moving: true, mode: 'bike' });
+  let moved = await alice('/api/world/move', { x: 11, z: -12, rotation: 0, moving: true, mode: 'bike' });
   assert.equal(moved.status, 200);
   assert.ok(moved.data.vehicle.fuel < 100, 'Driving must burn fuel on the server');
   assert.ok(moved.data.vehicle.fuel > 90, 'Normal short driving should use only part of the tank');
 
   app.advance(250);
-  assert.equal((await alice('/api/world/move', { x: 6, z: -12, rotation: 0, moving: false, mode: 'bike' })).status, 200);
+  assert.equal((await alice('/api/world/move', { x: 11, z: -12, rotation: 0, moving: false, mode: 'bike' })).status, 200);
   const refueled = await alice('/api/jobs/delivery/vehicle/service', { taskId: active.taskId, action: 'refuel' });
   assert.equal(refueled.status, 200);
   assert.equal(refueled.data.vehicle.fuel, 100);
@@ -485,10 +485,10 @@ test('job vehicle fuel damage refuel and repair stay server controlled', async t
   moved = await alice('/api/world/move', { x: -15, z: -17, rotation: 0, moving: true, mode: 'bike' });
   assert.equal(moved.status, 200);
   app.advance(2_000);
-  moved = await alice('/api/world/move', { x: -36, z: -22, rotation: 0, moving: true, mode: 'bike' });
+  moved = await alice('/api/world/move', { x: -36, z: -15, rotation: 0, moving: true, mode: 'bike' });
   assert.equal(moved.status, 200);
   app.advance(250);
-  assert.equal((await alice('/api/world/move', { x: -36, z: -22, rotation: 0, moving: false, mode: 'bike' })).status, 200);
+  assert.equal((await alice('/api/world/move', { x: -36, z: -15, rotation: 0, moving: false, mode: 'bike' })).status, 200);
 
   const repaired = await alice('/api/jobs/delivery/vehicle/service', { taskId: active.taskId, action: 'repair' });
   assert.equal(repaired.status, 200);
