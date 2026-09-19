@@ -117,7 +117,24 @@ async function jsonBody(request) {
 }
 
 /** A local, persistent multiplayer server. Sessions and live connections expire on restart. */
-export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publicDir = ROOT, now = Date.now } = {}) {
+export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publicDir = ROOT, now = Date.now, worldAlerts = [] } = {}) {
+  const configuredWorldAlerts = (Array.isArray(worldAlerts) ? worldAlerts : []).slice(0, 50).map((alert, index) => {
+    if (!alert || typeof alert !== 'object' || Array.isArray(alert)) return null;
+    const rawId = typeof alert.id === 'string' ? alert.id.trim() : '';
+    const id = /^[A-Za-z0-9:_-]{1,80}$/.test(rawId) ? rawId : `alert-${index + 1}`;
+    const title = String(alert.title || 'World alert').trim().slice(0, 80);
+    const message = String(alert.message || '').trim().slice(0, 240);
+    if (!message) return null;
+    const kind = ['world', 'weather', 'emergency', 'event'].includes(alert.kind) ? alert.kind : 'world';
+    const severity = ['info', 'warning', 'critical', 'success'].includes(alert.severity) ? alert.severity : 'info';
+    const target = ['wallet', 'home', 'garage', 'jobs', 'people'].includes(alert.target) ? alert.target : '';
+    const startsAt = Number.isFinite(Number(alert.startsAt)) ? Math.max(0, Number(alert.startsAt)) : 0;
+    const endsAt = Number.isFinite(Number(alert.endsAt)) ? Math.max(0, Number(alert.endsAt)) : 0;
+    const districts = Array.isArray(alert.districts)
+      ? alert.districts.filter(district => Object.hasOwn(DISTRICTS, district)).slice(0, 14)
+      : [];
+    return { id, title, message, kind, severity, target, startsAt, endsAt, districts };
+  }).filter(Boolean);
   await mkdir(dataDir, { recursive: true });
   const databasePath = resolve(dataDir, 'game.json');
   let db;
@@ -318,7 +335,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       title: String(title || 'Kerala Play'),
       message: String(message || ''),
       severity: ['info', 'warning', 'critical', 'success'].includes(severity) ? severity : 'info',
-      target: ['wallet', 'home', 'garage', 'jobs'].includes(target) ? target : '',
+      target: ['wallet', 'home', 'garage', 'jobs', 'people'].includes(target) ? target : '',
       createdAt: now(),
     };
     notifications.items.push(item);
@@ -433,6 +450,21 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           });
         }
       }
+    }
+
+    for (const alert of configuredWorldAlerts) {
+      if (alert.startsAt && alert.startsAt > timestamp) continue;
+      if (alert.endsAt && alert.endsAt < timestamp) continue;
+      if (alert.districts.length && !alert.districts.includes(user.district)) continue;
+      items.push({
+        id: `world:${alert.id}`,
+        kind: alert.kind,
+        title: alert.title,
+        message: alert.message,
+        severity: alert.severity,
+        target: alert.target,
+        createdAt: alert.startsAt || timestamp,
+      });
     }
 
     const eventSources = new Set(state.notifications.items.map(item => item.sourceKey));
@@ -1115,7 +1147,20 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/auth/reset' && request.method === 'POST') {
         const body = await jsonBody(request); const code = String(body.code || ''); const entry = resetTokens.get(hashToken(code));
         requireValue(entry && entry.expires > now(), 400, 'That reset code is invalid or expired.'); requireValue(typeof body.password === 'string' && body.password.length >= 8, 400, 'Use a password with at least 8 characters.');
-        const target = findUser(entry.userId); const salt = randomBytes(16).toString('hex'); target.salt = salt; target.passwordHash = (await scrypt(body.password, salt, 64)).toString('hex'); resetTokens.delete(hashToken(code)); await persist(); send(response, 200, { ok: true }); return;
+        const target = findUser(entry.userId);
+        const salt = randomBytes(16).toString('hex');
+        target.salt = salt;
+        target.passwordHash = (await scrypt(body.password, salt, 64)).toString('hex');
+        resetTokens.delete(hashToken(code));
+        addNotification(target, {
+          sourceKey: `security:password:${now()}`,
+          kind: 'security',
+          title: 'Password changed',
+          message: 'Your Kerala Play password was changed using account recovery.',
+          severity: 'warning',
+        });
+        await persist();
+        send(response, 200, { ok: true }); return;
       }
       const session = sessionFor(request);
       requireValue(session, 401, 'Please sign in first.');
@@ -1950,8 +1995,25 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         if (action === 'request') {
           requireValue(!outgoing, 409, 'A follow or request already exists.');
           db.follows.push({ from: user.id, to: peer.id, status: 'pending' });
+          addNotification(peer, {
+            sourceKey: `follow-request:${user.id}:${peer.id}:${now()}`,
+            kind: 'social',
+            title: 'New follow request',
+            message: `${publicUser(user).username} wants to follow you.`,
+            severity: 'info',
+            target: 'people',
+          });
         } else if (action === 'accept') {
-          requireValue(incoming?.status === 'pending', 409, 'No pending request to accept.'); incoming.status = 'accepted';
+          requireValue(incoming?.status === 'pending', 409, 'No pending request to accept.');
+          incoming.status = 'accepted';
+          addNotification(peer, {
+            sourceKey: `follow-accepted:${user.id}:${peer.id}:${now()}`,
+            kind: 'social',
+            title: 'Follow request accepted',
+            message: `${publicUser(user).username} accepted your follow request.`,
+            severity: 'success',
+            target: 'people',
+          });
         } else if (action === 'decline') {
           requireValue(incoming?.status === 'pending', 409, 'No pending request to decline.'); db.follows = db.follows.filter(follow => follow !== incoming);
         } else if (action === 'cancel' || action === 'unfollow') {
@@ -2006,6 +2068,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
             message.body = body.body.trim();
           }
           db.messages.push(message);
+          addNotification(peer, {
+            sourceKey: `message:${message.id}`,
+            kind: 'social',
+            title: message.audio ? 'New voice message' : 'New message',
+            message: `${publicUser(user).username} sent you ${message.audio ? 'a voice message' : 'a private message'}.`,
+            severity: 'info',
+            target: 'people',
+          });
           // Keep the most recent 100 messages per pair, bounded to 2,000 overall.
           const pairMessages = db.messages.filter(item => (item.from === user.id && item.to === peer.id) || (item.from === peer.id && item.to === user.id));
           const oldIds = new Set(pairMessages.slice(0, -100).map(item => item.id));
