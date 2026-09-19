@@ -447,6 +447,63 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     };
   }
 
+  function needsMovementFactor(needs) {
+    let factor = 1;
+    if (needs.energy <= 8) factor = Math.min(factor, .62);
+    else if (needs.energy <= 20) factor = Math.min(factor, .78);
+    if (needs.hunger <= 8) factor = Math.min(factor, .72);
+    else if (needs.hunger <= 18) factor = Math.min(factor, .86);
+    if (needs.thirst <= 5) factor = Math.min(factor, .62);
+    else if (needs.thirst <= 15) factor = Math.min(factor, .8);
+    return Math.max(.55, factor);
+  }
+
+  function applyNeedsDecay(user) {
+    const state = jobStateFor(user);
+    const needs = state.needs;
+    const timestamp = now();
+    const elapsedMs = Math.max(0, Math.min(timestamp - Number(needs.updatedAt || timestamp), NEEDS_MAX_CATCHUP_MS));
+    if (elapsedMs >= 1000) {
+      const minutes = elapsedMs / 60000;
+      needs.hunger = Math.max(0, Number(needs.hunger) - NEEDS_DECAY_PER_MINUTE.hunger * minutes);
+      needs.thirst = Math.max(0, Number(needs.thirst) - NEEDS_DECAY_PER_MINUTE.thirst * minutes);
+      needs.energy = Math.max(0, Number(needs.energy) - NEEDS_DECAY_PER_MINUTE.energy * minutes);
+      needs.updatedAt = timestamp;
+      dirty = true;
+    } else if (!Number(needs.updatedAt)) {
+      needs.updatedAt = timestamp;
+      dirty = true;
+    }
+    return needs;
+  }
+
+  function needsSummary(user) {
+    const needs = applyNeedsDecay(user);
+    const factor = needsMovementFactor(needs);
+    return {
+      hunger: Math.round(Number(needs.hunger) * 10) / 10,
+      thirst: Math.round(Number(needs.thirst) * 10) / 10,
+      energy: Math.round(Number(needs.energy) * 10) / 10,
+      movementFactor: factor,
+      canRun: factor >= .78 && Number(needs.energy) > 12 && Number(needs.hunger) > 5 && Number(needs.thirst) > 5,
+      restPoint: NEEDS_REST_POINT,
+      restEnergy: NEEDS_REST_ENERGY,
+      restReadyAt: Number(needs.lastRestAt || 0) + NEEDS_REST_COOLDOWN_MS,
+      updatedAt: Number(needs.updatedAt || now()),
+    };
+  }
+
+  function applyNeedsEffect(user, effect = {}) {
+    const needs = applyNeedsDecay(user);
+    for (const key of ['hunger', 'thirst', 'energy']) {
+      if (!Number.isFinite(Number(effect[key])) || Number(effect[key]) === 0) continue;
+      needs[key] = Math.max(0, Math.min(NEEDS_MAX, Number(needs[key]) + Number(effect[key])));
+    }
+    needs.updatedAt = now();
+    dirty = true;
+    return needsSummary(user);
+  }
+
   function jobStateFor(user) {
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
