@@ -1504,6 +1504,7 @@ try {
   let cameraPitch = .31;
   let runHeld = false;
   let runPointerId = null;
+  let runCruiseArmed = false;
   let acceleratorHeld = false;
   let acceleratorPointerId = null;
   let walkPhase = 0;
@@ -1590,6 +1591,7 @@ try {
   function setRun(value) {
     if (value && vehicleMode === 'walk' && needsSnapshot?.canRun === false) value = false;
     runHeld = value;
+    if (!value) runCruiseArmed = false;
     runButton.classList.toggle('active', value);
   }
   function clearRun(event) {
@@ -1781,7 +1783,8 @@ try {
     } else {
       driveSpeed = 0;
       const runningNow = runHeld && needsSnapshot?.canRun !== false;
-      const autoRun = runningNow && controlLength <= .08;
+      if (runningNow && controlLength > .08) runCruiseArmed = true;
+      const autoRun = runningNow && runCruiseArmed && controlLength <= .08;
       const walkingInput = controlLength > .08 || autoRun;
       const needsFactor = Math.max(.55, Math.min(1, Number(needsSnapshot?.movementFactor || 1)));
       if (walkingInput) {
