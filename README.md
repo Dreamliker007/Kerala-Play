@@ -362,3 +362,14 @@ Rain now lowers road roughness further and slightly increases metallic/specular 
 The atmosphere now adjusts ACES exposure gently by daylight and overcast state so night remains readable without flattening monsoon contrast. Moon/hemisphere lighting is also rebalanced for clearer silhouettes at night.
 
 All added local lights keep shadows disabled to preserve mobile performance; the main sun remains the shadow-casting light. No backend, database, economy, traffic-authority or Supabase migration changes are required.
+
+
+## Living Kerala NPC Routines (V87)
+
+V87 makes ambient villagers react to time of day and monsoon weather instead of repeating the same activity around the clock.
+
+NPCs can now carry lightweight procedural umbrellas when rain begins. Bus-stop waiters, shoppers, phone users, shopkeepers and selected customers can use configured shelter points when rain becomes heavy, while their posture and activity animation become calmer in wet weather.
+
+The village population also changes with time. Selected walkers, social groups, customers and two of the three zebra-crossing pedestrians leave the street late at night, while a smaller number of locals, bus-stop waiters and essential shop activity remain. Walking pace and social/task animation also slow in the evening/night.
+
+Existing zebra-crossing traffic yielding remains tied only to currently visible, actively crossing pedestrians. No pathfinding, server-side NPC AI, backend/database migration, economy change or player movement rule is introduced.
