@@ -293,7 +293,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       }
     } catch {
       audioEnabled = false;
-      soundButton.textContent = 'Resume sound';
+      soundButton.textContent = 'Resume';
       soundButton.setAttribute('aria-pressed', 'false');
     }
   }
