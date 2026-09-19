@@ -2137,15 +2137,26 @@ function updateTraffic(delta) {
     const response = targetSpeed < Number(config.currentSpeed) ? 4.6 : 1.9;
     config.currentSpeed += (targetSpeed - Number(config.currentSpeed)) * Math.min(1, delta * response);
     if (Math.abs(config.currentSpeed) < .03) config.currentSpeed = 0;
-    config.progress += config.direction * config.currentSpeed * delta;
-    if (config.direction > 0 && config.progress > config.max) {
-      config.progress = config.min;
-      config.currentSpeed = baseSpeed;
+
+    let nextProgress = Number(config.progress) + config.direction * config.currentSpeed * delta;
+    if (config.direction > 0 && nextProgress > config.max) nextProgress = config.min;
+    if (config.direction < 0 && nextProgress < config.min) nextProgress = config.max;
+
+    if (playerRef?.visible) {
+      const footprint = trafficFootprint(config);
+      const playerRadius = vehicleMode === 'taxi' ? .92 : vehicleMode === 'bike' ? .56 : .43;
+      const nextX = config.axis === 'x' ? nextProgress : Number(config.fixed);
+      const nextZ = config.axis === 'z' ? nextProgress : Number(config.fixed);
+      if (circleHitsBox(playerRef.position.x, playerRef.position.z, playerRadius + .18, nextX, nextZ, footprint.halfWidth, footprint.halfDepth)) {
+        nextProgress = Number(config.progress);
+        config.currentSpeed = 0;
+      }
     }
-    if (config.direction < 0 && config.progress < config.min) {
-      config.progress = config.max;
-      config.currentSpeed = baseSpeed;
-    }
+
+    const wrapped = (config.direction > 0 && nextProgress === config.min && Number(config.progress) > config.max - 1)
+      || (config.direction < 0 && nextProgress === config.max && Number(config.progress) < config.min + 1);
+    if (wrapped) config.currentSpeed = baseSpeed;
+    config.progress = nextProgress;
     if (config.axis === 'z') vehicle.position.z = config.progress;
     else vehicle.position.x = config.progress;
   });
