@@ -488,9 +488,70 @@ function toggleVehicleHeadlights() {
   applyVehicleHeadlights();
 }
 
+function applyDynamicHighQuality(root) {
+  if (!root) return root;
+  root.traverse(object => {
+    if (!object.isMesh) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const contactShadow = object.userData?.contactShadow === true;
+    if (!contactShadow) {
+      const opaque = materials.every(material => material && !material.transparent && !material.wireframe);
+      object.castShadow = opaque && (object.geometry?.type !== 'PlaneGeometry' || object.isInstancedMesh);
+      object.receiveShadow = opaque;
+    } else {
+      object.castShadow = false;
+      object.receiveShadow = false;
+    }
+    for (const material of materials) {
+      if (!material) continue;
+      material.dithering = true;
+    }
+  });
+  return root;
+}
+
+function attachContactShadow(root, radiusX = .48, radiusZ = .32, opacity = .18) {
+  if (!root || root.userData.contactShadow) return root?.userData.contactShadow || null;
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x101712,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 20), material);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = .018;
+  shadow.scale.set(radiusX, radiusZ, 1);
+  shadow.renderOrder = 1;
+  shadow.userData.contactShadow = true;
+  shadow.userData.baseOpacity = opacity;
+  shadow.castShadow = false;
+  shadow.receiveShadow = false;
+  root.add(shadow);
+  root.userData.contactShadow = shadow;
+  return shadow;
+}
+
+function updateDynamicContactShadows(state) {
+  const daylight = THREE.MathUtils.clamp(Number(state?.daylight ?? 1), 0, 1);
+  const overcast = THREE.MathUtils.clamp(Number(state?.overcast || 0), 0, 1);
+  const rain = THREE.MathUtils.clamp(Number(state?.rain || 0), 0, 1);
+  const lightFactor = THREE.MathUtils.clamp(.54 + daylight * .46 - overcast * .12 - rain * .08, .38, 1);
+  const roots = [playerRef, ...villagers, ...ambientAnimals, ...remotePlayers.values()];
+  for (const root of roots) {
+    const shadow = root?.userData?.contactShadow || root?.userData?.shadow;
+    if (!shadow?.material) continue;
+    const baseOpacity = Number(shadow.userData?.baseOpacity ?? shadow.material.opacity ?? .18);
+    shadow.material.opacity = baseOpacity * lightFactor;
+    shadow.visible = root.visible !== false;
+  }
+}
+
 function updateWorldWeatherVisuals(state) {
   if (!state) return;
   worldWeatherState = state;
+  updateDynamicContactShadows(state);
   const wet = THREE.MathUtils.clamp(Number(state.rain || 0), 0, 1);
   const daylight = THREE.MathUtils.clamp(Number(state.daylight ?? 1), 0, 1);
   const overcast = THREE.MathUtils.clamp(Number(state.overcast || 0), 0, 1);
@@ -807,7 +868,7 @@ function syncJobVehicleVisual() {
   jobVehicleSignature = signature;
   if (!vehicle) return;
 
-  jobVehicleVisual = createJobVehicleVisual(vehicle.kind, source);
+  jobVehicleVisual = applyDynamicHighQuality(createJobVehicleVisual(vehicle.kind, source));
   if (vehicle.entered) {
     vehicleMode = vehicle.kind;
     driveSpeed = 0;
@@ -1412,7 +1473,10 @@ function synchronizePlayers(players) {
       const remoteSeed = avatarStyleSeed(data.id || data.username);
       const avatar = createHuman({ gender: data.gender, shirt: data.gender === 'female' ? 0xc57e93 : 0x569bb5,
         trousers: 0x293b50, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x2c2825, accent: 0xe5bb51, styleSeed: remoteSeed });
-      remote.add(avatar); remote.position.set(data.x, 0, data.z);
+      remote.add(avatar);
+      attachContactShadow(remote, .48, .32, .18);
+      applyDynamicHighQuality(remote);
+      remote.position.set(data.x, 0, data.z);
       remote.userData = {
         avatar, gender: data.gender, phase: 0,
         target: new THREE.Vector3(data.x, 0, data.z),
@@ -2245,6 +2309,8 @@ function buildPlayer(player) {
   );
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = .025;
+  shadow.userData.contactShadow = true;
+  shadow.userData.baseOpacity = .25;
   player.add(shadow);
   player.userData.shadow = shadow;
   replacePlayerAvatar(profile?.gender || 'male');
@@ -2268,7 +2334,7 @@ function replacePlayerAvatar(gender) {
   const avatarStyle = gender === 'female'
     ? { gender: 'female', shirt: 0x1e8173, trousers: 0x273253, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x6c3c2c, accent: 0xe5bb51, styleSeed }
     : { gender: 'male', shirt: 0x2a759b, trousers: 0x26354a, skin: 0xa96d4c, hair: 0x171616, shoes: 0x27231f, accent: 0x6eaad0, styleSeed };
-  const avatar = createHuman(avatarStyle);
+  const avatar = applyDynamicHighQuality(createHuman(avatarStyle));
   avatar.position.y = .04;
   playerRef.add(avatar);
   playerRef.userData.avatar = avatar;
@@ -4389,12 +4455,7 @@ function addParkedVehicle(scene, kind, color, x, z, rotation = 0) {
   const parkedScale = kind === 'bus' ? .96 : kind === 'bike' ? .86 : kind === 'auto' ? .92 : .92;
   vehicle.scale.multiplyScalar(parkedScale);
   vehicle.userData.parked = true;
-  vehicle.traverse(object => {
-    if (object.isMesh) {
-      object.castShadow = true;
-      object.receiveShadow = true;
-    }
-  });
+  applyDynamicHighQuality(vehicle);
   scene.add(vehicle);
   const parkedRadius = kind === 'bus' ? 1.45 : kind === 'auto' ? .76 : kind === 'bike' ? .48 : .90;
   addCircleCollider(x, z, parkedRadius, 'parked-vehicle');
@@ -4405,6 +4466,7 @@ function addRoadVehicle(scene, config) {
   const vehicle = createTrafficVehicleVisual(config.kind, config.color);
   ambientVehicleLightMaterials.push(...(vehicle.userData.headlightMaterials || []));
   attachTrafficWetEffects(vehicle, config.kind);
+  applyDynamicHighQuality(vehicle);
   vehicle.userData.traffic = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
   if (config.axis === 'z') {
     vehicle.position.set(config.fixed, 0, config.progress);
@@ -4709,6 +4771,15 @@ function addAmbientAnimal(scene, kind, x, z, options = {}) {
   const animal = createVillageAnimal(kind, options.color || palette[index % palette.length]);
   const scale = Number(options.scale || 1);
   animal.scale.setScalar(scale);
+  const animalShadowSize = kind === 'cow'
+    ? [.78, .42, .20]
+    : kind === 'goat'
+      ? [.58, .34, .18]
+      : kind === 'dog'
+        ? [.48, .30, .17]
+        : [.28, .20, .14];
+  attachContactShadow(animal, ...animalShadowSize);
+  applyDynamicHighQuality(animal);
   animal.position.set(x, 0, z);
   animal.rotation.y = Number(options.yaw || 0);
   animal.userData.ambientAnimal = {
@@ -5271,6 +5342,8 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
   const umbrella = createNpcUmbrella(index);
   umbrella.scale.setScalar(.9 * scale + .2);
   villager.add(human, umbrella);
+  attachContactShadow(villager, .46, .31, .17);
+  applyDynamicHighQuality(villager);
   villager.position.set(x, 0, z);
   const npcName = options.name || names[index % names.length];
   const behavior = options.behavior || 'patrol';
