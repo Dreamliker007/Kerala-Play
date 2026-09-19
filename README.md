@@ -181,3 +181,14 @@ Kerala Play is now landscape-first on phones. In portrait on a touch phone, the 
 Phone landscape gets its own low-height HUD layout: compact profile/mission cards, a horizontally scrollable quick-action strip, smaller joystick and RUN controls, compact driving controls, and game panels sized for the wider viewport. Desktop and normal tablet layouts keep their existing behavior.
 
 The PWA manifest declares landscape orientation. Capacitor Android builds also run a post-add/post-sync script that patches the generated MainActivity with `android:screenOrientation="landscape"`, so generated Android builds stay landscape without committing the ignored `android/` project.
+
+
+## Social + Security + World Alerts (V70)
+
+Kerala Phone notifications now cover more of the living-world and social experience. New follow requests create a persistent alert for the recipient, accepted requests notify the original requester, and incoming private text or voice messages create social alerts. Social alerts can jump directly to the People panel.
+
+Account recovery now records a persistent security notification after a password is changed, giving the player a visible account-security trail inside Kerala Phone.
+
+The server also supports a controlled world-alert feed for weather notices, emergencies, scheduled events and general world announcements. Alerts can include severity, start/end times, an optional destination panel and optional Kerala-district targeting. Local and production servers can load this feed from the server-only `KP_WORLD_ALERTS_JSON` environment variable. The server validates and limits supplied alert data before it reaches players; world alerts use stable IDs so read state remains stable across refreshes and restarts.
+
+V70 reuses the existing V68 notification/read-state storage inside `job_state`, so no new Supabase migration is required. The world-alert configuration is operational input rather than player-controlled data.
