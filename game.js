@@ -1543,6 +1543,7 @@ try {
   cameraZone.addEventListener('lostpointercapture', clearLook);
 
   function setRun(value) {
+    if (value && vehicleMode === 'walk' && needsSnapshot?.canRun === false) value = false;
     runHeld = value;
     runButton.classList.toggle('active', value);
   }
@@ -1709,19 +1710,21 @@ try {
     } else {
       driveSpeed = 0;
       const walkingInput = controlLength > .08;
+      const runningNow = runHeld && needsSnapshot?.canRun !== false;
+      const needsFactor = Math.max(.55, Math.min(1, Number(needsSnapshot?.movementFactor || 1)));
       if (walkingInput) {
         moveForward.set(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
         moveRight.set(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
         desiredMove.copy(moveForward).multiplyScalar(-controlY).addScaledVector(moveRight, controlX);
         if (desiredMove.lengthSq() > .0001) desiredMove.normalize();
         const inputCurve = Math.pow(controlLength, 1.55);
-        const maxWalkSpeed = runHeld ? 5.4 : 3.05;
+        const maxWalkSpeed = (runningNow ? 5.4 : 3.05) * needsFactor;
         targetWalkVelocity.copy(desiredMove).multiplyScalar(maxWalkSpeed * inputCurve);
       } else {
         targetWalkVelocity.set(0, 0, 0);
       }
 
-      const walkResponse = walkingInput ? (runHeld ? 5.2 : 6.8) : 11.5;
+      const walkResponse = walkingInput ? (runningNow ? 5.2 : 6.8) : 11.5;
       walkVelocity.lerp(targetWalkVelocity, 1 - Math.exp(-delta * walkResponse));
       if (!walkingInput && walkVelocity.lengthSq() < .0016) walkVelocity.set(0, 0, 0);
 
@@ -1738,11 +1741,11 @@ try {
           const actualX = player.position.x - beforeX;
           const actualZ = player.position.z - beforeZ;
           const desiredYaw = Math.atan2(actualX, actualZ);
-          const turnSpeed = runHeld ? 5.6 : 6.8;
+          const turnSpeed = runningNow ? 5.6 : 6.8;
           player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
           if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
-          const animationAmount = Math.min(1, movedDistance / Math.max(.0001, (runHeld ? 5.4 : 3.05) * delta));
-          walkPhase += delta * (runHeld ? 12 : 8) * Math.max(.22, animationAmount);
+          const animationAmount = Math.min(1, movedDistance / Math.max(.0001, ((runningNow ? 5.4 : 3.05) * needsFactor) * delta));
+          walkPhase += delta * (runningNow ? 12 : 8) * Math.max(.22, animationAmount);
           animatePlayer(player, walkPhase, animationAmount);
           movingNow = true;
           if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
@@ -1769,7 +1772,7 @@ try {
     updateVehicleAction();
     updateDriveHud();
     sendMovement(player, movingNow);
-    atmosphere.update(delta, villageTime, { moving: movingNow, running: vehicleMode === 'walk' && runHeld, nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13, inChallenge: !!challengeRound });
+    atmosphere.update(delta, villageTime, { moving: movingNow, running: vehicleMode === 'walk' && runHeld && needsSnapshot?.canRun !== false, nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13, inChallenge: !!challengeRound });
     renderer.render(scene, camera);
     if (isMobile && !atmosphere) {
       perfFrames++; const now = performance.now();
