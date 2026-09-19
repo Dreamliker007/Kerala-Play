@@ -51,14 +51,16 @@ const VEHICLE_STATIONS = Object.freeze({
   service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
 });
 const TRAFFIC_CHECKPOINT = Object.freeze({ id: 'main-check', label: 'Kerala Play Traffic Checkpoint', x: 5.4, z: 18, radius: 7 });
-const TRAFFIC_CHALLAN_AMOUNTS = Object.freeze({ insurance_expired: 40, speeding: 25 });
+const TRAFFIC_CHALLAN_AMOUNTS = Object.freeze({ insurance_expired: 40, speeding: 25, licence_invalid: 50 });
+const DRIVING_LICENCE_TERMS = Object.freeze({ learner: 14 * 24 * 60 * 60 * 1000, full: 30 * 24 * 60 * 60 * 1000 });
+const DRIVING_LICENCE_COSTS = Object.freeze({ learner: 0, full: 150, renew_learner: 40, renew_full: 100 });
 const MOVEMENT_PROFILES = Object.freeze({
   walk: { rate: 8.5, maxCredit: 24 },
   bike: { rate: 16, maxCredit: 40 },
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [] } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -115,8 +117,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) { user.jobState.completed = {}; migrated = true; }
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) { user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null }; migrated = true; }
     if (!Array.isArray(user.jobState.garage.owned)) { user.jobState.garage.owned = []; migrated = true; }
-    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) { user.jobState.traffic = { challans: [] }; migrated = true; }
+    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) { user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }; migrated = true; }
     if (!Array.isArray(user.jobState.traffic.challans)) { user.jobState.traffic.challans = []; migrated = true; }
+    if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) { user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 }; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -206,7 +209,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       user.worldX = x; user.worldZ = z; user.worldRotation = rotation; user.worldUpdatedAt = now();
       dirty = true;
     }
-    const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now(), trafficSpeedStrikes: 0, trafficLastChallanAt: 0 };
+    const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now(), trafficSpeedStrikes: 0, trafficLastChallanAt: 0, trafficLicenceStrikes: 0, trafficLastLicenceChallanAt: 0 };
     presence.set(user.id, state);
     const garage = jobStateFor(user).garage;
     const personal = garage.activeVehicleId ? garage.owned.find(vehicle => vehicle.id === garage.activeVehicleId) : null;
@@ -338,17 +341,52 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { id: 'offroad', label: 'Off Road', limit: 20 };
   }
 
+  function licenceNumberFor(user) {
+    const suffix = String(randomInt(1, 1_000_000)).padStart(6, '0');
+    return `KPDL-${String(user.district || 'KL').slice(0, 3).toUpperCase()}-${suffix}`;
+  }
+
+  function drivingLicenceSummary(user) {
+    const state = jobStateFor(user);
+    const licence = state.traffic.licence;
+    const validUntil = Math.max(0, Number(licence.validUntil) || 0);
+    const active = licence.type !== 'none' && validUntil > now();
+    const remainingMs = Math.max(0, validUntil - now());
+    return {
+      type: licence.type,
+      label: licence.type === 'full' ? 'Full Licence' : licence.type === 'learner' ? 'Learner Permit' : 'No Licence',
+      number: licence.number || '',
+      issuedAt: Math.max(0, Number(licence.issuedAt) || 0),
+      validUntil,
+      active,
+      remainingMs,
+      holderName: user.displayName || user.firstName || user.username,
+      allowedKinds: active ? (licence.type === 'full' ? ['bike', 'taxi'] : ['bike']) : [],
+      canApplyLearner: licence.type === 'none',
+      canUpgradeFull: active && licence.type === 'learner',
+      canRenew: licence.type !== 'none',
+      costs: DRIVING_LICENCE_COSTS,
+    };
+  }
+
+  function licenceAllowsVehicle(user, kind) {
+    const licence = drivingLicenceSummary(user);
+    return licence.active && licence.allowedKinds.includes(kind);
+  }
+
   function createTrafficChallan(user, vehicle, kind, source, details = {}) {
     const amount = TRAFFIC_CHALLAN_AMOUNTS[kind];
     requireValue(Number.isInteger(amount) && amount > 0, 500, 'Traffic challan configuration is invalid.');
     const traffic = jobStateFor(user).traffic;
-    if (kind === 'insurance_expired') {
+    if (kind === 'insurance_expired' || kind === 'licence_invalid') {
       const existing = traffic.challans.find(challan => challan.vehicleId === vehicle.id && challan.kind === kind && !Number(challan.paidAt));
       if (existing) return { challan: existing, created: false };
     }
     const description = kind === 'insurance_expired'
       ? `Expired insurance · ${vehicle.registration}`
-      : `Speeding · ${vehicle.registration} · ${details.speedKmh || '?'} / ${details.limit || '?'} km/h`;
+      : kind === 'licence_invalid'
+        ? `Invalid driving licence · ${vehicle.registration}`
+        : `Speeding · ${vehicle.registration} · ${details.speedKmh || '?'} / ${details.limit || '?'} km/h`;
     const challan = {
       id: randomUUID(),
       vehicleId: vehicle.id,
@@ -388,6 +426,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const unpaid = challans.filter(challan => !challan.paid);
     return {
       checkpoint: TRAFFIC_CHECKPOINT,
+      licence: drivingLicenceSummary(user),
       documents,
       challans,
       unpaidCount: unpaid.length,
@@ -396,6 +435,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         title: 'Kerala Play Traffic Rules',
         insuranceExpiredFine: TRAFFIC_CHALLAN_AMOUNTS.insurance_expired,
         speedingFine: TRAFFIC_CHALLAN_AMOUNTS.speeding,
+        licenceInvalidFine: TRAFFIC_CHALLAN_AMOUNTS.licence_invalid,
       },
     };
   }
@@ -405,8 +445,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) user.jobState.completed = {};
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null };
-    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [] };
+    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } };
     if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
+    if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 };
+    const licence = user.jobState.traffic.licence;
+    if (!['none', 'learner', 'full'].includes(licence.type)) licence.type = 'none';
+    if (typeof licence.number !== 'string') licence.number = '';
+    if (!Number.isFinite(Number(licence.issuedAt))) licence.issuedAt = 0;
+    if (!Number.isFinite(Number(licence.validUntil))) licence.validUntil = 0;
     user.jobState.traffic.challans = user.jobState.traffic.challans.filter(challan => challan && typeof challan === 'object' && typeof challan.id === 'string');
     const garage = user.jobState.garage;
     if (!Array.isArray(garage.owned)) garage.owned = [];
@@ -743,6 +789,47 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/traffic' && request.method === 'GET') {
         send(response, 200, trafficSummary(user)); return;
       }
+      if (path === '/api/traffic/licence' && request.method === 'POST') {
+        limited(`traffic-licence:${user.id}`, 20, 60000);
+        const body = await jsonBody(request);
+        requireValue(['learner', 'full', 'renew'].includes(body.action), 400, 'Choose learner, full or renew.');
+        const state = jobStateFor(user);
+        const licence = state.traffic.licence;
+        let cost = 0;
+        let transaction = null;
+        if (body.action === 'learner') {
+          requireValue(licence.type === 'none', 409, 'A driving licence already exists. Use upgrade or renew.');
+          cost = DRIVING_LICENCE_COSTS.learner;
+          licence.type = 'learner';
+          licence.number = licence.number || licenceNumberFor(user);
+          licence.issuedAt = now();
+          licence.validUntil = now() + DRIVING_LICENCE_TERMS.learner;
+        } else if (body.action === 'full') {
+          requireValue(licence.type === 'learner' && Number(licence.validUntil) > now(), 409, 'An active Learner Permit is required before Full Licence upgrade.');
+          cost = DRIVING_LICENCE_COSTS.full;
+          transaction = walletTransaction(user, -cost, 'driving_licence', `Full Licence upgrade · ${licence.number}`);
+          licence.type = 'full';
+          licence.issuedAt = now();
+          licence.validUntil = now() + DRIVING_LICENCE_TERMS.full;
+        } else {
+          requireValue(licence.type === 'learner' || licence.type === 'full', 409, 'Apply for a Learner Permit first.');
+          cost = licence.type === 'full' ? DRIVING_LICENCE_COSTS.renew_full : DRIVING_LICENCE_COSTS.renew_learner;
+          transaction = walletTransaction(user, -cost, 'driving_licence', `${licence.type === 'full' ? 'Full Licence' : 'Learner Permit'} renewal · ${licence.number}`);
+          licence.validUntil = Math.max(now(), Number(licence.validUntil) || 0) + DRIVING_LICENCE_TERMS[licence.type];
+          if (!Number(licence.issuedAt)) licence.issuedAt = now();
+        }
+        if (body.action === 'learner' && cost > 0) transaction = walletTransaction(user, -cost, 'driving_licence', `Learner Permit · ${licence.number}`);
+        dirty = true;
+        await persist();
+        send(response, 200, {
+          traffic: trafficSummary(user),
+          wallet: walletSummary(user),
+          licence: drivingLicenceSummary(user),
+          action: body.action,
+          cost,
+          transaction,
+        }); return;
+      }
       if (path === '/api/traffic/checkpoint' && request.method === 'POST') {
         limited(`traffic-checkpoint:${user.id}`, 20, 60000);
         await jsonBody(request);
@@ -753,11 +840,22 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(!live.moving, 409, 'Stop the vehicle at the checkpoint.');
         requireValue(Math.hypot(live.x - TRAFFIC_CHECKPOINT.x, live.z - TRAFFIC_CHECKPOINT.z) <= TRAFFIC_CHECKPOINT.radius, 409, 'Move closer to the traffic checkpoint.');
         const insurance = vehicleInsuranceSummary(vehicle);
+        const model = GARAGE_CATALOG[vehicle.modelId];
+        const licence = drivingLicenceSummary(user);
+        const licenceValid = licenceAllowsVehicle(user, model.kind);
         let result = 'clear', challan = null, created = false;
+        const issued = [];
         if (!insurance.insuranceActive) {
           const createdResult = createTrafficChallan(user, vehicle, 'insurance_expired', 'checkpoint');
           challan = createdResult.challan;
           created = createdResult.created;
+          issued.push(createdResult.challan);
+          result = 'challan';
+        } else if (!licenceValid) {
+          const createdResult = createTrafficChallan(user, vehicle, 'licence_invalid', 'checkpoint', { licenceType: licence.type });
+          challan = createdResult.challan;
+          created = createdResult.created;
+          issued.push(createdResult.challan);
           result = 'challan';
         }
         vehicle.lastDocumentCheckAt = now();
@@ -769,7 +867,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
             registration: vehicle.registration,
             rcValid: true,
             insuranceActive: insurance.insuranceActive,
+            licenceValid,
+            licence,
             challan,
+            challans: issued,
             challanCreated: created,
             checkedAt: vehicle.lastDocumentCheckAt,
           },
@@ -1372,23 +1473,40 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         }
         let trafficNotice = null;
         if (personal?.entered && personalModel && elapsed >= .12 && elapsed <= 1.5 && distance > .25) {
-          const midpointX = (state.x + body.x) / 2;
-          const midpointZ = (state.z + body.z) / 2;
-          const zone = trafficZoneAt(midpointX, midpointZ);
-          const speedKmh = Math.round((distance / Math.max(.05, elapsed)) * 6);
-          if (speedKmh > zone.limit + 4) {
-            state.trafficSpeedStrikes = Math.min(4, Number(state.trafficSpeedStrikes || 0) + 1);
-            if (state.trafficSpeedStrikes >= 2 && now() - Number(state.trafficLastChallanAt || 0) >= 45000) {
-              const createdResult = createTrafficChallan(user, personal, 'speeding', 'server-speed-check', { speedKmh, limit: zone.limit, zone: zone.label });
+          const insurance = vehicleInsuranceSummary(personal);
+          const licenceValid = licenceAllowsVehicle(user, personalModel.kind);
+          if (!licenceValid && insurance.insuranceActive) {
+            state.trafficLicenceStrikes = Math.min(5, Number(state.trafficLicenceStrikes || 0) + 1);
+            if (state.trafficLicenceStrikes >= 3 && now() - Number(state.trafficLastLicenceChallanAt || 0) >= 60000) {
+              const createdResult = createTrafficChallan(user, personal, 'licence_invalid', 'server-licence-check', { licenceType: drivingLicenceSummary(user).type });
               if (createdResult.created) trafficNotice = createdResult.challan;
-              state.trafficLastChallanAt = now();
-              state.trafficSpeedStrikes = 0;
+              state.trafficLastLicenceChallanAt = now();
+              state.trafficLicenceStrikes = 0;
             }
           } else {
-            state.trafficSpeedStrikes = Math.max(0, Number(state.trafficSpeedStrikes || 0) - 1);
+            state.trafficLicenceStrikes = Math.max(0, Number(state.trafficLicenceStrikes || 0) - 1);
+          }
+
+          if (!trafficNotice) {
+            const midpointX = (state.x + body.x) / 2;
+            const midpointZ = (state.z + body.z) / 2;
+            const zone = trafficZoneAt(midpointX, midpointZ);
+            const speedKmh = Math.round((distance / Math.max(.05, elapsed)) * 6);
+            if (speedKmh > zone.limit + 4) {
+              state.trafficSpeedStrikes = Math.min(4, Number(state.trafficSpeedStrikes || 0) + 1);
+              if (state.trafficSpeedStrikes >= 2 && now() - Number(state.trafficLastChallanAt || 0) >= 45000) {
+                const createdResult = createTrafficChallan(user, personal, 'speeding', 'server-speed-check', { speedKmh, limit: zone.limit, zone: zone.label });
+                if (createdResult.created) trafficNotice = createdResult.challan;
+                state.trafficLastChallanAt = now();
+                state.trafficSpeedStrikes = 0;
+              }
+            } else {
+              state.trafficSpeedStrikes = Math.max(0, Number(state.trafficSpeedStrikes || 0) - 1);
+            }
           }
         } else if (requestedMode === 'walk' || distance <= .05) {
           state.trafficSpeedStrikes = 0;
+          state.trafficLicenceStrikes = 0;
         }
         const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();

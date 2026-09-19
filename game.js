@@ -424,11 +424,17 @@ function updateDriveHud() {
   const driveVehicle = currentDriveVehicle();
   const fuel = Math.round(Number(driveVehicle?.fuel ?? 100));
   const condition = Math.round(Number(driveVehicle?.condition ?? 100));
-  const insuranceExpired = currentVehicleSource() === 'personal' && driveVehicle?.insuranceActive === false;
+  const personalDriving = currentVehicleSource() === 'personal';
+  const insuranceExpired = personalDriving && driveVehicle?.insuranceActive === false;
+  const licence = trafficSnapshot?.licence;
+  const licenceAllowsCurrent = !personalDriving || (
+    licence?.active && Array.isArray(licence.allowedKinds) && licence.allowedKinds.includes(driveVehicle?.kind)
+  );
   const parkHint = Math.abs(driveSpeed) < .18 ? (zone.id === 'main' ? ' · STOPPED' : ' · PARK OK') : '';
   const insuranceHint = insuranceExpired ? ' · INS EXPIRED' : '';
-  roadStatus.textContent = `${zone.label} · ${speedKmh}/${zone.displayLimit} km/h · FUEL ${fuel}% · COND ${condition}%${insuranceHint}${parkHint}`;
-  roadStatus.classList.toggle('warning', fuel <= 15 || condition <= 35 || insuranceExpired);
+  const licenceHint = personalDriving && !licenceAllowsCurrent ? ' · DL INVALID' : '';
+  roadStatus.textContent = `${zone.label} · ${speedKmh}/${zone.displayLimit} km/h · FUEL ${fuel}% · COND ${condition}%${insuranceHint}${licenceHint}${parkHint}`;
+  roadStatus.classList.toggle('warning', fuel <= 15 || condition <= 35 || insuranceExpired || (personalDriving && !licenceAllowsCurrent));
 }
 
 hornAction?.addEventListener('pointerdown', event => {

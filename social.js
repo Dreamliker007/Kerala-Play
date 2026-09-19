@@ -571,6 +571,38 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
 
     if (trafficDocuments) {
       trafficDocuments.replaceChildren();
+      const licence = summary?.licence || null;
+      const licenceCard = node('article', `traffic-doc-card driving-licence-card${licence?.active ? '' : ' invalid'}`);
+      const licenceTop = node('div', 'traffic-challan-row');
+      licenceTop.append(node('strong', '', 'Driving Licence'), node('span', 'garage-registration', licence?.number || 'NOT ISSUED'));
+      const licenceStatus = node('p', licence?.active ? 'valid' : 'expired', licence?.active
+        ? `${licence.label} · ${Math.max(1, Math.ceil(Number(licence.remainingMs || 0) / 86400000))}d remaining`
+        : (licence?.type && licence.type !== 'none' ? `${licence.label} · Expired` : 'No driving licence'));
+      const licenceClass = node('p', '', licence?.active
+        ? `Allowed: ${(licence.allowedKinds || []).includes('taxi') ? 'Bike + Car' : 'Bike only'} · Holder: ${licence.holderName || ''}`
+        : 'Learner Permit is valid for bike; Full Licence is valid for bike + car.');
+      const licenceActions = node('div', 'licence-actions');
+      if (licence?.canApplyLearner) {
+        const apply = document.createElement('button');
+        apply.type = 'button'; apply.dataset.licenceAction = 'learner'; apply.textContent = 'Apply Learner · FREE';
+        licenceActions.append(apply);
+      } else {
+        if (licence?.canUpgradeFull) {
+          const upgrade = document.createElement('button');
+          upgrade.type = 'button'; upgrade.dataset.licenceAction = 'full'; upgrade.textContent = `Upgrade Full · ${formatCash(licence.costs?.full || 0)}`;
+          licenceActions.append(upgrade);
+        }
+        if (licence?.canRenew) {
+          const renew = document.createElement('button');
+          renew.type = 'button'; renew.dataset.licenceAction = 'renew';
+          const renewalCost = licence.type === 'full' ? licence.costs?.renew_full : licence.costs?.renew_learner;
+          renew.textContent = `Renew ${licence.type === 'full' ? 'Full' : 'Learner'} · ${formatCash(renewalCost || 0)}`;
+          licenceActions.append(renew);
+        }
+      }
+      licenceCard.append(licenceTop, licenceStatus, licenceClass, licenceActions);
+      trafficDocuments.append(licenceCard);
+
       const documents = Array.isArray(summary?.documents) ? summary.documents : [];
       if (!documents.length) trafficDocuments.append(node('p', 'social-empty', 'Buy a personal vehicle to create RC and insurance documents.'));
       for (const document of documents) {
@@ -1495,6 +1527,21 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshGarage, garageError); });
   });
 
+  trafficDocuments?.addEventListener('click', event => {
+    const actionButton = event.target.closest('button[data-licence-action]');
+    if (!actionButton || actionButton.disabled) return;
+    run(async () => {
+      actionButton.disabled = true;
+      const result = await api('/api/traffic/licence', { action: actionButton.dataset.licenceAction });
+      renderTraffic(result.traffic);
+      renderWallet(result.wallet);
+      const action = actionButton.dataset.licenceAction;
+      if (action === 'learner') toast('Starter Learner Permit issued · bike class active');
+      else if (action === 'full') toast(`Full Licence issued · ${formatCash(result.cost)} paid`);
+      else toast(`Driving licence renewed · ${formatCash(result.cost)} paid`);
+    }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshTraffic, garageError); });
+  });
+
   trafficChallans?.addEventListener('click', event => {
     const pay = event.target.closest('button[data-pay-challan]');
     if (!pay || pay.disabled) return;
@@ -1511,9 +1558,15 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     const result = await api('/api/traffic/checkpoint', {});
     renderTraffic(result.traffic);
     const inspection = result.inspection;
-    if (inspection.result === 'clear') toast('Checkpoint clear · RC and insurance verified');
-    else if (inspection.challanCreated) toast(`Insurance expired · in-game challan ${formatCash(inspection.challan.amount)} issued`);
-    else toast('Insurance expired · unpaid challan already exists');
+    if (inspection.result === 'clear') {
+      toast('Checkpoint clear · RC, insurance and driving licence verified');
+    } else {
+      const kind = inspection.challan?.kind;
+      const label = kind === 'licence_invalid' ? 'Driving licence invalid' : 'Insurance expired';
+      toast(inspection.challanCreated
+        ? `${label} · in-game challan ${formatCash(inspection.challan.amount)} issued`
+        : `${label} · unpaid challan already exists`);
+    }
   }, garageError));
 
   window.addEventListener('kerala-traffic-refresh', () => run(refreshTraffic, garageError));

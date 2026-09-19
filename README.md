@@ -127,3 +127,12 @@ Kerala Play now has an in-game traffic enforcement layer for personal vehicles. 
 A Kerala Play Traffic Checkpoint is placed on the main road. Stop a personal vehicle at the checkpoint and use CHECK DOCUMENTS. RC is currently always valid for owned vehicles; expired insurance creates one unpaid in-game challan until that challan is paid. Challans are paid from Kerala Cash and appear in wallet transaction history.
 
 The server also measures personal-vehicle movement against Kerala Play road speed zones. Two consecutive samples materially above the in-game road limit can create a speeding challan, with a cooldown to prevent rapid duplicate tickets. Server-side movement validation remains authoritative. Traffic state is stored inside existing job_state JSONB, so V63 requires no new Supabase migration.
+
+
+## Driving Licence + Digital Documents (V64)
+
+Kerala Play now has an in-game driving licence system for personal vehicles. A free Starter Learner Permit unlocks the bike class for 14 days. An active Learner Permit can be upgraded to a Full Licence for Kerala Cash; Full Licence covers bike + car for 30 days. Learner and Full licences can be renewed, and the same Kerala Play licence number is preserved across upgrades and renewals.
+
+Garage > Documents & Traffic now acts as a digital document wallet showing the player's Driving Licence plus each owned vehicle's RC and insurance. The driving HUD shows DL INVALID when the current personal vehicle is not covered by an active licence. The traffic checkpoint verifies RC, insurance and licence class. The server can also detect continued personal-vehicle driving without the required licence and issue one unpaid in-game licence challan per vehicle until paid. These are Kerala Play game rules, not real-world legal guidance.
+
+Licence and challan state live inside the existing job_state JSONB, so V64 requires no new Supabase migration.
