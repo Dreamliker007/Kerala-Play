@@ -208,3 +208,14 @@ Vehicles now have a dedicated on-screen ACCEL pedal while driving. The existing 
 The always-on HUD is reduced further so the world stays visually dominant. The Current Mission card and separate Level/Points chip are hidden from gameplay; level and points remain available in the player profile. Hunger, Thirst and Energy are shown as a very small top status strip, while the brand, profile, online and world-time chips and the icon dock use smaller footprints.
 
 On foot, holding RUN now acts as forward auto-run after movement has begun: if the player releases the left movement joystick while still holding RUN, the avatar continues straight ahead at full running speed. Releasing RUN stops the auto-run behavior. Normal joystick steering still takes priority while the movement control is being used, and the existing needs-based run restriction remains enforced.
+
+
+## World Visual Upgrade — Pass 1 (V73)
+
+V73 starts the world-quality upgrade after the HUD cleanup. This pass focuses on the highest-impact environment improvements without adding heavy downloaded assets or weakening mobile performance.
+
+Changes include richer procedural grass/ground texture, textured asphalt, road shoulders, white edge markings, reflective road studs, lightweight roadside grass, emissive street lamps, brighter and more readable night lighting, longer night visibility, and extra Kerala-house facade details such as skirting, trim, window sills and porch lighting.
+
+The visual pass deliberately keeps lighting and roadside detail lightweight: street lamps use emissive materials instead of many dynamic point lights, and vegetation detail uses instancing. High-quality mode can still use the existing shadow system, while lower graphics levels avoid the heaviest shadow cost.
+
+This is the first environment pass, not the final character/vehicle realism stage. Higher-detail human avatars, vehicle models and larger world assets can be upgraded separately so each change can be tested on Android performance.
