@@ -406,3 +406,16 @@ The procedural Web Audio mix now includes two-layer monsoon rain, wind, water am
 The mix reacts continuously to daylight, hour, rain and overcast conditions. Rain masks street activity naturally, night reduces traffic/shop ambience and increases crickets, and heavy rain uses a fuller body+hiss texture. Challenge mode retains its short synthesized music sequence, but ordinary exploration is now environment-first.
 
 No downloaded audio assets are required. The whole soundscape is generated locally with a shared noise source, filters and short oscillators, and remains disabled until the player explicitly turns World Sound on.
+
+
+## Dynamic Wind + Vegetation Motion (V91)
+
+V91 makes the High-quality Kerala world react visibly to wind and monsoon weather instead of leaving vegetation and overhead wires static.
+
+Coconut-palm fronds now sway gently in clear weather and move more strongly as overcast/rain builds. Broadleaf tree canopies use subtle independent motion, banana leaves gain layered sway/flutter, and the instanced roadside grass field bends in gusts while remaining a single efficient draw-call structure.
+
+Utility wires now use small dynamic vertex offsets between pole anchors, so they move slightly in gusts without detaching from the poles. The wind model is driven by the existing shared rain/overcast state and combines slow sway with short gust variation.
+
+The vegetation/wire animation pass is throttled to roughly 12.5 updates per second rather than running full geometry/matrix updates every render frame, keeping the effect practical on mobile while preserving the always-High graphics policy.
+
+No backend, database, traffic, economy, ownership, collision or Supabase changes are required.
