@@ -163,3 +163,12 @@ Kerala Play now has a separate persistent Kerala Bank account in addition to the
 The Wallet panel now includes bank balance, Wallet ↔ Bank deposit/withdraw controls, Kerala Pay UPI transfers, and bank transaction history. Deposit and withdrawal amounts are server validated. UPI transfers move bank balance directly between players by username or Kerala Pay UPI ID, reject self-transfers and blocked-player transfers, and write matching sender/receiver ledger entries with a shared transfer ID.
 
 Bank balance and bank history are stored inside the existing job_state JSONB. Existing wallet transactions remain separate, so V67 requires no new Supabase migration.
+
+
+## Kerala Phone Notifications + Reminders (V68)
+
+Kerala Play now has a persistent Kerala Phone alerts panel with an unread badge. Event notifications are stored for salary credits, Kerala Pay UPI receipts, traffic challans and used-vehicle sales. Live reminders are generated from the player's current world state for overdue rent/utilities, home access restrictions, low Hunger/Thirst/Energy, expiring or expired vehicle insurance, driving-licence expiry, ready job completion and job cooldown completion.
+
+Notifications use stable IDs and per-player read state so refreshing the panel does not create duplicate unread alerts. Players can mark individual alerts or all current alerts as read. Relevant alerts can jump directly to Wallet, Home, Garage or Jobs. Active sessions refresh live reminders periodically and receive server-sent notification events for immediate updates.
+
+Notification state is stored inside the existing job_state JSONB, so V68 requires no new Supabase migration.
