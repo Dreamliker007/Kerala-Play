@@ -464,7 +464,26 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       const weatherText = weather === 'Clear' ? '' : ` · ${weather}`;
       clockOutput.textContent = `${icon} ${period}${weatherText} · ${String(Math.floor(hour)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
     }
-    if (audioEnabled && !document.hidden) soundscape?.update({ daylight, rain, moving, running, nearWater, inChallenge });
+    if (audioEnabled && !document.hidden) {
+      const mainRoadProximity = Math.max(0, 1 - Math.abs(camera.position.x) / 34);
+      const sideRoadProximity = Math.max(0, 1 - Math.abs(camera.position.z + 22) / 30);
+      const roadProximity = Math.max(mainRoadProximity, sideRoadProximity);
+      const firstShopDistance = Math.hypot(camera.position.x + 14.4, camera.position.z - 7.5);
+      const secondShopDistance = Math.hypot(camera.position.x - 14.8, camera.position.z - 38.5);
+      const townProximity = Math.max(0, 1 - Math.min(firstShopDistance, secondShopDistance) / 28);
+      soundscape?.update({
+        daylight,
+        hour,
+        rain,
+        overcast,
+        moving,
+        running,
+        nearWater,
+        inChallenge,
+        roadProximity,
+        townProximity,
+      });
+    }
     return currentWeather;
   }
   update(0, 0);
@@ -517,11 +536,14 @@ function createSoundscape() {
   if (!AudioContext) throw new Error('Web Audio is unavailable');
   const context = new AudioContext();
   const master = context.createGain();
-  master.gain.value = .24;
+  master.gain.value = .23;
   const limiter = context.createDynamicsCompressor();
   limiter.threshold.value = -20;
   limiter.ratio.value = 4;
   master.connect(limiter).connect(context.destination);
+
+  // One looping procedural noise source feeds several filtered ambience buses.
+  // This avoids downloaded audio assets and keeps mobile memory/network cost low.
   const noiseBuffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate);
   const noiseData = noiseBuffer.getChannelData(0);
   let smoothed = 0;
@@ -532,30 +554,33 @@ function createSoundscape() {
   const noise = context.createBufferSource();
   noise.buffer = noiseBuffer;
   noise.loop = true;
-  const waterFilter = context.createBiquadFilter();
-  waterFilter.type = 'bandpass';
-  waterFilter.frequency.value = 850;
-  waterFilter.Q.value = .6;
-  const water = context.createGain();
-  water.gain.value = 0;
-  noise.connect(waterFilter).connect(water).connect(master);
-  const windFilter = context.createBiquadFilter();
-  windFilter.type = 'lowpass';
-  windFilter.frequency.value = 330;
-  const wind = context.createGain();
-  wind.gain.value = .06;
-  noise.connect(windFilter).connect(wind).connect(master);
-  const rainFilter = context.createBiquadFilter();
-  rainFilter.type = 'highpass';
-  rainFilter.frequency.value = 1450;
-  const rainNoise = context.createGain();
-  rainNoise.gain.value = 0;
-  noise.connect(rainFilter).connect(rainNoise).connect(master);
+
+  function filteredNoise(type, frequency, q = .7) {
+    const filter = context.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = frequency;
+    filter.Q.value = q;
+    const gain = context.createGain();
+    gain.gain.value = 0;
+    noise.connect(filter).connect(gain).connect(master);
+    return { filter, gain };
+  }
+
+  const water = filteredNoise('bandpass', 850, .6);
+  const wind = filteredNoise('lowpass', 330, .5);
+  const rainBody = filteredNoise('bandpass', 1050, .52);
+  const rainHiss = filteredNoise('highpass', 2300, .45);
+  const trafficHum = filteredNoise('lowpass', 145, .7);
+  const streetMurmur = filteredNoise('bandpass', 520, .85);
+  const nightBed = filteredNoise('bandpass', 3300, 1.4);
   noise.start();
+
   const active = new Set();
   let nextBird = 0;
   let nextCricket = 0;
-  let nextNote = 0;
+  let nextStreetBeat = 0;
+  let nextTrafficCue = 0;
+  let nextChallengeNote = 0;
   let sequence = 0;
   let closed = false;
 
@@ -565,58 +590,142 @@ function createSoundscape() {
     const gain = context.createGain();
     const start = context.currentTime + delay;
     oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, start);
+    oscillator.frequency.setValueAtTime(Math.max(20, frequency), start);
     oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), start + duration);
     gain.gain.setValueAtTime(.0001, start);
     gain.gain.exponentialRampToValueAtTime(Math.max(.0002, volume), start + Math.min(.035, duration / 3));
     gain.gain.exponentialRampToValueAtTime(.0001, start + duration);
     oscillator.connect(gain).connect(master);
     active.add(oscillator);
-    oscillator.onended = () => { active.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
+    oscillator.onended = () => {
+      active.delete(oscillator);
+      oscillator.disconnect();
+      gain.disconnect();
+    };
     oscillator.start(start);
     oscillator.stop(start + duration + .02);
   }
-  function update({ daylight, rain = 0, moving, running, nearWater, inChallenge }) {
-    if (closed || context.state !== 'running') return;
-    const now = context.currentTime;
-    water.gain.setTargetAtTime(nearWater ? .65 : 0, now, .8);
-    wind.gain.setTargetAtTime((running && moving ? .09 : .045) + rain * .035, now, .7);
-    rainNoise.gain.setTargetAtTime(rain * .15, now, .55);
-    if (daylight > .45 && rain < .38 && now >= nextBird) {
-      const pitch = 1800 + Math.random() * 1100;
-      note(pitch, .18, .085 * daylight, 0, pitch * 1.35);
-      note(pitch * 1.25, .22, .06 * daylight, .2, pitch * .82);
-      nextBird = now + 3 + Math.random() * 5;
-    }
-    if (daylight < .55 && rain < .55 && now >= nextCricket) {
-      for (let count = 0; count < 3; count++) note(3800, .08, .048 * (1 - daylight) * (1 - rain), count * .15, 3650);
-      nextCricket = now + 1.3 + Math.random() * 1.8;
-    }
-    if (now >= nextNote) {
-      const notes = inChallenge ? [293.66, 392, 440, 493.88, 587.33, 440, 392, 329.63]
-        : running && moving ? [196, 293.66, 329.63, 392, 293.66, 246.94]
-          : [196, 246.94, 293.66, 392, 329.63, 293.66, 246.94, 0];
-      const pitch = notes[sequence++ % notes.length];
-      if (pitch) note(pitch * (daylight < .4 ? .75 : 1), .85, inChallenge ? .095 : .065, 0, pitch * (daylight < .4 ? .75 : 1), 'triangle');
-      nextNote = now + (inChallenge ? .38 : running && moving ? .5 : moving ? .95 : 1.5);
+
+  function birdCall(daylight, rain) {
+    const pitch = 1750 + Math.random() * 1250;
+    const volume = .055 * daylight * (1 - rain);
+    note(pitch, .12, volume, 0, pitch * 1.28);
+    note(pitch * 1.16, .13, volume * .76, .14, pitch * .88);
+    if (Math.random() > .56) note(pitch * .92, .11, volume * .62, .30, pitch * 1.18);
+  }
+
+  function cricketChirp(level) {
+    for (let count = 0; count < 3; count++) {
+      note(3700 + count * 75, .065, .032 * level, count * .115, 3520 + count * 70);
     }
   }
+
+  function streetPulse(level) {
+    const base = 160 + Math.random() * 90;
+    note(base, .22, .013 * level, 0, base * .94, 'triangle');
+    note(base * 1.65, .16, .008 * level, .08, base * 1.52, 'sine');
+  }
+
+  function trafficCue(level) {
+    const pitch = 90 + Math.random() * 42;
+    note(pitch, .48, .026 * level, 0, pitch * .72, 'sawtooth');
+    if (Math.random() > .78) {
+      // Rare, quiet distant horn rather than a frequent arcade-style sound.
+      note(410 + Math.random() * 70, .12, .022 * level, .12, 390, 'square');
+    }
+  }
+
+  function update({
+    daylight,
+    hour = 12,
+    rain = 0,
+    overcast = 0,
+    moving,
+    running,
+    nearWater,
+    inChallenge,
+    roadProximity = 0,
+    townProximity = 0,
+  }) {
+    if (closed || context.state !== 'running') return;
+    const now = context.currentTime;
+    const night = hour >= 19.5 || hour < 5.5;
+    const daytimeActivity = Math.max(.12, daylight * (night ? .18 : 1));
+    const dryFactor = 1 - Math.min(1, rain * 1.1);
+
+    water.gain.setTargetAtTime(nearWater ? .47 : 0, now, .9);
+    wind.gain.setTargetAtTime((running && moving ? .075 : .032) + rain * .035 + overcast * .012, now, .8);
+
+    // Two rain bands create a fuller monsoon texture without samples.
+    rainBody.gain.setTargetAtTime(rain * (.10 + rain * .08), now, .45);
+    rainHiss.gain.setTargetAtTime(rain * (.075 + rain * .105), now, .38);
+    rainBody.filter.frequency.setTargetAtTime(850 + rain * 520, now, .7);
+    rainHiss.filter.frequency.setTargetAtTime(2100 + rain * 900, now, .7);
+
+    const trafficLevel = roadProximity * daytimeActivity * (1 - rain * .28);
+    trafficHum.gain.setTargetAtTime(.055 * trafficLevel, now, 1.2);
+    trafficHum.filter.frequency.setTargetAtTime(115 + trafficLevel * 75, now, 1);
+
+    const streetLevel = townProximity * daytimeActivity * dryFactor;
+    streetMurmur.gain.setTargetAtTime(.030 * streetLevel, now, 1.15);
+    streetMurmur.filter.frequency.setTargetAtTime(430 + streetLevel * 250, now, 1.1);
+
+    const cricketLevel = Math.max(0, 1 - daylight) * dryFactor;
+    nightBed.gain.setTargetAtTime(.015 * cricketLevel, now, 1.4);
+
+    if (daylight > .42 && rain < .42 && now >= nextBird) {
+      birdCall(daylight, rain);
+      nextBird = now + 2.7 + Math.random() * 4.8;
+    }
+    if (cricketLevel > .25 && rain < .62 && now >= nextCricket) {
+      cricketChirp(cricketLevel);
+      nextCricket = now + .9 + Math.random() * 1.6;
+    }
+    if (streetLevel > .18 && now >= nextStreetBeat) {
+      streetPulse(streetLevel);
+      nextStreetBeat = now + 2.4 + Math.random() * 3.7;
+    }
+    if (trafficLevel > .18 && now >= nextTrafficCue) {
+      trafficCue(trafficLevel);
+      nextTrafficCue = now + 3.8 + Math.random() * 6.2;
+    }
+
+    // Keep music for the explicit challenge only; normal exploration is now
+    // environmental rather than a repeating synthesized melody.
+    if (inChallenge && now >= nextChallengeNote) {
+      const notes = [293.66, 392, 440, 493.88, 587.33, 440, 392, 329.63];
+      const pitch = notes[sequence++ % notes.length];
+      note(pitch, .52, .072, 0, pitch, 'triangle');
+      nextChallengeNote = now + .38;
+    }
+  }
+
   async function resume() {
     if (closed) return;
     await context.resume();
     if (context.state !== 'running') throw new Error('Audio awaits a user gesture');
-    nextBird = context.currentTime + .7;
-    nextCricket = context.currentTime + .7;
-    nextNote = context.currentTime + .2;
+    const now = context.currentTime;
+    nextBird = now + .7;
+    nextCricket = now + .8;
+    nextStreetBeat = now + 1.2;
+    nextTrafficCue = now + 1.6;
+    nextChallengeNote = now + .2;
   }
-  async function suspend() { if (!closed && context.state !== 'closed') await context.suspend(); }
+
+  async function suspend() {
+    if (!closed && context.state !== 'closed') await context.suspend();
+  }
+
   async function dispose() {
     if (closed) return;
     closed = true;
-    for (const oscillator of active) { try { oscillator.stop(); } catch { /* Already ended. */ } }
+    for (const oscillator of active) {
+      try { oscillator.stop(); } catch { /* Already ended. */ }
+    }
     noise.stop();
     noise.disconnect();
     await context.close().catch(() => {});
   }
+
   return { update, resume, suspend, dispose };
 }
