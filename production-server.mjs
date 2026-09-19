@@ -10,6 +10,19 @@ const DATA_DIR = resolve(ROOT, '.data-production-cache');
 const DATABASE_PATH = resolve(DATA_DIR, 'game.json');
 const SYNC_INTERVAL = Math.max(250, Number(process.env.KP_SYNC_INTERVAL_MS || 1000));
 
+function worldAlertsFromEnv() {
+  const raw = process.env.KP_WORLD_ALERTS_JSON;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('expected a JSON array');
+    return parsed;
+  } catch (error) {
+    console.error('[Kerala Play] KP_WORLD_ALERTS_JSON ignored:', error.message);
+    return [];
+  }
+}
+
 async function atomicWrite(path, content) {
   const temporary = `${path}.${randomUUID()}.tmp`;
   await writeFile(temporary, content, { mode: 0o600 });
@@ -29,7 +42,7 @@ await atomicWrite(DATABASE_PATH, initialSnapshot);
 // missing. This also validates that the installed schema matches this server.
 await store.save(initialSnapshot);
 
-const server = await createGameServer({ dataDir: DATA_DIR });
+const server = await createGameServer({ dataDir: DATA_DIR, worldAlerts: worldAlertsFromEnv() });
 
 // Keep the game server's strict static-file allowlist, but expose public policy
 // pages at stable, human-readable URLs required by app stores.
