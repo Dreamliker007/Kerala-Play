@@ -464,6 +464,8 @@ function clearJobVehicleVisual() {
   jobVehicleSignature = '';
   vehicleMode = 'walk';
   driveSpeed = 0;
+  vehicleSafeReady = false;
+  vehicleCollisionFrames = 0;
   headlightsOn = false;
   if (driveTools) driveTools.hidden = true;
   if (roadStatus) roadStatus.hidden = true;
@@ -484,6 +486,13 @@ function syncJobVehicleVisual() {
   if (vehicle.entered) {
     vehicleMode = vehicle.kind;
     driveSpeed = 0;
+    vehicleCollisionFrames = 0;
+    const vehicleRadius = vehicle.kind === 'taxi' ? .92 : .56;
+    vehicleSafeReady = !positionBlocked(playerRef.position.x, playerRef.position.z, vehicleRadius + .06);
+    if (vehicleSafeReady) {
+      vehicleSafePosition.copy(playerRef.position);
+      vehicleSafeRotation = playerRef.rotation.y;
+    }
     jobVehicleVisual.position.set(0, 0, 0);
     playerRef.add(jobVehicleVisual);
     const avatar = playerRef.userData.avatar;
@@ -1460,6 +1469,14 @@ try {
     if (vehicleMode !== 'walk') {
       walkVelocity.set(0, 0, 0);
       targetWalkVelocity.set(0, 0, 0);
+      const vehicleRadius = vehicleMode === 'taxi' ? .92 : .56;
+
+      if (positionBlocked(player.position.x, player.position.z, vehicleRadius)) {
+        recoverVehicleOverlap(player, vehicleRadius);
+      } else {
+        rememberVehicleSafePose(player, vehicleRadius);
+      }
+
       const rawThrottle = paused ? 0 : THREE.MathUtils.clamp(-controlY, -1, 1);
       const rawSteering = paused ? 0 : THREE.MathUtils.clamp(controlX, -1, 1);
       const throttleDeadzone = .18;
@@ -1477,28 +1494,40 @@ try {
       const conditionFactor = .62 + .38 * (condition / 100);
       const fuel = Math.max(0, Number(activeJobMission?.vehicle?.fuel ?? 100));
       const maxForward = (vehicleMode === 'bike' ? roadZone.bikeLimit : roadZone.taxiLimit) * conditionFactor * (fuel <= .05 ? 0 : 1);
-      const maxReverse = Math.min(vehicleMode === 'bike' ? 2.6 : 2.4, maxForward * .48);
+      const maxReverse = fuel <= .05 ? 0 : Math.min(vehicleMode === 'bike' ? 2.6 : 2.4, Math.max(.8, maxForward * .48));
       const targetSpeed = runHeld ? 0 : (throttle >= 0 ? throttle * maxForward : throttle * maxReverse);
       const response = runHeld ? 9 : (Math.abs(throttle) > .01 ? 2.25 : 3.6);
       driveSpeed += (targetSpeed - driveSpeed) * Math.min(1, delta * response);
       if (Math.abs(driveSpeed) < .03) driveSpeed = 0;
-      const speedRatio = Math.min(1, Math.abs(driveSpeed) / maxForward);
+      const speedRatio = maxForward > .01 ? Math.min(1, Math.abs(driveSpeed) / maxForward) : 0;
+
       if (Math.abs(driveSpeed) > .035) {
         player.rotation.y -= steering * delta * (.72 + speedRatio * .9) * (driveSpeed >= 0 ? 1 : -1);
         const dx = Math.sin(player.rotation.y) * driveSpeed * delta;
         const dz = Math.cos(player.rotation.y) * driveSpeed * delta;
-        const vehicleRadius = vehicleMode === 'taxi' ? .95 : .62;
         const beforeX = player.position.x;
         const beforeZ = player.position.z;
         const impactSpeed = Math.abs(driveSpeed);
         const collided = moveWithCollision(player, dx, dz, vehicleRadius);
         const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
+
         if (collided) {
           reportVehicleImpact(impactSpeed);
+          vehicleCollisionFrames = movedDistance < .002 ? vehicleCollisionFrames + 1 : 0;
           driveSpeed *= movedDistance > .001 ? .42 : .12;
+        } else {
+          vehicleCollisionFrames = 0;
         }
-        movingNow = movedDistance > .0005;
+
+        if (positionBlocked(player.position.x, player.position.z, vehicleRadius)) {
+          recoverVehicleOverlap(player, vehicleRadius);
+          movingNow = false;
+        } else {
+          rememberVehicleSafePose(player, vehicleRadius);
+          movingNow = movedDistance > .0005;
+        }
       }
+
       if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 2.5);
       animatePlayer(player, walkPhase, 0);
       if (mapAccumulator >= .12) { updateMapPlayer(player); mapAccumulator = 0; }
