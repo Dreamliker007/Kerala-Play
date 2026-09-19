@@ -1240,7 +1240,8 @@ function inspectAvatar(object) {
   if (object.userData.npc) {
     const panel = document.querySelector('#npc-profile');
     panel.querySelector('h2').textContent = object.userData.name;
-    panel.querySelector('p').textContent = 'Village guide · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ' avatar. I live in the village and help bring Kerala to life. Find real players in People to follow and chat.';
+    const activity = object.userData.role || 'Local';
+    panel.querySelector('p').textContent = activity + ' · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ' local. NPCs now walk, wait, shop, use phones, cross roads and talk with each other around the village.';
     panel.hidden = false;
     panel.querySelector('button').focus();
   } else if (object.userData.playerId) social.openProfile(object.userData.playerId);
@@ -3913,9 +3914,10 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
     crossingActive: false,
     npc: true,
     name: npcName,
+    role: options.role || 'Local',
     gender,
   };
-  updateNameLabel(villager, npcName + ' · ' + (options.role || 'Local'), 'npc-' + index);
+  updateNameLabel(villager, npcName + ' · ' + villager.userData.role, 'npc-' + index);
   villagers.push(villager);
   scene.add(villager);
 }
