@@ -571,3 +571,60 @@ test('personal garage purchase retrieve driving storage and persistence stay ser
   assert.equal(garage.activeVehicle, null);
   assert.equal(garage.selectedId, vehicleId);
 });
+
+
+test('vehicle registration insurance resale and used-market ownership transfer stay server controlled', async t => {
+  const app = await setup(t), seller = app.client(), buyer = app.client();
+  await signup(seller, 'MarketSeller');
+  await signup(buyer, 'MarketBuyer');
+
+  assert.equal((await seller('/api/jobs/starter-delivery/complete', {})).status, 200);
+  const boughtNew = await seller('/api/garage/buy', { modelId: 'kerala_bike', price: 1 });
+  assert.equal(boughtNew.status, 201);
+  const vehicle = boughtNew.data.garage.owned[0];
+  assert.match(vehicle.registration, /^KL-07-[A-Z]{2}-\d{4}$/);
+  assert.equal(vehicle.insuranceActive, true);
+  assert.equal(vehicle.insuranceRenewalCost, 90);
+  assert.equal(vehicle.resaleValue, 560);
+
+  const listed = await seller('/api/garage/market/list', { vehicleId: vehicle.id, price: 1 });
+  assert.equal(listed.status, 200);
+  assert.equal(listed.data.listing.price, 560, 'Resale price must be server controlled');
+  assert.equal(listed.data.garage.owned[0].forSale, true);
+  assert.equal((await seller('/api/garage/vehicle', { action: 'retrieve', vehicleId: vehicle.id })).status, 409, 'Listed vehicles cannot be retrieved');
+
+  let market = (await buyer('/api/garage/market')).data;
+  assert.equal(market.listings.length, 1);
+  assert.equal(market.listings[0].registration, vehicle.registration);
+  assert.equal(market.listings[0].price, 560);
+  assert.equal(market.listings[0].ownListing, false);
+
+  assert.equal((await buyer('/api/jobs/starter-delivery/complete', {})).status, 200);
+  const transferred = await buyer('/api/garage/market/buy', { vehicleId: vehicle.id, price: 1 });
+  assert.equal(transferred.status, 200);
+  assert.equal(transferred.data.purchase.price, 560);
+  assert.equal(transferred.data.purchase.registration, vehicle.registration);
+  assert.equal(transferred.data.wallet.balance, 190);
+  assert.equal(transferred.data.garage.owned[0].ownerChanges, 1);
+  assert.equal(transferred.data.garage.owned[0].registration, vehicle.registration);
+  assert.equal((await seller('/api/garage')).data.owned.length, 0);
+  assert.equal((await seller('/api/wallet')).data.balance, 610);
+  market = (await buyer('/api/garage/market')).data;
+  assert.equal(market.listings.length, 0);
+
+  const beforeInsurance = transferred.data.garage.owned[0].insuranceUntil;
+  const renewed = await buyer('/api/garage/insurance', { vehicleId: vehicle.id, cost: 1 });
+  assert.equal(renewed.status, 200);
+  assert.equal(renewed.data.insurance.cost, 90, 'Insurance cost must be server controlled');
+  assert.equal(renewed.data.wallet.balance, 100);
+  assert.ok(renewed.data.insurance.insuranceUntil > beforeInsurance);
+  assert.equal(renewed.data.garage.owned[0].insuranceActive, true);
+
+  await app.restart();
+  assert.equal((await buyer('/api/auth/login', { identifier: 'MarketBuyer', password: 'test-password-2026' })).status, 200);
+  const afterRestart = (await buyer('/api/garage')).data;
+  assert.equal(afterRestart.owned.length, 1);
+  assert.equal(afterRestart.owned[0].registration, vehicle.registration);
+  assert.equal(afterRestart.owned[0].ownerChanges, 1);
+  assert.equal(afterRestart.owned[0].insuranceActive, true);
+});

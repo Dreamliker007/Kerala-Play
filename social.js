@@ -116,10 +116,13 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const garageClose = $('garage-close');
   const garageList = $('garage-list');
   const garageCatalog = $('garage-catalog');
+  const garageMarket = $('garage-market');
+  const garageMarketRefresh = $('garage-market-refresh');
   const garageError = $('garage-error');
   const garageRefresh = $('garage-refresh');
   const garageSummaryLabel = $('garage-summary');
   let garageSnapshot = null;
+  let garageMarketSnapshot = null;
   const jobsPanel = $('jobs-panel');
   const jobsToggle = $('jobs-toggle');
   const jobsClose = $('jobs-close');
@@ -516,6 +519,40 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     showPanel(walletPanel);
     run(refreshWallet, walletError);
   }
+  function insuranceLabel(vehicle) {
+    if (!vehicle?.insuranceActive) return 'Insurance expired';
+    const days = Math.max(1, Math.ceil(Number(vehicle.insuranceRemainingMs || 0) / 86400000));
+    return `Insurance ${days}d`;
+  }
+
+  function renderUsedMarket(market) {
+    garageMarketSnapshot = market || { listings: [] };
+    if (!garageMarket) return;
+    garageMarket.replaceChildren();
+    const listings = Array.isArray(market?.listings) ? market.listings : [];
+    if (!listings.length) {
+      garageMarket.append(node('p', 'social-empty', 'No used vehicles are listed right now.'));
+      return;
+    }
+    for (const listing of listings) {
+      const card = node('article', 'market-card');
+      const head = node('div', 'garage-card-head');
+      head.append(node('h3', '', listing.label), node('span', 'garage-price', formatCash(listing.price)));
+      const registration = node('span', 'garage-registration', listing.registration || 'KL');
+      const info = node('p', '', `${listing.sellerName} · ${Math.round(Number(listing.condition || 0))}% condition · Fuel ${Math.round(Number(listing.fuel || 0))}%`);
+      const insurance = node('p', listing.insuranceActive ? 'garage-insurance-ok' : 'garage-insurance-expired', insuranceLabel(listing));
+      const actions = node('div', 'garage-actions');
+      const buy = document.createElement('button');
+      buy.type = 'button';
+      buy.dataset.marketBuy = listing.vehicleId;
+      buy.disabled = !!listing.ownListing;
+      buy.textContent = listing.ownListing ? 'Your listing' : `Buy used · ${formatCash(listing.price)}`;
+      actions.append(buy);
+      card.append(head, registration, info, insurance, actions);
+      garageMarket.append(card);
+    }
+  }
+
   function renderGarage(summary) {
     garageSnapshot = summary || null;
     window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: garageSnapshot }));
@@ -529,13 +566,31 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const owned = Array.isArray(summary?.owned) ? summary.owned : [];
       if (!owned.length) garageList.append(node('p', 'social-empty', 'No personal vehicles yet. Buy your first vehicle from the showroom below.'));
       for (const vehicle of owned) {
-        const card = node('article', `garage-card${vehicle.selected ? ' selected' : ''}${vehicle.active ? ' active' : ''}`);
+        const card = node('article', `garage-card${vehicle.selected ? ' selected' : ''}${vehicle.active ? ' active' : ''}${vehicle.forSale ? ' listed' : ''}`);
         const head = node('div', 'garage-card-head');
-        head.append(node('h3', '', vehicle.label), node('span', 'garage-price', vehicle.active ? (vehicle.entered ? 'DRIVING' : 'OUTSIDE') : (vehicle.selected ? 'SELECTED' : 'OWNED')));
+        const status = vehicle.forSale
+          ? `FOR SALE · ${formatCash(vehicle.salePrice)}`
+          : vehicle.active
+            ? (vehicle.entered ? 'DRIVING' : 'OUTSIDE')
+            : (vehicle.selected ? 'SELECTED' : 'OWNED');
+        head.append(node('h3', '', vehicle.label), node('span', 'garage-price', status));
+        const registration = node('span', 'garage-registration', vehicle.registration || 'KL');
         const meta = node('div', 'garage-meta');
-        meta.append(node('span', '', vehicle.kind === 'bike' ? '🏍 Bike' : '🚘 Car'), node('span', '', `Fuel ${Math.round(Number(vehicle.fuel ?? 100))}%`), node('span', '', `Condition ${Math.round(Number(vehicle.condition ?? 100))}%`));
+        meta.append(
+          node('span', '', vehicle.kind === 'bike' ? '🏍 Bike' : '🚘 Car'),
+          node('span', '', `Fuel ${Math.round(Number(vehicle.fuel ?? 100))}%`),
+          node('span', '', `Condition ${Math.round(Number(vehicle.condition ?? 100))}%`),
+          node('span', '', `Resale ${formatCash(vehicle.resaleValue)}`),
+          node('span', vehicle.insuranceActive ? 'garage-insurance-ok' : 'garage-insurance-expired', insuranceLabel(vehicle)),
+        );
+
         const actions = node('div', 'garage-actions');
-        if (vehicle.active) {
+        if (vehicle.forSale) {
+          const unlist = button('Remove listing', async () => {}, 'secondary');
+          unlist.dataset.marketAction = 'unlist';
+          unlist.dataset.vehicleId = vehicle.id;
+          actions.append(unlist);
+        } else if (vehicle.active) {
           const activeButton = button(vehicle.entered ? 'Driving now' : 'Store in garage', async () => {}, vehicle.entered ? 'secondary' : 'danger');
           activeButton.dataset.garageAction = vehicle.entered ? 'none' : 'store';
           activeButton.dataset.vehicleId = vehicle.id;
@@ -554,7 +609,20 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
           selectVehicle.disabled = !!summary?.activeVehicleId;
           actions.append(selectVehicle);
         }
-        card.append(head, meta, actions);
+
+        const ownershipActions = node('div', 'garage-actions');
+        const insurance = button(`Renew insurance · ${formatCash(vehicle.insuranceRenewalCost)}`, async () => {}, 'secondary');
+        insurance.dataset.insuranceVehicle = vehicle.id;
+        ownershipActions.append(insurance);
+        if (!vehicle.forSale) {
+          const sell = button(vehicle.active ? 'Store before selling' : `List for sale · ${formatCash(vehicle.resaleValue)}`, async () => {}, 'danger');
+          sell.dataset.marketAction = 'list';
+          sell.dataset.vehicleId = vehicle.id;
+          sell.disabled = !!vehicle.active;
+          ownershipActions.append(sell);
+        }
+
+        card.append(head, registration, meta, actions, ownershipActions);
         garageList.append(card);
       }
     }
@@ -571,16 +639,18 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         buy.type = 'button';
         buy.dataset.buyModel = model.id;
         buy.disabled = !!model.owned;
-        buy.textContent = model.owned ? 'Already owned' : `Buy · ${formatCash(model.price)}`;
+        buy.textContent = model.owned ? 'Already owned' : `Buy new · ${formatCash(model.price)}`;
         card.append(head, description, buy);
         garageCatalog.append(card);
       }
     }
   }
+
   async function refreshGarage() {
     if (!user) return null;
-    const summary = await api('/api/garage');
+    const [summary, market] = await Promise.all([api('/api/garage'), api('/api/garage/market')]);
     renderGarage(summary);
+    renderUsedMarket(market);
     return summary;
   }
   function openGarage() {
@@ -1264,7 +1334,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     walletTransactions?.replaceChildren();
     if (starterDelivery) { starterDelivery.disabled = false; starterDelivery.textContent = 'Complete Starter Delivery · +₹250'; }
     jobsSnapshot = null; jobsList?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-job-mission', { detail: null })); if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
-    garageSnapshot = null; garageList?.replaceChildren(); garageCatalog?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: null }));
+    garageSnapshot = null; garageMarketSnapshot = null; garageList?.replaceChildren(); garageCatalog?.replaceChildren(); garageMarket?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: null }));
     dmInput.value = ''; dmLog.replaceChildren();
     renderPeople(); renderAuth('login', message);
   }
@@ -1277,6 +1347,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   garageToggle?.addEventListener('click', () => garagePanel?.classList.contains('open') ? closePanels() : openGarage());
   garageClose?.addEventListener('click', () => { closePanels(); garageToggle?.focus(); });
   garageRefresh?.addEventListener('click', () => run(refreshGarage, garageError));
+  garageMarketRefresh?.addEventListener('click', () => run(refreshGarage, garageError));
   jobsToggle?.addEventListener('click', () => jobsPanel?.classList.contains('open') ? closePanels() : openJobs());
   jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
   jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
@@ -1337,6 +1408,44 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       if (action === 'store') toast('Vehicle stored in My Garage');
     }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshGarage, garageError); });
   });
+  garageList?.addEventListener('click', event => {
+    const insuranceButton = event.target.closest('button[data-insurance-vehicle]');
+    if (insuranceButton && !insuranceButton.disabled) {
+      run(async () => {
+        insuranceButton.disabled = true;
+        const result = await api('/api/garage/insurance', { vehicleId: insuranceButton.dataset.insuranceVehicle });
+        renderGarage(result.garage);
+        renderWallet(result.wallet);
+        toast(`Insurance renewed · ${formatCash(result.insurance.cost)}`);
+        await refreshGarage();
+      }, garageError);
+      return;
+    }
+    const marketButton = event.target.closest('button[data-market-action]');
+    if (!marketButton || marketButton.disabled) return;
+    run(async () => {
+      marketButton.disabled = true;
+      const action = marketButton.dataset.marketAction;
+      const result = await api(`/api/garage/market/${action}`, { vehicleId: marketButton.dataset.vehicleId });
+      renderGarage(result.garage);
+      renderUsedMarket(result.market);
+      toast(action === 'list' ? `Vehicle listed · ${formatCash(result.listing.price)}` : 'Used-market listing removed');
+    }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshGarage, garageError); });
+  });
+
+  garageMarket?.addEventListener('click', event => {
+    const buy = event.target.closest('button[data-market-buy]');
+    if (!buy || buy.disabled) return;
+    run(async () => {
+      buy.disabled = true;
+      const result = await api('/api/garage/market/buy', { vehicleId: buy.dataset.marketBuy });
+      renderGarage(result.garage);
+      renderUsedMarket(result.market);
+      renderWallet(result.wallet);
+      toast(`${result.purchase.label} transferred · ${result.purchase.registration} · ${formatCash(result.purchase.price)}`);
+    }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshGarage, garageError); });
+  });
+
   proximityVoiceToggle?.addEventListener('click', () => proximityEnabled ? stopProximityVoice() : startProximityVoice());
   window.addEventListener('blur', () => { stopTalking(); cancelRecording(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { stopTalking(); cancelRecording(); stopProximityVoice(); } });

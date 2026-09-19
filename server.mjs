@@ -39,6 +39,13 @@ const GARAGE_CATALOG = Object.freeze({
   kerala_compact: { id: 'kerala_compact', label: 'Kerala Compact', kind: 'taxi', price: 2200, description: 'Compact personal car with better weather protection.' },
 });
 const PERSONAL_VEHICLE_RADIUS = 4.5;
+const VEHICLE_INSURANCE_TERM = 30 * 24 * 60 * 60 * 1000;
+const VEHICLE_INSURANCE_COST = Object.freeze({ bike: 90, taxi: 220 });
+const DISTRICT_REGISTRATION_PREFIX = Object.freeze({
+  Alappuzha: 'KL-04', Ernakulam: 'KL-07', Idukki: 'KL-06', Kannur: 'KL-13', Kasaragod: 'KL-14',
+  Kollam: 'KL-02', Kottayam: 'KL-05', Kozhikode: 'KL-11', Malappuram: 'KL-10', Palakkad: 'KL-09',
+  Pathanamthitta: 'KL-03', Thiruvananthapuram: 'KL-01', Thrissur: 'KL-08', Wayanad: 'KL-12',
+});
 const VEHICLE_STATIONS = Object.freeze({
   fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 11, z: -12, radius: 7 },
   service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
@@ -264,6 +271,63 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     db.transactions.push(transaction); dirty = true;
     return transaction;
   }
+  function registrationNumberFor(user) {
+    const prefix = DISTRICT_REGISTRATION_PREFIX[user.district] || 'KL-99';
+    const existing = new Set();
+    for (const owner of db.users) {
+      for (const vehicle of owner.jobState?.garage?.owned || []) {
+        if (vehicle?.registration) existing.add(vehicle.registration);
+      }
+    }
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const letters = String.fromCharCode(65 + randomInt(26)) + String.fromCharCode(65 + randomInt(26));
+      const number = String(randomInt(1, 10000)).padStart(4, '0');
+      const registration = `${prefix}-${letters}-${number}`;
+      if (!existing.has(registration)) return registration;
+    }
+    return `${prefix}-KP-${String(randomInt(1, 10000)).padStart(4, '0')}`;
+  }
+
+  function vehicleResaleValue(vehicle) {
+    const model = GARAGE_CATALOG[vehicle.modelId];
+    if (!model) return 0;
+    const condition = Math.max(15, Math.min(100, Number(vehicle.condition) || 15));
+    return Math.max(100, Math.floor(model.price * (.45 + .35 * (condition / 100))));
+  }
+
+  function vehicleInsuranceSummary(vehicle) {
+    const until = Math.max(0, Number(vehicle.insuranceUntil) || 0);
+    const remainingMs = Math.max(0, until - now());
+    return { insuranceUntil: until, insuranceActive: remainingMs > 0, insuranceRemainingMs: remainingMs };
+  }
+
+  function usedMarketSummary(viewer) {
+    const listings = [];
+    for (const owner of db.users) {
+      const state = jobStateFor(owner);
+      for (const vehicle of state.garage.owned) {
+        if (!(Number(vehicle.salePrice) > 0) || !Number(vehicle.listedAt)) continue;
+        const model = GARAGE_CATALOG[vehicle.modelId];
+        listings.push({
+          vehicleId: vehicle.id,
+          modelId: vehicle.modelId,
+          label: model.label,
+          kind: model.kind,
+          registration: vehicle.registration,
+          fuel: Math.round(vehicle.fuel * 10) / 10,
+          condition: Math.round(vehicle.condition),
+          price: Number(vehicle.salePrice),
+          listedAt: Number(vehicle.listedAt),
+          sellerName: owner.displayName || (/^\d+$/.test(owner.username) ? 'Explorer' : owner.username),
+          ownListing: owner.id === viewer.id,
+          ...vehicleInsuranceSummary(vehicle),
+        });
+      }
+    }
+    listings.sort((a, b) => b.listedAt - a.listedAt);
+    return { listings: listings.slice(0, 50) };
+  }
+
   function jobStateFor(user) {
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
@@ -279,9 +343,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       vehicle.condition = Math.max(15, Math.min(VEHICLE_CONDITION_MAX, Number(vehicle.condition)));
       if (typeof vehicle.entered !== 'boolean') vehicle.entered = false;
       if (!Number.isFinite(Number(vehicle.lastImpactAt))) vehicle.lastImpactAt = 0;
+      if (typeof vehicle.registration !== 'string' || !vehicle.registration.trim()) { vehicle.registration = registrationNumberFor(user); dirty = true; }
+      if (!Number.isFinite(Number(vehicle.insuranceUntil))) { vehicle.insuranceUntil = now() + VEHICLE_INSURANCE_TERM; dirty = true; }
+      if (!Number.isFinite(Number(vehicle.listedAt))) vehicle.listedAt = 0;
+      if (!Number.isFinite(Number(vehicle.salePrice))) vehicle.salePrice = 0;
+      if (!Number.isInteger(Number(vehicle.ownerChanges))) vehicle.ownerChanges = 0;
     }
-    if (garage.selectedId && !garage.owned.some(vehicle => vehicle.id === garage.selectedId)) garage.selectedId = garage.owned[0]?.id || null;
-    if (!garage.selectedId && garage.owned.length) garage.selectedId = garage.owned[0].id;
+    if (garage.selectedId && !garage.owned.some(vehicle => vehicle.id === garage.selectedId && !(Number(vehicle.salePrice) > 0))) garage.selectedId = garage.owned.find(vehicle => !(Number(vehicle.salePrice) > 0))?.id || null;
+    if (!garage.selectedId && garage.owned.length) garage.selectedId = garage.owned.find(vehicle => !(Number(vehicle.salePrice) > 0))?.id || null;
     if (garage.activeVehicleId && !garage.owned.some(vehicle => vehicle.id === garage.activeVehicleId)) garage.activeVehicleId = null;
     const active = user.jobState.active;
     if (active && (!Array.isArray(active.checkpoints) || Number(active.expiresAt) <= now())) {
@@ -354,6 +423,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       condition: Math.round(vehicle.condition),
       conditionMax: VEHICLE_CONDITION_MAX,
       stations: VEHICLE_STATIONS,
+      registration: vehicle.registration,
+      resaleValue: vehicleResaleValue(vehicle),
+      forSale: Number(vehicle.salePrice) > 0,
+      salePrice: Number(vehicle.salePrice) || 0,
+      ...vehicleInsuranceSummary(vehicle),
     };
   }
 
@@ -378,6 +452,13 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           kind: model.kind,
           fuel: Math.round(vehicle.fuel * 10) / 10,
           condition: Math.round(vehicle.condition),
+          registration: vehicle.registration,
+          resaleValue: vehicleResaleValue(vehicle),
+          forSale: Number(vehicle.salePrice) > 0,
+          salePrice: Number(vehicle.salePrice) || 0,
+          ownerChanges: Number(vehicle.ownerChanges) || 0,
+          insuranceRenewalCost: VEHICLE_INSURANCE_COST[model.kind],
+          ...vehicleInsuranceSummary(vehicle),
           selected: garage.selectedId === vehicle.id,
           active: garage.activeVehicleId === vehicle.id,
           entered: !!vehicle.entered,
@@ -584,6 +665,97 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/garage' && request.method === 'GET') {
         send(response, 200, garageSummary(user)); return;
       }
+      if (path === '/api/garage/market' && request.method === 'GET') {
+        send(response, 200, usedMarketSummary(user)); return;
+      }
+      if (path === '/api/garage/insurance' && request.method === 'POST') {
+        limited(`garage-insurance:${user.id}`, 20, 60000);
+        const body = await jsonBody(request);
+        const state = jobStateFor(user);
+        const vehicle = state.garage.owned.find(item => item.id === body.vehicleId);
+        requireValue(vehicle, 404, 'Owned vehicle not found.');
+        const model = GARAGE_CATALOG[vehicle.modelId];
+        const cost = VEHICLE_INSURANCE_COST[model.kind];
+        const transaction = walletTransaction(user, -cost, 'insurance', `${model.label} insurance · ${vehicle.registration}`);
+        vehicle.insuranceUntil = Math.max(now(), Number(vehicle.insuranceUntil) || 0) + VEHICLE_INSURANCE_TERM;
+        dirty = true;
+        await persist();
+        send(response, 200, { garage: garageSummary(user), wallet: walletSummary(user), insurance: { vehicleId: vehicle.id, registration: vehicle.registration, cost, insuranceUntil: vehicle.insuranceUntil }, transaction }); return;
+      }
+      if (path === '/api/garage/market/list' && request.method === 'POST') {
+        limited(`garage-market-list:${user.id}`, 20, 60000);
+        const body = await jsonBody(request);
+        const state = jobStateFor(user);
+        const garage = state.garage;
+        const vehicle = garage.owned.find(item => item.id === body.vehicleId);
+        requireValue(vehicle, 404, 'Owned vehicle not found.');
+        requireValue(garage.activeVehicleId !== vehicle.id && !vehicle.entered, 409, 'Store this vehicle before listing it for sale.');
+        requireValue(!(Number(vehicle.salePrice) > 0), 409, 'This vehicle is already listed.');
+        vehicle.salePrice = vehicleResaleValue(vehicle);
+        vehicle.listedAt = now();
+        if (garage.selectedId === vehicle.id) garage.selectedId = garage.owned.find(item => item.id !== vehicle.id && !(Number(item.salePrice) > 0))?.id || null;
+        dirty = true;
+        await persist();
+        send(response, 200, { garage: garageSummary(user), market: usedMarketSummary(user), listing: { vehicleId: vehicle.id, price: vehicle.salePrice, registration: vehicle.registration } }); return;
+      }
+      if (path === '/api/garage/market/unlist' && request.method === 'POST') {
+        limited(`garage-market-unlist:${user.id}`, 20, 60000);
+        const body = await jsonBody(request);
+        const state = jobStateFor(user);
+        const vehicle = state.garage.owned.find(item => item.id === body.vehicleId);
+        requireValue(vehicle, 404, 'Owned vehicle not found.');
+        requireValue(Number(vehicle.salePrice) > 0, 409, 'This vehicle is not listed.');
+        vehicle.salePrice = 0;
+        vehicle.listedAt = 0;
+        if (!state.garage.selectedId) state.garage.selectedId = vehicle.id;
+        dirty = true;
+        await persist();
+        send(response, 200, { garage: garageSummary(user), market: usedMarketSummary(user) }); return;
+      }
+      if (path === '/api/garage/market/buy' && request.method === 'POST') {
+        limited(`garage-market-buy:${user.id}`, 15, 60000);
+        const body = await jsonBody(request);
+        let seller = null, vehicle = null;
+        for (const owner of db.users) {
+          const candidate = jobStateFor(owner).garage.owned.find(item => item.id === body.vehicleId && Number(item.salePrice) > 0);
+          if (candidate) { seller = owner; vehicle = candidate; break; }
+        }
+        requireValue(seller && vehicle, 404, 'Used vehicle listing is no longer available.');
+        requireValue(seller.id !== user.id, 409, 'You already own this vehicle.');
+        const buyerState = jobStateFor(user);
+        const sellerState = jobStateFor(seller);
+        requireValue(!buyerState.garage.owned.some(item => item.modelId === vehicle.modelId), 409, 'You already own this vehicle model.');
+        requireValue(sellerState.garage.activeVehicleId !== vehicle.id && !vehicle.entered, 409, 'Seller vehicle is not available for transfer.');
+        const price = Number(vehicle.salePrice);
+        requireValue(Number.isInteger(price) && price > 0, 409, 'Used vehicle price is invalid.');
+        requireValue(user.walletBalance >= price, 409, 'Not enough Kerala Cash.');
+        requireValue(seller.walletBalance + price <= WALLET_LIMIT, 409, 'Seller wallet cannot receive this payment right now.');
+        const model = GARAGE_CATALOG[vehicle.modelId];
+        const buyerTransaction = walletTransaction(user, -price, 'used_vehicle_purchase', `${model.label} used purchase · ${vehicle.registration}`);
+        const sellerTransaction = walletTransaction(seller, price, 'used_vehicle_sale', `${model.label} sold · ${vehicle.registration}`);
+        sellerState.garage.owned = sellerState.garage.owned.filter(item => item.id !== vehicle.id);
+        if (sellerState.garage.selectedId === vehicle.id) sellerState.garage.selectedId = sellerState.garage.owned.find(item => !(Number(item.salePrice) > 0))?.id || null;
+        vehicle.salePrice = 0;
+        vehicle.listedAt = 0;
+        vehicle.entered = false;
+        vehicle.ownerChanges = (Number(vehicle.ownerChanges) || 0) + 1;
+        vehicle.lastTransferAt = now();
+        const buyerPosition = jobPosition(user);
+        vehicle.parkedX = buyerPosition.x;
+        vehicle.parkedZ = buyerPosition.z;
+        buyerState.garage.owned.push(vehicle);
+        if (!buyerState.garage.selectedId) buyerState.garage.selectedId = vehicle.id;
+        dirty = true;
+        await persist();
+        send(response, 200, {
+          garage: garageSummary(user),
+          market: usedMarketSummary(user),
+          wallet: walletSummary(user),
+          purchase: { vehicleId: vehicle.id, label: model.label, registration: vehicle.registration, price, previousOwner: seller.displayName || seller.username },
+          transaction: buyerTransaction,
+          sellerTransactionId: sellerTransaction.id,
+        }); return;
+      }
       if (path === '/api/garage/buy' && request.method === 'POST') {
         limited(`garage-buy:${user.id}`, 10, 60000);
         const body = await jsonBody(request);
@@ -602,6 +774,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           parkedZ: position.z,
           entered: false,
           lastImpactAt: 0,
+          registration: registrationNumberFor(user),
+          insuranceUntil: now() + VEHICLE_INSURANCE_TERM,
+          listedAt: 0,
+          salePrice: 0,
+          ownerChanges: 0,
           purchasedAt: now(),
         };
         state.garage.owned.push(vehicle);
@@ -617,6 +794,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(!state.garage.activeVehicleId, 409, 'Store the active personal vehicle before selecting another one.');
         const vehicle = state.garage.owned.find(item => item.id === body.vehicleId);
         requireValue(vehicle, 404, 'Owned vehicle not found.');
+        requireValue(!(Number(vehicle.salePrice) > 0), 409, 'Remove this vehicle from the Used Market before selecting it.');
         state.garage.selectedId = vehicle.id;
         dirty = true;
         await persist();
@@ -635,6 +813,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           requireValue(!garage.activeVehicleId, 409, 'A personal vehicle is already outside the garage.');
           const vehicle = garage.owned.find(item => item.id === (body.vehicleId || garage.selectedId));
           requireValue(vehicle, 404, 'Select an owned vehicle first.');
+          requireValue(!(Number(vehicle.salePrice) > 0), 409, 'Remove this vehicle from the Used Market before retrieving it.');
           garage.selectedId = vehicle.id;
           garage.activeVehicleId = vehicle.id;
           vehicle.entered = false;

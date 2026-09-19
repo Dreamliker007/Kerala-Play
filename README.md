@@ -111,3 +111,10 @@ AI traffic also predicts its next position and stops before its body enters the 
 Players can now own personal vehicles separately from temporary job vehicles. The GARAGE panel contains a server-priced showroom with a Kerala Bike and Kerala Compact car, an owned-vehicle list, selection controls, and Retrieve / Store actions. Only one personal vehicle can be outside the garage at a time, and personal vehicles must be stored before starting a job.
 
 Retrieved vehicles appear in the world near the player and use the existing stable V55–V60 driving, road, traffic, collision-recovery, horn, lights, fuel, condition, refuel and repair systems. Personal fuel and condition persist across sessions and server restarts. Purchases and service costs use Kerala Cash wallet transactions. Garage ownership is stored inside the existing job_state JSONB, so V61 requires no new Supabase migration.
+
+
+## Vehicle Registration + Insurance + Used Market (V62)
+
+Personal vehicles now receive a unique Kerala registration number when first purchased or migrated into the V62 garage. New vehicles include 30 days of insurance. The Garage shows registration, insurance status, renewal cost, condition-based resale value and ownership-transfer count. Insurance renewal is server-priced and paid from Kerala Cash.
+
+Stored personal vehicles can be listed on the Used Vehicle Market at a server-calculated resale price based on model value and current condition. Another player can buy the listing with Kerala Cash; the seller is credited, ownership transfers atomically, and the same vehicle keeps its registration, fuel, condition and remaining insurance. Listed vehicles cannot be selected or retrieved until the listing is removed. Market state is stored inside the selling owner's existing persisted job_state JSONB, so V62 requires no new Supabase migration.

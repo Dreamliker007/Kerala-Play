@@ -538,7 +538,8 @@ function syncJobVehicleVisual() {
   } else {
     vehicleMode = 'walk';
     jobVehicleVisual.position.set(Number(vehicle.x) || 0, 0, Number(vehicle.z) || 0);
-    jobVehicleVisual.add(missionTag(vehicle.label || 'Job Vehicle', '#6e5412'));
+    const parkedLabel = currentVehicleSource() === 'personal' && vehicle.registration ? vehicle.registration : (vehicle.label || 'Job Vehicle');
+    jobVehicleVisual.add(missionTag(parkedLabel, '#6e5412'));
     sceneRef.add(jobVehicleVisual);
     restorePlayerVehiclePose();
   }
