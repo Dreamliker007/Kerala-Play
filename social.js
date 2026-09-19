@@ -111,6 +111,15 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const starterDelivery = $('starter-delivery');
   const walletRefresh = $('wallet-refresh');
   const walletShop = $('wallet-shop');
+  const garagePanel = $('garage-panel');
+  const garageToggle = $('garage-toggle');
+  const garageClose = $('garage-close');
+  const garageList = $('garage-list');
+  const garageCatalog = $('garage-catalog');
+  const garageError = $('garage-error');
+  const garageRefresh = $('garage-refresh');
+  const garageSummaryLabel = $('garage-summary');
+  let garageSnapshot = null;
   const jobsPanel = $('jobs-panel');
   const jobsToggle = $('jobs-toggle');
   const jobsClose = $('jobs-close');
@@ -153,10 +162,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function closePanels() {
     cancelRecording(); stopTalking();
-    for (const panel of [peoplePanel, dmPanel, chatPanel, walletPanel, jobsPanel]) panel?.classList.remove('open');
+    for (const panel of [peoplePanel, dmPanel, chatPanel, walletPanel, garagePanel, jobsPanel]) panel?.classList.remove('open');
     peopleToggle?.setAttribute('aria-expanded', 'false');
     chatToggle?.setAttribute('aria-expanded', 'false');
     walletToggle?.setAttribute('aria-expanded', 'false');
+    garageToggle?.setAttribute('aria-expanded', 'false');
     jobsToggle?.setAttribute('aria-expanded', 'false');
     if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
   }
@@ -171,6 +181,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     peopleToggle?.setAttribute('aria-expanded', String(panel === peoplePanel));
     chatToggle?.setAttribute('aria-expanded', String(panel === dmPanel || panel === chatPanel));
     walletToggle?.setAttribute('aria-expanded', String(panel === walletPanel));
+    garageToggle?.setAttribute('aria-expanded', String(panel === garagePanel));
     jobsToggle?.setAttribute('aria-expanded', String(panel === jobsPanel));
   }
   function panelHeader(title, panel, id) {
@@ -505,6 +516,78 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     showPanel(walletPanel);
     run(refreshWallet, walletError);
   }
+  function renderGarage(summary) {
+    garageSnapshot = summary || null;
+    window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: garageSnapshot }));
+    if (garageSummaryLabel) {
+      const ownedCount = Array.isArray(summary?.owned) ? summary.owned.length : 0;
+      garageSummaryLabel.textContent = `${ownedCount} owned · ${summary?.activeVehicle ? (summary.activeVehicle.entered ? 'driving now' : 'vehicle outside') : 'all stored'}`;
+    }
+
+    if (garageList) {
+      garageList.replaceChildren();
+      const owned = Array.isArray(summary?.owned) ? summary.owned : [];
+      if (!owned.length) garageList.append(node('p', 'social-empty', 'No personal vehicles yet. Buy your first vehicle from the showroom below.'));
+      for (const vehicle of owned) {
+        const card = node('article', `garage-card${vehicle.selected ? ' selected' : ''}${vehicle.active ? ' active' : ''}`);
+        const head = node('div', 'garage-card-head');
+        head.append(node('h3', '', vehicle.label), node('span', 'garage-price', vehicle.active ? (vehicle.entered ? 'DRIVING' : 'OUTSIDE') : (vehicle.selected ? 'SELECTED' : 'OWNED')));
+        const meta = node('div', 'garage-meta');
+        meta.append(node('span', '', vehicle.kind === 'bike' ? '🏍 Bike' : '🚘 Car'), node('span', '', `Fuel ${Math.round(Number(vehicle.fuel ?? 100))}%`), node('span', '', `Condition ${Math.round(Number(vehicle.condition ?? 100))}%`));
+        const actions = node('div', 'garage-actions');
+        if (vehicle.active) {
+          const activeButton = button(vehicle.entered ? 'Driving now' : 'Store in garage', async () => {}, vehicle.entered ? 'secondary' : 'danger');
+          activeButton.dataset.garageAction = vehicle.entered ? 'none' : 'store';
+          activeButton.dataset.vehicleId = vehicle.id;
+          activeButton.disabled = !!vehicle.entered;
+          actions.append(activeButton);
+        } else if (vehicle.selected) {
+          const retrieve = button('Retrieve vehicle', async () => {}, '');
+          retrieve.dataset.garageAction = 'retrieve';
+          retrieve.dataset.vehicleId = vehicle.id;
+          retrieve.disabled = !!summary?.activeVehicleId;
+          actions.append(retrieve);
+        } else {
+          const selectVehicle = button('Select', async () => {}, 'secondary');
+          selectVehicle.dataset.garageAction = 'select';
+          selectVehicle.dataset.vehicleId = vehicle.id;
+          selectVehicle.disabled = !!summary?.activeVehicleId;
+          actions.append(selectVehicle);
+        }
+        card.append(head, meta, actions);
+        garageList.append(card);
+      }
+    }
+
+    if (garageCatalog) {
+      garageCatalog.replaceChildren();
+      const catalog = Array.isArray(summary?.catalog) ? summary.catalog : [];
+      for (const model of catalog) {
+        const card = node('article', 'garage-card');
+        const head = node('div', 'garage-card-head');
+        head.append(node('h3', '', model.label), node('span', 'garage-price', formatCash(model.price)));
+        const description = node('p', '', model.description || '');
+        const buy = document.createElement('button');
+        buy.type = 'button';
+        buy.dataset.buyModel = model.id;
+        buy.disabled = !!model.owned;
+        buy.textContent = model.owned ? 'Already owned' : `Buy · ${formatCash(model.price)}`;
+        card.append(head, description, buy);
+        garageCatalog.append(card);
+      }
+    }
+  }
+  async function refreshGarage() {
+    if (!user) return null;
+    const summary = await api('/api/garage');
+    renderGarage(summary);
+    return summary;
+  }
+  function openGarage() {
+    if (!requireUser()) return;
+    showPanel(garagePanel);
+    run(refreshGarage, garageError);
+  }
   function secondsRemaining(timestamp) { return Math.max(0, Math.ceil((Number(timestamp || 0) - Date.now()) / 1000)); }
   function renderJobs(summary) {
     jobsSnapshot = summary || null;
@@ -607,18 +690,37 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   window.addEventListener('kerala-job-vehicle', event => run(() => performJobVehicleAction(event.detail?.action)));
 
-  async function performVehicleService(action) {
-    const active = jobsSnapshot?.active;
-    if (!user || !active?.vehicle || !['refuel', 'repair'].includes(action)) return;
-    const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle/service`, { taskId: active.taskId, action });
-    renderJobs(result.jobs);
+  async function performPersonalVehicleAction(action) {
+    if (!user || !['enter', 'exit'].includes(action)) return;
+    const active = garageSnapshot?.activeVehicle;
+    if (!active) return;
+    const result = await api('/api/garage/vehicle', { action, vehicleId: active.vehicleId });
+    renderGarage(result.garage);
+    toast(action === 'enter' ? `${active.label} ready · personal driving active` : `${active.label} parked`);
+  }
+  window.addEventListener('kerala-personal-vehicle', event => run(() => performPersonalVehicleAction(event.detail?.action), garageError));
+
+  async function performVehicleService(action, source = 'job') {
+    if (!user || !['refuel', 'repair'].includes(action)) return;
+    let result;
+    if (source === 'personal') {
+      const active = garageSnapshot?.activeVehicle;
+      if (!active) return;
+      result = await api('/api/garage/vehicle/service', { vehicleId: active.vehicleId, action });
+      renderGarage(result.garage);
+    } else {
+      const active = jobsSnapshot?.active;
+      if (!active?.vehicle) return;
+      result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle/service`, { taskId: active.taskId, action });
+      renderJobs(result.jobs);
+    }
     renderWallet(result.wallet);
     const service = result.service;
     toast(action === 'refuel'
       ? `Fuel tank full · ${formatCash(service.cost)} paid`
       : `Vehicle repaired · condition 100% · ${formatCash(service.cost)} paid`);
   }
-  window.addEventListener('kerala-vehicle-service', event => run(() => performVehicleService(event.detail?.action)));
+  window.addEventListener('kerala-vehicle-service', event => run(() => performVehicleService(event.detail?.action, event.detail?.source || 'job')));
 
   function startJobsTimer() {
     if (jobsTimer) clearInterval(jobsTimer);
@@ -1147,6 +1249,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     startEvents();
     await run(refreshPeople, peopleError);
     await run(refreshJobs, jobsError);
+    await run(refreshGarage, garageError);
   }
   function endSession(message = '') {
     sessionVersion++;
@@ -1160,6 +1263,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     walletTransactions?.replaceChildren();
     if (starterDelivery) { starterDelivery.disabled = false; starterDelivery.textContent = 'Complete Starter Delivery · +₹250'; }
     jobsSnapshot = null; jobsList?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-job-mission', { detail: null })); if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
+    garageSnapshot = null; garageList?.replaceChildren(); garageCatalog?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: null }));
     dmInput.value = ''; dmLog.replaceChildren();
     renderPeople(); renderAuth('login', message);
   }
@@ -1169,6 +1273,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   walletToggle?.addEventListener('click', () => walletPanel?.classList.contains('open') ? closePanels() : openWallet());
   walletClose?.addEventListener('click', () => { closePanels(); walletToggle?.focus(); });
   walletRefresh?.addEventListener('click', () => run(refreshWallet, walletError));
+  garageToggle?.addEventListener('click', () => garagePanel?.classList.contains('open') ? closePanels() : openGarage());
+  garageClose?.addEventListener('click', () => { closePanels(); garageToggle?.focus(); });
+  garageRefresh?.addEventListener('click', () => run(refreshGarage, garageError));
   jobsToggle?.addEventListener('click', () => jobsPanel?.classList.contains('open') ? closePanels() : openJobs());
   jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
   jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
@@ -1202,6 +1309,32 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const result = await api('/api/shop/purchase', { itemId: purchaseButton.dataset.itemId });
       renderWallet(result.wallet); toast(`${result.purchase.name} purchased · ${formatCash(result.purchase.price)}`);
     }, walletError).finally(() => { purchaseButton.disabled = false; });
+  });
+  garageCatalog?.addEventListener('click', event => {
+    const buy = event.target.closest('button[data-buy-model]');
+    if (!buy || buy.disabled) return;
+    run(async () => {
+      buy.disabled = true;
+      const result = await api('/api/garage/buy', { modelId: buy.dataset.buyModel });
+      renderGarage(result.garage);
+      renderWallet(result.wallet);
+      toast(`${result.purchase.label} purchased · ${formatCash(result.purchase.price)}`);
+    }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshGarage, garageError); });
+  });
+  garageList?.addEventListener('click', event => {
+    const actionButton = event.target.closest('button[data-garage-action]');
+    if (!actionButton || actionButton.disabled || actionButton.dataset.garageAction === 'none') return;
+    run(async () => {
+      actionButton.disabled = true;
+      const action = actionButton.dataset.garageAction;
+      let result;
+      if (action === 'select') result = await api('/api/garage/select', { vehicleId: actionButton.dataset.vehicleId });
+      else result = await api('/api/garage/vehicle', { action, vehicleId: actionButton.dataset.vehicleId });
+      renderGarage(result.garage);
+      if (action === 'select') toast('Garage vehicle selected');
+      if (action === 'retrieve') toast('Vehicle retrieved · walk to it and tap ENTER');
+      if (action === 'store') toast('Vehicle stored in My Garage');
+    }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshGarage, garageError); });
   });
   proximityVoiceToggle?.addEventListener('click', () => proximityEnabled ? stopProximityVoice() : startProximityVoice());
   window.addEventListener('blur', () => { stopTalking(); cancelRecording(); });
