@@ -120,14 +120,14 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     if (!sun.target.parent) scene.add(sun.target);
   }
   const daySky = new THREE.Color(0x97ccee);
-  const nightSky = new THREE.Color(0x101d36);
-  const duskSky = new THREE.Color(0xc68f84);
+  const nightSky = new THREE.Color(0x172943);
+  const duskSky = new THREE.Color(0xb98278);
   const daylightColor = new THREE.Color(0xeaf5ff);
-  const nightLightColor = new THREE.Color(0x98b4e3);
+  const nightLightColor = new THREE.Color(0xa9c6ef);
   const warmColor = new THREE.Color(0xffc797);
   const whiteColor = new THREE.Color(0xfff2d9);
   const groundDay = new THREE.Color(0x647d42);
-  const groundNight = new THREE.Color(0x303d50);
+  const groundNight = new THREE.Color(0x3b4b55);
   const lightDirection = new THREE.Vector3();
   const target = new THREE.Vector3();
 
@@ -244,7 +244,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.shadowMap.needsUpdate = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
+    renderer.toneMappingExposure = quality === 'high' ? 1.22 : quality === 'balanced' ? 1.2 : 1.17;
     if (sun) sun.castShadow = quality === 'high';
     stars.visible = quality !== 'low';
     clouds.visible = quality !== 'low';
@@ -310,8 +310,8 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     const twilight = Math.max(0, 1 - Math.abs(elevation) / .42) * .58;
     scene.background.copy(nightSky).lerp(daySky, daylight).lerp(duskSky, twilight);
     scene.fog.color.copy(scene.background);
-    scene.fog.near = 42 + daylight * 15;
-    scene.fog.far = 120 + daylight * 38;
+    scene.fog.near = 48 + daylight * 14;
+    scene.fog.far = 138 + daylight * 34;
     sky.position.copy(camera.position);
     lightDirection.set(Math.cos(angle) * .84, elevation, Math.cos(angle) * .54).normalize();
     sunDisc.position.copy(lightDirection).multiplyScalar(120);
@@ -331,11 +331,11 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       sun.target.position.copy(target);
     }
     if (hemi) {
-      hemi.intensity = .65 + daylight * 1.5;
+      hemi.intensity = .84 + daylight * 1.34;
       hemi.color.copy(nightLightColor).lerp(daylightColor, daylight);
       hemi.groundColor.copy(groundNight).lerp(groundDay, daylight);
     }
-    moonLight.intensity = (1 - daylight) * .38;
+    moonLight.intensity = (1 - daylight) * .56;
     moonLight.position.copy(target).addScaledVector(lightDirection, -70);
     moonLight.position.y = Math.max(15, moonLight.position.y);
     moonLight.target.position.copy(target);
