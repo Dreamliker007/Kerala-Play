@@ -535,3 +535,12 @@ V100.1 fixes a production startup crash introduced by the V99 mobile optimizatio
 A module-level `runtimeIsMobile` flag is now shared by the renderer and the weather-effect update helpers. The browser fallback text was also changed so the production site no longer tells players to run a local npm server.
 
 No gameplay, graphics-quality, movement, economy, backend/database or Supabase behavior changes.
+
+
+## V100.2 Footstep Runtime + Walk Direction Hotfix
+
+V100.2 fixes the in-game error toast caused by the V100 footstep helper reading `walkPhase` outside the game-loop scope. The current gait phase is now passed explicitly into the visual helper, and the footstep call is isolated so a cosmetic particle failure cannot interrupt movement controls.
+
+On-foot camera-relative movement has also been rewritten with an explicit screen-forward yaw (`cameraYaw + PI`). Joystick-up therefore maps directly to movement away from the chase camera, while the avatar continues rotating toward its actual movement vector. Driving controls are untouched.
+
+No server movement limits, speed values, collision rules, economy, backend/database or Supabase behavior changes.
