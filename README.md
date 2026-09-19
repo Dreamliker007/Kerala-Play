@@ -312,3 +312,14 @@ High now keeps hardware anti-aliasing available on mobile, raises the render pix
 High also enables material dithering, keeps ACES filmic tone mapping, increases local rain density to 620 line drops, and renders the full 30-instance cloud field. Balanced uses a lower pixel ratio, up to 4x anisotropy, 300 rain drops and fewer clouds. Low keeps shadows disabled, uses the smallest pixel-ratio cap, 1x anisotropy and the lightest weather density.
 
 The preset switch still works at runtime. No backend, database, gameplay, economy or Supabase migration is required.
+
+
+## High-Quality-Only Graphics (V83)
+
+V83 removes the Low and Balanced graphics choices from Kerala Play. The game now always starts and stays on the V82 High-quality renderer profile for every player, including mobile.
+
+Saved older Low/Balanced preferences are ignored and replaced with High. The Settings panel now reports **HIGH QUALITY** instead of exposing a graphics selector. Runtime rendering therefore always keeps mobile anti-aliasing, up to 2x device pixel ratio, PCF soft shadows, 2048 sun shadow maps, up to 8x texture anisotropy, material dithering, ACES tone mapping, the full cloud field and the high-density rain field.
+
+Future performance work should optimize world geometry, draw calls, instancing, culling and update frequency rather than visibly lowering the graphics preset.
+
+No backend, database, economy, gameplay or Supabase migration is required.
