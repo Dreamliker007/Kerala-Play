@@ -870,3 +870,82 @@ test('daily needs decay shop restoration rest and movement penalties persist ser
   assert.ok(needs.thirst < 50);
   assert.equal(needs.restPoint.label, 'Village Rest Bench');
 });
+
+
+test('rental home rent utilities grace sleep and persistence stay server controlled', async t => {
+  const app = await setup(t), alice = app.client();
+  await signup(alice, 'HomeAlice');
+
+  let home = (await alice('/api/home')).data;
+  assert.equal(home.status, 'rented');
+  assert.equal(home.home.label, 'Village Rental Home');
+  assert.equal(home.home.rent, 60);
+  assert.equal(home.home.utilities, 20);
+  assert.equal(home.rentOverdue, false);
+  assert.equal(home.utilityOverdue, false);
+  assert.equal(home.accessBlocked, false);
+  assert.ok(home.rentDueAt > 0);
+  assert.equal(home.rentDueAt, home.utilityDueAt);
+
+  app.advance(25 * 60 * 60 * 1000);
+  home = (await alice('/api/home')).data;
+  assert.equal(home.rentOverdue, true);
+  assert.equal(home.utilityOverdue, true);
+  assert.equal(home.accessBlocked, false, 'Overdue home charges must keep a 48-hour grace period');
+
+  const lowNeeds = (await alice('/api/needs')).data;
+  assert.ok(lowNeeds.energy < 75);
+
+  app.advance(3_000);
+  assert.equal((await alice('/api/world/move', { x: -20, z: -10, rotation: 0, moving: true, mode: 'walk' })).status, 200);
+  app.advance(3_000);
+  assert.equal((await alice('/api/world/move', { x: -24, z: -30.8, rotation: 0, moving: true, mode: 'walk' })).status, 200);
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x: -24, z: -30.8, rotation: 0, moving: false, mode: 'walk' })).status, 200);
+
+  const sleptInGrace = await alice('/api/home/sleep', {});
+  assert.equal(sleptInGrace.status, 200);
+  assert.equal(sleptInGrace.data.slept, true);
+  assert.equal(sleptInGrace.data.needs.energy, 100);
+  assert.ok(sleptInGrace.data.needs.hunger < lowNeeds.hunger);
+  assert.ok(sleptInGrace.data.needs.thirst < lowNeeds.thirst);
+  const firstSleepAt = sleptInGrace.data.home.lastSleepAt;
+
+  app.advance(48 * 60 * 60 * 1000 + 1000);
+  home = (await alice('/api/home')).data;
+  assert.equal(home.accessBlocked, true);
+  assert.equal((await alice('/api/home/sleep', {})).status, 409, 'Sleep must pause after the home-payment grace period');
+
+  const rent = await alice('/api/home/pay', { kind: 'rent', amount: 1 });
+  assert.equal(rent.status, 200);
+  assert.equal(rent.data.payment.amount, 60, 'Rent price must be server controlled');
+  assert.equal(rent.data.wallet.balance, 440);
+  assert.equal(rent.data.home.rentOverdue, false);
+  assert.equal(rent.data.home.accessBlocked, true, 'Utilities can independently keep sleep access blocked');
+
+  const utilities = await alice('/api/home/pay', { kind: 'utilities', amount: 1 });
+  assert.equal(utilities.status, 200);
+  assert.equal(utilities.data.payment.amount, 20, 'Utility price must be server controlled');
+  assert.equal(utilities.data.wallet.balance, 420);
+  assert.equal(utilities.data.home.utilityOverdue, false);
+  assert.equal(utilities.data.home.accessBlocked, false);
+  assert.equal(utilities.data.home.rentPayments, 1);
+  assert.equal(utilities.data.home.utilityPayments, 1);
+
+  const needsAfterLongGap = (await alice('/api/needs')).data;
+  assert.ok(needsAfterLongGap.energy < 75);
+  const sleptAfterPayment = await alice('/api/home/sleep', {});
+  assert.equal(sleptAfterPayment.status, 200);
+  assert.equal(sleptAfterPayment.data.slept, true);
+  assert.equal(sleptAfterPayment.data.needs.energy, 100);
+  assert.ok(sleptAfterPayment.data.home.lastSleepAt > firstSleepAt);
+
+  await app.restart();
+  assert.equal((await alice('/api/auth/login', { identifier: 'HomeAlice', password: 'test-password-2026' })).status, 200);
+  home = (await alice('/api/home')).data;
+  assert.equal(home.rentPayments, 1);
+  assert.equal(home.utilityPayments, 1);
+  assert.equal(home.accessBlocked, false);
+  assert.ok(home.lastSleepAt > firstSleepAt);
+  assert.equal((await alice('/api/wallet')).data.balance, 420);
+});
