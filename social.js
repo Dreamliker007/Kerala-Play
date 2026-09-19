@@ -111,6 +111,18 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const starterDelivery = $('starter-delivery');
   const walletRefresh = $('wallet-refresh');
   const walletShop = $('wallet-shop');
+  const homePanel = $('home-panel');
+  const homeToggle = $('home-toggle');
+  const homeClose = $('home-close');
+  const homeSummaryCard = $('home-summary-card');
+  const homeRentStatus = $('home-rent-status');
+  const homeUtilityStatus = $('home-utility-status');
+  const homePayRent = $('home-pay-rent');
+  const homePayUtilities = $('home-pay-utilities');
+  const homeSleepNote = $('home-sleep-note');
+  const homeRefresh = $('home-refresh');
+  const homeError = $('home-error');
+  let homeSnapshot = null;
   const garagePanel = $('garage-panel');
   const garageToggle = $('garage-toggle');
   const garageClose = $('garage-close');
@@ -171,10 +183,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function closePanels() {
     cancelRecording(); stopTalking();
-    for (const panel of [peoplePanel, dmPanel, chatPanel, walletPanel, garagePanel, jobsPanel]) panel?.classList.remove('open');
+    for (const panel of [peoplePanel, dmPanel, chatPanel, walletPanel, homePanel, garagePanel, jobsPanel]) panel?.classList.remove('open');
     peopleToggle?.setAttribute('aria-expanded', 'false');
     chatToggle?.setAttribute('aria-expanded', 'false');
     walletToggle?.setAttribute('aria-expanded', 'false');
+    homeToggle?.setAttribute('aria-expanded', 'false');
     garageToggle?.setAttribute('aria-expanded', 'false');
     jobsToggle?.setAttribute('aria-expanded', 'false');
     if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
@@ -190,6 +203,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     peopleToggle?.setAttribute('aria-expanded', String(panel === peoplePanel));
     chatToggle?.setAttribute('aria-expanded', String(panel === dmPanel || panel === chatPanel));
     walletToggle?.setAttribute('aria-expanded', String(panel === walletPanel));
+    homeToggle?.setAttribute('aria-expanded', String(panel === homePanel));
     garageToggle?.setAttribute('aria-expanded', String(panel === garagePanel));
     jobsToggle?.setAttribute('aria-expanded', String(panel === jobsPanel));
   }
@@ -534,6 +548,53 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (!requireUser()) return;
     showPanel(walletPanel);
     run(refreshWallet, walletError);
+  }
+  function homeDueText(timestamp, overdue) {
+    const date = new Date(Number(timestamp));
+    const label = Number.isNaN(date.getTime()) ? 'Due date unavailable' : date.toLocaleString();
+    return overdue ? `OVERDUE · ${label}` : `Due ${label}`;
+  }
+
+  function renderHome(summary) {
+    homeSnapshot = summary || null;
+    window.dispatchEvent(new CustomEvent('kerala-home-state', { detail: homeSnapshot }));
+    if (!summary) return;
+    if (homeSummaryCard) {
+      homeSummaryCard.classList.toggle('overdue', !!(summary.rentOverdue || summary.utilityOverdue));
+      homeSummaryCard.classList.toggle('blocked', !!summary.accessBlocked);
+      const title = homeSummaryCard.querySelector('strong');
+      const status = homeSummaryCard.querySelector('span');
+      if (title) title.textContent = summary.home?.label || 'Village Rental Home';
+      if (status) status.textContent = summary.reminder || 'Home payments are up to date.';
+    }
+    if (homeRentStatus) {
+      homeRentStatus.textContent = `${formatCash(summary.home?.rent || 0)} · ${homeDueText(summary.rentDueAt, summary.rentOverdue)}`;
+      homeRentStatus.classList.toggle('overdue', !!summary.rentOverdue);
+    }
+    if (homeUtilityStatus) {
+      homeUtilityStatus.textContent = `${formatCash(summary.home?.utilities || 0)} · ${homeDueText(summary.utilityDueAt, summary.utilityOverdue)}`;
+      homeUtilityStatus.classList.toggle('overdue', !!summary.utilityOverdue);
+    }
+    if (homePayRent) homePayRent.textContent = `Pay Rent · ${formatCash(summary.home?.rent || 0)}`;
+    if (homePayUtilities) homePayUtilities.textContent = `Pay Utilities · ${formatCash(summary.home?.utilities || 0)}`;
+    if (homeSleepNote) {
+      homeSleepNote.textContent = summary.accessBlocked
+        ? 'Sleep access is paused after the grace period. Pay overdue home charges to restore access.'
+        : 'Go to your home porch in the world and tap SLEEP. Energy restores to 100; Hunger −4 and Thirst −6.';
+    }
+  }
+
+  async function refreshHome() {
+    if (!user) return null;
+    const summary = await api('/api/home');
+    renderHome(summary);
+    return summary;
+  }
+
+  function openHome() {
+    if (!requireUser()) return;
+    showPanel(homePanel);
+    run(refreshHome, homeError);
   }
   function insuranceLabel(vehicle) {
     if (!vehicle?.insuranceActive) return 'Insurance expired';
@@ -1426,6 +1487,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     await run(refreshJobs, jobsError);
     await run(refreshGarage, garageError);
     await run(refreshNeeds, walletError);
+    await run(refreshHome, homeError);
   }
   function endSession(message = '') {
     sessionVersion++;
@@ -1439,7 +1501,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     walletTransactions?.replaceChildren();
     if (starterDelivery) { starterDelivery.disabled = false; starterDelivery.textContent = 'Complete Starter Delivery · +₹250'; }
     jobsSnapshot = null; jobsList?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-job-mission', { detail: null })); if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
-    garageSnapshot = null; garageMarketSnapshot = null; trafficSnapshot = null; needsSnapshot = null; garageList?.replaceChildren(); garageCatalog?.replaceChildren(); garageMarket?.replaceChildren(); trafficDocuments?.replaceChildren(); trafficChallans?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: null })); window.dispatchEvent(new CustomEvent('kerala-traffic-state', { detail: null })); window.dispatchEvent(new CustomEvent('kerala-needs-state', { detail: null }));
+    garageSnapshot = null; garageMarketSnapshot = null; trafficSnapshot = null; needsSnapshot = null; homeSnapshot = null; garageList?.replaceChildren(); garageCatalog?.replaceChildren(); garageMarket?.replaceChildren(); trafficDocuments?.replaceChildren(); trafficChallans?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-garage-state', { detail: null })); window.dispatchEvent(new CustomEvent('kerala-traffic-state', { detail: null })); window.dispatchEvent(new CustomEvent('kerala-needs-state', { detail: null })); window.dispatchEvent(new CustomEvent('kerala-home-state', { detail: null }));
     dmInput.value = ''; dmLog.replaceChildren();
     renderPeople(); renderAuth('login', message);
   }
@@ -1449,6 +1511,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   walletToggle?.addEventListener('click', () => walletPanel?.classList.contains('open') ? closePanels() : openWallet());
   walletClose?.addEventListener('click', () => { closePanels(); walletToggle?.focus(); });
   walletRefresh?.addEventListener('click', () => run(refreshWallet, walletError));
+  homeToggle?.addEventListener('click', () => homePanel?.classList.contains('open') ? closePanels() : openHome());
+  homeClose?.addEventListener('click', () => { closePanels(); homeToggle?.focus(); });
+  homeRefresh?.addEventListener('click', () => run(refreshHome, homeError));
   garageToggle?.addEventListener('click', () => garagePanel?.classList.contains('open') ? closePanels() : openGarage());
   garageClose?.addEventListener('click', () => { closePanels(); garageToggle?.focus(); });
   garageRefresh?.addEventListener('click', () => run(refreshGarage, garageError));
@@ -1457,6 +1522,28 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   jobsToggle?.addEventListener('click', () => jobsPanel?.classList.contains('open') ? closePanels() : openJobs());
   jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
   jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
+  const payHomeCharge = (button, kind) => {
+    if (!button || button.disabled) return;
+    run(async () => {
+      button.disabled = true;
+      const result = await api('/api/home/pay', { kind, amount: 1 });
+      renderHome(result.home);
+      renderWallet(result.wallet);
+      toast(`${kind === 'rent' ? 'Home rent' : 'Electricity + water'} paid · ${formatCash(result.payment.amount)}`);
+    }, homeError).finally(() => { if (button) button.disabled = false; });
+  };
+  homePayRent?.addEventListener('click', () => payHomeCharge(homePayRent, 'rent'));
+  homePayUtilities?.addEventListener('click', () => payHomeCharge(homePayUtilities, 'utilities'));
+
+  window.addEventListener('kerala-home-sleep', () => run(async () => {
+    const result = await api('/api/home/sleep', {});
+    if (result.home) renderHome(result.home);
+    if (result.needs) renderNeeds(result.needs);
+    toast(result.slept
+      ? `Sleep complete · Energy 100 · Hunger −${result.hungerCost} · Thirst −${result.thirstCost}`
+      : (result.message || 'Energy is already full'));
+  }, homeError));
+
   jobsList?.addEventListener('click', event => {
     const action = event.target.closest('button[data-job-action]');
     if (!action || action.disabled) return;

@@ -33,7 +33,7 @@
     #camera-note { position: absolute; z-index:2; right: 122px; bottom: calc(env(safe-area-inset-bottom) + 65px); color: rgba(255,255,255,.87); background: rgba(11,35,45,.42); padding: 6px 8px; border-radius: 8px; font-size: 11px; pointer-events:none; }
     #fallback { display: none; position: fixed; inset: 0; z-index: 5; place-items: center; padding: 24px; background: #16323f; color: white; text-align: center; line-height: 1.5; }
     #camera-zone { z-index: 1; }
-    #profile-chip, #progress-chip, #online-chip, #mission-card, #quick-actions, #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #garage-panel, #jobs-panel, #dm-panel, #asset-notice, #toast { z-index: 5; pointer-events: auto; }
+    #profile-chip, #progress-chip, #online-chip, #mission-card, #quick-actions, #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #home-panel, #garage-panel, #jobs-panel, #dm-panel, #asset-notice, #toast { z-index: 5; pointer-events: auto; }
     #profile-chip { position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:176px; max-width:180px; padding:8px 10px; border:1px solid rgba(255,255,255,.22); border-radius:11px; background:rgba(8,29,34,.67); color:#fff; font-size:11px; line-height:1.25; cursor:pointer; touch-action:manipulation; }
     #profile-name { display:block; font-weight:800; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     #profile-district { display:block; margin-top:2px; color:#bde7d0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -50,8 +50,8 @@
     .hud-icon[aria-pressed="true"] { background:rgba(38,133,91,.95); border-color:#b9ffe1; box-shadow:0 0 0 2px rgba(105,255,184,.16),0 4px 14px rgba(0,0,0,.18); }
     #chat-toggle.unread { position:relative; }
     #chat-toggle.unread::after { content:''; position:absolute; top:5px; right:5px; width:10px; height:10px; border-radius:50%; background:#ff5d67; box-shadow:0 0 0 2px #08232b; }
-    #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #garage-panel, #jobs-panel, #dm-panel { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:72px; width:min(310px, calc(100vw - 90px)); max-height:min(58dvh, 380px); overflow-y:auto; padding:11px; border:1px solid rgba(255,255,255,.3); border-radius:15px; background:rgba(7,24,30,.94); color:#fff; box-shadow:0 9px 26px rgba(0,0,0,.32); touch-action:pan-y; }
-    #minimap.open, #chat-panel.open, #people-panel.open, #task-panel.open, #wallet-panel.open, #garage-panel.open, #jobs-panel.open, #dm-panel.open { display:block; z-index:7; }
+    #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #home-panel, #garage-panel, #jobs-panel, #dm-panel { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:72px; width:min(310px, calc(100vw - 90px)); max-height:min(58dvh, 380px); overflow-y:auto; padding:11px; border:1px solid rgba(255,255,255,.3); border-radius:15px; background:rgba(7,24,30,.94); color:#fff; box-shadow:0 9px 26px rgba(0,0,0,.32); touch-action:pan-y; }
+    #minimap.open, #chat-panel.open, #people-panel.open, #task-panel.open, #wallet-panel.open, #home-panel.open, #garage-panel.open, #jobs-panel.open, #dm-panel.open { display:block; z-index:7; }
     .panel-heading, .map-header, .chat-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#fff; font-size:13px; font-weight:900; }
     .panel-heading small { color:#abd7c1; font-size:10px; font-weight:600; }
     .panel-close, #map-label-toggle { border:0; border-radius:7px; color:#fff; background:rgba(255,255,255,.13); padding:4px 7px; font:inherit; font-size:12px; cursor:pointer; touch-action:manipulation; }
@@ -104,7 +104,7 @@
     .profile-card input, .profile-card select { width:100%; padding:11px; border:1px solid rgba(255,255,255,.24); border-radius:9px; color:#fff; background:#18363d; font:inherit; }
     #profile-submit { width:100%; margin-top:17px; border:0; border-radius:10px; padding:12px; color:#062019; background:#50c980; font-weight:900; font-size:14px; cursor:pointer; }
     #profile-error { min-height:17px; margin-top:8px; color:#ffd996; font-size:11px; }
-    @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #progress-chip { top:calc(env(safe-area-inset-top) + 105px); left:16px; max-width:165px; } #mission-card { top:calc(env(safe-area-inset-top) + 144px); width:166px; } #online-chip { top:calc(env(safe-area-inset-top) + 242px); right:14px; max-width:118px; } #hint { display:none; } #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #garage-panel, #jobs-panel, #dm-panel { width:min(284px, calc(100vw - 88px)); max-height:min(56dvh, 350px); } #kerala-map { height:220px; } }
+    @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #progress-chip { top:calc(env(safe-area-inset-top) + 105px); left:16px; max-width:165px; } #mission-card { top:calc(env(safe-area-inset-top) + 144px); width:166px; } #online-chip { top:calc(env(safe-area-inset-top) + 242px); right:14px; max-width:118px; } #hint { display:none; } #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #home-panel, #garage-panel, #jobs-panel, #dm-panel { width:min(284px, calc(100vw - 88px)); max-height:min(56dvh, 350px); } #kerala-map { height:220px; } }
     #needs-hud { position:fixed; left:50%; bottom:48px; z-index:6; transform:translateX(-50%); display:flex; gap:6px; padding:5px 7px; border:1px solid rgba(255,255,255,.14); border-radius:10px; background:rgba(7,20,25,.78); backdrop-filter:blur(7px); font:800 9px system-ui,sans-serif; color:#eaf7ef; pointer-events:none; }
     #needs-hud[hidden] { display:none; }
     #needs-hud span { display:inline-flex; align-items:center; gap:3px; min-width:42px; justify-content:center; }
@@ -138,7 +138,7 @@
       .drive-tool span { font-size:15px; }
       #road-status { bottom:calc(env(safe-area-inset-bottom) + 10px); min-width:150px; max-width:52vw; padding:5px 7px; font-size:8px; }
       #joystick-zone:active #joystick-base, #run:active { opacity:.88; }
-      #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #garage-panel, #jobs-panel, #dm-panel { right:58px; width:min(286px,calc(100vw - 74px)); max-height:58dvh; }
+      #minimap, #chat-panel, #people-panel, #task-panel, #wallet-panel, #home-panel, #garage-panel, #jobs-panel, #dm-panel { right:58px; width:min(286px,calc(100vw - 74px)); max-height:58dvh; }
     }
   </style>
   <link rel="stylesheet" href="./social.css">
@@ -146,7 +146,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V65</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V66</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -176,6 +176,7 @@
       <button id="chat-toggle" class="hud-icon" type="button" aria-label="Open chat" aria-controls="chat-panel" aria-expanded="false">💬<span>CHAT</span></button>
       <button id="proximity-voice-toggle" class="hud-icon" type="button" aria-label="Turn on nearby voice" aria-pressed="false">🎙<span>VOICE</span></button>
       <button id="wallet-toggle" class="hud-icon" type="button" aria-label="Open Kerala Cash wallet" aria-controls="wallet-panel" aria-expanded="false">💰<span>WALLET</span></button>
+      <button id="home-toggle" class="hud-icon" type="button" aria-label="Open home" aria-controls="home-panel" aria-expanded="false">🏠<span>HOME</span></button>
       <button id="garage-toggle" class="hud-icon" type="button" aria-label="Open personal garage" aria-controls="garage-panel" aria-expanded="false">🚘<span>GARAGE</span></button>
       <button id="jobs-toggle" class="hud-icon" type="button" aria-label="Open jobs" aria-controls="jobs-panel" aria-expanded="false">💼<span>JOBS</span></button>
       <button id="task-toggle" class="hud-icon" type="button" aria-label="Open tasks" aria-controls="task-panel" aria-expanded="false">★<span>TASKS</span></button>
@@ -206,6 +207,19 @@
       </div></div>
       <div class="wallet-section"><div class="wallet-history-heading"><strong>Transactions</strong><button id="wallet-refresh" type="button">Refresh</button></div><div id="wallet-transactions" aria-live="polite"></div></div>
       <div id="wallet-error" class="social-error" role="status"></div>
+    </section>
+    <section id="home-panel" aria-label="Rental home and bills">
+      <div class="panel-heading"><span>My Home</span><button id="home-close" class="panel-close" type="button" aria-label="Close home">×</button></div>
+      <div id="home-summary-card" class="home-summary-card" aria-live="polite">
+        <small>STARTER RENTAL</small><strong>Village Rental Home</strong><span>Loading home status…</span>
+      </div>
+      <div class="wallet-section">
+        <div class="home-charge-row"><div><strong>🏠 Daily Rent</strong><small id="home-rent-status">₹60 · first day free</small></div><button id="home-pay-rent" type="button">Pay ₹60</button></div>
+        <div class="home-charge-row"><div><strong>💡 Electricity + Water</strong><small id="home-utility-status">₹20 · first day free</small></div><button id="home-pay-utilities" type="button">Pay ₹20</button></div>
+      </div>
+      <div class="wallet-section"><strong>Sleep & Recovery</strong><p id="home-sleep-note" class="panel-note">Go to your home porch in the world. SLEEP restores Energy to 100.</p></div>
+      <div class="wallet-history-heading"><strong>Home Status</strong><button id="home-refresh" type="button">Refresh</button></div>
+      <div id="home-error" class="social-error" role="status"></div>
     </section>
     <section id="garage-panel" aria-label="Personal vehicle garage">
       <div class="panel-heading"><span>My Garage</span><button id="garage-close" class="panel-close" type="button" aria-label="Close garage">×</button></div>

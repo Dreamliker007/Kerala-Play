@@ -145,3 +145,12 @@ Kerala Play now has persistent Hunger, Thirst and Energy for each player. Needs 
 The HUD shows compact Hunger, Thirst and Energy values. Village Shop purchases now have real life-sim effects: Water restores thirst, Tea restores thirst + energy, Snack restores hunger + energy, and Kerala Meal restores hunger, thirst and energy. Prices and effects are server controlled.
 
 The Village Rest Bench at the existing bench location can restore Energy when the player is on foot and nearby. Rest has a short server cooldown after a successful recovery. Needs state is stored inside the existing job_state JSONB, so V65 requires no new Supabase migration.
+
+
+## Home / Rent / Sleep System (V66)
+
+Every player now receives a persistent Village Rental Home tied to the existing village house at the rental-home marker. The first rent and utility cycle is due after 24 hours. Daily in-game charges are server controlled: ₹60 Kerala Cash for rent and ₹20 for electricity + water. Payments are recorded in the normal wallet transaction history.
+
+Overdue charges have a 48-hour grace period. During the grace period the home still works. After the grace period, only the SLEEP interaction is temporarily paused until overdue rent or utilities are paid; the account and home are never deleted or evicted by this V66 system.
+
+When the player is on foot at the home porch with no active job, SLEEP restores Energy to 100 and applies a small Hunger −4 / Thirst −6 cost. Sleep has a short server cooldown and is location verified. Home, bill, payment-count and sleep state are stored inside the existing job_state JSONB, so V66 requires no new Supabase migration.

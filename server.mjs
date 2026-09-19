@@ -27,6 +27,20 @@ const NEEDS_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
 const NEEDS_REST_POINT = Object.freeze({ id: 'village-bench', label: 'Village Rest Bench', x: -10, z: -10, radius: 5.2 });
 const NEEDS_REST_ENERGY = 35;
 const NEEDS_REST_COOLDOWN_MS = 30_000;
+const HOME_DEFINITION = Object.freeze({
+  id: 'village-rental',
+  label: 'Village Rental Home',
+  x: -24,
+  z: -30.8,
+  radius: 5.2,
+  rent: 60,
+  utilities: 20,
+  periodMs: 24 * 60 * 60 * 1000,
+  graceMs: 48 * 60 * 60 * 1000,
+});
+const HOME_SLEEP_COOLDOWN_MS = 60_000;
+const HOME_SLEEP_HUNGER_COST = 4;
+const HOME_SLEEP_THIRST_COST = 6;
 const JOB_DEFINITIONS = Object.freeze({
   delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Take the delivery bike, collect a parcel, then ride to the customer.', missionType: 'route', vehicle: 'bike', vehicleLabel: 'Delivery Bike' },
   taxi: { title: 'Taxi Driver', reward: 220, durationMs: 0, cooldownMs: 35_000, description: 'Enter the taxi, reach the passenger pickup point, then drive to the destination.', missionType: 'route', vehicle: 'taxi', vehicleLabel: 'Kerala Taxi' },
@@ -66,7 +80,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -127,6 +141,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!Array.isArray(user.jobState.traffic.challans)) { user.jobState.traffic.challans = []; migrated = true; }
     if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) { user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 }; migrated = true; }
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) { user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 }; migrated = true; }
+    if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) { user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -447,6 +462,38 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     };
   }
 
+  function homeSummary(user) {
+    const state = jobStateFor(user);
+    const home = state.home;
+    const timestamp = now();
+    const rentDueAt = Number(home.rentDueAt);
+    const utilityDueAt = Number(home.utilityDueAt);
+    const rentOverdue = timestamp > rentDueAt;
+    const utilityOverdue = timestamp > utilityDueAt;
+    const rentGraceUntil = rentDueAt + HOME_DEFINITION.graceMs;
+    const utilityGraceUntil = utilityDueAt + HOME_DEFINITION.graceMs;
+    const accessBlocked = timestamp > rentGraceUntil || timestamp > utilityGraceUntil;
+    const reminder = accessBlocked
+      ? 'Sleep access paused until overdue home charges are paid.'
+      : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
+    return {
+      status: home.status,
+      home: HOME_DEFINITION,
+      rentDueAt,
+      utilityDueAt,
+      rentOverdue,
+      utilityOverdue,
+      rentGraceUntil,
+      utilityGraceUntil,
+      accessBlocked,
+      reminder,
+      lastSleepAt: Number(home.lastSleepAt || 0),
+      nextSleepAt: Number(home.lastSleepAt || 0) + HOME_SLEEP_COOLDOWN_MS,
+      rentPayments: Number(home.rentPayments || 0),
+      utilityPayments: Number(home.utilityPayments || 0),
+    };
+  }
+
   function needsMovementFactor(needs) {
     let factor = 1;
     if (needs.energy <= 8) factor = Math.min(factor, .62);
@@ -511,6 +558,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null };
     if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } };
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 };
+    if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 };
     if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
     const needs = user.jobState.needs;
     for (const key of ['hunger', 'thirst', 'energy']) {
@@ -519,6 +567,13 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     }
     if (!Number.isFinite(Number(needs.updatedAt)) || Number(needs.updatedAt) <= 0) needs.updatedAt = now();
     if (!Number.isFinite(Number(needs.lastRestAt))) needs.lastRestAt = 0;
+    const home = user.jobState.home;
+    if (home.status !== 'rented') home.status = 'rented';
+    if (!Number.isFinite(Number(home.rentDueAt)) || Number(home.rentDueAt) <= 0) { home.rentDueAt = now() + HOME_DEFINITION.periodMs; dirty = true; }
+    if (!Number.isFinite(Number(home.utilityDueAt)) || Number(home.utilityDueAt) <= 0) { home.utilityDueAt = now() + HOME_DEFINITION.periodMs; dirty = true; }
+    if (!Number.isFinite(Number(home.lastSleepAt))) home.lastSleepAt = 0;
+    if (!Number.isInteger(Number(home.rentPayments)) || Number(home.rentPayments) < 0) home.rentPayments = 0;
+    if (!Number.isInteger(Number(home.utilityPayments)) || Number(home.utilityPayments) < 0) home.utilityPayments = 0;
     if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 };
     const licence = user.jobState.traffic.licence;
     if (!['none', 'learner', 'full'].includes(licence.type)) licence.type = 'none';
@@ -848,6 +903,70 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       }
       if (path === '/api/needs' && request.method === 'GET') {
         send(response, 200, needsSummary(user)); return;
+      }
+      if (path === '/api/home' && request.method === 'GET') {
+        send(response, 200, homeSummary(user)); return;
+      }
+      if (path === '/api/home/pay' && request.method === 'POST') {
+        limited(`home-payment:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        requireValue(body.kind === 'rent' || body.kind === 'utilities', 400, 'Choose rent or utilities.');
+        const state = jobStateFor(user);
+        const home = state.home;
+        const isRent = body.kind === 'rent';
+        const amount = isRent ? HOME_DEFINITION.rent : HOME_DEFINITION.utilities;
+        const transaction = walletTransaction(
+          user,
+          -amount,
+          isRent ? 'home_rent' : 'home_utilities',
+          isRent ? 'Village Rental Home rent' : 'Village Rental Home electricity + water'
+        );
+        if (isRent) {
+          home.rentDueAt = Math.max(now(), Number(home.rentDueAt) || 0) + HOME_DEFINITION.periodMs;
+          home.rentPayments = Number(home.rentPayments || 0) + 1;
+        } else {
+          home.utilityDueAt = Math.max(now(), Number(home.utilityDueAt) || 0) + HOME_DEFINITION.periodMs;
+          home.utilityPayments = Number(home.utilityPayments || 0) + 1;
+        }
+        dirty = true;
+        await persist();
+        send(response, 200, { home: homeSummary(user), wallet: walletSummary(user), payment: { kind: body.kind, amount }, transaction }); return;
+      }
+      if (path === '/api/home/sleep' && request.method === 'POST') {
+        limited(`home-sleep:${user.id}`, 20, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        requireValue(!state.active, 409, 'Finish your active job before sleeping.');
+        const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before sleeping.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before sleeping.');
+        requireValue(!live.moving, 409, 'Stop moving before sleeping.');
+        requireValue(Math.hypot(live.x - HOME_DEFINITION.x, live.z - HOME_DEFINITION.z) <= HOME_DEFINITION.radius, 409, 'Move closer to your Village Rental Home.');
+        const summary = homeSummary(user);
+        requireValue(!summary.accessBlocked, 409, 'Home sleep access is paused. Pay overdue rent or utilities first.');
+        const needsBefore = needsSummary(user);
+        if (needsBefore.energy >= 99) {
+          send(response, 200, { slept: false, message: 'Energy is already full.', home: summary, needs: needsBefore }); return;
+        }
+        const timestamp = now();
+        requireValue(timestamp >= Number(state.home.lastSleepAt || 0) + HOME_SLEEP_COOLDOWN_MS, 409, 'Sleep is still cooling down.');
+        const needs = state.needs;
+        needs.energy = NEEDS_MAX;
+        needs.hunger = Math.max(0, Number(needs.hunger) - HOME_SLEEP_HUNGER_COST);
+        needs.thirst = Math.max(0, Number(needs.thirst) - HOME_SLEEP_THIRST_COST);
+        needs.updatedAt = timestamp;
+        state.home.lastSleepAt = timestamp;
+        dirty = true;
+        await persist();
+        send(response, 200, {
+          slept: true,
+          restoredEnergy: 100,
+          hungerCost: HOME_SLEEP_HUNGER_COST,
+          thirstCost: HOME_SLEEP_THIRST_COST,
+          home: homeSummary(user),
+          needs: needsSummary(user),
+        }); return;
       }
       if (path === '/api/needs/rest' && request.method === 'POST') {
         limited(`needs-rest:${user.id}`, 20, 60000);

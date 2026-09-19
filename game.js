@@ -80,6 +80,7 @@ let activeJobMission = null;
 let garageSnapshot = null;
 let trafficSnapshot = null;
 let needsSnapshot = null;
+let homeSnapshot = null;
 let trafficCheckpointVisual = null;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
@@ -760,6 +761,20 @@ function updateWorldInteract() {
     }
   }
 
+  if (!active && vehicleMode === 'walk' && homeSnapshot?.home) {
+    const home = homeSnapshot.home;
+    const distance = Math.hypot(playerRef.position.x - Number(home.x), playerRef.position.z - Number(home.z));
+    if (distance <= Number(home.radius || 5.2) + .3) {
+      worldInteract.hidden = false;
+      worldInteract.dataset.mode = 'home-sleep';
+      worldInteract.textContent = homeSnapshot.accessBlocked
+        ? 'HOME · PAYMENT DUE'
+        : `SLEEP · ENERGY ${Math.round(Number(needsSnapshot?.energy ?? 100))}%`;
+      worldInteract.disabled = !!homeSnapshot.accessBlocked;
+      return;
+    }
+  }
+
   if (!active && vehicleMode === 'walk' && needsSnapshot?.restPoint) {
     const rest = needsSnapshot.restPoint;
     const distance = Math.hypot(playerRef.position.x - Number(rest.x), playerRef.position.z - Number(rest.z));
@@ -822,6 +837,8 @@ worldInteract?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('kerala-traffic-checkpoint'));
   } else if (worldInteract.dataset.mode === 'needs-rest') {
     window.dispatchEvent(new CustomEvent('kerala-needs-rest'));
+  } else if (worldInteract.dataset.mode === 'home-sleep') {
+    window.dispatchEvent(new CustomEvent('kerala-home-sleep'));
   } else {
     window.dispatchEvent(new CustomEvent('kerala-job-interact'));
   }
@@ -883,6 +900,10 @@ window.addEventListener('kerala-traffic-state', event => {
   updateDriveHud();
 });
 window.addEventListener('kerala-needs-state', event => applyNeedsState(event.detail, { warn: false }));
+window.addEventListener('kerala-home-state', event => {
+  homeSnapshot = event.detail || null;
+  updateWorldInteract();
+});
 
 window.addEventListener('error', event => {
   console.error(event.error || event.message);
@@ -2113,6 +2134,10 @@ function buildWorld(scene) {
   addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5 });
 
   addPhotoHouse(scene, -24, -36, 10.2, 6.8);
+  const rentalHomeMarker = new THREE.Group();
+  rentalHomeMarker.add(missionTag('Rental Home', '#654b36'));
+  rentalHomeMarker.position.set(-24, 0, -30.8);
+  scene.add(rentalHomeMarker);
   addPhotoHouse(scene, 28, 24, 8.8, 5.9);
   addPhotoHouse(scene, -36, 33, 9.4, 6.25);
   addPhotoHouse(scene, 18, -32, 8.6, 5.75);
