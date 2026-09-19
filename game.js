@@ -83,6 +83,8 @@ let trafficSnapshot = null;
 let needsSnapshot = null;
 let homeSnapshot = null;
 let trafficCheckpointVisual = null;
+let junctionSignalVisual = null;
+const pedestrianCrossingZ = -14.3;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
@@ -2273,16 +2275,55 @@ function animateHuman(human, phase, moving) {
   }
 }
 
+function npcPingPongState(time, speed, offset) {
+  const cycle = ((time * Math.max(.18, speed) * 1.55 + offset) % 8 + 8) % 8;
+  if (cycle < 1.15) return { progress: 0, direction: 1, moving: 0 };
+  if (cycle < 3.15) return { progress: (cycle - 1.15) / 2, direction: 1, moving: 1 };
+  if (cycle < 4.30) return { progress: 1, direction: -1, moving: 0 };
+  if (cycle < 6.30) return { progress: 1 - (cycle - 4.30) / 2, direction: -1, moving: 1 };
+  return { progress: 0, direction: 1, moving: 0 };
+}
+
 function updateVillagers(time) {
   villagers.forEach(villager => {
-    const pace = (Math.sin(time * villager.userData.speed + villager.userData.offset) + 1) * .5;
-    villager.position.z = villager.userData.startZ + Math.sin(time * villager.userData.speed + villager.userData.offset) * villager.userData.distance;
-    villager.rotation.y = Math.cos(time * villager.userData.speed + villager.userData.offset) > 0 ? 0 : Math.PI;
-    if (villager.userData.photo) {
-      villager.userData.photo.position.y = .025 + Math.abs(Math.sin(time * villager.userData.speed * 6)) * .018;
-      animateHuman(villager.userData.human, time * villager.userData.speed * 7, .55 + pace * .45);
-    } else {
-      animateHuman(villager.userData.human, time * villager.userData.speed * 7, .55 + pace * .45);
+    const data = villager.userData;
+    const human = data.human;
+    if (!human) return;
+
+    if (data.behavior === 'idle') {
+      villager.position.set(data.startX, 0, data.startZ);
+      villager.rotation.y = Number(data.facing || 0);
+      animateHuman(human, time * .8 + data.offset, 0);
+      const head = human.userData.parts?.head;
+      if (head) head.rotation.y = Math.sin(time * .55 + data.offset) * .13;
+      const torso = human.userData.parts?.torso;
+      if (torso) torso.rotation.y = Math.sin(time * .32 + data.offset) * .025;
+      data.crossingActive = false;
+      return;
+    }
+
+    const motion = npcPingPongState(time, data.speed, data.offset);
+    if (data.behavior === 'crossing') {
+      const fromX = Number(data.crossFromX);
+      const toX = Number(data.crossToX);
+      villager.position.x = THREE.MathUtils.lerp(fromX, toX, motion.progress);
+      villager.position.z = data.startZ;
+      villager.rotation.y = motion.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+      data.crossingActive = motion.moving > 0 && Math.abs(villager.position.x) < 8.45;
+      animateHuman(human, time * data.speed * 7.5, motion.moving ? .86 : 0);
+      return;
+    }
+
+    const routeOffset = (motion.progress * 2 - 1) * data.distance;
+    villager.position.x = data.startX;
+    villager.position.z = data.startZ + routeOffset;
+    villager.rotation.y = motion.direction > 0 ? 0 : Math.PI;
+    data.crossingActive = false;
+    animateHuman(human, time * data.speed * 7, motion.moving ? .72 : 0);
+
+    if (!motion.moving) {
+      const head = human.userData.parts?.head;
+      if (head) head.rotation.y = Math.sin(time * .45 + data.offset) * .10;
     }
   });
 }
@@ -2842,6 +2883,19 @@ function buildWorld(scene) {
   addPhotoVillager(scene, -8.9, 8, 4.8, .38, 3, .72);
   addPhotoVillager(scene, 8.9, 31, 5.4, .35, 1.3, .70);
   addPhotoVillager(scene, -9.2, -43, 3.8, .40, 5.4, .69);
+
+  addPhotoVillager(scene, -10.4, pedestrianCrossingZ, 0, .56, .7, .72, {
+    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian',
+  });
+  addPhotoVillager(scene, 10.1, 27.2, 0, .28, 2.4, .70, {
+    behavior: 'idle', facing: Math.PI, role: 'Waiting',
+  });
+  addPhotoVillager(scene, -10.0, -50.2, 0, .28, 4.8, .69, {
+    behavior: 'idle', facing: 0, role: 'Waiting',
+  });
+  addPhotoVillager(scene, -10.2, 7.5, 0, .25, 1.6, .68, {
+    behavior: 'idle', facing: Math.PI / 2, role: 'Shopper',
+  });
 }
 
 function buildLandmarkWorld(scene) {
@@ -3348,9 +3402,9 @@ function addPalm(scene, x, z, scale) {
   palm.position.set(x, 0, z); palm.scale.setScalar(scale); scene.add(palm);
 }
 
-function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
+function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options = {}) {
   const index = villagers.length;
-  const names = ['Anu', 'Vivek', 'Meera', 'Arun', 'Nisha', 'Riyas', 'Asha', 'Manu'];
+  const names = ['Anu', 'Vivek', 'Meera', 'Arun', 'Nisha', 'Riyas', 'Asha', 'Manu', 'Liya', 'Nabeel', 'Sreeja', 'Jose'];
   const gender = index % 2 ? 'male' : 'female';
   const styles = [
     { shirt: 0xa95762, trousers: 0x2e3447, skin: 0xa96d4c, hair: 0x171311, shoes: 0x372b26, accent: 0xd8aa55 },
@@ -3364,9 +3418,25 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
   human.scale.setScalar(.9 * scale + .2);
   villager.add(human);
   villager.position.set(x, 0, z);
-  const npcName = names[index % names.length];
-  villager.userData = { human, startZ: z, distance, speed, offset, npc: true, name: npcName, gender };
-  updateNameLabel(villager, npcName + ' · Local', 'npc-' + index);
+  const npcName = options.name || names[index % names.length];
+  const behavior = options.behavior || 'patrol';
+  villager.userData = {
+    human,
+    startX: x,
+    startZ: z,
+    distance,
+    speed,
+    offset,
+    behavior,
+    facing: Number(options.facing || 0),
+    crossFromX: Number(options.fromX ?? x),
+    crossToX: Number(options.toX ?? x),
+    crossingActive: false,
+    npc: true,
+    name: npcName,
+    gender,
+  };
+  updateNameLabel(villager, npcName + ' · ' + (options.role || 'Local'), 'npc-' + index);
   villagers.push(villager);
   scene.add(villager);
 }
