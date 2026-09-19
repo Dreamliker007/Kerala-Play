@@ -1780,15 +1780,22 @@ try {
       if (mapAccumulator >= .12) { updateMapPlayer(player); mapAccumulator = 0; }
     } else {
       driveSpeed = 0;
-      const walkingInput = controlLength > .08;
       const runningNow = runHeld && needsSnapshot?.canRun !== false;
+      const autoRun = runningNow && controlLength <= .08;
+      const walkingInput = controlLength > .08 || autoRun;
       const needsFactor = Math.max(.55, Math.min(1, Number(needsSnapshot?.movementFactor || 1)));
       if (walkingInput) {
-        moveForward.set(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
-        moveRight.set(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
-        desiredMove.copy(moveForward).multiplyScalar(-controlY).addScaledVector(moveRight, controlX);
-        if (desiredMove.lengthSq() > .0001) desiredMove.normalize();
-        const inputCurve = Math.pow(controlLength, 1.55);
+        if (autoRun) {
+          // Holding RUN keeps the avatar moving straight ahead even after the
+          // movement joystick is released. Releasing RUN stops auto-run.
+          desiredMove.set(Math.sin(player.rotation.y), 0, Math.cos(player.rotation.y));
+        } else {
+          moveForward.set(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
+          moveRight.set(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
+          desiredMove.copy(moveForward).multiplyScalar(-controlY).addScaledVector(moveRight, controlX);
+          if (desiredMove.lengthSq() > .0001) desiredMove.normalize();
+        }
+        const inputCurve = autoRun ? 1 : Math.pow(controlLength, 1.55);
         const maxWalkSpeed = (runningNow ? 5.4 : 3.05) * needsFactor;
         targetWalkVelocity.copy(desiredMove).multiplyScalar(maxWalkSpeed * inputCurve);
       } else {
