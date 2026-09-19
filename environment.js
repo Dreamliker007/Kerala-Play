@@ -1,7 +1,6 @@
 // A shared visual clock and opt-in soundscape. No downloaded audio or visual assets.
 const DAY_LENGTH_MS = 24 * 60 * 1000;
 const PREFERENCE_KEY = 'kerala-play:environment:v1';
-const QUALITY_LEVELS = ['low', 'balanced', 'high'];
 
 function readPreferences() {
   try { return JSON.parse(localStorage.getItem(PREFERENCE_KEY) || '{}') || {}; }
@@ -11,8 +10,7 @@ function readPreferences() {
 /** Environment controller; time is game elapsed time, while the sky uses UTC epoch time. */
 export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) {
   const preferences = readPreferences();
-  const coarsePointer = matchMedia('(pointer: coarse)').matches;
-  let quality = QUALITY_LEVELS.includes(preferences.quality) ? preferences.quality : (coarsePointer ? 'low' : 'balanced');
+  const quality = 'high';
   let disposed = false;
   let lastHudMinute = -1;
   let lastHudWeather = '';
@@ -209,7 +207,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     }
     #world-settings button[aria-pressed="true"] { background:#247a54; }
     #world-settings :focus-visible { outline:2px solid #9be7c1; outline-offset:2px; }
-    #world-quality { min-width:96px; }
+    #world-quality-fixed { min-width:96px; text-align:right; color:#bff7d7; font-weight:900; letter-spacing:.25px; }
     .settings-fullscreen { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:800!important; }
     #world-audio-status { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
     @media(max-width:979px) {
@@ -231,7 +229,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   const settings = document.createElement('div');
   settings.id = 'world-settings';
   settings.setAttribute('aria-label', 'Game settings');
-  settings.innerHTML = '<div class="world-settings-head"><strong>Settings</strong><button type="button" id="world-settings-close" aria-label="Close settings">×</button></div><label class="world-setting-row"><span>World sound</span><button type="button" id="world-sound" aria-pressed="false">Off</button></label><label class="world-setting-row"><span>Graphics</span><select id="world-quality" aria-label="Graphics quality"><option value="low">Low</option><option value="balanced">Balanced</option><option value="high">High</option></select></label><output id="world-audio-status" role="status"></output>';
+  settings.innerHTML = '<div class="world-settings-head"><strong>Settings</strong><button type="button" id="world-settings-close" aria-label="Close settings">×</button></div><label class="world-setting-row"><span>World sound</span><button type="button" id="world-sound" aria-pressed="false">Off</button></label><div class="world-setting-row"><span>Graphics</span><strong id="world-quality-fixed">HIGH QUALITY</strong></div><output id="world-audio-status" role="status"></output>';
 
   const quickActions = document.querySelector('#quick-actions');
   const settingsToggle = document.createElement('button');
@@ -254,7 +252,6 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
 
   (document.querySelector('#hud') || document.body).append(clockOutput, settings);
   const soundButton = settings.querySelector('#world-sound');
-  const qualitySelect = settings.querySelector('#world-quality');
   const audioStatus = settings.querySelector('#world-audio-status');
   const settingsClose = settings.querySelector('#world-settings-close');
 
@@ -272,32 +269,29 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   soundButton.title = 'Enable birds, water, night insects, and gentle music';
 
   function savePreferences() {
-    try { localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ quality, sound: audioEnabled })); } catch { /* Storage can be unavailable in private mode. */ }
+    try { localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ quality: 'high', sound: audioEnabled })); } catch { /* Storage can be unavailable in private mode. */ }
   }
   function applyQuality() {
-    const high = quality === 'high';
-    const balanced = quality === 'balanced';
-    const maxRatio = quality === 'low' ? .82 : high ? 2 : 1.2;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, maxRatio));
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
     renderer.setSize(innerWidth, innerHeight, false);
-    renderer.shadowMap.enabled = high;
+    renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.shadowMap.needsUpdate = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = high ? 1.20 : balanced ? 1.18 : 1.15;
+    renderer.toneMappingExposure = 1.20;
 
-    const anisotropy = Math.max(1, Math.min(renderer.capabilities.getMaxAnisotropy?.() || 1, high ? 8 : balanced ? 4 : 1));
+    const anisotropy = Math.max(1, Math.min(renderer.capabilities.getMaxAnisotropy?.() || 1, 8));
     scene.traverse(object => {
       if (!object.isMesh && !object.isSprite) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      if (object.isMesh && high) {
+      if (object.isMesh) {
         const opaque = materials.every(material => material && !material.transparent && !material.wireframe);
         object.castShadow = opaque && (object.geometry?.type !== 'PlaneGeometry' || object.isInstancedMesh);
         object.receiveShadow = opaque;
       }
       for (const material of materials) {
         if (!material) continue;
-        material.dithering = high;
+        material.dithering = true;
         if (material.map) {
           texturedMaterials.add(material);
           material.map.anisotropy = anisotropy;
@@ -307,30 +301,23 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     });
 
     if (sun) {
-      sun.castShadow = high;
-      if (sun.shadow) {
-        const size = high ? 2048 : 1024;
-        if (sun.shadow.mapSize.x !== size || sun.shadow.mapSize.y !== size) {
-          sun.shadow.mapSize.set(size, size);
-          sun.shadow.map?.dispose?.();
-          sun.shadow.map = null;
-        }
+      sun.castShadow = true;
+      if (sun.shadow && (sun.shadow.mapSize.x !== 2048 || sun.shadow.mapSize.y !== 2048)) {
+        sun.shadow.mapSize.set(2048, 2048);
+        sun.shadow.map?.dispose?.();
+        sun.shadow.map = null;
       }
     }
-    stars.visible = quality !== 'low';
-    clouds.count = high ? 30 : balanced ? 21 : 12;
-    clouds.visible = quality !== 'low' || currentWeather.overcast > .3;
-    rainGeometry.setDrawRange(0, (high ? 620 : balanced ? 300 : 150) * 2);
-    rainMaterial.opacity = Math.min(rainMaterial.opacity, high ? .72 : balanced ? .62 : .46);
-    qualitySelect.value = quality;
+    stars.visible = true;
+    clouds.count = 30;
+    clouds.visible = true;
+    rainGeometry.setDrawRange(0, 620 * 2);
+    rainMaterial.opacity = Math.min(rainMaterial.opacity, .72);
   }
-  function setQuality(value) {
-    if (!QUALITY_LEVELS.includes(value) || disposed) return;
-    quality = value;
+  function setQuality() {
+    if (disposed) return;
     applyQuality();
-    savePreferences();
   }
-  qualitySelect.addEventListener('change', () => setQuality(qualitySelect.value));
   async function toggleSound() {
     if (disposed) return;
     soundButton.disabled = true;
@@ -407,14 +394,14 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     sunDisc.visible = elevation > -.08;
     moonDisc.visible = elevation < .08;
     starMaterial.opacity = (1 - daylight) * .88 * (1 - overcast);
-    clouds.visible = quality !== 'low' || overcast > .3;
+    clouds.visible = true;
     clouds.rotation.y = worldMinute / 1440 * Math.PI * 2 + time * .002 * (1 + overcast * 1.8);
     cloudMaterial.opacity = .45 + overcast * .43;
     cloudMaterial.color.copy(nightLightColor).lerp(whiteColor, daylight).lerp(warmColor, twilight).lerp(stormCloud, overcast * .76).multiplyScalar(.35 + daylight * .65);
 
-    const rainLimit = quality === 'high' ? 620 : quality === 'balanced' ? 300 : 150;
+    const rainLimit = 620;
     rainField.visible = rain > .035;
-    rainMaterial.opacity = rain * (quality === 'high' ? .72 : quality === 'balanced' ? .62 : .46);
+    rainMaterial.opacity = rain * .72;
     rainField.position.set(camera.position.x, 0, camera.position.z);
     if (rainField.visible) {
       const wind = .75 + overcast * 1.3;
