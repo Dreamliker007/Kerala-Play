@@ -323,3 +323,16 @@ Saved older Low/Balanced preferences are ignored and replaced with High. The Set
 Future performance work should optimize world geometry, draw calls, instancing, culling and update frequency rather than visibly lowering the graphics preset.
 
 No backend, database, economy, gameplay or Supabase migration is required.
+
+
+## Kerala Environment Realism (V84)
+
+V84 uses the High-quality-only renderer as the baseline and improves the physical look of the village rather than adding another graphics preset.
+
+Kerala houses gain visible rain gutters, downpipes, roof-edge depth and drainage shoes. Roadside shops gain shutter slats, awning supports, framed signage and a small front counter so facades read as layered structures instead of flat boxes.
+
+The road network now includes concrete roadside drainage channels, occasional cover slabs, repaired asphalt patches and damp soil shoulder patches. Compound homes gain efficient instanced hedges, while lightweight procedural banana plants add more recognizable Kerala vegetation around homes and roadside spaces.
+
+All new street detail is visual-only. Existing road collision, traffic authority, jobs, economy, ownership and server movement rules are unchanged.
+
+V84 also adds browser-module syntax checks for game.js, environment.js, social.js and boot.js to the core GitHub workflow so future visual changes are less likely to merge with a client-side syntax error.

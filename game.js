@@ -3008,6 +3008,137 @@ function addRoadsideClutter(scene) {
   });
 }
 
+function addBananaPlant(scene, x, z, scale = 1, yaw = 0) {
+  const group = new THREE.Group();
+  const stemMat = new THREE.MeshStandardMaterial({ color: 0x6f963f, roughness: .94 });
+  const leafMat = new THREE.MeshStandardMaterial({
+    color: 0x3f8d42,
+    roughness: .82,
+    side: THREE.DoubleSide,
+  });
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(.09, .15, 2.45, 9), stemMat);
+  stem.position.y = 1.22;
+  group.add(stem);
+
+  const leafGeometry = new THREE.PlaneGeometry(.78, 2.55, 1, 3);
+  leafGeometry.translate(0, 1.18, 0);
+  for (let index = 0; index < 7; index++) {
+    const leaf = new THREE.Mesh(leafGeometry, leafMat);
+    const angle = index / 7 * Math.PI * 2;
+    leaf.position.set(Math.cos(angle) * .08, 2.20 + (index % 2) * .08, Math.sin(angle) * .08);
+    leaf.rotation.order = 'YXZ';
+    leaf.rotation.y = angle;
+    leaf.rotation.x = -.82 + (index % 3) * .08;
+    leaf.rotation.z = (index % 2 ? 1 : -1) * .08;
+    leaf.scale.set(.92 + (index % 3) * .06, .88 + (index % 2) * .08, 1);
+    leaf.castShadow = true;
+    group.add(leaf);
+  }
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  group.scale.setScalar(scale);
+  scene.add(group);
+}
+
+function addKeralaStreetRealism(scene) {
+  const concrete = new THREE.MeshStandardMaterial({ color: 0xa8a69c, roughness: .96 });
+  const drainMat = new THREE.MeshStandardMaterial({ color: 0x48534a, roughness: .72, metalness: .02 });
+  const patchMat = new THREE.MeshStandardMaterial({ color: 0x34393a, roughness: .80 });
+  const soilMat = new THREE.MeshStandardMaterial({ color: 0x6b5437, roughness: 1 });
+  const hedgeMat = new THREE.MeshStandardMaterial({ color: 0x35733d, roughness: .95 });
+
+  // Kerala-style roadside drainage channels beside the main road.
+  [-1, 1].forEach(side => {
+    [-64, -48, -32, -16, 0, 16, 32, 48, 64].forEach((z, index) => {
+      if (Math.abs(z + 22) < 8 && side < 0) return;
+      const rim = new THREE.Mesh(new THREE.BoxGeometry(.54, .14, 13.4), concrete);
+      rim.position.set(side * 8.62, .055, z);
+      const channel = new THREE.Mesh(new THREE.BoxGeometry(.28, .055, 13.1), drainMat);
+      channel.position.set(side * 8.62, .075, z);
+      rim.receiveShadow = true;
+      channel.receiveShadow = true;
+      scene.add(rim, channel);
+
+      if (index % 3 === 1) {
+        const slab = new THREE.Mesh(new THREE.BoxGeometry(.72, .12, 1.25), concrete);
+        slab.position.set(side * 8.62, .13, z + 1.8);
+        slab.receiveShadow = true;
+        scene.add(slab);
+      }
+    });
+  });
+
+  // Side-road drain.
+  [-60, -44, -28, -12, 4].forEach(x => {
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(13.0, .14, .48), concrete);
+    rim.position.set(x, .055, -28.18);
+    const channel = new THREE.Mesh(new THREE.BoxGeometry(12.7, .055, .25), drainMat);
+    channel.position.set(x, .075, -28.18);
+    scene.add(rim, channel);
+  });
+
+  // Repaired asphalt and damp shoulder patches stop the roads looking perfectly flat/new.
+  const patchGeometry = new THREE.CircleGeometry(1, 20);
+  [
+    [-3.5,-58,1.45,.58,.18],[3.0,-37,1.10,.48,-.2],[-3.2,-3,1.55,.54,.08],
+    [3.6,19,1.25,.46,-.12],[-2.8,54,1.35,.52,.22],[-52,-21.2,1.55,.44,.05],
+    [-31,-22.4,1.30,.42,-.08],[-9,-21.5,1.12,.38,.14],
+  ].forEach(([x,z,sx,sz,rotation]) => {
+    const patch = new THREE.Mesh(patchGeometry, patchMat);
+    patch.rotation.x = -Math.PI / 2;
+    patch.rotation.z = rotation;
+    patch.scale.set(sx, sz, 1);
+    patch.position.set(x, .041, z);
+    patch.receiveShadow = true;
+    scene.add(patch);
+  });
+
+  [
+    [-9.7,-57,1.5,.55], [9.8,-42,1.15,.45], [-10.2,-5,1.4,.52],
+    [9.7,13,1.3,.48], [-9.8,46,1.2,.45], [10.0,61,1.45,.52],
+    [-54,-29.0,1.6,.50], [-35,-15.0,1.35,.46],
+  ].forEach(([x,z,sx,sz]) => {
+    const soil = new THREE.Mesh(patchGeometry, soilMat);
+    soil.rotation.x = -Math.PI / 2;
+    soil.scale.set(sx, sz, 1);
+    soil.position.set(x, .026, z);
+    soil.receiveShadow = true;
+    scene.add(soil);
+  });
+
+  // Compact hedges around homes; instanced to keep the high-quality pass efficient.
+  const hedgeGeometry = new THREE.IcosahedronGeometry(.42, 1);
+  const hedgePositions = [];
+  [
+    [28, 28.2, 10.0], [-36, 37.4, 10.4], [18, -28.0, 9.5],
+  ].forEach(([cx, cz, width]) => {
+    for (let offset = -width / 2; offset <= width / 2; offset += .72) {
+      if (Math.abs(offset) < 1.7) continue;
+      hedgePositions.push([cx + offset, cz, .80 + (Math.abs(Math.round(offset * 10)) % 3) * .08]);
+    }
+  });
+  const hedge = new THREE.InstancedMesh(hedgeGeometry, hedgeMat, hedgePositions.length);
+  const dummy = new THREE.Object3D();
+  hedgePositions.forEach(([x,z,scale], index) => {
+    dummy.position.set(x, .40, z);
+    dummy.scale.set(scale * 1.08, scale, scale * .92);
+    dummy.rotation.y = (index % 4) * .18;
+    dummy.updateMatrix();
+    hedge.setMatrixAt(index, dummy.matrix);
+  });
+  hedge.instanceMatrix.needsUpdate = true;
+  hedge.castShadow = true;
+  hedge.receiveShadow = true;
+  scene.add(hedge);
+
+  [
+    [23.8,20.6,.72,.2],[31.6,20.8,.82,1.2],
+    [-40.6,29.6,.76,.7],[-31.7,29.4,.70,2.0],
+    [14.0,-35.6,.74,.4],[22.4,-35.4,.80,1.7],
+    [-18.5,3.2,.66,1.1],[19.5,3.8,.68,2.2],
+  ].forEach(([x,z,scale,yaw]) => addBananaPlant(scene, x, z, scale, yaw));
+}
+
 function addTownStreetDetails(scene) {
   addShop(scene, -14.4, 7.5);
   addShop(scene, 14.8, 38.5);
@@ -3072,6 +3203,7 @@ function buildWorld(scene) {
   addWeatherRoadDetails(scene);
   addRoadsideLife(scene);
   addTownStreetDetails(scene);
+  addKeralaStreetRealism(scene);
   addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737 });
   addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -76, max: 76, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d });
   addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5 });
@@ -3705,6 +3837,28 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   canopy.position.set(0, 3.85, 4.18);
   canopy.rotation.x = -.08;
   group.add(canopy);
+
+  const gutterMat = new THREE.MeshStandardMaterial({ color: 0x5f6462, roughness: .62, metalness: .28 });
+  const gutterFront = new THREE.Mesh(new THREE.BoxGeometry(9.55, .10, .12), gutterMat);
+  gutterFront.position.set(0, 5.06, 3.72);
+  const gutterBack = gutterFront.clone();
+  gutterBack.position.z = -3.72;
+  group.add(gutterFront, gutterBack);
+  [-4.15, 4.15].forEach(pipeX => {
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(.055, .065, 4.25, 8), gutterMat);
+    pipe.position.set(pipeX, 2.52, 3.70);
+    group.add(pipe);
+    const shoe = new THREE.Mesh(new THREE.BoxGeometry(.18, .12, .42), gutterMat);
+    shoe.position.set(pipeX, .42, 3.88);
+    group.add(shoe);
+  });
+
+  const roofShadow = new THREE.Mesh(
+    new THREE.BoxGeometry(9.15, .08, .18),
+    new THREE.MeshStandardMaterial({ color: 0x5e4637, roughness: .96 })
+  );
+  roofShadow.position.set(0, 4.92, 3.66);
+  group.add(roofShadow);
   group.position.set(x, 0, z);
   scene.add(group);
 }
@@ -3718,9 +3872,33 @@ function addShop(scene, x, z) {
   awning.position.set(0, 3.35, 3.2);
   const sign = new THREE.Mesh(new THREE.BoxGeometry(5.5, .9, .1), new THREE.MeshStandardMaterial({ color: 0x276a7e, roughness: .72 }));
   sign.position.set(0, 4.25, 2.93);
-  const shutter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.05, .12), new THREE.MeshStandardMaterial({ color: 0x6e5845, roughness: 1 }));
+  const shutterMat = new THREE.MeshStandardMaterial({ color: 0x6e5845, roughness: .96, metalness: .08 });
+  const shutter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.05, .12), shutterMat);
   shutter.position.set(0, 1.82, 2.96);
   group.add(body, awning, sign, shutter);
+
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x3d4547, roughness: .74, metalness: .22 });
+  for (let y = .94; y <= 2.70; y += .22) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(4.28, .035, .055), trimMat);
+    slat.position.set(0, y, 3.035);
+    group.add(slat);
+  }
+  [-4.55, 4.55].forEach(px => {
+    const support = new THREE.Mesh(new THREE.BoxGeometry(.12, 3.18, .12), trimMat);
+    support.position.set(px, 1.63, 3.18);
+    group.add(support);
+  });
+  const signBorder = new THREE.Mesh(new THREE.BoxGeometry(5.82, 1.12, .07), trimMat);
+  signBorder.position.set(0, 4.25, 2.86);
+  signBorder.scale.z = .60;
+  group.add(signBorder);
+  sign.position.z = 2.91;
+  const counter = new THREE.Mesh(
+    new THREE.BoxGeometry(2.65, .82, .70),
+    new THREE.MeshStandardMaterial({ color: 0x8c6a45, roughness: .88 })
+  );
+  counter.position.set(-3.0, .62, 3.22);
+  group.add(counter);
   group.position.set(x, 0, z);
   scene.add(group);
 }
