@@ -529,8 +529,8 @@ function updateFootstepEffects(delta, player, moving, running) {
     const pulse = vehicleMode === 'walk' && moving
       ? Math.abs(Math.sin(walkPhase)) * (running ? .045 : .025)
       : 0;
-    const targetX = .48 * (1 + pulse);
-    const targetY = .32 * (1 - pulse * .42);
+    const targetX = 1 + pulse;
+    const targetY = 1 - pulse * .42;
     shadow.scale.x += (targetX - shadow.scale.x) * Math.min(1, delta * 10);
     shadow.scale.y += (targetY - shadow.scale.y) * Math.min(1, delta * 10);
   }
