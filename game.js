@@ -595,6 +595,30 @@ function createJobVehicleVisual(kind, source = 'job') {
   return source === 'personal' ? createPersonalCarVehicle() : createTaxiVehicle();
 }
 
+function animateVehicleVisual(vehicle, delta, speed, steering = 0, speedRatio = 0) {
+  if (!vehicle) return;
+  const wheelRadius = Math.max(.12, Number(vehicle.userData.wheelRadius || .24));
+  const spin = speed / wheelRadius * delta;
+  for (const wheelRoot of vehicle.userData.wheels || []) {
+    const wheel = wheelRoot.children?.[0];
+    const hub = wheelRoot.children?.[1];
+    if (wheel) wheel.rotation.x -= spin;
+    if (hub) hub.rotation.x -= spin;
+  }
+
+  const steerAngle = THREE.MathUtils.clamp(steering, -1, 1) * .30;
+  for (const wheelRoot of vehicle.userData.frontWheels || []) {
+    wheelRoot.rotation.y += (steerAngle - wheelRoot.rotation.y) * Math.min(1, delta * 10);
+  }
+
+  const leanTarget = -THREE.MathUtils.clamp(steering, -1, 1) * Math.min(.06, .018 + speedRatio * .045);
+  const pitchTarget = Math.abs(speed) > .15
+    ? (speed >= 0 ? -.008 : .008) * Math.min(1, speedRatio + .2)
+    : 0;
+  vehicle.rotation.z += (leanTarget - vehicle.rotation.z) * Math.min(1, delta * 7);
+  vehicle.rotation.x += (pitchTarget - vehicle.rotation.x) * Math.min(1, delta * 6);
+}
+
 function restorePlayerVehiclePose() {
   const avatar = playerRef?.userData.avatar;
   if (avatar) {
@@ -1545,6 +1569,8 @@ try {
   let runCruiseArmed = false;
   let acceleratorHeld = false;
   let acceleratorPointerId = null;
+  let smoothedDriveSteering = 0;
+  let driveSpeedRatio = 0;
   let walkPhase = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
   let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0;
@@ -1695,6 +1721,8 @@ try {
     acceleratorPointerId = null;
     lookPointerId = null;
     driveSpeed = 0;
+    smoothedDriveSteering = 0;
+    driveSpeedRatio = 0;
     walkVelocity.set(0, 0, 0);
     targetWalkVelocity.set(0, 0, 0);
   }
@@ -1775,6 +1803,8 @@ try {
         : (Math.abs(rawSteering) - steeringDeadzone) / (1 - steeringDeadzone);
       const throttle = Math.sign(rawThrottle) * Math.pow(throttleMagnitude, 1.8);
       const steering = Math.sign(rawSteering) * Math.pow(steeringMagnitude, 1.35);
+      const steerResponse = Math.abs(driveSpeed) < .8 ? 9.5 : 7.2;
+      smoothedDriveSteering += (steering - smoothedDriveSteering) * (1 - Math.exp(-delta * steerResponse));
       const roadZone = roadZoneAt(player.position.x, player.position.z);
       const driveVehicle = currentDriveVehicle();
       const condition = Math.max(15, Math.min(100, Number(driveVehicle?.condition ?? 100)));
@@ -1783,13 +1813,16 @@ try {
       const maxForward = (vehicleMode === 'bike' ? roadZone.bikeLimit : roadZone.taxiLimit) * conditionFactor * (fuel <= .05 ? 0 : 1);
       const maxReverse = fuel <= .05 ? 0 : Math.min(vehicleMode === 'bike' ? 2.6 : 2.4, Math.max(.8, maxForward * .48));
       const targetSpeed = runHeld ? 0 : (throttle >= 0 ? throttle * maxForward : throttle * maxReverse);
-      const response = runHeld ? 9 : (acceleratorHeld ? 4.8 : (Math.abs(throttle) > .01 ? 2.55 : 3.6));
+      const brakingResponse = Math.abs(driveSpeed) > Math.max(2.2, maxForward * .35) ? 7.2 : 10.2;
+      const response = runHeld ? brakingResponse : (acceleratorHeld ? 4.9 : (Math.abs(throttle) > .01 ? 2.7 : 3.8));
       driveSpeed += (targetSpeed - driveSpeed) * Math.min(1, delta * response);
       if (Math.abs(driveSpeed) < .03) driveSpeed = 0;
       const speedRatio = maxForward > .01 ? Math.min(1, Math.abs(driveSpeed) / maxForward) : 0;
+      driveSpeedRatio = speedRatio;
 
       if (Math.abs(driveSpeed) > .035) {
-        player.rotation.y -= steering * delta * (.72 + speedRatio * .9) * (driveSpeed >= 0 ? 1 : -1);
+        const lowSpeedAssist = 1.08 - speedRatio * .20;
+        player.rotation.y -= smoothedDriveSteering * delta * (.68 + speedRatio * .72) * lowSpeedAssist * (driveSpeed >= 0 ? 1 : -1);
         const dx = Math.sin(player.rotation.y) * driveSpeed * delta;
         const dz = Math.cos(player.rotation.y) * driveSpeed * delta;
         const beforeX = player.position.x;
@@ -1815,11 +1848,14 @@ try {
         }
       }
 
-      if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 2.5);
+      if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * (2.0 + speedRatio * 1.15));
+      animateVehicleVisual(jobVehicleVisual, delta, driveSpeed, smoothedDriveSteering, speedRatio);
       animatePlayer(player, walkPhase, 0);
       if (mapAccumulator >= .12) { updateMapPlayer(player); mapAccumulator = 0; }
     } else {
       driveSpeed = 0;
+      driveSpeedRatio = 0;
+      smoothedDriveSteering += (0 - smoothedDriveSteering) * (1 - Math.exp(-delta * 10));
       const runningNow = runHeld && needsSnapshot?.canRun !== false;
       if (runningNow && controlLength > .08) runCruiseArmed = true;
       const autoRun = runningNow && runCruiseArmed && controlLength <= .08;
@@ -1877,15 +1913,23 @@ try {
       }
     }
 
-    cameraTarget.set(player.position.x, player.position.y + (vehicleMode === 'taxi' ? 1.35 : 1.45), player.position.z);
-    const distance = vehicleMode === 'taxi' ? 8.8 : vehicleMode === 'bike' ? 7.8 : 7.1;
+    const drivingCamera = vehicleMode !== 'walk';
+    const lookAhead = drivingCamera ? .75 + driveSpeedRatio * 2.2 : 0;
+    cameraTarget.set(
+      player.position.x + Math.sin(player.rotation.y) * lookAhead,
+      player.position.y + (vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45),
+      player.position.z + Math.cos(player.rotation.y) * lookAhead
+    );
+    const baseDistance = vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
+    const distance = baseDistance + (drivingCamera ? driveSpeedRatio * 1.35 : 0);
     const horizontal = Math.cos(cameraPitch) * distance;
     cameraPosition.set(
       player.position.x + Math.sin(cameraYaw) * horizontal,
-      player.position.y + 1.45 + Math.sin(cameraPitch) * distance,
+      player.position.y + (drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance,
       player.position.z + Math.cos(cameraYaw) * horizontal
     );
-    camera.position.lerp(cameraPosition, 1 - Math.exp(-delta * 9));
+    const cameraResponse = drivingCamera ? 6.8 + driveSpeedRatio * 1.4 : 9;
+    camera.position.lerp(cameraPosition, 1 - Math.exp(-delta * cameraResponse));
     camera.lookAt(cameraTarget);
     updateRemotePlayers(delta, camera);
     updateVehicleAction();
