@@ -3911,6 +3911,7 @@ function createRoadVehicle(kind, color) {
   const width = isBus ? 2.28 : 1.62;
   const length = isBus ? 5.25 : 3.35;
   const vehicle = new THREE.Group();
+  const wipers = [];
 
   const paint = new THREE.MeshStandardMaterial({ color, roughness: .63, metalness: .035 });
   const trim = new THREE.MeshStandardMaterial({ color: 0x20272a, roughness: .78, metalness: .12 });
@@ -3973,6 +3974,18 @@ function createRoadVehicle(kind, color) {
     rearGlass.position.z = -.87;
     rearGlass.rotation.x = .16;
 
+    [-.33, .33].forEach((wiperX, index) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(wiperX, 1.08, .825);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(.42, .025, .025), trim);
+      blade.position.x = index ? -.18 : .18;
+      pivot.rotation.z = index ? -.18 : Math.PI + .18;
+      pivot.userData.wiperBaseZ = pivot.rotation.z;
+      pivot.add(blade);
+      vehicle.add(pivot);
+      wipers.push(pivot);
+    });
+
     const mirrorLeft = new THREE.Mesh(new THREE.BoxGeometry(.14, .10, .18), trim);
     const mirrorRight = mirrorLeft.clone();
     mirrorLeft.position.set(-width * .54, 1.20, .53);
@@ -3983,6 +3996,18 @@ function createRoadVehicle(kind, color) {
     const windscreen = new THREE.Mesh(new THREE.BoxGeometry(width - .30, .48, .055), glass);
     windscreen.position.set(0, 1.76, length / 2 + .035);
     vehicle.add(windscreen);
+
+    [-.46, .46].forEach((wiperX, index) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(wiperX, 1.60, length / 2 + .073);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(.58, .026, .024), trim);
+      blade.position.x = index ? -.25 : .25;
+      pivot.rotation.z = index ? -.15 : Math.PI + .15;
+      pivot.userData.wiperBaseZ = pivot.rotation.z;
+      pivot.add(blade);
+      vehicle.add(pivot);
+      wipers.push(pivot);
+    });
 
     for (let row = -1.55; row <= 1.55; row += .78) {
       const window = new THREE.Mesh(new THREE.BoxGeometry(.05, .38, .58), glass);
@@ -4048,6 +4073,7 @@ function createRoadVehicle(kind, color) {
   vehicle.userData.wheels = wheels;
   vehicle.userData.frontWheels = frontWheels;
   vehicle.userData.bodyParts = [lowerBody, upperBody, cabin, roof];
+  vehicle.userData.wipers = wipers;
   vehicle.userData.wheelRadius = wheelRadius;
   return vehicle;
 }
@@ -4148,6 +4174,14 @@ function createAutoRickshaw(color = 0x26763f) {
   const windscreen = new THREE.Mesh(new THREE.BoxGeometry(1.02, .68, .055), glassMat);
   windscreen.position.set(0, 1.48, .72);
   windscreen.rotation.x = -.08;
+  const wiperPivot = new THREE.Group();
+  wiperPivot.position.set(-.30, 1.31, .755);
+  const wiperBlade = new THREE.Mesh(new THREE.BoxGeometry(.52, .025, .024), trimMat);
+  wiperBlade.position.x = .22;
+  wiperPivot.rotation.z = Math.PI + .18;
+  wiperPivot.userData.wiperBaseZ = wiperPivot.rotation.z;
+  wiperPivot.add(wiperBlade);
+  auto.add(wiperPivot);
   const frontApron = new THREE.Mesh(new THREE.BoxGeometry(1.02, .58, .62), bodyMat);
   frontApron.position.set(0, .82, .82);
   const bumper = new THREE.Mesh(new THREE.BoxGeometry(.92, .11, .10), trimMat);
@@ -4190,6 +4224,7 @@ function createAutoRickshaw(color = 0x26763f) {
 
   auto.userData.headlightMaterials = [lampMat];
   auto.userData.tailLightMaterials = [tailMat];
+  auto.userData.wipers = [wiperPivot];
   auto.userData.wheels = wheels;
   auto.userData.frontWheels = frontWheels;
   auto.userData.bodyParts = [lower, rearCabin, canopy, frontApron];
@@ -4236,6 +4271,116 @@ function createTrafficVehicleVisual(kind, color) {
   return createRoadVehicle(kind, color);
 }
 
+function attachTrafficWetEffects(vehicle, kind) {
+  const count = kind === 'bus' ? 18 : kind === 'car' ? 14 : kind === 'auto' ? 12 : 8;
+  const width = kind === 'bus' ? .88 : kind === 'bike' ? .28 : kind === 'auto' ? .48 : .62;
+  const rearZ = kind === 'bus' ? -2.15 : kind === 'auto' ? -.86 : kind === 'bike' ? -.60 : -1.28;
+  const positions = new Float32Array(count * 3);
+  const geometry = new THREE.BufferGeometry();
+  const attribute = new THREE.BufferAttribute(positions, 3);
+  attribute.setUsage(THREE.DynamicDrawUsage);
+  geometry.setAttribute('position', attribute);
+  const sprayMaterial = new THREE.PointsMaterial({
+    color: 0xd7e9ef,
+    size: kind === 'bike' ? .065 : .080,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+  });
+  const spray = new THREE.Points(geometry, sprayMaterial);
+  spray.frustumCulled = false;
+  spray.visible = false;
+  const particles = [];
+  for (let index = 0; index < count; index++) {
+    const side = count <= 8 ? 0 : (index % 2 ? 1 : -1);
+    particles.push({
+      x: side * width + (Math.random() - .5) * .16,
+      y: .10 + Math.random() * .16,
+      z: rearZ - Math.random() * .42,
+      life: Math.random(),
+    });
+  }
+  vehicle.add(spray);
+
+  const glowWidth = kind === 'bus' ? 1.55 : kind === 'auto' ? .72 : kind === 'bike' ? .40 : 1.02;
+  const glowLength = kind === 'bus' ? 5.4 : kind === 'auto' ? 3.3 : kind === 'bike' ? 2.8 : 4.2;
+  const frontZ = kind === 'bus' ? 2.65 : kind === 'auto' ? 1.18 : kind === 'bike' ? .78 : 1.70;
+  const glowMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffe6a8,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(glowWidth, glowLength), glowMaterial);
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.set(0, .045, frontZ + glowLength * .42);
+  glow.renderOrder = 2;
+  vehicle.add(glow);
+
+  vehicle.userData.trafficWet = {
+    spray,
+    sprayMaterial,
+    attribute,
+    positions,
+    particles,
+    rearZ,
+    width,
+    glow,
+    glowMaterial,
+  };
+}
+
+function updateTrafficWetEffects(vehicle, delta, rain, speedRatio, braking) {
+  const wet = vehicle.userData.trafficWet;
+  if (!wet) return;
+
+  const rainStrength = THREE.MathUtils.clamp(rain * speedRatio, 0, 1);
+  wet.spray.visible = rainStrength > .045;
+  wet.sprayMaterial.opacity = rainStrength * (.46 + speedRatio * .28);
+  wet.glowMaterial.opacity = worldWeatherState.needsLights
+    ? .055 + Number(worldWeatherState.overcast || 0) * .035 + rain * .065
+    : rain > .55 ? .018 : 0;
+
+  if (wet.spray.visible) {
+    wet.particles.forEach((particle, index) => {
+      particle.life -= delta * (1.45 + speedRatio * 2.1 + rain * .6);
+      if (particle.life <= 0) {
+        particle.life = .60 + Math.random() * .55;
+        const side = wet.particles.length <= 8 ? 0 : (index % 2 ? 1 : -1);
+        particle.x = side * wet.width + (Math.random() - .5) * .18;
+        particle.y = .08 + Math.random() * .14;
+        particle.z = wet.rearZ - Math.random() * .22;
+      }
+      particle.x += (Math.random() - .5) * delta * (.20 + rain * .18);
+      particle.y += delta * (.28 + speedRatio * .48 + rain * .20);
+      particle.z -= delta * (.70 + speedRatio * 2.25 + rain * .55);
+      const offset = index * 3;
+      wet.positions[offset] = particle.x;
+      wet.positions[offset + 1] = particle.y;
+      wet.positions[offset + 2] = particle.z;
+    });
+    wet.attribute.needsUpdate = true;
+  }
+
+  const wiperLevel = THREE.MathUtils.smoothstep(rain, .10, .75);
+  for (const [index, wiper] of (vehicle.userData.wipers || []).entries()) {
+    const base = Number(wiper.userData.wiperBaseZ || 0);
+    if (wiperLevel <= .01) {
+      wiper.rotation.z += (base - wiper.rotation.z) * Math.min(1, delta * 7);
+      continue;
+    }
+    const direction = index % 2 ? -1 : 1;
+    const sweep = (Math.sin(villageTime * (4.8 + rain * 3.8) + index * .65) * .42 + .42) * direction;
+    wiper.rotation.z = base + sweep * wiperLevel;
+  }
+
+  for (const material of vehicle.userData.tailLightMaterials || []) {
+    material.emissiveIntensity = braking ? .86 : (worldWeatherState.needsLights ? .23 : .14);
+  }
+}
+
 function addParkedVehicle(scene, kind, color, x, z, rotation = 0) {
   const vehicle = createTrafficVehicleVisual(kind, color);
   ambientVehicleLightMaterials.push(...(vehicle.userData.headlightMaterials || []));
@@ -4259,6 +4404,7 @@ function addParkedVehicle(scene, kind, color, x, z, rotation = 0) {
 function addRoadVehicle(scene, config) {
   const vehicle = createTrafficVehicleVisual(config.kind, config.color);
   ambientVehicleLightMaterials.push(...(vehicle.userData.headlightMaterials || []));
+  attachTrafficWetEffects(vehicle, config.kind);
   vehicle.userData.traffic = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
   if (config.axis === 'z') {
     vehicle.position.set(config.fixed, 0, config.progress);
@@ -4287,7 +4433,10 @@ function updateTraffic(delta) {
     const flowPhase = Number(config.flowPhase || 0);
     const flowAmount = Number(config.flowAmount ?? (config.kind === 'bike' ? .10 : config.kind === 'auto' ? .07 : .04));
     const naturalCruise = 1 - flowAmount * .5 + Math.sin(villageTime * .42 + flowPhase) * flowAmount * .5;
-    let targetSpeed = baseSpeed * naturalCruise;
+    const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+    const rainPenalty = config.kind === 'bike' ? .30 : config.kind === 'auto' ? .23 : config.kind === 'bus' ? .16 : .20;
+    const weatherCruise = 1 - rain * rainPenalty;
+    let targetSpeed = baseSpeed * naturalCruise * weatherCruise;
 
     if (playerRef && vehicleMode !== 'walk') {
       const playerDistance = Math.hypot(playerRef.position.x - vehicle.position.x, playerRef.position.z - vehicle.position.z);
@@ -4349,8 +4498,9 @@ function updateTraffic(delta) {
       }
     }
 
-    const response = targetSpeed < Number(config.currentSpeed) ? 4.9 : 1.85;
-    config.currentSpeed += (targetSpeed - Number(config.currentSpeed)) * Math.min(1, delta * response);
+    const previousSpeed = Number(config.currentSpeed);
+    const response = targetSpeed < previousSpeed ? 4.9 : 1.85;
+    config.currentSpeed += (targetSpeed - previousSpeed) * Math.min(1, delta * response);
     if (Math.abs(config.currentSpeed) < .03) config.currentSpeed = 0;
 
     let nextProgress = Number(config.progress) + config.direction * config.currentSpeed * delta;
@@ -4384,7 +4534,9 @@ function updateTraffic(delta) {
     else vehicle.position.x = config.progress;
 
     const trafficRatio = baseSpeed > .01 ? Math.min(1, Math.abs(Number(config.currentSpeed)) / baseSpeed) : 0;
-    animateVehicleVisual(vehicle, delta, Number(config.currentSpeed) * Number(config.direction), 0, trafficRatio, targetSpeed < baseSpeed * .18);
+    const braking = targetSpeed < previousSpeed - .18 || targetSpeed < baseSpeed * .18;
+    animateVehicleVisual(vehicle, delta, Number(config.currentSpeed) * Number(config.direction), 0, trafficRatio, braking);
+    updateTrafficWetEffects(vehicle, delta, rain, trafficRatio, braking);
   });
 }
 
