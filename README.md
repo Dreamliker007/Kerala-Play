@@ -154,3 +154,12 @@ Every player now receives a persistent Village Rental Home tied to the existing 
 Overdue charges have a 48-hour grace period. During the grace period the home still works. After the grace period, only the SLEEP interaction is temporarily paused until overdue rent or utilities are paid; the account and home are never deleted or evicted by this V66 system.
 
 When the player is on foot at the home porch with no active job, SLEEP restores Energy to 100 and applies a small Hunger −4 / Thirst −6 cost. Sleep has a short server cooldown and is location verified. Home, bill, payment-count and sleep state are stored inside the existing job_state JSONB, so V66 requires no new Supabase migration.
+
+
+## Kerala Bank + UPI (V67)
+
+Kerala Play now has a separate persistent Kerala Bank account in addition to the cash wallet. Every account starts with ₹0 in the bank and receives a deterministic Kerala Bank account number plus a Kerala Pay UPI ID in the form username@keralapay.
+
+The Wallet panel now includes bank balance, Wallet ↔ Bank deposit/withdraw controls, Kerala Pay UPI transfers, and bank transaction history. Deposit and withdrawal amounts are server validated. UPI transfers move bank balance directly between players by username or Kerala Pay UPI ID, reject self-transfers and blocked-player transfers, and write matching sender/receiver ledger entries with a shared transfer ID.
+
+Bank balance and bank history are stored inside the existing job_state JSONB. Existing wallet transactions remain separate, so V67 requires no new Supabase migration.
