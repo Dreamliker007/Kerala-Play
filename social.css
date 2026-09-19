@@ -21,7 +21,7 @@
 .social-button.secondary { background:#223e45; border-color:#49616b; }
 .social-button.danger { color:#ffd9c8; background:#583731; border-color:#9b5b50; }
 .social-button:disabled, #dm-panel button:disabled { opacity:.48; cursor:not-allowed; }
-.social-button:focus-visible, .social-modal :focus-visible, #people-panel :focus-visible, #wallet-panel :focus-visible, #jobs-panel :focus-visible, #dm-panel :focus-visible, #chat-panel :focus-visible { outline:3px solid #ffe298; outline-offset:3px; }
+.social-button:focus-visible, .social-modal :focus-visible, #people-panel :focus-visible, #wallet-panel :focus-visible, #garage-panel :focus-visible, #jobs-panel :focus-visible, #dm-panel :focus-visible, #chat-panel :focus-visible { outline:3px solid #ffe298; outline-offset:3px; }
 .social-error { min-height:17px; margin:9px 0 0; color:#ffddaa; font-size:12px; line-height:1.4; overflow-wrap:anywhere; }
 .social-error:empty { margin:0; min-height:0; }
 .social-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:11px; }
@@ -113,3 +113,8 @@
 .garage-actions button.danger { background:#744438; }
 .garage-actions button:disabled, #garage-catalog button:disabled { opacity:.52; cursor:not-allowed; }
 #garage-refresh { grid-column:2; grid-row:1 / span 2; border:1px solid rgba(255,255,255,.17); border-radius:8px; padding:6px 8px; color:#fff; background:#283f48; font:inherit; font-size:10px; font-weight:800; cursor:pointer; }
+
+/* V61.1 garage panel mobile hotfix */
+#garage-panel { overscroll-behavior:contain; }
+#garage-panel .panel-heading { position:sticky; top:-11px; z-index:3; margin:-11px -11px 8px; padding:11px; background:rgba(7,24,30,.98); border-bottom:1px solid rgba(255,255,255,.10); }
+#garage-panel .panel-close { min-width:34px; min-height:34px; position:relative; z-index:4; }
