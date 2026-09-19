@@ -4435,11 +4435,11 @@ function updateAmbientAnimals(time, delta) {
       parts.tail.rotation.z = Math.sin(time * 3.4 + data.phase) * (data.kind === 'dog' ? .28 : .10);
     }
     if (parts.head) {
-      if (data.kind === 'chicken' && alert < .2) {
-        parts.head.position.y += Math.max(0, Math.sin(time * 3.2 + data.phase)) * -.035;
-      }
+      const peck = data.kind === 'chicken' && alert < .2
+        ? Math.max(0, Math.sin(time * 3.2 + data.phase)) * .32
+        : 0;
       parts.head.rotation.y = Math.sin(time * .9 + data.phase) * .08;
-      parts.head.rotation.x = alert * .10;
+      parts.head.rotation.x = alert * .10 + peck;
     }
     if (parts.leftWing && parts.rightWing) {
       const wingBeat = Math.sin(time * 4.5 + data.phase) * (alert > .15 ? .45 : .10);
