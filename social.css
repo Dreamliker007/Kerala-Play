@@ -176,3 +176,27 @@
 .home-charge-row button, #home-refresh { border:1px solid rgba(255,255,255,.17); border-radius:8px; padding:7px 9px; color:#fff; background:#2c6650; font:inherit; font-size:9px; font-weight:900; cursor:pointer; }
 .home-charge-row button:disabled { opacity:.5; cursor:not-allowed; }
 #home-refresh { padding:5px 8px; background:#283f48; }
+
+
+/* Kerala Bank + UPI V67 */
+.bank-balance-card { margin:10px 0 12px; padding:14px; border:1px solid rgba(112,164,205,.42); border-radius:13px; background:linear-gradient(135deg,rgba(35,83,119,.78),rgba(17,48,60,.92)); }
+.bank-balance-card small { display:block; color:#b9d9ee; font-size:9px; font-weight:900; letter-spacing:1.3px; }
+.bank-balance-card strong { display:block; margin:4px 0 3px; color:#f4f1b5; font-size:26px; line-height:1.1; }
+.bank-balance-card span, .bank-balance-card code { display:block; margin-top:3px; color:#c9e1ea; font-family:inherit; font-size:9px; line-height:1.35; overflow-wrap:anywhere; }
+.bank-cash-controls { display:grid; grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; }
+.bank-upi-controls { display:grid; grid-template-columns:1fr 90px; gap:6px; margin-top:8px; }
+.bank-upi-controls #bank-upi-send { grid-column:1 / -1; }
+.bank-cash-controls input, .bank-upi-controls input { min-width:0; width:100%; box-sizing:border-box; border:1px solid rgba(255,255,255,.18); border-radius:8px; padding:8px 9px; color:#fff; background:#112e37; font:inherit; font-size:11px; }
+.bank-cash-controls button, .bank-upi-controls button, #bank-refresh { border:1px solid rgba(255,255,255,.17); border-radius:8px; padding:8px 9px; color:#fff; background:#286a72; font:inherit; font-size:10px; font-weight:900; cursor:pointer; }
+.bank-cash-controls button[data-bank-cash="withdraw"] { background:#40555d; }
+#bank-upi-send { background:#276d55; }
+#bank-refresh { padding:5px 8px; background:#283f48; }
+.bank-cash-controls button:disabled, .bank-upi-controls button:disabled { opacity:.5; cursor:not-allowed; }
+#bank-transactions { margin-top:4px; }
+@media (max-width:560px) {
+  .bank-cash-controls { grid-template-columns:1fr 1fr; }
+  .bank-cash-controls input { grid-column:1 / -1; }
+  .bank-upi-controls { grid-template-columns:1fr; }
+  .bank-upi-controls #bank-upi-send { grid-column:auto; }
+  .bank-cash-controls input, .bank-upi-controls input { font-size:16px; }
+}
