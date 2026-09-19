@@ -489,3 +489,16 @@ Residential houses now receive small front-facing house-name plates selected det
 All sign textures are generated locally at runtime, use SRGB canvas textures, fixed anisotropic filtering and simple plane geometry, so no downloaded signage images or new network dependencies are introduced.
 
 This is a visual identity pass only. No navigation rules, map coordinates, collisions, gameplay, economy, backend/database or Supabase behavior changes.
+
+
+## Kerala Building Weathering + Material Detail (V98)
+
+V98 removes more of the clean/procedural look from the village architecture by adding deterministic monsoon-age detail without external texture downloads.
+
+Houses now receive subtle damp/moss patches around the lower facade, plus small deterministic colour variation across the visible clay roof-tile strips. Shops gain lower-wall dampness, rust streaks on the metal shutters and additional aged wall patches.
+
+Compound walls now receive irregular moss strips along selected caps, while several utility poles carry small weathered paper/poster sheets for extra roadside detail. The variation is seeded from world position, so the scene remains stable between frames and sessions rather than changing randomly every load.
+
+The pass uses simple local geometry/material overlays rather than large image textures or decals, keeping it practical for the High-quality mobile target.
+
+This is visual-only. Building colliders, navigation, weather physics, economy, backend/database and Supabase behavior are unchanged.
