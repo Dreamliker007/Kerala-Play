@@ -87,6 +87,9 @@ const farVisualDetails = [];
 let monsoonWaterTimer = 0;
 let farVisualTimer = 0;
 let lastContactShadowUpdateAt = 0;
+let footstepEffects = null;
+let lastFootstepBeat = -1;
+let footstepSide = -1;
 const fruitGeometry = new THREE.SphereGeometry(.14, 6, 5);
 const fruitMaterial = new THREE.MeshStandardMaterial({ color: 0xe4a737, roughness: .72 });
 const birdBodyGeometry = new THREE.SphereGeometry(.10, 6, 5);
@@ -415,6 +418,147 @@ async function reportVehicleImpact(speed) {
     updateDriveHud();
   } catch (error) {
     if (error.status !== 409) console.warn('Vehicle impact report failed', error);
+  }
+}
+
+function createFootstepParticlePool(scene, count, color, size) {
+  const positions = new Float32Array(count * 3);
+  const geometry = new THREE.BufferGeometry();
+  const attribute = new THREE.BufferAttribute(positions, 3);
+  attribute.setUsage(THREE.DynamicDrawUsage);
+  geometry.setAttribute('position', attribute);
+  const material = new THREE.PointsMaterial({
+    color,
+    size,
+    transparent: true,
+    opacity: .48,
+    depthWrite: false,
+  });
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  points.visible = false;
+  const particles = Array.from({ length: count }, () => ({
+    life: 0,
+    maxLife: 0,
+    vx: 0,
+    vy: 0,
+    vz: 0,
+  }));
+  for (let index = 0; index < count; index++) positions[index * 3 + 1] = -100;
+  scene.add(points);
+  return { points, geometry, attribute, material, positions, particles, cursor: 0 };
+}
+
+function ensureFootstepEffects(scene) {
+  if (footstepEffects || !scene) return footstepEffects;
+  footstepEffects = {
+    dust: createFootstepParticlePool(scene, 24, 0x9b8260, .070),
+    road: createFootstepParticlePool(scene, 18, 0xb0b3ad, .048),
+    splash: createFootstepParticlePool(scene, 30, 0xd2e7ef, .062),
+  };
+  return footstepEffects;
+}
+
+function emitFootstepParticles(pool, x, z, yaw, running, count, wet = false) {
+  if (!pool) return;
+  for (let emitted = 0; emitted < count; emitted++) {
+    const index = pool.cursor++ % pool.particles.length;
+    const particle = pool.particles[index];
+    const side = (Math.random() - .5) * (running ? .28 : .20);
+    const backward = (Math.random() - .5) * .16;
+    const rightX = Math.cos(yaw);
+    const rightZ = -Math.sin(yaw);
+    const forwardX = Math.sin(yaw);
+    const forwardZ = Math.cos(yaw);
+    const offset = index * 3;
+    pool.positions[offset] = x + rightX * side - forwardX * backward;
+    pool.positions[offset + 1] = wet ? .055 : .040;
+    pool.positions[offset + 2] = z + rightZ * side - forwardZ * backward;
+    particle.life = particle.maxLife = wet
+      ? .25 + Math.random() * .18
+      : .34 + Math.random() * .24;
+    const spread = wet ? .55 : .34;
+    particle.vx = rightX * (Math.random() - .5) * spread + forwardX * (Math.random() - .30) * .18;
+    particle.vz = rightZ * (Math.random() - .5) * spread + forwardZ * (Math.random() - .30) * .18;
+    particle.vy = wet
+      ? .50 + Math.random() * .48 + (running ? .20 : 0)
+      : .12 + Math.random() * .18;
+  }
+  pool.points.visible = true;
+  pool.attribute.needsUpdate = true;
+}
+
+function updateFootstepParticlePool(pool, delta, gravity, drag) {
+  if (!pool) return;
+  let active = 0;
+  for (let index = 0; index < pool.particles.length; index++) {
+    const particle = pool.particles[index];
+    const offset = index * 3;
+    if (particle.life <= 0) {
+      pool.positions[offset + 1] = -100;
+      continue;
+    }
+    active++;
+    particle.life -= delta;
+    if (particle.life <= 0) {
+      pool.positions[offset + 1] = -100;
+      continue;
+    }
+    particle.vx *= Math.max(0, 1 - drag * delta);
+    particle.vz *= Math.max(0, 1 - drag * delta);
+    particle.vy -= gravity * delta;
+    pool.positions[offset] += particle.vx * delta;
+    pool.positions[offset + 1] += particle.vy * delta;
+    pool.positions[offset + 2] += particle.vz * delta;
+    if (pool.positions[offset + 1] < .025) pool.positions[offset + 1] = .025;
+  }
+  pool.points.visible = active > 0;
+  if (active > 0) pool.attribute.needsUpdate = true;
+}
+
+function updateFootstepEffects(delta, player, moving, running) {
+  const effects = ensureFootstepEffects(sceneRef);
+  if (!effects || !player) return;
+
+  updateFootstepParticlePool(effects.dust, delta, .42, 2.1);
+  updateFootstepParticlePool(effects.road, delta, .34, 2.5);
+  updateFootstepParticlePool(effects.splash, delta, 3.4, 1.3);
+
+  const shadow = player.userData?.shadow;
+  if (shadow) {
+    const pulse = vehicleMode === 'walk' && moving
+      ? Math.abs(Math.sin(walkPhase)) * (running ? .045 : .025)
+      : 0;
+    const targetX = .48 * (1 + pulse);
+    const targetY = .32 * (1 - pulse * .42);
+    shadow.scale.x += (targetX - shadow.scale.x) * Math.min(1, delta * 10);
+    shadow.scale.y += (targetY - shadow.scale.y) * Math.min(1, delta * 10);
+  }
+
+  if (vehicleMode !== 'walk' || !moving) {
+    lastFootstepBeat = -1;
+    return;
+  }
+
+  const beat = Math.floor(walkPhase / Math.PI);
+  if (beat === lastFootstepBeat) return;
+  lastFootstepBeat = beat;
+  footstepSide *= -1;
+
+  const rightX = Math.cos(player.rotation.y);
+  const rightZ = -Math.sin(player.rotation.y);
+  const heelX = player.position.x + rightX * footstepSide * .16;
+  const heelZ = player.position.z + rightZ * footstepSide * .16;
+  const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+  const zone = roadZoneAt(player.position.x, player.position.z);
+
+  if (rain > .12) {
+    const amount = running ? 6 : 4;
+    emitFootstepParticles(effects.splash, heelX, heelZ, player.rotation.y, running, amount, true);
+  } else if (zone.id === 'offroad') {
+    emitFootstepParticles(effects.dust, heelX, heelZ, player.rotation.y, running, running ? 5 : 3, false);
+  } else {
+    emitFootstepParticles(effects.road, heelX, heelZ, player.rotation.y, running, running ? 2 : 1, false);
   }
 }
 
@@ -2257,6 +2401,8 @@ try {
       }
     }
 
+    updateFootstepEffects(delta, player, movingNow, runHeld);
+
     const drivingCamera = vehicleMode !== 'walk';
     const walkingMotion = !drivingCamera && movingNow ? (runHeld ? 1 : .62) : 0;
     const walkBob = Math.sin(walkPhase * 2) * (runHeld ? .040 : .026) * walkingMotion;
@@ -4004,6 +4150,8 @@ function buildWorld(scene) {
   farVisualDetails.length = 0;
   monsoonWaterTimer = 0;
   farVisualTimer = 0;
+  lastFootstepBeat = -1;
+  footstepSide = -1;
   const groundTexture = createGroundSurfaceTexture();
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(160, 160),
