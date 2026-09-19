@@ -284,3 +284,20 @@ Street lamps and ambient vehicle lamps switch on automatically when the world be
 NPC movement slows slightly in rain and characters adopt a subtle rain posture rather than continuing exactly as in clear weather.
 
 The weather system is visual/local simulation only. It does not change server-authoritative movement, traffic rules, fuel, economy, jobs, ownership or persistence, and V78 requires no database or Supabase migration.
+
+
+## Natural NPC Life + Run Fix + Tree Realism (V79)
+
+V79 responds to the first in-world V78 playtest and focuses on movement feel, pedestrian variety and vegetation.
+
+RUN no longer becomes completely unusable when hunger, thirst or energy are low. Needs still reduce movement speed through the existing server-authoritative movement factor, but the RUN control remains usable so low needs create a performance penalty instead of a dead button.
+
+Ambient NPC movement is slowed to a more believable walking pace and uses smaller, slower walk animation strides. Remote real-player avatars also use walk animation by default and only switch to a stronger run-looking stride when their measured network movement speed is high enough.
+
+The zebra crossing now has several independently-timed pedestrians rather than one NPC continuously shuttling across the road. The street population also gains varied activities: bus-stop waiting, shopping/task gestures, phone use, walking and paired conversation. Social NPC pairs face each other and use subtle head/arm gestures, giving visible NPC-to-NPC interaction without adding a heavy AI/pathfinding system.
+
+NPC floating labels use a shorter visibility distance to reduce screen clutter, while the NPC profile panel reports each local's current activity.
+
+Broadleaf trees now use tapered trunks, more branch variation and layered irregular foliage clusters. Coconut palms use a fuller procedural crown with a tapered trunk, coconut cluster, shared-style midribs and many feather-like leaflet triangles, producing a denser Kerala roadside silhouette while remaining texture-free and mobile-oriented.
+
+V79 changes client/world visuals and behavior only. No database or Supabase migration is required, and existing server movement validation remains authoritative.
