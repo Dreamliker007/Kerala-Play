@@ -83,6 +83,8 @@ let trafficSnapshot = null;
 let needsSnapshot = null;
 let homeSnapshot = null;
 let trafficCheckpointVisual = null;
+let junctionSignalVisual = null;
+const pedestrianCrossingZ = -14.3;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
@@ -2273,16 +2275,55 @@ function animateHuman(human, phase, moving) {
   }
 }
 
+function npcPingPongState(time, speed, offset) {
+  const cycle = ((time * Math.max(.18, speed) * 1.55 + offset) % 8 + 8) % 8;
+  if (cycle < 1.15) return { progress: 0, direction: 1, moving: 0 };
+  if (cycle < 3.15) return { progress: (cycle - 1.15) / 2, direction: 1, moving: 1 };
+  if (cycle < 4.30) return { progress: 1, direction: -1, moving: 0 };
+  if (cycle < 6.30) return { progress: 1 - (cycle - 4.30) / 2, direction: -1, moving: 1 };
+  return { progress: 0, direction: 1, moving: 0 };
+}
+
 function updateVillagers(time) {
   villagers.forEach(villager => {
-    const pace = (Math.sin(time * villager.userData.speed + villager.userData.offset) + 1) * .5;
-    villager.position.z = villager.userData.startZ + Math.sin(time * villager.userData.speed + villager.userData.offset) * villager.userData.distance;
-    villager.rotation.y = Math.cos(time * villager.userData.speed + villager.userData.offset) > 0 ? 0 : Math.PI;
-    if (villager.userData.photo) {
-      villager.userData.photo.position.y = .025 + Math.abs(Math.sin(time * villager.userData.speed * 6)) * .018;
-      animateHuman(villager.userData.human, time * villager.userData.speed * 7, .55 + pace * .45);
-    } else {
-      animateHuman(villager.userData.human, time * villager.userData.speed * 7, .55 + pace * .45);
+    const data = villager.userData;
+    const human = data.human;
+    if (!human) return;
+
+    if (data.behavior === 'idle') {
+      villager.position.set(data.startX, 0, data.startZ);
+      villager.rotation.y = Number(data.facing || 0);
+      animateHuman(human, time * .8 + data.offset, 0);
+      const head = human.userData.parts?.head;
+      if (head) head.rotation.y = Math.sin(time * .55 + data.offset) * .13;
+      const torso = human.userData.parts?.torso;
+      if (torso) torso.rotation.y = Math.sin(time * .32 + data.offset) * .025;
+      data.crossingActive = false;
+      return;
+    }
+
+    const motion = npcPingPongState(time, data.speed, data.offset);
+    if (data.behavior === 'crossing') {
+      const fromX = Number(data.crossFromX);
+      const toX = Number(data.crossToX);
+      villager.position.x = THREE.MathUtils.lerp(fromX, toX, motion.progress);
+      villager.position.z = data.startZ;
+      villager.rotation.y = motion.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+      data.crossingActive = motion.moving > 0 && Math.abs(villager.position.x) < 8.45;
+      animateHuman(human, time * data.speed * 7.5, motion.moving ? .86 : 0);
+      return;
+    }
+
+    const routeOffset = (motion.progress * 2 - 1) * data.distance;
+    villager.position.x = data.startX;
+    villager.position.z = data.startZ + routeOffset;
+    villager.rotation.y = motion.direction > 0 ? 0 : Math.PI;
+    data.crossingActive = false;
+    animateHuman(human, time * data.speed * 7, motion.moving ? .72 : 0);
+
+    if (!motion.moving) {
+      const head = human.userData.parts?.head;
+      if (head) head.rotation.y = Math.sin(time * .45 + data.offset) * .10;
     }
   });
 }
@@ -2769,6 +2810,9 @@ function addTownStreetDetails(scene) {
   addUtilityPoles(scene);
   addJunctionMarkings(scene);
   addRoadsideClutter(scene);
+  addJunctionSignal(scene);
+  addParkedVehicle(scene, 'car', 0x7d8b91, 10.8, 56.5, Math.PI);
+  addParkedVehicle(scene, 'car', 0x8c4e45, -47.5, -29.7, Math.PI / 2);
 }
 
 function buildWorld(scene) {
@@ -2842,6 +2886,19 @@ function buildWorld(scene) {
   addPhotoVillager(scene, -8.9, 8, 4.8, .38, 3, .72);
   addPhotoVillager(scene, 8.9, 31, 5.4, .35, 1.3, .70);
   addPhotoVillager(scene, -9.2, -43, 3.8, .40, 5.4, .69);
+
+  addPhotoVillager(scene, -10.4, pedestrianCrossingZ, 0, .56, .7, .72, {
+    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian',
+  });
+  addPhotoVillager(scene, 10.1, 27.2, 0, .28, 2.4, .70, {
+    behavior: 'idle', facing: Math.PI, role: 'Waiting',
+  });
+  addPhotoVillager(scene, -10.0, -50.2, 0, .28, 4.8, .69, {
+    behavior: 'idle', facing: 0, role: 'Waiting',
+  });
+  addPhotoVillager(scene, -10.2, 7.5, 0, .25, 1.6, .68, {
+    behavior: 'idle', facing: Math.PI / 2, role: 'Shopper',
+  });
 }
 
 function buildLandmarkWorld(scene) {
@@ -3081,6 +3138,97 @@ function createRoadVehicle(kind, color) {
   return vehicle;
 }
 
+function junctionTrafficState(time) {
+  const cycle = ((time % 14) + 14) % 14;
+  if (cycle < 5) return { main: 'green', side: 'red' };
+  if (cycle < 6) return { main: 'amber', side: 'red' };
+  if (cycle < 7) return { main: 'red', side: 'red' };
+  if (cycle < 12) return { main: 'red', side: 'green' };
+  if (cycle < 13) return { main: 'red', side: 'amber' };
+  return { main: 'red', side: 'red' };
+}
+
+function addJunctionSignal(scene) {
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x4a5052, roughness: .72, metalness: .28 });
+  const housingMat = new THREE.MeshStandardMaterial({ color: 0x1b2022, roughness: .86 });
+  const makeLens = color => new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: .06,
+    roughness: .44,
+  });
+
+  const makeSignal = (x, z, rotation) => {
+    const root = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(.055, .075, 3.25, 8), poleMat);
+    pole.position.y = 1.62;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(.42, 1.06, .32), housingMat);
+    head.position.set(0, 3.08, 0);
+
+    const red = makeLens(0x5a1613);
+    const amber = makeLens(0x5b4210);
+    const green = makeLens(0x174d2d);
+    [
+      [red, 3.38],
+      [amber, 3.08],
+      [green, 2.78],
+    ].forEach(([material, y]) => {
+      const lens = new THREE.Mesh(new THREE.SphereGeometry(.105, 8, 6), material);
+      lens.position.set(0, y, .18);
+      root.add(lens);
+    });
+
+    root.add(pole, head);
+    root.position.set(x, 0, z);
+    root.rotation.y = rotation;
+    scene.add(root);
+    return { red, amber, green };
+  };
+
+  junctionSignalVisual = {
+    main: makeSignal(8.85, -28.8, Math.PI),
+    side: makeSignal(-8.85, -15.15, -Math.PI / 2),
+    last: '',
+  };
+}
+
+function updateJunctionSignal(state) {
+  if (!junctionSignalVisual) return;
+  const signature = state.main + '|' + state.side;
+  if (junctionSignalVisual.last === signature) return;
+  junctionSignalVisual.last = signature;
+
+  const apply = (set, active) => {
+    for (const [name, material] of Object.entries(set)) {
+      const on = name === active;
+      material.emissiveIntensity = on ? 1.0 : .05;
+      const color = name === 'red' ? 0xff3d32 : name === 'amber' ? 0xffbd36 : 0x38d878;
+      material.color.setHex(on ? color : name === 'red' ? 0x5a1613 : name === 'amber' ? 0x5b4210 : 0x174d2d);
+      material.emissive.setHex(color);
+    }
+  };
+
+  apply(junctionSignalVisual.main, state.main);
+  apply(junctionSignalVisual.side, state.side);
+}
+
+function addParkedVehicle(scene, kind, color, x, z, rotation = 0) {
+  const vehicle = createRoadVehicle(kind, color);
+  vehicle.position.set(x, 0, z);
+  vehicle.rotation.y = rotation;
+  vehicle.scale.setScalar(kind === 'bus' ? .96 : .92);
+  vehicle.userData.parked = true;
+  vehicle.traverse(object => {
+    if (object.isMesh) {
+      object.castShadow = true;
+      object.receiveShadow = true;
+    }
+  });
+  scene.add(vehicle);
+  addCircleCollider(x, z, kind === 'bus' ? 1.45 : .90, 'parked-vehicle');
+  return vehicle;
+}
+
 function addRoadVehicle(scene, config) {
   const vehicle = createRoadVehicle(config.kind, config.color);
   vehicle.userData.traffic = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
@@ -3096,6 +3244,15 @@ function addRoadVehicle(scene, config) {
 }
 
 function updateTraffic(delta) {
+  const now = performance.now();
+  const signalState = junctionTrafficState(villageTime);
+  updateJunctionSignal(signalState);
+  const pedestrianOnCrossing = villagers.some(villager =>
+    villager.userData?.crossingActive
+    && Math.abs(villager.position.z - pedestrianCrossingZ) < 1.2
+    && Math.abs(villager.position.x) < 8.6
+  );
+
   traffic.forEach(vehicle => {
     const config = vehicle.userData.traffic;
     const baseSpeed = Number(config.baseSpeed || config.speed || 0);
@@ -3106,7 +3263,7 @@ function updateTraffic(delta) {
       if (playerDistance < 3.8) targetSpeed = 0;
       else if (playerDistance < 6.2) targetSpeed = Math.min(targetSpeed, baseSpeed * .18);
       else if (playerDistance < 9.5) targetSpeed = Math.min(targetSpeed, baseSpeed * .52);
-      if (performance.now() < hornPulseUntil && playerDistance < 11) targetSpeed = Math.min(targetSpeed, baseSpeed * .22);
+      if (now < hornPulseUntil && playerDistance < 11) targetSpeed = Math.min(targetSpeed, baseSpeed * .22);
     }
 
     for (const other of traffic) {
@@ -3118,16 +3275,46 @@ function updateTraffic(delta) {
       else if (gap >= 4.4 && gap < 8) targetSpeed = Math.min(targetSpeed, baseSpeed * .35);
     }
 
-    if (config.axis === 'x') {
-      const distanceToCrossing = (0 - Number(config.progress)) * Number(config.direction);
-      const mainRoadTrafficNear = traffic.some(other => {
-        const otherConfig = other.userData.traffic;
-        return otherConfig.axis === 'z' && Math.abs(other.position.z + 24.5) < 7.5;
-      });
-      if (distanceToCrossing > 1.5 && distanceToCrossing < 11 && mainRoadTrafficNear) targetSpeed = 0;
+    const junctionProgress = config.axis === 'x' ? 0 : -24.5;
+    const distanceToJunction = (junctionProgress - Number(config.progress)) * Number(config.direction);
+    const permission = config.axis === 'x' ? signalState.side : signalState.main;
+    if (distanceToJunction > .8 && distanceToJunction < 11) {
+      if (permission === 'red') targetSpeed = 0;
+      else if (permission === 'amber' && distanceToJunction > 3.0) targetSpeed = 0;
+    } else if (distanceToJunction >= 11 && distanceToJunction < 16 && permission !== 'green') {
+      targetSpeed = Math.min(targetSpeed, baseSpeed * .42);
     }
 
-    const response = targetSpeed < Number(config.currentSpeed) ? 4.6 : 1.9;
+    if (config.axis === 'z' && pedestrianOnCrossing) {
+      const distanceToCrossing = (pedestrianCrossingZ - Number(config.progress)) * Number(config.direction);
+      if (distanceToCrossing > .75 && distanceToCrossing < 10.5) targetSpeed = 0;
+      else if (distanceToCrossing >= 10.5 && distanceToCrossing < 15) targetSpeed = Math.min(targetSpeed, baseSpeed * .38);
+    }
+
+    if (config.kind === 'bus' && config.axis === 'z') {
+      if (Number(config.stopUntil || 0) > now) {
+        targetSpeed = 0;
+      } else {
+        const stops = [27.5, -50.5];
+        for (const stopZ of stops) {
+          if (Number(config.lastBusStop) === stopZ) continue;
+          const stopDistance = (stopZ - Number(config.progress)) * Number(config.direction);
+          if (stopDistance > 0 && stopDistance < 7.5) {
+            targetSpeed = Math.min(targetSpeed, baseSpeed * Math.max(.08, Math.min(.65, stopDistance / 7.5)));
+            if (stopDistance < .48) {
+              config.progress = stopZ;
+              config.currentSpeed = 0;
+              config.stopUntil = now + 2200;
+              config.lastBusStop = stopZ;
+              targetSpeed = 0;
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    const response = targetSpeed < Number(config.currentSpeed) ? 4.9 : 1.85;
     config.currentSpeed += (targetSpeed - Number(config.currentSpeed)) * Math.min(1, delta * response);
     if (Math.abs(config.currentSpeed) < .03) config.currentSpeed = 0;
 
@@ -3148,7 +3335,15 @@ function updateTraffic(delta) {
 
     const wrapped = (config.direction > 0 && nextProgress === config.min && Number(config.progress) > config.max - 1)
       || (config.direction < 0 && nextProgress === config.max && Number(config.progress) < config.min + 1);
-    if (wrapped) config.currentSpeed = baseSpeed;
+    if (wrapped) {
+      config.currentSpeed = baseSpeed;
+      if (config.kind === 'bus') {
+        config.lastBusStop = null;
+        config.stopUntil = 0;
+      }
+    } else if (config.kind === 'bus' && config.lastBusStop !== null && config.lastBusStop !== undefined) {
+      if (Math.abs(Number(config.progress) - Number(config.lastBusStop)) > 13) config.lastBusStop = null;
+    }
     config.progress = nextProgress;
     if (config.axis === 'z') vehicle.position.z = config.progress;
     else vehicle.position.x = config.progress;
@@ -3348,9 +3543,9 @@ function addPalm(scene, x, z, scale) {
   palm.position.set(x, 0, z); palm.scale.setScalar(scale); scene.add(palm);
 }
 
-function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
+function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options = {}) {
   const index = villagers.length;
-  const names = ['Anu', 'Vivek', 'Meera', 'Arun', 'Nisha', 'Riyas', 'Asha', 'Manu'];
+  const names = ['Anu', 'Vivek', 'Meera', 'Arun', 'Nisha', 'Riyas', 'Asha', 'Manu', 'Liya', 'Nabeel', 'Sreeja', 'Jose'];
   const gender = index % 2 ? 'male' : 'female';
   const styles = [
     { shirt: 0xa95762, trousers: 0x2e3447, skin: 0xa96d4c, hair: 0x171311, shoes: 0x372b26, accent: 0xd8aa55 },
@@ -3364,9 +3559,25 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
   human.scale.setScalar(.9 * scale + .2);
   villager.add(human);
   villager.position.set(x, 0, z);
-  const npcName = names[index % names.length];
-  villager.userData = { human, startZ: z, distance, speed, offset, npc: true, name: npcName, gender };
-  updateNameLabel(villager, npcName + ' · Local', 'npc-' + index);
+  const npcName = options.name || names[index % names.length];
+  const behavior = options.behavior || 'patrol';
+  villager.userData = {
+    human,
+    startX: x,
+    startZ: z,
+    distance,
+    speed,
+    offset,
+    behavior,
+    facing: Number(options.facing || 0),
+    crossFromX: Number(options.fromX ?? x),
+    crossToX: Number(options.toX ?? x),
+    crossingActive: false,
+    npc: true,
+    name: npcName,
+    gender,
+  };
+  updateNameLabel(villager, npcName + ' · ' + (options.role || 'Local'), 'npc-' + index);
   villagers.push(villager);
   scene.add(villager);
 }
