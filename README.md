@@ -136,3 +136,12 @@ Kerala Play now has an in-game driving licence system for personal vehicles. A f
 Garage > Documents & Traffic now acts as a digital document wallet showing the player's Driving Licence plus each owned vehicle's RC and insurance. The driving HUD shows DL INVALID when the current personal vehicle is not covered by an active licence. The traffic checkpoint verifies RC, insurance and licence class. The server can also detect continued personal-vehicle driving without the required licence and issue one unpaid in-game licence challan per vehicle until paid. These are Kerala Play game rules, not real-world legal guidance.
 
 Licence and challan state live inside the existing job_state JSONB, so V64 requires no new Supabase migration.
+
+
+## Daily Needs System (V65)
+
+Kerala Play now has persistent Hunger, Thirst and Energy for each player. Needs decay gradually over time with a capped offline catch-up so returning players are not instantly emptied after a long break. Walking consumes a small additional amount of energy and hydration. Low needs reduce server-authoritative walking speed; very low needs prevent running until the player recovers.
+
+The HUD shows compact Hunger, Thirst and Energy values. Village Shop purchases now have real life-sim effects: Water restores thirst, Tea restores thirst + energy, Snack restores hunger + energy, and Kerala Meal restores hunger, thirst and energy. Prices and effects are server controlled.
+
+The Village Rest Bench at the existing bench location can restore Energy when the player is on foot and nearby. Rest has a short server cooldown after a successful recovery. Needs state is stored inside the existing job_state JSONB, so V65 requires no new Supabase migration.
