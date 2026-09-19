@@ -133,32 +133,105 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
 
   const style = document.createElement('style');
   style.textContent = `
-    #world-time { position:fixed; z-index:4; top:calc(env(safe-area-inset-top) + 15px); left:50%; transform:translateX(-50%); border:1px solid #ffffff2d; border-radius:10px; padding:7px 10px; background:#0b232dcc; color:#e7f2ff; font:700 11px/1.4 Arial,sans-serif; pointer-events:none; white-space:nowrap; }
-    #world-settings { position:fixed; z-index:6; bottom:calc(env(safe-area-inset-bottom) + 20px); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:5px; padding:5px; border:1px solid #ffffff2d; border-radius:12px; background:#0b232dd9; color:white; font:11px Arial,sans-serif; pointer-events:auto; touch-action:manipulation; }
-    #world-settings button,#world-settings select { min-height:32px; max-width:100px; border:1px solid #ffffff36; border-radius:7px; padding:5px 7px; background:#193d46; color:#fff; font:inherit; touch-action:manipulation; cursor:pointer; }
-    #world-settings button[aria-pressed="true"] { background:#237650; }
+    #world-time {
+      position:fixed; z-index:5;
+      top:calc(env(safe-area-inset-top) + 15px); left:50%; transform:translateX(-50%);
+      border:1px solid rgba(255,255,255,.14); border-radius:999px;
+      padding:7px 11px; background:rgba(7,18,28,.66); color:#eef8ff;
+      box-shadow:0 8px 24px rgba(0,0,0,.15);
+      backdrop-filter:blur(12px) saturate(1.1); -webkit-backdrop-filter:blur(12px) saturate(1.1);
+      font:700 10px/1.35 system-ui,sans-serif; pointer-events:none; white-space:nowrap;
+    }
+    #world-settings {
+      display:none; position:fixed; z-index:12;
+      top:calc(env(safe-area-inset-top) + 64px); right:18px;
+      width:min(268px,calc(100vw - 36px)); padding:12px;
+      border:1px solid rgba(255,255,255,.14); border-radius:18px;
+      background:rgba(7,18,28,.96); color:#fff;
+      box-shadow:0 22px 58px rgba(0,0,0,.38);
+      backdrop-filter:blur(20px) saturate(1.15); -webkit-backdrop-filter:blur(20px) saturate(1.15);
+      font:12px/1.35 system-ui,sans-serif; pointer-events:auto; touch-action:manipulation;
+    }
+    #world-settings.open { display:grid; gap:9px; }
+    .world-settings-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:1px 1px 4px; }
+    .world-settings-head strong { font-size:14px; letter-spacing:.15px; }
+    #world-settings-close {
+      width:30px; height:30px; border:0; border-radius:10px;
+      background:rgba(255,255,255,.08); color:#fff; font:800 17px/1 system-ui,sans-serif; cursor:pointer;
+    }
+    .world-setting-row {
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      min-height:44px; padding:8px 10px;
+      border:1px solid rgba(255,255,255,.09); border-radius:13px; background:rgba(255,255,255,.045);
+    }
+    .world-setting-row > span { color:rgba(235,247,250,.76); font-weight:700; }
+    #world-settings button,#world-settings select {
+      min-height:32px; border:1px solid rgba(255,255,255,.14); border-radius:9px;
+      padding:6px 9px; background:rgba(26,55,65,.92); color:#fff; font:inherit;
+      touch-action:manipulation; cursor:pointer;
+    }
+    #world-settings button[aria-pressed="true"] { background:#247a54; }
     #world-settings :focus-visible { outline:2px solid #9be7c1; outline-offset:2px; }
-    #world-settings label { display:flex; align-items:center; gap:5px; }
+    #world-quality { min-width:96px; }
+    .settings-fullscreen { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:800!important; }
     #world-audio-status { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-    @media(max-width:979px) { #world-time { top:calc(env(safe-area-inset-top) + 65px); left:auto; right:74px; transform:none; } }
-    @media(max-width:560px) { #world-time { max-width:132px; font-size:10px; padding:6px 7px; } #world-settings { top:calc(env(safe-area-inset-top) + 103px); bottom:auto; right:74px; left:auto; transform:none; display:grid; width:125px; padding:5px; } #world-settings button,#world-settings select { max-width:none; width:100%; min-height:29px; } #world-settings label span { display:none; } }
-    @media(max-width:369px) { #world-time { top:calc(env(safe-area-inset-top) + 230px); left:16px; right:auto; } #world-settings { top:calc(env(safe-area-inset-top) + 263px); left:16px; right:auto; width:135px; display:flex; } #world-settings button { max-width:65px; } #world-settings select { width:53px; } }
-    @media(max-height:480px) and (min-width:561px) { #world-settings { bottom:8px; padding:3px; } }
+    @media(max-width:979px) {
+      #world-time { top:calc(env(safe-area-inset-top) + 54px); left:auto; right:12px; transform:none; }
+      #world-settings { top:calc(env(safe-area-inset-top) + 56px); right:10px; }
+    }
+    @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) {
+      #world-time { top:calc(env(safe-area-inset-top) + 47px); right:calc(env(safe-area-inset-right) + 10px); padding:5px 8px; font-size:8px; }
+      #world-settings { top:calc(env(safe-area-inset-top) + 53px); right:calc(env(safe-area-inset-right) + 10px); width:236px; max-height:calc(100dvh - 64px); overflow:auto; padding:10px; }
+      .world-setting-row { min-height:39px; padding:6px 8px; }
+    }
   `;
   document.head.append(style);
   const clockOutput = document.createElement('output');
   clockOutput.id = 'world-time';
   clockOutput.title = 'Shared world time · one full day every 24 real minutes · based on device UTC clock';
   clockOutput.setAttribute('aria-label', 'World time');
+
   const settings = document.createElement('div');
   settings.id = 'world-settings';
-  settings.setAttribute('aria-label', 'World sound and graphics');
-  settings.innerHTML = '<button type="button" id="world-sound" aria-pressed="false">Sound off</button><label><span>Graphics</span><select id="world-quality" aria-label="Graphics quality"><option value="low">Low</option><option value="balanced">Balanced</option><option value="high">High</option></select></label><output id="world-audio-status" role="status"></output>';
+  settings.setAttribute('aria-label', 'Game settings');
+  settings.innerHTML = '<div class="world-settings-head"><strong>Settings</strong><button type="button" id="world-settings-close" aria-label="Close settings">×</button></div><label class="world-setting-row"><span>World sound</span><button type="button" id="world-sound" aria-pressed="false">Off</button></label><label class="world-setting-row"><span>Graphics</span><select id="world-quality" aria-label="Graphics quality"><option value="low">Low</option><option value="balanced">Balanced</option><option value="high">High</option></select></label><output id="world-audio-status" role="status"></output>';
+
+  const quickActions = document.querySelector('#quick-actions');
+  const settingsToggle = document.createElement('button');
+  settingsToggle.id = 'settings-toggle';
+  settingsToggle.className = 'hud-icon';
+  settingsToggle.type = 'button';
+  settingsToggle.setAttribute('aria-label', 'Open settings');
+  settingsToggle.setAttribute('aria-controls', 'world-settings');
+  settingsToggle.setAttribute('aria-expanded', 'false');
+  settingsToggle.innerHTML = '⚙<span>SETTINGS</span>';
+  quickActions?.append(settingsToggle);
+
+  const fullscreenButton = document.querySelector('#fullscreen-toggle');
+  if (fullscreenButton) {
+    fullscreenButton.classList.remove('hud-icon');
+    fullscreenButton.classList.add('settings-fullscreen');
+    fullscreenButton.innerHTML = '⛶ <span>Fullscreen</span>';
+    settings.append(fullscreenButton);
+  }
+
   (document.querySelector('#hud') || document.body).append(clockOutput, settings);
   const soundButton = settings.querySelector('#world-sound');
   const qualitySelect = settings.querySelector('#world-quality');
   const audioStatus = settings.querySelector('#world-audio-status');
-  if (preferences.sound) soundButton.textContent = 'Resume sound';
+  const settingsClose = settings.querySelector('#world-settings-close');
+
+  function setSettingsOpen(open) {
+    const next = !!open;
+    settings.classList.toggle('open', next);
+    settingsToggle.setAttribute('aria-expanded', String(next));
+  }
+  settingsToggle.addEventListener('click', () => setSettingsOpen(!settings.classList.contains('open')));
+  settingsClose.addEventListener('click', () => setSettingsOpen(false));
+  settings.addEventListener('pointerdown', event => event.stopPropagation());
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') setSettingsOpen(false); });
+
+  if (preferences.sound) soundButton.textContent = 'Resume';
   soundButton.title = 'Enable birds, water, night insects, and gentle music';
 
   function savePreferences() {
@@ -203,7 +276,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       audioEnabled = false;
       audioStatus.textContent = 'Sound could not start. Tap Sound off to try again.';
     } finally {
-      soundButton.textContent = audioEnabled ? 'Sound on' : 'Sound off';
+      soundButton.textContent = audioEnabled ? 'On' : 'Off';
       soundButton.setAttribute('aria-pressed', String(audioEnabled));
       soundButton.disabled = false;
       savePreferences();
@@ -288,7 +361,13 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     disposed = true;
     document.removeEventListener('visibilitychange', visibilityChanged);
     soundscape?.dispose();
-    settings.remove(); clockOutput.remove(); style.remove();
+    if (fullscreenButton && quickActions) {
+      fullscreenButton.classList.remove('settings-fullscreen');
+      fullscreenButton.classList.add('hud-icon');
+      fullscreenButton.innerHTML = '⛶<span>FULL</span>';
+      quickActions.append(fullscreenButton);
+    }
+    settingsToggle.remove(); settings.remove(); clockOutput.remove(); style.remove();
     scene.remove(sky, moonLight, moonLight.target);
     for (const item of disposables) item.dispose();
     for (const { object, cast, receive } of shadowObjects) { object.castShadow = cast; object.receiveShadow = receive; }
