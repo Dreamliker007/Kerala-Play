@@ -230,3 +230,16 @@ Walking and running animation now includes elbow bend, knee lift, mild torso cou
 Village NPCs now use different skin tones, clothing palettes and hair/face variants. Player name labels are smaller, more transparent and less dominant over the 3D world.
 
 The V74 pass deliberately stays procedural and lightweight rather than downloading high-poly character assets. This keeps the current web/Android bundle small and leaves a future path for optional rigged GLB characters after mobile performance and asset licensing are ready.
+
+
+## Vehicle Visual + Driving Polish (V75)
+
+V75 improves both the look and feel of Kerala Play vehicles without changing server-authoritative traffic, ownership, fuel or speed-limit rules.
+
+Cars and buses now use more layered body geometry with separate lower/upper body sections, roof, bumpers, improved glazing, mirrors/grille details, front/rear lamps, registration-plate surfaces, larger wheel hubs and more realistic proportions. The delivery bike gains a clearer engine/tank/frame/fork/handlebar/carrier silhouette and dedicated front/rear lighting.
+
+Vehicle wheels now rotate while moving. Front wheels visually steer, driven vehicles receive subtle body lean/pitch, and brake lights brighten while braking. Traffic vehicles reuse the same lightweight wheel animation.
+
+Driving input now smooths steering rather than applying full joystick direction instantly. Braking response is progressive but stronger at lower speeds, while acceleration remains responsive. The chase camera gains speed-based distance and forward look-ahead so the road ahead is easier to read while moving quickly.
+
+This visual/control pass remains procedural and mobile-oriented: no large external vehicle assets are added, and existing server movement validation, road limits, vehicle condition, fuel use and traffic enforcement stay authoritative.
