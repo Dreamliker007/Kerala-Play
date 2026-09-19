@@ -395,3 +395,14 @@ The village now includes roadside dogs, chickens, goats and a cow placed away fr
 The existing tree birds now remain available on mobile and use low-cost circling/flapping animation in daylight. Birds hide during heavy rain and at night, while chickens, goats and cattle settle out of view late at night. This keeps the world visually active during the day without adding persistent server AI.
 
 Animals are cosmetic ambient actors only: they do not become colliders, do not affect traffic authority, jobs, economy or player movement, and require no backend/database/Supabase migration.
+
+
+## Kerala Ambient Soundscape (V90)
+
+V90 replaces the normal exploration melody with a more environmental Kerala sound bed while keeping the existing opt-in World Sound setting.
+
+The procedural Web Audio mix now includes two-layer monsoon rain, wind, water ambience, distant road traffic, occasional low-volume vehicle/horn cues, shop/street murmur, daytime bird calls and night crickets. Traffic ambience strengthens near the main/side roads, while shop activity becomes more audible near the two village shop areas.
+
+The mix reacts continuously to daylight, hour, rain and overcast conditions. Rain masks street activity naturally, night reduces traffic/shop ambience and increases crickets, and heavy rain uses a fuller body+hiss texture. Challenge mode retains its short synthesized music sequence, but ordinary exploration is now environment-first.
+
+No downloaded audio assets are required. The whole soundscape is generated locally with a shared noise source, filters and short oscillators, and remains disabled until the player explicitly turns World Sound on.
