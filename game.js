@@ -2664,8 +2664,8 @@ function addUtilityPoles(scene) {
   const metal = new THREE.MeshStandardMaterial({ color: 0x4c5153, roughness: .78, metalness: .18 });
   const insulator = new THREE.MeshStandardMaterial({ color: 0x6e5542, roughness: .84 });
   const wireMaterial = new THREE.LineBasicMaterial({ color: 0x25292a, transparent: true, opacity: .72 });
-  const zPositions = [-64, -46, -28, -10, 8, 26, 44, 62];
-  const poleX = -11.6;
+  const zPositions = [-64, -46, -28, -10, 26, 44, 62];
+  const poleX = -13.0;
   const wirePoints = [[], [], []];
 
   zPositions.forEach(z => {
@@ -2759,8 +2759,8 @@ function addRoadsideClutter(scene) {
 function addTownStreetDetails(scene) {
   addShop(scene, -14.4, 7.5);
   addShop(scene, 14.8, 38.5);
-  addBusStop(scene, 10.7, 27.5, 0);
-  addBusStop(scene, -10.7, -50.5, Math.PI);
+  addBusStop(scene, 11.7, 27.5, 0);
+  addBusStop(scene, -11.7, -50.5, Math.PI);
 
   addCompoundWall(scene, 28, 24, 11.4, 9.2);
   addCompoundWall(scene, -36, 33, 11.8, 9.6);
@@ -2839,9 +2839,9 @@ function buildWorld(scene) {
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
   addPhotoVillager(scene, -9, 19, 8, .5, 4, .75);
   addPhotoVillager(scene, 10, 50, 7, .42, 1, .68);
-  addPhotoVillager(scene, -12.6, 8, 4.8, .38, 3, .72);
-  addPhotoVillager(scene, 12.4, 31, 5.4, .35, 1.3, .70);
-  addPhotoVillager(scene, -11.9, -44, 4.2, .40, 5.4, .69);
+  addPhotoVillager(scene, -8.9, 8, 4.8, .38, 3, .72);
+  addPhotoVillager(scene, 8.9, 31, 5.4, .35, 1.3, .70);
+  addPhotoVillager(scene, -9.2, -43, 3.8, .40, 5.4, .69);
 }
 
 function buildLandmarkWorld(scene) {
