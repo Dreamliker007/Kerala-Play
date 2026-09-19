@@ -3335,7 +3335,15 @@ function updateTraffic(delta) {
 
     const wrapped = (config.direction > 0 && nextProgress === config.min && Number(config.progress) > config.max - 1)
       || (config.direction < 0 && nextProgress === config.max && Number(config.progress) < config.min + 1);
-    if (wrapped) config.currentSpeed = baseSpeed;
+    if (wrapped) {
+      config.currentSpeed = baseSpeed;
+      if (config.kind === 'bus') {
+        config.lastBusStop = null;
+        config.stopUntil = 0;
+      }
+    } else if (config.kind === 'bus' && config.lastBusStop !== null && config.lastBusStop !== undefined) {
+      if (Math.abs(Number(config.progress) - Number(config.lastBusStop)) > 13) config.lastBusStop = null;
+    }
     config.progress = nextProgress;
     if (config.axis === 'z') vehicle.position.z = config.progress;
     else vehicle.position.x = config.progress;
