@@ -54,3 +54,16 @@ The Android project is generated locally and is ignored by Git, so the npm scrip
 - After changing the orientation lock, rebuild and reinstall the APK/AAB; an already-installed old APK cannot pick up AndroidManifest changes from the hosted website alone.
 
 The web/PWA button requests fullscreen first and then asks the Screen Orientation API for landscape. If Android/browser policy rejects that request, the prompt tells the player to enable Auto-rotate and rotate manually. Native Capacitor releases should not depend on that web fallback because the Activity itself is locked to sensor landscape.
+
+
+## Closed testing release metadata
+
+The current Play closed-testing update is defined in `mobile-release.json` as version `1.0.1` with `versionCode 2`.
+
+`npm run mobile:add` and `npm run mobile:sync` now run `mobile:configure`, which reapplies:
+
+- `sensorLandscape` to MainActivity
+- the Play `versionCode`
+- the Play `versionName`
+
+This prevents Capacitor regeneration/sync from silently resetting the release metadata before an AAB is generated.

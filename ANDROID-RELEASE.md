@@ -1,25 +1,21 @@
-# Kerala Play Android release v1
+# Kerala Play Android closed-testing update
 
-This release branch prepares the currently proven Android shell for a first signed internal-test build.
+This repository is prepared for the next Google Play closed-testing update.
 
 ## Release identity
 
 - App name: `Kerala Play`
 - Application ID: `com.dreamliker007.keralaplay`
-- App version: `1.0.0`
-- Initial Android version code: `1`
-- Production origin: `https://kerala-play-1.onrender.com`
-- Cleartext HTTP and mixed content remain disabled.
+- Version name: `1.0.1`
+- Android version code: `2`
+- Play track: `closed-testing`
+- Production origin: `https://keralaplay.in`
+- Android orientation: `sensorLandscape`
+- Cleartext HTTP and mixed content: disabled
 
-## Why v1 uses the production origin
+The release values are stored in `mobile-release.json`. The generated Android project remains ignored by Git, so `npm run mobile:sync` reapplies both the orientation lock and Play version metadata automatically.
 
-The current web client and backend intentionally use same-origin HttpOnly session cookies, same-origin write checks, Server-Sent Events and WebRTC signalling. The Android build that has already been tested successfully loads the production HTTPS origin directly, so login, points, social features and live state keep the same security model.
-
-A later native-client slice can bundle the web assets in the APK, but that requires a deliberate cross-origin/native authentication and realtime transport design first. Do not weaken the backend's same-origin protections merely to make bundled assets call the API.
-
-## Before a release build
-
-Run:
+## Prepare the Android project
 
 ```powershell
 npm install
@@ -28,33 +24,35 @@ npm run mobile:sync
 npm run mobile:open
 ```
 
-Then verify on a real Android phone using mobile data (not the development LAN):
+After `mobile:sync`, the generated Android app should contain:
 
+- `versionCode 2`
+- `versionName "1.0.1"`
+- `android:screenOrientation="sensorLandscape"`
+
+## Build the Play Store update
+
+In Android Studio use **Build > Generate Signed App Bundle or APK > Android App Bundle**.
+
+Use the same Play app and the same upload signing key used for the existing Kerala Play listing. Do not create a second application ID. Upload the resulting signed `.aab` to the existing **Closed testing** track.
+
+The V80 landscape fix is native Android configuration, so testers need this newly built Play Store update; an already installed older build cannot receive the AndroidManifest orientation change from the hosted website alone.
+
+## Closed-testing update checks
+
+Before uploading the AAB, verify on a real phone:
+
+- app starts in landscape
+- both left-landscape and right-landscape work
 - existing account can log in
-- a new account can be created
-- points survive app/server restart
-- People, Chat and Tasks open
-- movement and Run controls work
-- app resumes correctly after being backgrounded
-- microphone/voice permissions are tested before enabling a public voice release
+- movement, WALK/RUN and camera controls work
+- People, Chat, Phone, Jobs and Garage panels open
+- weather/world rendering remains usable
+- background/resume works
+- microphone/voice permission behavior is acceptable for the current test build
 
-## Android Studio release settings
+Keep the update in the same Play Console closed-testing track and keep existing testers opted in while the test continues.
 
-For the first Play release use:
+## Signing safety
 
-- `versionCode 1`
-- `versionName "1.0.0"`
-- release build type
-- a private upload keystore that is never committed to GitHub
-
-Create the signed bundle from Android Studio with **Build > Generate Signed App Bundle or APK > Android App Bundle**.
-
-Store the generated `.aab` separately from the upload keystore. Back up the keystore and its passwords securely; losing the upload key complicates future releases.
-
-## Current production limits before a public launch
-
-The current backend is a transitional single-instance service. Durable account/social/message/progress data is stored in Supabase, while live sessions/presence/signalling are still process-local. A backend restart can therefore require users to sign in again and temporarily resets live presence.
-
-Render's free instance can also sleep during inactivity. It is suitable for development/internal testing, not the final always-on public launch configuration.
-
-Before a broad public release, complete the next backend slices for durable sessions, scalable realtime/voice storage, production monitoring and always-on hosting.
+Never commit the upload keystore or signing passwords to this repository. Keep at least one secure backup of the upload key and credentials.
