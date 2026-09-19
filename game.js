@@ -1264,7 +1264,7 @@ function inspectAvatar(object) {
     const panel = document.querySelector('#npc-profile');
     panel.querySelector('h2').textContent = object.userData.name;
     const activity = object.userData.role || 'Local';
-    panel.querySelector('p').textContent = activity + ' · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ' local. NPCs now walk, wait, shop, use phones, cross roads and talk with each other around the village.';
+    panel.querySelector('p').textContent = activity + ' · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ' local. NPCs follow day/night routines, use umbrellas or shelter in rain, walk, wait, shop, cross roads and talk around the village.';
     panel.hidden = false;
     panel.querySelector('button').focus();
   } else if (object.userData.playerId) social.openProfile(object.userData.playerId);
@@ -2431,6 +2431,29 @@ function updateVillagers(time) {
     if (!human) return;
     const parts = human.userData.parts || {};
     const rainReaction = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+    const hour = Number(worldWeatherState.hour ?? 12);
+    const night = hour >= 20 || hour < 5.25;
+    const lateEvening = hour >= 18.5 || hour < 6.0;
+    const hiddenByRoutine = data.nightHide && night && !data.nightActive;
+    villager.visible = !hiddenByRoutine;
+    if (!villager.visible) {
+      data.crossingActive = false;
+      return;
+    }
+
+    const usingUmbrella = rainReaction > .18 && !data.hasRainShelter;
+    if (data.umbrella) {
+      data.umbrella.visible = usingUmbrella;
+      data.umbrella.rotation.y = Math.sin(time * .22 + data.routinePhase) * .035;
+    }
+
+    const applyRainShelter = () => {
+      if (!data.hasRainShelter || rainReaction < .42) return false;
+      const shelterBlend = THREE.MathUtils.smoothstep(rainReaction, .42, .84);
+      villager.position.x = THREE.MathUtils.lerp(villager.position.x, data.rainShelterX, shelterBlend);
+      villager.position.z = THREE.MathUtils.lerp(villager.position.z, data.rainShelterZ, shelterBlend);
+      return shelterBlend > .45;
+    };
 
     // Restore the relaxed arm posture before applying activity/weather poses.
     if (parts.leftArm) parts.leftArm.rotation.z = -.055;
@@ -2442,20 +2465,30 @@ function updateVillagers(time) {
       if (rainReaction <= .08) return;
       if (parts.head) parts.head.rotation.x = rainReaction * .09;
       if (parts.torso) parts.torso.rotation.x = rainReaction * .03;
-      if (parts.leftArm) parts.leftArm.rotation.z += rainReaction * .035;
-      if (parts.rightArm) parts.rightArm.rotation.z -= rainReaction * .035;
+      if (usingUmbrella) {
+        if (parts.rightArm) {
+          parts.rightArm.rotation.x = -.82;
+          parts.rightArm.rotation.z = -.08;
+        }
+        if (parts.rightElbow) parts.rightElbow.rotation.x = .92;
+        if (parts.leftArm) parts.leftArm.rotation.z += rainReaction * .025;
+      } else {
+        if (parts.leftArm) parts.leftArm.rotation.z += rainReaction * .035;
+        if (parts.rightArm) parts.rightArm.rotation.z -= rainReaction * .035;
+      }
     };
 
     data.crossingActive = false;
 
     if (data.behavior === 'social') {
       villager.position.set(data.startX, 0, data.startZ);
+      const sheltered = applyRainShelter();
       const dx = Number(data.targetX) - villager.position.x;
       const dz = Number(data.targetZ) - villager.position.z;
       villager.rotation.y = Math.atan2(dx, dz);
       animateHuman(human, time * .55 + data.offset, 0);
 
-      const talkBeat = Math.sin(time * .72 + data.offset);
+      const talkBeat = Math.sin(time * (lateEvening ? .46 : .72) + data.offset) * (sheltered ? .55 : 1);
       if (parts.head) {
         parts.head.rotation.y = talkBeat * .10;
         parts.head.rotation.z = Math.sin(time * .38 + data.offset) * .025;
@@ -2469,9 +2502,10 @@ function updateVillagers(time) {
 
     if (data.behavior === 'task') {
       villager.position.set(data.startX, 0, data.startZ);
+      const sheltered = applyRainShelter();
       villager.rotation.y = Number(data.facing || 0);
       animateHuman(human, time * .55 + data.offset, 0);
-      const workBeat = (Math.sin(time * .95 + data.offset) + 1) * .5;
+      const workBeat = (Math.sin(time * (lateEvening ? .58 : .95) + data.offset) + 1) * .5 * (sheltered ? .68 : 1);
       if (parts.rightArm) parts.rightArm.rotation.x = -.22 - workBeat * .46;
       if (parts.rightElbow) parts.rightElbow.rotation.x = .38 + workBeat * .48;
       if (parts.head) parts.head.rotation.y = Math.sin(time * .34 + data.offset) * .12;
@@ -2481,6 +2515,7 @@ function updateVillagers(time) {
 
     if (data.behavior === 'phone') {
       villager.position.set(data.startX, 0, data.startZ);
+      applyRainShelter();
       villager.rotation.y = Number(data.facing || 0);
       animateHuman(human, time * .45 + data.offset, 0);
       if (parts.rightArm) parts.rightArm.rotation.x = -1.0;
@@ -2495,6 +2530,7 @@ function updateVillagers(time) {
 
     if (data.behavior === 'idle') {
       villager.position.set(data.startX, 0, data.startZ);
+      applyRainShelter();
       villager.rotation.y = Number(data.facing || 0);
       animateHuman(human, time * .55 + data.offset, 0);
       if (parts.head) parts.head.rotation.y = Math.sin(time * .42 + data.offset) * .11;
@@ -2503,7 +2539,8 @@ function updateVillagers(time) {
       return;
     }
 
-    const weatherSpeed = data.speed * (1 - rainReaction * .20);
+    const routineSpeed = night ? .56 : lateEvening ? .78 : 1;
+    const weatherSpeed = data.speed * routineSpeed * (1 - rainReaction * .22);
     const motion = npcPingPongState(time, weatherSpeed, data.offset);
 
     if (data.behavior === 'crossing') {
@@ -3352,59 +3389,67 @@ function buildWorld(scene) {
   addFuelStation(scene, 11, -12);
   addServiceGarage(scene, -36, -15);
   addTrafficCheckpoint(scene, 5.4, 18);
-  addPhotoVillager(scene, -6, -50, 11, .55, 0, .78);
+  addPhotoVillager(scene, -6, -50, 11, .55, 0, .78, { nightHide: true });
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
-  addPhotoVillager(scene, -9, 19, 8, .50, 4, .75);
+  addPhotoVillager(scene, -9, 19, 8, .50, 4, .75, { nightHide: true });
   addPhotoVillager(scene, 10, 50, 7, .42, 1, .68);
-  addPhotoVillager(scene, -8.9, 8, 4.8, .38, 3, .72);
+  addPhotoVillager(scene, -8.9, 8, 4.8, .38, 3, .72, { nightHide: true });
   addPhotoVillager(scene, 8.9, 31, 5.4, .35, 1.3, .70);
-  addPhotoVillager(scene, -9.2, -43, 3.8, .40, 5.4, .69);
+  addPhotoVillager(scene, -9.2, -43, 3.8, .40, 5.4, .69, { nightHide: true });
 
   // Several independently-timed pedestrians use the zebra crossing instead of
   // one person shuttling back and forth continuously.
   addPhotoVillager(scene, -10.4, pedestrianCrossingZ - .48, 0, .54, .25, .72, {
-    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian',
+    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian', nightHide: true,
   });
   addPhotoVillager(scene, 10.4, pedestrianCrossingZ, 0, .48, 3.05, .70, {
     behavior: 'crossing', fromX: 10.4, toX: -10.4, role: 'Pedestrian',
   });
   addPhotoVillager(scene, -10.4, pedestrianCrossingZ + .48, 0, .44, 5.85, .69, {
-    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian',
+    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian', nightHide: true,
   });
 
   addPhotoVillager(scene, 10.1, 27.2, 0, .28, 2.4, .70, {
     behavior: 'idle', facing: Math.PI, role: 'Waiting',
+    shelterX: 10.1, shelterZ: 26.95,
   });
   addPhotoVillager(scene, -10.0, -50.2, 0, .28, 4.8, .69, {
     behavior: 'idle', facing: 0, role: 'Waiting',
+    shelterX: -10.1, shelterZ: -50.45,
   });
   addPhotoVillager(scene, -10.2, 7.5, 0, .25, 1.6, .68, {
-    behavior: 'task', facing: Math.PI / 2, role: 'Shopper',
+    behavior: 'task', facing: Math.PI / 2, role: 'Shopper', nightHide: true,
+    shelterX: -11.4, shelterZ: 10.15,
   });
 
   // Small social groups make the street feel inhabited rather than scripted.
   addPhotoVillager(scene, -11.0, 14.1, 0, .25, .3, .70, {
-    behavior: 'social', targetX: -12.35, targetZ: 14.35, role: 'Talking',
+    behavior: 'social', targetX: -12.35, targetZ: 14.35, role: 'Talking', nightHide: true,
   });
   addPhotoVillager(scene, -12.35, 14.35, 0, .25, 2.1, .72, {
-    behavior: 'social', targetX: -11.0, targetZ: 14.1, role: 'Talking',
+    behavior: 'social', targetX: -11.0, targetZ: 14.1, role: 'Talking', nightHide: true,
   });
   addPhotoVillager(scene, 10.4, 44.5, 0, .25, 4.2, .69, {
     behavior: 'phone', facing: Math.PI, role: 'Phone',
+    shelterX: 11.8, shelterZ: 41.25,
   });
 
   // Shop-front locals give the two stores visible daily activity.
   addPhotoVillager(scene, -12.9, 10.9, 0, .22, 1.1, .70, {
     behavior: 'task', facing: Math.PI, role: 'Shopkeeper',
+    shelterX: -12.9, shelterZ: 10.45,
   });
   addPhotoVillager(scene, -11.5, 10.7, 0, .22, 3.3, .69, {
-    behavior: 'social', targetX: -12.9, targetZ: 10.9, role: 'Customer',
+    behavior: 'social', targetX: -12.9, targetZ: 10.9, role: 'Customer', nightHide: true,
+    shelterX: -11.9, shelterZ: 10.35,
   });
   addPhotoVillager(scene, 13.8, 41.6, 0, .22, 2.6, .71, {
-    behavior: 'task', facing: Math.PI, role: 'Shopkeeper',
+    behavior: 'task', facing: Math.PI, role: 'Shopkeeper', nightHide: true,
+    shelterX: 13.8, shelterZ: 41.1,
   });
   addPhotoVillager(scene, 12.4, 41.4, 0, .22, 5.1, .68, {
-    behavior: 'social', targetX: 13.8, targetZ: 41.6, role: 'Customer',
+    behavior: 'social', targetX: 13.8, targetZ: 41.6, role: 'Customer', nightHide: true,
+    shelterX: 12.7, shelterZ: 41.05,
   });
 }
 
@@ -4392,6 +4437,31 @@ function addPalm(scene, x, z, scale) {
   scene.add(palm);
 }
 
+function createNpcUmbrella(index) {
+  const colors = [0x2d5f86, 0x8a3f46, 0x3f754d, 0x6e557f, 0xb47b32];
+  const root = new THREE.Group();
+  const canopyMat = new THREE.MeshStandardMaterial({
+    color: colors[index % colors.length],
+    roughness: .68,
+    metalness: .02,
+    side: THREE.DoubleSide,
+  });
+  const shaftMat = new THREE.MeshStandardMaterial({ color: 0x3b4142, roughness: .58, metalness: .38 });
+  const canopy = new THREE.Mesh(new THREE.ConeGeometry(.68, .28, 14, 1, true), canopyMat);
+  canopy.position.y = 2.22;
+  canopy.rotation.x = Math.PI;
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(.055, 8, 6), shaftMat);
+  cap.position.y = 2.39;
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.018, .022, 1.25, 6), shaftMat);
+  shaft.position.set(.18, 1.68, .02);
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(.07, .018, 5, 10, Math.PI * 1.2), shaftMat);
+  handle.position.set(.18, 1.07, .02);
+  handle.rotation.z = Math.PI * .25;
+  root.add(canopy, cap, shaft, handle);
+  root.visible = false;
+  return root;
+}
+
 function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options = {}) {
   const index = villagers.length;
   const names = ['Anu', 'Vivek', 'Meera', 'Arun', 'Nisha', 'Riyas', 'Asha', 'Manu', 'Liya', 'Nabeel', 'Sreeja', 'Jose'];
@@ -4406,7 +4476,9 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
   const villager = new THREE.Group();
   const human = createHuman({ gender, ...style, styleSeed: index + 1 });
   human.scale.setScalar(.9 * scale + .2);
-  villager.add(human);
+  const umbrella = createNpcUmbrella(index);
+  umbrella.scale.setScalar(.9 * scale + .2);
+  villager.add(human, umbrella);
   villager.position.set(x, 0, z);
   const npcName = options.name || names[index % names.length];
   const behavior = options.behavior || 'patrol';
@@ -4428,6 +4500,13 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
     name: npcName,
     role: options.role || 'Local',
     gender,
+    umbrella,
+    rainShelterX: Number(options.shelterX ?? x),
+    rainShelterZ: Number(options.shelterZ ?? z),
+    hasRainShelter: Number.isFinite(Number(options.shelterX)) && Number.isFinite(Number(options.shelterZ)),
+    nightHide: !!options.nightHide,
+    nightActive: !!options.nightActive,
+    routinePhase: Number(options.routinePhase ?? offset),
   };
   updateNameLabel(villager, npcName + ' · ' + villager.userData.role, 'npc-' + index);
   villagers.push(villager);
