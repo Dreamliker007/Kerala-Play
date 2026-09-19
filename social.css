@@ -146,3 +146,12 @@
 .traffic-challan-card button { width:100%; margin-top:6px; border:0; border-radius:8px; padding:7px 9px; color:#fff; background:#9b4a36; font:inherit; font-size:9px; font-weight:900; cursor:pointer; }
 .traffic-challan-card button:disabled { opacity:.5; cursor:not-allowed; }
 #traffic-refresh { border:1px solid rgba(255,255,255,.17); border-radius:8px; padding:5px 8px; color:#fff; background:#283f48; font:inherit; font-size:9px; font-weight:800; cursor:pointer; }
+
+
+/* Digital Driving Licence V64 */
+.driving-licence-card { border-color:rgba(82,168,214,.5); background:linear-gradient(145deg, rgba(26,80,111,.22), rgba(255,255,255,.035)); }
+.driving-licence-card.invalid { border-color:rgba(216,143,79,.5); background:linear-gradient(145deg, rgba(111,67,26,.20), rgba(255,255,255,.035)); }
+.licence-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+.licence-actions button { flex:1 1 120px; border:0; border-radius:8px; padding:8px 9px; color:#fff; background:#2b7b9c; font:inherit; font-size:9px; font-weight:900; cursor:pointer; }
+.licence-actions button:nth-child(2) { background:#355b68; }
+.licence-actions button:disabled { opacity:.5; cursor:not-allowed; }
