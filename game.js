@@ -1302,8 +1302,11 @@ function updateRemotePlayers(delta, camera) {
     remote.userData.predicted.z = THREE.MathUtils.clamp(remote.userData.predicted.z, -110, 110);
     remote.position.lerp(remote.userData.predicted, 1 - Math.exp(-delta * 10));
     remote.rotation.y = rotateTowards(remote.rotation.y, remote.userData.yaw, delta * 12);
-    remote.userData.phase += delta * 9;
-    animatePlayer(remote, remote.userData.phase, remote.userData.moving && remote.userData.mode === 'walk' ? 1 : 0);
+    const remoteWalkSpeed = remote.userData.velocity.length();
+    const remoteOnFoot = remote.userData.moving && remote.userData.mode === 'walk';
+    const remoteRunning = remoteOnFoot && remoteWalkSpeed > 3.9;
+    remote.userData.phase += delta * (remoteRunning ? 10.5 : 5.2);
+    animatePlayer(remote, remote.userData.phase, remoteOnFoot ? (remoteRunning ? .78 : .36) : 0);
   }
   camera.updateMatrixWorld();
   for (const object of [playerRef, ...villagers, ...remotePlayers.values()]) {
@@ -1313,7 +1316,8 @@ function updateRemotePlayers(delta, camera) {
     const distance = camera.position.distanceTo(labelWorldPosition);
     labelPosition.copy(labelWorldPosition); labelPosition.y += 2.65;
     labelPosition.project(camera);
-    const visible = !!profile && object.visible && !!label.textContent && distance < 45 && labelPosition.z > -1 && labelPosition.z < 1 && Math.abs(labelPosition.x) < .95 && Math.abs(labelPosition.y) < .93;
+    const labelDistance = object.userData.npc ? 30 : 45;
+    const visible = !!profile && object.visible && !!label.textContent && distance < labelDistance && labelPosition.z > -1 && labelPosition.z < 1 && Math.abs(labelPosition.x) < .95 && Math.abs(labelPosition.y) < .93;
     label.hidden = !visible;
     if (visible) label.style.transform = 'translate(-50%, -100%) translate(' + ((labelPosition.x + 1) * innerWidth / 2).toFixed(1) + 'px,' + ((1 - labelPosition.y) * innerHeight / 2).toFixed(1) + 'px)';
   }
@@ -3713,59 +3717,166 @@ function addShop(scene, x, z) {
 function addTree(scene, x, z, scale, withFruit = false) {
   addCircleCollider(x, z, Math.max(.42, .58 * scale), 'tree');
   const group = new THREE.Group();
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x65442e, roughness: 1 });
-  const branchMat = new THREE.MeshStandardMaterial({ color: 0x77503a, roughness: 1 });
-  const foliageMats = [0x1d5e2e, 0x29773a, 0x3b843d].map(color => new THREE.MeshStandardMaterial({ color, roughness: 1 }));
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.25, .43, 4.2, 8), trunkMat);
-  trunk.position.y = 2.1;
+  const random = visualRandom(Math.abs(Math.floor(x * 137 + z * 211 + scale * 1000)) + 9041);
+  const barkColors = [0x65442e, 0x72503a, 0x5c3d2b];
+  const foliageColors = [0x1d5e2e, 0x28723a, 0x347f3d, 0x468b46];
+
+  const trunkMat = new THREE.MeshStandardMaterial({
+    color: barkColors[Math.floor(random() * barkColors.length)],
+    roughness: 1,
+  });
+  const branchMat = new THREE.MeshStandardMaterial({ color: 0x6d4934, roughness: 1 });
+  const foliageMats = foliageColors.map(color => new THREE.MeshStandardMaterial({ color, roughness: .96 }));
+
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.23, .46, 4.55, 10, 4), trunkMat);
+  trunk.position.y = 2.27;
+  trunk.rotation.z = (random() - .5) * .075;
   group.add(trunk);
-  [[-.65,4.1,.65],[.7,4.35,-.25],[0,4.85,.55]].forEach(([bx, by, bz], i) => {
-    const branch = new THREE.Mesh(new THREE.CylinderGeometry(.09, .17, 1.6, 7), branchMat);
-    branch.position.set(bx * .45, by, bz * .25);
-    branch.rotation.z = bx < 0 ? .76 : -.72;
-    branch.rotation.x = bz * .32;
+
+  const branchConfigs = [
+    [-.68, 4.05, .42, -.82, .25],
+    [.74, 4.20, -.22, .78, -.18],
+    [-.18, 4.62, -.62, -.42, -.34],
+    [.28, 4.82, .58, .38, .30],
+    [0, 4.48, .18, .08, .12],
+  ];
+  branchConfigs.forEach(([bx, by, bz, rz, rx], index) => {
+    const branch = new THREE.Mesh(
+      new THREE.CylinderGeometry(.065, .16 - index * .012, 1.72 - index * .08, 7),
+      branchMat
+    );
+    branch.position.set(bx * .52, by, bz * .36);
+    branch.rotation.z = rz;
+    branch.rotation.x = rx;
     group.add(branch);
   });
-  [[0,5.2,0,2.1],[-1.15,4.9,.2,1.48],[1.2,4.9,-.15,1.55],[.35,6.1,.1,1.4],[-.45,5.65,-.85,1.25],[.75,5.55,.82,1.2]].forEach(([lx, ly, lz, radius], i) => {
-    const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(radius, 1), foliageMats[i % foliageMats.length]);
-    leaves.scale.set(1.08, .84, 1);
-    leaves.position.set(lx, ly, lz);
+
+  const canopyGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const clusters = [
+    [0, 5.35, 0, 1.95, 1.22, 1.55],
+    [-1.18, 5.12, .22, 1.42, 1.02, 1.22],
+    [1.20, 5.10, -.18, 1.48, 1.04, 1.30],
+    [-.52, 6.12, -.45, 1.30, 1.02, 1.16],
+    [.62, 6.18, .42, 1.34, 1.06, 1.18],
+    [-1.05, 5.78, -.72, 1.10, .88, .96],
+    [1.08, 5.72, .76, 1.08, .90, .98],
+    [0, 6.62, .02, 1.12, .92, 1.02],
+  ];
+  clusters.forEach(([lx, ly, lz, sx, sy, sz], index) => {
+    const leaves = new THREE.Mesh(canopyGeometry, foliageMats[index % foliageMats.length]);
+    leaves.position.set(lx + (random() - .5) * .18, ly + (random() - .5) * .12, lz + (random() - .5) * .18);
+    leaves.scale.set(sx * (.93 + random() * .12), sy * (.94 + random() * .10), sz * (.93 + random() * .12));
+    leaves.rotation.y = random() * Math.PI;
+    leaves.castShadow = true;
     group.add(leaves);
   });
+
   if (withFruit) addFruitClusters(group);
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
   scene.add(group);
 }
 
-function addPalm(scene, x, z, scale) {
-  addCircleCollider(x + .2 * scale, z, Math.max(.34, .42 * scale), 'palm');
-  const palm = new THREE.Group();
-  const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x84735a, roughness: 1 });
-  const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x357b32, roughness: .82, side: THREE.DoubleSide });
-  const leaflets = new THREE.InstancedMesh(new THREE.PlaneGeometry(.13, 1), leafMaterial, 144);
-  const leafletPose = new THREE.Object3D();
-  let leafletIndex = 0;
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.13, .3, 7, 9, 5), trunkMaterial);
-  trunk.position.set(.3, 3.5, 0); trunk.rotation.z = -.08; palm.add(trunk);
-  for (let i = 0; i < 9; i++) {
-    const yaw = i * Math.PI * 2 / 9;
-    const points = [];
-    for (let j = 0; j <= 8; j++) { const t = j / 8; points.push(new THREE.Vector3(.58 + Math.cos(yaw) * t * 3.2, 7 + Math.sin(t * Math.PI) * .7 - t * 1.1, Math.sin(yaw) * t * 3.2)); }
-    const curve = new THREE.CatmullRomCurve3(points);
-    palm.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 8, .035, 4, false), leafMaterial));
-    for (let j = 1; j < 9; j++) {
-      const point = curve.getPoint(j / 10);
+function createPalmFrondGeometry() {
+  const vertices = [];
+  const stems = [];
+  const frondCount = 10;
+  const segments = 9;
+
+  for (let frond = 0; frond < frondCount; frond++) {
+    const yaw = frond / frondCount * Math.PI * 2 + (frond % 2) * .08;
+    const radialX = Math.cos(yaw);
+    const radialZ = Math.sin(yaw);
+    const sideX = -radialZ;
+    const sideZ = radialX;
+    let previous = null;
+
+    for (let segment = 0; segment <= segments; segment++) {
+      const t = segment / segments;
+      const distance = .34 + t * 3.55;
+      const center = {
+        x: .32 + radialX * distance,
+        y: 7.05 + Math.sin(t * Math.PI) * .78 - t * 1.28,
+        z: radialZ * distance,
+      };
+
+      if (previous) {
+        stems.push(previous.x, previous.y, previous.z, center.x, center.y, center.z);
+      }
+      previous = center;
+
+      if (segment === 0 || segment === segments) continue;
+      const leafletLength = (.64 + Math.sin(t * Math.PI) * .34) * (1 - t * .22);
+      const baseSpread = .105 * (1 - t * .45);
+
       for (const side of [-1, 1]) {
-        leafletPose.position.copy(point); leafletPose.rotation.set(-Math.PI / 2 + .3, 0, -yaw + side * .6);
-        leafletPose.scale.set(1, .9 * (1 - j / 12), 1); leafletPose.updateMatrix();
-        leaflets.setMatrixAt(leafletIndex++, leafletPose.matrix);
+        const alongX = radialX * baseSpread;
+        const alongZ = radialZ * baseSpread;
+        const tipX = center.x + sideX * leafletLength * side;
+        const tipZ = center.z + sideZ * leafletLength * side;
+        const tipY = center.y - (.10 + t * .28);
+
+        vertices.push(
+          center.x - alongX, center.y + .015, center.z - alongZ,
+          center.x + alongX, center.y - .015, center.z + alongZ,
+          tipX, tipY, tipZ,
+        );
       }
     }
   }
-  palm.add(leaflets);
-  for (let i = 0; i < 4; i++) { const nut = new THREE.Mesh(new THREE.SphereGeometry(.19, 7, 6), trunkMaterial); nut.position.set(.58 + Math.sin(i * 2) * .25, 6.8, Math.cos(i * 2) * .25); palm.add(nut); }
-  palm.position.set(x, 0, z); palm.scale.setScalar(scale); scene.add(palm);
+
+  const leafGeometry = new THREE.BufferGeometry();
+  leafGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  leafGeometry.computeVertexNormals();
+
+  const stemGeometry = new THREE.BufferGeometry();
+  stemGeometry.setAttribute('position', new THREE.Float32BufferAttribute(stems, 3));
+  return { leafGeometry, stemGeometry };
+}
+
+function addPalm(scene, x, z, scale) {
+  addCircleCollider(x + .18 * scale, z, Math.max(.34, .42 * scale), 'palm');
+  const palm = new THREE.Group();
+  const random = visualRandom(Math.abs(Math.floor(x * 191 + z * 109 + scale * 1000)) + 6151);
+  const trunkMaterial = new THREE.MeshStandardMaterial({
+    color: random() > .5 ? 0x7c694f : 0x89755a,
+    roughness: 1,
+  });
+  const crownMaterial = new THREE.MeshStandardMaterial({ color: 0x5b4d39, roughness: 1 });
+  const leafMaterial = new THREE.MeshStandardMaterial({
+    color: random() > .5 ? 0x2f7434 : 0x347d38,
+    roughness: .84,
+    side: THREE.DoubleSide,
+  });
+  const stemMaterial = new THREE.LineBasicMaterial({ color: 0x315f2d, transparent: true, opacity: .90 });
+
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.14, .33, 7.1, 10, 5), trunkMaterial);
+  trunk.position.set(.28, 3.55, 0);
+  trunk.rotation.z = -.065 + (random() - .5) * .035;
+  palm.add(trunk);
+
+  const crown = new THREE.Mesh(new THREE.SphereGeometry(.34, 9, 7), crownMaterial);
+  crown.scale.set(1.05, .72, 1);
+  crown.position.set(.31, 6.92, 0);
+  palm.add(crown);
+
+  const { leafGeometry, stemGeometry } = createPalmFrondGeometry();
+  const fronds = new THREE.Mesh(leafGeometry, leafMaterial);
+  const stems = new THREE.LineSegments(stemGeometry, stemMaterial);
+  fronds.rotation.y = random() * .14;
+  stems.rotation.y = fronds.rotation.y;
+  palm.add(fronds, stems);
+
+  for (let i = 0; i < 5; i++) {
+    const nut = new THREE.Mesh(new THREE.SphereGeometry(.16 + (i % 2) * .02, 8, 6), crownMaterial);
+    const angle = i / 5 * Math.PI * 2;
+    nut.position.set(.31 + Math.cos(angle) * .24, 6.72 - (i % 2) * .08, Math.sin(angle) * .24);
+    palm.add(nut);
+  }
+
+  palm.position.set(x, 0, z);
+  palm.scale.setScalar(scale);
+  scene.add(palm);
 }
 
 function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options = {}) {
