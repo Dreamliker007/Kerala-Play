@@ -497,33 +497,70 @@ lightsAction?.addEventListener('click', toggleVehicleHeadlights);
 
 function createDeliveryBike() {
   const bike = new THREE.Group();
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0x2d6f55, roughness: .78 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x171a1c, roughness: .92 });
-  const metalMat = new THREE.MeshStandardMaterial({ color: 0xaab2b3, roughness: .46, metalness: .55 });
-  const wheelGeometry = new THREE.TorusGeometry(.34, .075, 8, 18);
-  [-.68, .68].forEach(z => {
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x2d6f55, roughness: .68, metalness: .04 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x14181a, roughness: .90 });
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0xaeb6b7, roughness: .42, metalness: .60 });
+  const lampMaterial = new THREE.MeshStandardMaterial({ color: 0xffe9a2, emissive: 0xffd66b, emissiveIntensity: .30 });
+  const tailMaterial = new THREE.MeshStandardMaterial({ color: 0xb92d27, emissive: 0x72130e, emissiveIntensity: .16 });
+
+  const wheelGeometry = new THREE.TorusGeometry(.34, .072, 8, 20);
+  const wheels = [];
+  const frontWheels = [];
+  [-.69, .69].forEach(z => {
+    const root = new THREE.Group();
+    root.position.set(0, .36, z);
     const wheel = new THREE.Mesh(wheelGeometry, darkMat);
     wheel.rotation.y = Math.PI / 2;
-    wheel.position.set(0, .36, z);
-    bike.add(wheel);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.105, .105, .10, 10), metalMat);
+    hub.rotation.z = Math.PI / 2;
+    root.add(wheel, hub);
+    bike.add(root);
+    wheels.push(root);
+    if (z > 0) frontWheels.push(root);
   });
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(.18, .24, 1.18), frameMat);
-  frame.position.set(0, .62, 0);
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(.42, .12, .42), darkMat);
-  seat.position.set(0, .95, -.15);
-  const front = new THREE.Mesh(new THREE.BoxGeometry(.12, .72, .12), metalMat);
-  front.position.set(0, .72, .54);
-  front.rotation.x = -.12;
-  const handle = new THREE.Mesh(new THREE.BoxGeometry(.72, .07, .07), metalMat);
-  handle.position.set(0, 1.08, .58);
-  const lampMaterial = new THREE.MeshStandardMaterial({ color: 0xffe9a2, emissive: 0xffd66b, emissiveIntensity: .28 });
-  const lamp = new THREE.Mesh(new THREE.SphereGeometry(.12, 8, 7), lampMaterial);
-  lamp.position.set(0, .94, .73);
-  const carrier = new THREE.Mesh(new THREE.BoxGeometry(.55, .08, .46), metalMat);
-  carrier.position.set(0, .82, -.68);
-  bike.add(frame, seat, front, handle, lamp, carrier);
+
+  const engine = new THREE.Mesh(new THREE.BoxGeometry(.34, .34, .46), darkMat);
+  engine.position.set(0, .53, -.02);
+
+  const tank = new THREE.Mesh(new THREE.CapsuleGeometry(.21, .42, 5, 10), frameMat);
+  tank.rotation.x = Math.PI / 2;
+  tank.position.set(0, .79, .16);
+  tank.scale.set(1, .72, .86);
+
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(.12, .12, 1.12), metalMat);
+  frame.position.set(0, .59, 0);
+  frame.rotation.x = -.05;
+
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(.40, .11, .48), darkMat);
+  seat.position.set(0, .93, -.18);
+
+  const fork = new THREE.Mesh(new THREE.BoxGeometry(.10, .68, .10), metalMat);
+  fork.position.set(0, .70, .54);
+  fork.rotation.x = -.16;
+
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(.70, .065, .065), metalMat);
+  handle.position.set(0, 1.08, .60);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.115, 8, 7), lampMaterial);
+  head.position.set(0, .94, .75);
+
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(.18, .10, .055), tailMaterial);
+  tail.position.set(0, .79, -.78);
+
+  const rearCarrier = new THREE.Mesh(new THREE.BoxGeometry(.54, .07, .48), metalMat);
+  rearCarrier.position.set(0, .82, -.67);
+
+  const mudguardFront = new THREE.Mesh(new THREE.TorusGeometry(.37, .025, 6, 16, Math.PI), frameMat);
+  mudguardFront.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+  mudguardFront.position.set(0, .39, .69);
+
+  bike.add(engine, tank, frame, seat, fork, handle, head, tail, rearCarrier, mudguardFront);
   bike.userData.headlightMaterials = [lampMaterial];
-  bike.scale.setScalar(1.12);
+  bike.userData.tailLightMaterials = [tailMaterial];
+  bike.userData.wheels = wheels;
+  bike.userData.frontWheels = frontWheels;
+  bike.userData.wheelRadius = .34;
+  bike.scale.setScalar(1.10);
   return bike;
 }
 
@@ -556,6 +593,36 @@ function currentVehicleSource() {
 function createJobVehicleVisual(kind, source = 'job') {
   if (kind === 'bike') return createDeliveryBike();
   return source === 'personal' ? createPersonalCarVehicle() : createTaxiVehicle();
+}
+
+function animateVehicleVisual(vehicle, delta, speed, steering = 0, speedRatio = 0, braking = false) {
+  if (!vehicle) return;
+  const wheelRadius = Math.max(.12, Number(vehicle.userData.wheelRadius || .24));
+  const spin = speed / wheelRadius * delta;
+  for (const wheelRoot of vehicle.userData.wheels || []) {
+    const wheel = wheelRoot.children?.[0];
+    const hub = wheelRoot.children?.[1];
+    if (wheel) wheel.rotation.x -= spin;
+    if (hub) hub.rotation.x -= spin;
+  }
+
+  const steerAngle = THREE.MathUtils.clamp(steering, -1, 1) * .30;
+  for (const wheelRoot of vehicle.userData.frontWheels || []) {
+    wheelRoot.rotation.y += (steerAngle - wheelRoot.rotation.y) * Math.min(1, delta * 10);
+  }
+
+  const leanTarget = -THREE.MathUtils.clamp(steering, -1, 1) * Math.min(.06, .018 + speedRatio * .045);
+  const pitchTarget = braking && Math.abs(speed) > .3
+    ? .018 * Math.min(1, speedRatio + .25)
+    : Math.abs(speed) > .15
+      ? (speed >= 0 ? -.008 : .008) * Math.min(1, speedRatio + .2)
+      : 0;
+  vehicle.rotation.z += (leanTarget - vehicle.rotation.z) * Math.min(1, delta * 7);
+  vehicle.rotation.x += (pitchTarget - vehicle.rotation.x) * Math.min(1, delta * 6);
+
+  for (const material of vehicle.userData.tailLightMaterials || []) {
+    material.emissiveIntensity = braking ? .75 : .14;
+  }
 }
 
 function restorePlayerVehiclePose() {
@@ -1508,6 +1575,8 @@ try {
   let runCruiseArmed = false;
   let acceleratorHeld = false;
   let acceleratorPointerId = null;
+  let smoothedDriveSteering = 0;
+  let driveSpeedRatio = 0;
   let walkPhase = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
   let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0;
@@ -1658,6 +1727,8 @@ try {
     acceleratorPointerId = null;
     lookPointerId = null;
     driveSpeed = 0;
+    smoothedDriveSteering = 0;
+    driveSpeedRatio = 0;
     walkVelocity.set(0, 0, 0);
     targetWalkVelocity.set(0, 0, 0);
   }
@@ -1738,6 +1809,8 @@ try {
         : (Math.abs(rawSteering) - steeringDeadzone) / (1 - steeringDeadzone);
       const throttle = Math.sign(rawThrottle) * Math.pow(throttleMagnitude, 1.8);
       const steering = Math.sign(rawSteering) * Math.pow(steeringMagnitude, 1.35);
+      const steerResponse = Math.abs(driveSpeed) < .8 ? 9.5 : 7.2;
+      smoothedDriveSteering += (steering - smoothedDriveSteering) * (1 - Math.exp(-delta * steerResponse));
       const roadZone = roadZoneAt(player.position.x, player.position.z);
       const driveVehicle = currentDriveVehicle();
       const condition = Math.max(15, Math.min(100, Number(driveVehicle?.condition ?? 100)));
@@ -1746,13 +1819,16 @@ try {
       const maxForward = (vehicleMode === 'bike' ? roadZone.bikeLimit : roadZone.taxiLimit) * conditionFactor * (fuel <= .05 ? 0 : 1);
       const maxReverse = fuel <= .05 ? 0 : Math.min(vehicleMode === 'bike' ? 2.6 : 2.4, Math.max(.8, maxForward * .48));
       const targetSpeed = runHeld ? 0 : (throttle >= 0 ? throttle * maxForward : throttle * maxReverse);
-      const response = runHeld ? 9 : (acceleratorHeld ? 4.8 : (Math.abs(throttle) > .01 ? 2.55 : 3.6));
+      const brakingResponse = Math.abs(driveSpeed) > Math.max(2.2, maxForward * .35) ? 7.2 : 10.2;
+      const response = runHeld ? brakingResponse : (acceleratorHeld ? 4.9 : (Math.abs(throttle) > .01 ? 2.7 : 3.8));
       driveSpeed += (targetSpeed - driveSpeed) * Math.min(1, delta * response);
       if (Math.abs(driveSpeed) < .03) driveSpeed = 0;
       const speedRatio = maxForward > .01 ? Math.min(1, Math.abs(driveSpeed) / maxForward) : 0;
+      driveSpeedRatio = speedRatio;
 
       if (Math.abs(driveSpeed) > .035) {
-        player.rotation.y -= steering * delta * (.72 + speedRatio * .9) * (driveSpeed >= 0 ? 1 : -1);
+        const lowSpeedAssist = 1.08 - speedRatio * .20;
+        player.rotation.y -= smoothedDriveSteering * delta * (.68 + speedRatio * .72) * lowSpeedAssist * (driveSpeed >= 0 ? 1 : -1);
         const dx = Math.sin(player.rotation.y) * driveSpeed * delta;
         const dz = Math.cos(player.rotation.y) * driveSpeed * delta;
         const beforeX = player.position.x;
@@ -1778,11 +1854,14 @@ try {
         }
       }
 
-      if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * 2.5);
+      if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * (2.0 + speedRatio * 1.15));
+      animateVehicleVisual(jobVehicleVisual, delta, driveSpeed, smoothedDriveSteering, speedRatio, runHeld);
       animatePlayer(player, walkPhase, 0);
       if (mapAccumulator >= .12) { updateMapPlayer(player); mapAccumulator = 0; }
     } else {
       driveSpeed = 0;
+      driveSpeedRatio = 0;
+      smoothedDriveSteering += (0 - smoothedDriveSteering) * (1 - Math.exp(-delta * 10));
       const runningNow = runHeld && needsSnapshot?.canRun !== false;
       if (runningNow && controlLength > .08) runCruiseArmed = true;
       const autoRun = runningNow && runCruiseArmed && controlLength <= .08;
@@ -1840,15 +1919,23 @@ try {
       }
     }
 
-    cameraTarget.set(player.position.x, player.position.y + (vehicleMode === 'taxi' ? 1.35 : 1.45), player.position.z);
-    const distance = vehicleMode === 'taxi' ? 8.8 : vehicleMode === 'bike' ? 7.8 : 7.1;
+    const drivingCamera = vehicleMode !== 'walk';
+    const lookAhead = drivingCamera ? .75 + driveSpeedRatio * 2.2 : 0;
+    cameraTarget.set(
+      player.position.x + Math.sin(player.rotation.y) * lookAhead,
+      player.position.y + (vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45),
+      player.position.z + Math.cos(player.rotation.y) * lookAhead
+    );
+    const baseDistance = vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
+    const distance = baseDistance + (drivingCamera ? driveSpeedRatio * 1.35 : 0);
     const horizontal = Math.cos(cameraPitch) * distance;
     cameraPosition.set(
       player.position.x + Math.sin(cameraYaw) * horizontal,
-      player.position.y + 1.45 + Math.sin(cameraPitch) * distance,
+      player.position.y + (drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance,
       player.position.z + Math.cos(cameraYaw) * horizontal
     );
-    camera.position.lerp(cameraPosition, 1 - Math.exp(-delta * 9));
+    const cameraResponse = drivingCamera ? 6.8 + driveSpeedRatio * 1.4 : 9;
+    camera.position.lerp(cameraPosition, 1 - Math.exp(-delta * cameraResponse));
     camera.lookAt(cameraTarget);
     updateRemotePlayers(delta, camera);
     updateVehicleAction();
@@ -2660,42 +2747,147 @@ function addRoadEdges(scene, x, z, width, depth) {
 
 function createRoadVehicle(kind, color) {
   const isBus = kind === 'bus';
-  const width = isBus ? 2.25 : 1.55;
-  const length = isBus ? 5.15 : 3.05;
+  const width = isBus ? 2.28 : 1.62;
+  const length = isBus ? 5.25 : 3.35;
   const vehicle = new THREE.Group();
-  const paint = new THREE.MeshStandardMaterial({ color, roughness: .78 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0x193543, roughness: .3, metalness: .1 });
-  const tire = new THREE.MeshStandardMaterial({ color: 0x16191b, roughness: 1 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(width, isBus ? 1.30 : .68, length), paint);
-  body.position.y = isBus ? .90 : .55;
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(width - .16, isBus ? .62 : .54, isBus ? 3.85 : 1.62), glass);
-  cabin.position.y = isBus ? 1.64 : 1.12;
-  const windscreen = new THREE.Mesh(new THREE.BoxGeometry(width - .27, isBus ? .42 : .30, .055), glass);
-  windscreen.position.set(0, isBus ? 1.63 : 1.12, length / 2 + .03);
-  const headlightMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0b8, emissive: 0xffd56b, emissiveIntensity: .22, roughness: .42 });
-  const leftLamp = new THREE.Mesh(new THREE.SphereGeometry(isBus ? .10 : .085, 7, 6), headlightMaterial);
-  const rightLamp = leftLamp.clone();
-  leftLamp.position.set(-width * .29, isBus ? .82 : .62, length / 2 + .08);
-  rightLamp.position.set(width * .29, isBus ? .82 : .62, length / 2 + .08);
-  vehicle.add(body, cabin, windscreen, leftLamp, rightLamp);
-  vehicle.userData.headlightMaterials = [headlightMaterial];
-  if (isBus) {
-    for (let row = -1.25; row <= 1.25; row += .82) {
-      const window = new THREE.Mesh(new THREE.BoxGeometry(.045, .34, .56), glass);
+
+  const paint = new THREE.MeshStandardMaterial({ color, roughness: .63, metalness: .035 });
+  const trim = new THREE.MeshStandardMaterial({ color: 0x20272a, roughness: .78, metalness: .12 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x173543, roughness: .18, metalness: .12, transparent: true, opacity: .92 });
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111416, roughness: .96 });
+  const rim = new THREE.MeshStandardMaterial({ color: 0xb8bec0, roughness: .46, metalness: .58 });
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xcbd0d1, roughness: .38, metalness: .62 });
+  const headlightMaterial = new THREE.MeshStandardMaterial({
+    color: 0xfff0bf, emissive: 0xffd36b, emissiveIntensity: .24, roughness: .34,
+  });
+  const tailMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb92f29, emissive: 0x7c120d, emissiveIntensity: .14, roughness: .52,
+  });
+
+  const lowerBody = new THREE.Mesh(
+    new THREE.BoxGeometry(width, isBus ? .90 : .48, length),
+    paint
+  );
+  lowerBody.position.y = isBus ? .68 : .48;
+
+  const upperBody = new THREE.Mesh(
+    new THREE.BoxGeometry(width - (isBus ? .08 : .12), isBus ? .72 : .42, isBus ? 4.72 : 2.42),
+    paint
+  );
+  upperBody.position.set(0, isBus ? 1.32 : .82, isBus ? -.04 : -.08);
+
+  const cabin = new THREE.Mesh(
+    new THREE.BoxGeometry(width - (isBus ? .13 : .20), isBus ? .62 : .52, isBus ? 4.10 : 1.72),
+    glass
+  );
+  cabin.position.set(0, isBus ? 1.78 : 1.18, isBus ? -.08 : -.05);
+
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(width - .10, isBus ? .10 : .08, isBus ? 4.88 : 1.94),
+    paint
+  );
+  roof.position.set(0, isBus ? 2.13 : 1.50, isBus ? -.06 : -.10);
+
+  const bumperFront = new THREE.Mesh(new THREE.BoxGeometry(width * .86, .13, .16), trim);
+  bumperFront.position.set(0, isBus ? .55 : .40, length / 2 + .04);
+  const bumperRear = bumperFront.clone();
+  bumperRear.position.z = -length / 2 - .04;
+
+  vehicle.add(lowerBody, upperBody, cabin, roof, bumperFront, bumperRear);
+
+  if (!isBus) {
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(width * .88, .16, .72), paint);
+    hood.position.set(0, .89, length * .35);
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(width * .84, .14, .55), paint);
+    boot.position.set(0, .86, -length * .39);
+
+    const grille = new THREE.Mesh(new THREE.BoxGeometry(width * .48, .22, .035), trim);
+    grille.position.set(0, .57, length / 2 + .09);
+
+    const windscreen = new THREE.Mesh(new THREE.BoxGeometry(width * .72, .36, .045), glass);
+    windscreen.position.set(0, 1.23, .79);
+    windscreen.rotation.x = -.18;
+
+    const rearGlass = windscreen.clone();
+    rearGlass.position.z = -.87;
+    rearGlass.rotation.x = .16;
+
+    const mirrorLeft = new THREE.Mesh(new THREE.BoxGeometry(.14, .10, .18), trim);
+    const mirrorRight = mirrorLeft.clone();
+    mirrorLeft.position.set(-width * .54, 1.20, .53);
+    mirrorRight.position.set(width * .54, 1.20, .53);
+
+    vehicle.add(hood, boot, grille, windscreen, rearGlass, mirrorLeft, mirrorRight);
+  } else {
+    const windscreen = new THREE.Mesh(new THREE.BoxGeometry(width - .30, .48, .055), glass);
+    windscreen.position.set(0, 1.76, length / 2 + .035);
+    vehicle.add(windscreen);
+
+    for (let row = -1.55; row <= 1.55; row += .78) {
+      const window = new THREE.Mesh(new THREE.BoxGeometry(.05, .38, .58), glass);
       const opposite = window.clone();
-      window.position.set(width / 2 + .025, 1.66, row);
-      opposite.position.set(-width / 2 - .025, 1.66, row);
+      window.position.set(width / 2 + .026, 1.78, row);
+      opposite.position.set(-width / 2 - .026, 1.78, row);
       vehicle.add(window, opposite);
     }
+
+    const destination = new THREE.Mesh(new THREE.BoxGeometry(width * .62, .19, .055), trim);
+    destination.position.set(0, 2.02, length / 2 + .07);
+    vehicle.add(destination);
   }
-  [-length * .31, length * .31].forEach(zPos => {
-    [-width / 2, width / 2].forEach(xPos => {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(.20, .20, .12, 10), tire);
+
+  const leftLamp = new THREE.Mesh(new THREE.SphereGeometry(isBus ? .105 : .09, 8, 6), headlightMaterial);
+  const rightLamp = leftLamp.clone();
+  leftLamp.position.set(-width * .30, isBus ? .78 : .60, length / 2 + .11);
+  rightLamp.position.set(width * .30, isBus ? .78 : .60, length / 2 + .11);
+
+  const leftTail = new THREE.Mesh(new THREE.BoxGeometry(isBus ? .16 : .12, .16, .055), tailMaterial);
+  const rightTail = leftTail.clone();
+  leftTail.position.set(-width * .31, isBus ? .78 : .58, -length / 2 - .08);
+  rightTail.position.set(width * .31, isBus ? .78 : .58, -length / 2 - .08);
+
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(isBus ? .68 : .48, .16, .035), chrome);
+  plate.position.set(0, isBus ? .55 : .42, -length / 2 - .10);
+
+  vehicle.add(leftLamp, rightLamp, leftTail, rightTail, plate);
+  vehicle.userData.headlightMaterials = [headlightMaterial];
+  vehicle.userData.tailLightMaterials = [tailMaterial];
+
+  const wheelRadius = isBus ? .27 : .235;
+  const wheelWidth = isBus ? .15 : .14;
+  const wheelZ = isBus ? length * .34 : length * .315;
+  const wheelX = width / 2 + .015;
+  const wheels = [];
+  const frontWheels = [];
+
+  for (const zPos of [-wheelZ, wheelZ]) {
+    for (const xPos of [-wheelX, wheelX]) {
+      const wheelRoot = new THREE.Group();
+      wheelRoot.position.set(xPos, wheelRadius + .03, zPos);
+
+      const wheel = new THREE.Mesh(
+        new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, 12),
+        tire
+      );
       wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(xPos, .22, zPos);
-      vehicle.add(wheel);
-    });
-  });
+
+      const hub = new THREE.Mesh(
+        new THREE.CylinderGeometry(wheelRadius * .48, wheelRadius * .48, wheelWidth + .012, 10),
+        rim
+      );
+      hub.rotation.z = Math.PI / 2;
+
+      wheelRoot.add(wheel, hub);
+      vehicle.add(wheelRoot);
+      wheels.push(wheelRoot);
+      if (zPos > 0) frontWheels.push(wheelRoot);
+    }
+  }
+
+  vehicle.userData.wheels = wheels;
+  vehicle.userData.frontWheels = frontWheels;
+  vehicle.userData.bodyParts = [lowerBody, upperBody, cabin, roof];
+  vehicle.userData.wheelRadius = wheelRadius;
   return vehicle;
 }
 
@@ -2770,6 +2962,9 @@ function updateTraffic(delta) {
     config.progress = nextProgress;
     if (config.axis === 'z') vehicle.position.z = config.progress;
     else vehicle.position.x = config.progress;
+
+    const trafficRatio = baseSpeed > .01 ? Math.min(1, Math.abs(Number(config.currentSpeed)) / baseSpeed) : 0;
+    animateVehicleVisual(vehicle, delta, Number(config.currentSpeed) * Number(config.direction), 0, trafficRatio, targetSpeed < baseSpeed * .18);
   });
 }
 
