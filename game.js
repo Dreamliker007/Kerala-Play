@@ -80,6 +80,10 @@ const wetReflectionMaterials = [];
 const ambientVehicleLightMaterials = [];
 const weatherRoadSurfaces = [];
 const puddleMaterials = [];
+const puddleRipples = [];
+const drainWaterSurfaces = [];
+const roofRunoffJets = [];
+let monsoonWaterTimer = 0;
 const fruitGeometry = new THREE.SphereGeometry(.14, 6, 5);
 const fruitMaterial = new THREE.MeshStandardMaterial({ color: 0xe4a737, roughness: .72 });
 const birdBodyGeometry = new THREE.SphereGeometry(.10, 6, 5);
@@ -535,7 +539,7 @@ function updateVehicleRainSpray(delta) {
   if (!jobVehicleVisual) return;
   let spray = jobVehicleVisual.userData.rainSpray;
   if (!spray) {
-    const count = 18;
+    const count = 28;
     const positions = new Float32Array(count * 3);
     const geometry = new THREE.BufferGeometry();
     const attribute = new THREE.BufferAttribute(positions, 3);
@@ -543,7 +547,7 @@ function updateVehicleRainSpray(delta) {
     geometry.setAttribute('position', attribute);
     const material = new THREE.PointsMaterial({
       color: 0xd4e5ec,
-      size: .085,
+      size: .095,
       transparent: true,
       opacity: 0,
       depthWrite: false,
@@ -566,7 +570,7 @@ function updateVehicleRainSpray(delta) {
   const speedRatio = Math.min(1, Math.abs(driveSpeed) / 7);
   const strength = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0) * speedRatio, 0, 1);
   spray.points.visible = vehicleMode !== 'walk' && strength > .06;
-  spray.material.opacity = strength * .62;
+  spray.material.opacity = strength * (.58 + speedRatio * .24);
   if (!spray.points.visible) return;
 
   spray.particles.forEach((particle, index) => {
@@ -577,8 +581,8 @@ function updateVehicleRainSpray(delta) {
       particle.y = .10 + Math.random() * .18;
       particle.z = -.50 - Math.random() * .30;
     }
-    particle.y += delta * (.40 + speedRatio * .55);
-    particle.z -= delta * (1.2 + speedRatio * 2.8);
+    particle.y += delta * (.38 + speedRatio * .72 + strength * .22);
+    particle.z -= delta * (1.25 + speedRatio * 3.35 + strength * .55);
     particle.x += (Math.random() - .5) * delta * .35;
     const offset = index * 3;
     spray.positions[offset] = particle.x;
@@ -2208,6 +2212,7 @@ try {
     });
     updateWorldWeatherVisuals(weatherState);
     updateWindWorld(villageTime, delta);
+    updateMonsoonWaterVisuals(villageTime, delta);
     updateVehicleRainSpray(delta);
     renderer.render(scene, camera);
     if (isMobile && !atmosphere) {
@@ -2977,6 +2982,33 @@ function addWeatherRoadDetails(scene) {
     puddle.renderOrder = 1;
     puddleMaterials.push(material);
     scene.add(puddle);
+
+    for (let ringIndex = 0; ringIndex < 2; ringIndex++) {
+      const rippleMaterial = new THREE.MeshBasicMaterial({
+        color: 0xbad7e3,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      });
+      const ripple = new THREE.Mesh(new THREE.RingGeometry(.22, .27, 22), rippleMaterial);
+      ripple.rotation.x = -Math.PI / 2;
+      ripple.position.set(
+        x + (ringIndex ? .24 : -.18) * scaleX,
+        .054,
+        z + (ringIndex ? -.10 : .16) * scaleZ
+      );
+      ripple.renderOrder = 2;
+      puddleRipples.push({
+        mesh: ripple,
+        material: rippleMaterial,
+        baseScaleX: scaleX,
+        baseScaleZ: scaleZ,
+        phase: ringIndex * .53 + puddleRipples.length * .31,
+      });
+      scene.add(ripple);
+    }
   });
 }
 
@@ -3306,7 +3338,25 @@ function addKeralaStreetRealism(scene) {
       channel.position.set(side * 8.62, .075, z);
       rim.receiveShadow = true;
       channel.receiveShadow = true;
-      scene.add(rim, channel);
+
+      const waterMaterial = new THREE.MeshStandardMaterial({
+        color: 0x5b7f8b,
+        roughness: .18,
+        metalness: .08,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      const drainWater = new THREE.Mesh(new THREE.BoxGeometry(.20, .022, 12.75), waterMaterial);
+      drainWater.position.set(side * 8.62, .108, z);
+      drainWater.renderOrder = 1;
+      drainWaterSurfaces.push({
+        mesh: drainWater,
+        material: waterMaterial,
+        phase: drainWaterSurfaces.length * .47,
+        axis: 'z',
+      });
+      scene.add(rim, channel, drainWater);
 
       if (index % 3 === 1) {
         const slab = new THREE.Mesh(new THREE.BoxGeometry(.72, .12, 1.25), concrete);
@@ -3323,7 +3373,25 @@ function addKeralaStreetRealism(scene) {
     rim.position.set(x, .055, -28.18);
     const channel = new THREE.Mesh(new THREE.BoxGeometry(12.7, .055, .25), drainMat);
     channel.position.set(x, .075, -28.18);
-    scene.add(rim, channel);
+
+    const waterMaterial = new THREE.MeshStandardMaterial({
+      color: 0x5b7f8b,
+      roughness: .18,
+      metalness: .08,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const drainWater = new THREE.Mesh(new THREE.BoxGeometry(12.35, .022, .17), waterMaterial);
+    drainWater.position.set(x, .108, -28.18);
+    drainWater.renderOrder = 1;
+    drainWaterSurfaces.push({
+      mesh: drainWater,
+      material: waterMaterial,
+      phase: drainWaterSurfaces.length * .47,
+      axis: 'x',
+    });
+    scene.add(rim, channel, drainWater);
   });
 
   // Repaired asphalt and damp shoulder patches stop the roads looking perfectly flat/new.
@@ -3550,12 +3618,61 @@ function updateWindWorld(time, delta) {
   }
 }
 
+function updateMonsoonWaterVisuals(time, delta) {
+  monsoonWaterTimer += delta;
+  if (monsoonWaterTimer < .055) return;
+  monsoonWaterTimer = 0;
+
+  const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+  const activeRain = THREE.MathUtils.smoothstep(rain, .08, .72);
+
+  for (const ripple of puddleRipples) {
+    const cycle = (time * (.48 + rain * .52) + ripple.phase) % 1;
+    const scale = .42 + cycle * 2.15;
+    ripple.mesh.scale.set(
+      scale * ripple.baseScaleX * .48,
+      scale * ripple.baseScaleZ * .72,
+      1
+    );
+    ripple.material.opacity = activeRain * (1 - cycle) * .34;
+    ripple.mesh.visible = activeRain > .025;
+  }
+
+  for (const flow of drainWaterSurfaces) {
+    const pulse = .86 + Math.sin(time * 2.1 + flow.phase) * .10;
+    flow.material.opacity = activeRain * (.26 + rain * .42) * pulse;
+    flow.material.roughness = Math.max(.055, .20 - rain * .11);
+    flow.material.metalness = .08 + rain * .16;
+    const travel = ((time * (.20 + rain * .55) + flow.phase) % 1) - .5;
+    if (flow.axis === 'z') {
+      flow.mesh.position.x += Math.sin(time * 1.8 + flow.phase) * .00025 * activeRain;
+      flow.mesh.material.emissive?.setHex?.(0x000000);
+      flow.mesh.rotation.y = travel * .0008;
+    } else {
+      flow.mesh.position.z += Math.sin(time * 1.8 + flow.phase) * .00025 * activeRain;
+      flow.mesh.rotation.z = travel * .0008;
+    }
+    flow.mesh.visible = activeRain > .02;
+  }
+
+  for (const jet of roofRunoffJets) {
+    const flutter = .78 + Math.sin(time * 7.5 + jet.phase) * .18;
+    jet.material.opacity = activeRain * (.34 + rain * .54) * flutter;
+    jet.mesh.scale.y = .78 + rain * .48 + Math.sin(time * 5.4 + jet.phase) * .06 * activeRain;
+    jet.mesh.visible = activeRain > .04;
+  }
+}
+
 function buildWorld(scene) {
   staticColliders.length = 0;
   windVegetation.length = 0;
   windWires.length = 0;
   roadsideGrassWind = null;
   windUpdateTimer = 0;
+  puddleRipples.length = 0;
+  drainWaterSurfaces.length = 0;
+  roofRunoffJets.length = 0;
+  monsoonWaterTimer = 0;
   const groundTexture = createGroundSurfaceTexture();
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(160, 160),
@@ -4674,6 +4791,23 @@ function addHouse(scene, x, z, wallColor, roofColor) {
     const shoe = new THREE.Mesh(new THREE.BoxGeometry(.18, .12, .42), gutterMat);
     shoe.position.set(pipeX, .42, 3.88);
     group.add(shoe);
+
+    const runoffMaterial = new THREE.MeshBasicMaterial({
+      color: 0xaed9e8,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const runoff = new THREE.Mesh(new THREE.CylinderGeometry(.022, .035, .58, 7), runoffMaterial);
+    runoff.position.set(pipeX, .18, 4.10);
+    runoff.rotation.x = -.12;
+    roofRunoffJets.push({
+      mesh: runoff,
+      material: runoffMaterial,
+      phase: roofRunoffJets.length * .61,
+    });
+    group.add(runoff);
   });
 
   const roofShadow = new THREE.Mesh(
