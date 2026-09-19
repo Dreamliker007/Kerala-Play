@@ -1264,7 +1264,7 @@ function inspectAvatar(object) {
     const panel = document.querySelector('#npc-profile');
     panel.querySelector('h2').textContent = object.userData.name;
     const activity = object.userData.role || 'Local';
-    panel.querySelector('p').textContent = activity + ' · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ' local. NPCs now walk, wait, shop, use phones, cross roads and talk with each other around the village.';
+    panel.querySelector('p').textContent = activity + ' · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ' local. NPCs follow day/night routines, use umbrellas or shelter in rain, walk, wait, shop, cross roads and talk around the village.';
     panel.hidden = false;
     panel.querySelector('button').focus();
   } else if (object.userData.playerId) social.openProfile(object.userData.playerId);
@@ -3389,59 +3389,67 @@ function buildWorld(scene) {
   addFuelStation(scene, 11, -12);
   addServiceGarage(scene, -36, -15);
   addTrafficCheckpoint(scene, 5.4, 18);
-  addPhotoVillager(scene, -6, -50, 11, .55, 0, .78);
+  addPhotoVillager(scene, -6, -50, 11, .55, 0, .78, { nightHide: true });
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
-  addPhotoVillager(scene, -9, 19, 8, .50, 4, .75);
+  addPhotoVillager(scene, -9, 19, 8, .50, 4, .75, { nightHide: true });
   addPhotoVillager(scene, 10, 50, 7, .42, 1, .68);
-  addPhotoVillager(scene, -8.9, 8, 4.8, .38, 3, .72);
+  addPhotoVillager(scene, -8.9, 8, 4.8, .38, 3, .72, { nightHide: true });
   addPhotoVillager(scene, 8.9, 31, 5.4, .35, 1.3, .70);
-  addPhotoVillager(scene, -9.2, -43, 3.8, .40, 5.4, .69);
+  addPhotoVillager(scene, -9.2, -43, 3.8, .40, 5.4, .69, { nightHide: true });
 
   // Several independently-timed pedestrians use the zebra crossing instead of
   // one person shuttling back and forth continuously.
   addPhotoVillager(scene, -10.4, pedestrianCrossingZ - .48, 0, .54, .25, .72, {
-    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian',
+    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian', nightHide: true,
   });
   addPhotoVillager(scene, 10.4, pedestrianCrossingZ, 0, .48, 3.05, .70, {
     behavior: 'crossing', fromX: 10.4, toX: -10.4, role: 'Pedestrian',
   });
   addPhotoVillager(scene, -10.4, pedestrianCrossingZ + .48, 0, .44, 5.85, .69, {
-    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian',
+    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian', nightHide: true,
   });
 
   addPhotoVillager(scene, 10.1, 27.2, 0, .28, 2.4, .70, {
     behavior: 'idle', facing: Math.PI, role: 'Waiting',
+    shelterX: 10.1, shelterZ: 26.95,
   });
   addPhotoVillager(scene, -10.0, -50.2, 0, .28, 4.8, .69, {
     behavior: 'idle', facing: 0, role: 'Waiting',
+    shelterX: -10.1, shelterZ: -50.45,
   });
   addPhotoVillager(scene, -10.2, 7.5, 0, .25, 1.6, .68, {
-    behavior: 'task', facing: Math.PI / 2, role: 'Shopper',
+    behavior: 'task', facing: Math.PI / 2, role: 'Shopper', nightHide: true,
+    shelterX: -11.4, shelterZ: 10.15,
   });
 
   // Small social groups make the street feel inhabited rather than scripted.
   addPhotoVillager(scene, -11.0, 14.1, 0, .25, .3, .70, {
-    behavior: 'social', targetX: -12.35, targetZ: 14.35, role: 'Talking',
+    behavior: 'social', targetX: -12.35, targetZ: 14.35, role: 'Talking', nightHide: true,
   });
   addPhotoVillager(scene, -12.35, 14.35, 0, .25, 2.1, .72, {
-    behavior: 'social', targetX: -11.0, targetZ: 14.1, role: 'Talking',
+    behavior: 'social', targetX: -11.0, targetZ: 14.1, role: 'Talking', nightHide: true,
   });
   addPhotoVillager(scene, 10.4, 44.5, 0, .25, 4.2, .69, {
     behavior: 'phone', facing: Math.PI, role: 'Phone',
+    shelterX: 11.8, shelterZ: 41.25,
   });
 
   // Shop-front locals give the two stores visible daily activity.
   addPhotoVillager(scene, -12.9, 10.9, 0, .22, 1.1, .70, {
     behavior: 'task', facing: Math.PI, role: 'Shopkeeper',
+    shelterX: -12.9, shelterZ: 10.45,
   });
   addPhotoVillager(scene, -11.5, 10.7, 0, .22, 3.3, .69, {
-    behavior: 'social', targetX: -12.9, targetZ: 10.9, role: 'Customer',
+    behavior: 'social', targetX: -12.9, targetZ: 10.9, role: 'Customer', nightHide: true,
+    shelterX: -11.9, shelterZ: 10.35,
   });
   addPhotoVillager(scene, 13.8, 41.6, 0, .22, 2.6, .71, {
-    behavior: 'task', facing: Math.PI, role: 'Shopkeeper',
+    behavior: 'task', facing: Math.PI, role: 'Shopkeeper', nightHide: true,
+    shelterX: 13.8, shelterZ: 41.1,
   });
   addPhotoVillager(scene, 12.4, 41.4, 0, .22, 5.1, .68, {
-    behavior: 'social', targetX: 13.8, targetZ: 41.6, role: 'Customer',
+    behavior: 'social', targetX: 13.8, targetZ: 41.6, role: 'Customer', nightHide: true,
+    shelterX: 12.7, shelterZ: 41.05,
   });
 }
 
