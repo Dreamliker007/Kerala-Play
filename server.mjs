@@ -462,6 +462,38 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     };
   }
 
+  function homeSummary(user) {
+    const state = jobStateFor(user);
+    const home = state.home;
+    const timestamp = now();
+    const rentDueAt = Number(home.rentDueAt);
+    const utilityDueAt = Number(home.utilityDueAt);
+    const rentOverdue = timestamp > rentDueAt;
+    const utilityOverdue = timestamp > utilityDueAt;
+    const rentGraceUntil = rentDueAt + HOME_DEFINITION.graceMs;
+    const utilityGraceUntil = utilityDueAt + HOME_DEFINITION.graceMs;
+    const accessBlocked = timestamp > rentGraceUntil || timestamp > utilityGraceUntil;
+    const reminder = accessBlocked
+      ? 'Sleep access paused until overdue home charges are paid.'
+      : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
+    return {
+      status: home.status,
+      home: HOME_DEFINITION,
+      rentDueAt,
+      utilityDueAt,
+      rentOverdue,
+      utilityOverdue,
+      rentGraceUntil,
+      utilityGraceUntil,
+      accessBlocked,
+      reminder,
+      lastSleepAt: Number(home.lastSleepAt || 0),
+      nextSleepAt: Number(home.lastSleepAt || 0) + HOME_SLEEP_COOLDOWN_MS,
+      rentPayments: Number(home.rentPayments || 0),
+      utilityPayments: Number(home.utilityPayments || 0),
+    };
+  }
+
   function needsMovementFactor(needs) {
     let factor = 1;
     if (needs.energy <= 8) factor = Math.min(factor, .62);
