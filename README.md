@@ -104,3 +104,10 @@ A Kerala Fuel Station and Village Service Garage are now placed in the world. St
 Vehicle collision now uses the full visual footprint of moving cars and buses instead of a small circular approximation, preventing bikes and taxis from entering the visible body of traffic. Vehicle movement is collision-substepped, the player continuously records a last safe vehicle pose, and any detected overlap automatically restores a nearby safe position with speed reset. Reverse movement remains available after a normal edge collision.
 
 AI traffic also predicts its next position and stops before its body enters the player footprint. Fuel Station and Service Garage server interaction coordinates are aligned with their visible world locations. No new Supabase migration is required.
+
+
+## Personal Vehicle Ownership + Garage (V61)
+
+Players can now own personal vehicles separately from temporary job vehicles. The GARAGE panel contains a server-priced showroom with a Kerala Bike and Kerala Compact car, an owned-vehicle list, selection controls, and Retrieve / Store actions. Only one personal vehicle can be outside the garage at a time, and personal vehicles must be stored before starting a job.
+
+Retrieved vehicles appear in the world near the player and use the existing stable V55–V60 driving, road, traffic, collision-recovery, horn, lights, fuel, condition, refuel and repair systems. Personal fuel and condition persist across sessions and server restarts. Purchases and service costs use Kerala Cash wallet transactions. Garage ownership is stored inside the existing job_state JSONB, so V61 requires no new Supabase migration.
