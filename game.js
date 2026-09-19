@@ -518,7 +518,7 @@ function updateFootstepParticlePool(pool, delta, gravity, drag) {
   if (active > 0) pool.attribute.needsUpdate = true;
 }
 
-function updateFootstepEffects(delta, player, moving, running) {
+function updateFootstepEffects(delta, player, moving, running, phase = 0) {
   const effects = ensureFootstepEffects(sceneRef);
   if (!effects || !player) return;
 
@@ -529,7 +529,7 @@ function updateFootstepEffects(delta, player, moving, running) {
   const shadow = player.userData?.shadow;
   if (shadow) {
     const pulse = vehicleMode === 'walk' && moving
-      ? Math.abs(Math.sin(walkPhase)) * (running ? .045 : .025)
+      ? Math.abs(Math.sin(phase)) * (running ? .045 : .025)
       : 0;
     const targetX = 1 + pulse;
     const targetY = 1 - pulse * .42;
@@ -542,7 +542,7 @@ function updateFootstepEffects(delta, player, moving, running) {
     return;
   }
 
-  const beat = Math.floor(walkPhase / Math.PI);
+  const beat = Math.floor(phase / Math.PI);
   if (beat === lastFootstepBeat) return;
   lastFootstepBeat = beat;
   footstepSide *= -1;
@@ -2418,7 +2418,7 @@ try {
 
     if (!footstepEffectsFailed) {
       try {
-        updateFootstepEffects(delta, player, movingNow, runHeld);
+        updateFootstepEffects(delta, player, movingNow, runHeld, walkPhase);
       } catch (error) {
         footstepEffectsFailed = true;
         console.warn('Footstep visuals disabled after a runtime error:', error);
