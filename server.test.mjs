@@ -704,3 +704,95 @@ test('traffic checkpoint documents challans payments and speeding stay server co
   assert.equal(traffic.challans[0].kind, 'speeding');
   assert.equal((await alice('/api/traffic/challan/pay', { challanId: traffic.challans[0].id })).status, 409, 'Insufficient Kerala Cash must block challan payment');
 });
+
+
+test('driving licence lifecycle and unlicensed-driving enforcement stay server controlled', async t => {
+  const app = await setup(t), licensed = app.client(), driver = app.client();
+  await signup(licensed, 'LicenceAlice');
+
+  let traffic = (await licensed('/api/traffic')).data;
+  assert.equal(traffic.licence.type, 'none');
+  assert.equal(traffic.licence.active, false);
+  assert.equal(traffic.licence.canApplyLearner, true);
+  assert.equal(traffic.rules.licenceInvalidFine, 50);
+
+  const learner = await licensed('/api/traffic/licence', { action: 'learner', cost: 999 });
+  assert.equal(learner.status, 200);
+  assert.equal(learner.data.cost, 0, 'Starter Learner Permit must be free');
+  assert.equal(learner.data.licence.type, 'learner');
+  assert.equal(learner.data.licence.active, true);
+  assert.deepEqual(learner.data.licence.allowedKinds, ['bike']);
+  assert.match(learner.data.licence.number, /^KPDL-[A-Z]{3}-\d{6}$/);
+  const licenceNumber = learner.data.licence.number;
+  assert.equal(learner.data.wallet.balance, 500);
+
+  const full = await licensed('/api/traffic/licence', { action: 'full', cost: 1 });
+  assert.equal(full.status, 200);
+  assert.equal(full.data.cost, 150, 'Full Licence upgrade price must be server controlled');
+  assert.equal(full.data.wallet.balance, 350);
+  assert.equal(full.data.licence.type, 'full');
+  assert.deepEqual(full.data.licence.allowedKinds, ['bike', 'taxi']);
+  assert.equal(full.data.licence.number, licenceNumber);
+
+  const fullUntil = full.data.licence.validUntil;
+  const renewed = await licensed('/api/traffic/licence', { action: 'renew', cost: 1 });
+  assert.equal(renewed.status, 200);
+  assert.equal(renewed.data.cost, 100, 'Full Licence renewal price must be server controlled');
+  assert.equal(renewed.data.wallet.balance, 250);
+  assert.ok(renewed.data.licence.validUntil > fullUntil);
+  assert.equal(renewed.data.licence.number, licenceNumber);
+  assert.equal((await licensed('/api/traffic/licence', { action: 'learner' })).status, 409, 'Full Licence cannot be downgraded to Learner');
+
+  await signup(driver, 'NoLicenceDriver');
+  assert.equal((await driver('/api/jobs/starter-delivery/complete', {})).status, 200);
+  const bought = await driver('/api/garage/buy', { modelId: 'kerala_bike' });
+  assert.equal(bought.status, 201);
+  const vehicleId = bought.data.garage.owned[0].id;
+  assert.equal(bought.data.wallet.balance, 50);
+
+  let retrieved = await driver('/api/garage/vehicle', { action: 'retrieve', vehicleId });
+  let active = retrieved.data.garage.activeVehicle;
+  app.advance(1_000);
+  assert.equal((await driver('/api/world/move', { x: active.x, z: active.z, rotation: 0, moving: true })).status, 200);
+  assert.equal((await driver('/api/garage/vehicle', { action: 'enter', vehicleId })).status, 200);
+
+  traffic = (await driver('/api/traffic')).data;
+  const checkpoint = traffic.checkpoint;
+  app.advance(1_000);
+  assert.equal((await driver('/api/world/move', { x: checkpoint.x, z: checkpoint.z, rotation: 0, moving: true, mode: 'bike' })).status, 200);
+  app.advance(250);
+  assert.equal((await driver('/api/world/move', { x: checkpoint.x, z: checkpoint.z, rotation: 0, moving: false, mode: 'bike' })).status, 200);
+
+  const inspection = await driver('/api/traffic/checkpoint', {});
+  assert.equal(inspection.status, 200);
+  assert.equal(inspection.data.inspection.insuranceActive, true);
+  assert.equal(inspection.data.inspection.licenceValid, false);
+  assert.equal(inspection.data.inspection.challan.kind, 'licence_invalid');
+  assert.equal(inspection.data.inspection.challan.amount, 50);
+  assert.equal(inspection.data.traffic.unpaidCount, 1);
+
+  const duplicate = await driver('/api/traffic/checkpoint', {});
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.data.inspection.challanCreated, false);
+  assert.equal(duplicate.data.traffic.unpaidCount, 1);
+
+  const paid = await driver('/api/traffic/challan/pay', { challanId: inspection.data.inspection.challan.id });
+  assert.equal(paid.status, 200);
+  assert.equal(paid.data.wallet.balance, 0);
+
+  for (let step = 1; step <= 3; step++) {
+    app.advance(1_000);
+    const move = await driver('/api/world/move', { x: checkpoint.x, z: checkpoint.z + step * 3, rotation: 0, moving: true, mode: 'bike' });
+    assert.equal(move.status, 200);
+    if (step < 3) assert.equal(move.data.trafficNotice, null);
+    else {
+      assert.equal(move.data.trafficNotice.kind, 'licence_invalid');
+      assert.equal(move.data.trafficNotice.amount, 50);
+      assert.equal(move.data.trafficNotice.source, 'server-licence-check');
+    }
+  }
+
+  traffic = (await driver('/api/traffic')).data;
+  assert.equal(traffic.unpaidCount, 1);
+  assert.equal(traffic.challans[0].kind, 'licence_invalid');
+});
