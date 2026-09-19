@@ -68,6 +68,10 @@ const villagers = [];
 const traffic = [];
 const staticColliders = [];
 const streetLampMaterials = [];
+const streetLightSources = [];
+const buildingLightMaterials = [];
+const buildingLightSources = [];
+const wetReflectionMaterials = [];
 const ambientVehicleLightMaterials = [];
 const weatherRoadSurfaces = [];
 const puddleMaterials = [];
@@ -479,22 +483,41 @@ function updateWorldWeatherVisuals(state) {
   if (!state) return;
   worldWeatherState = state;
   const wet = THREE.MathUtils.clamp(Number(state.rain || 0), 0, 1);
+  const daylight = THREE.MathUtils.clamp(Number(state.daylight ?? 1), 0, 1);
+  const overcast = THREE.MathUtils.clamp(Number(state.overcast || 0), 0, 1);
+  const darkness = THREE.MathUtils.clamp(1 - daylight, 0, 1);
+  const lightStrength = THREE.MathUtils.clamp(Math.max(darkness, overcast * .72), 0, 1);
   const lightsNeeded = !!state.needsLights;
 
   for (const surface of weatherRoadSurfaces) {
-    surface.material.roughness = surface.baseRoughness - wet * .43;
-    surface.material.metalness = surface.baseMetalness + wet * .13;
-    surface.material.color.copy(surface.baseColor).multiplyScalar(1 - wet * .16);
+    surface.material.roughness = Math.max(.26, surface.baseRoughness - wet * .58);
+    surface.material.metalness = surface.baseMetalness + wet * .20;
+    surface.material.color.copy(surface.baseColor).multiplyScalar(1 - wet * .13 - darkness * .035);
   }
   for (const material of puddleMaterials) {
-    material.opacity = wet * .48;
-    material.roughness = .22 - wet * .08;
+    material.opacity = wet * (.44 + lightStrength * .22);
+    material.roughness = Math.max(.055, .20 - wet * .12);
+    material.metalness = .10 + wet * .22;
   }
   for (const material of streetLampMaterials) {
-    material.emissiveIntensity = lightsNeeded ? 1.45 : .12;
+    material.emissiveIntensity = lightsNeeded ? 1.1 + lightStrength * 1.55 : .08;
+  }
+  for (const light of streetLightSources) {
+    light.intensity = lightsNeeded ? .55 + lightStrength * 2.65 + wet * .35 : 0;
+  }
+  for (const material of buildingLightMaterials) {
+    material.emissiveIntensity = lightsNeeded ? .45 + lightStrength * 1.35 : .04;
+  }
+  for (const light of buildingLightSources) {
+    light.intensity = lightsNeeded ? .30 + lightStrength * 1.45 : 0;
+  }
+  for (const reflection of wetReflectionMaterials) {
+    const base = Number(reflection.userData?.dryGlow || 0);
+    const wetBoost = Number(reflection.userData?.wetGlow || .40);
+    reflection.opacity = lightsNeeded ? base * lightStrength + wet * wetBoost * (.45 + lightStrength * .55) : wet * wetBoost * .08;
   }
   for (const material of ambientVehicleLightMaterials) {
-    material.emissiveIntensity = lightsNeeded ? 1.35 : .24;
+    material.emissiveIntensity = lightsNeeded ? 1.05 + lightStrength * .65 : .20;
   }
 
   if (autoHeadlightsOn !== lightsNeeded) {
@@ -2783,8 +2806,8 @@ function addStreetLight(scene, x, z, side = 1, rotation = 0) {
   const lampMaterial = new THREE.MeshStandardMaterial({
     color: 0xfff0c7,
     emissive: 0xffc86f,
-    emissiveIntensity: .22,
-    roughness: .42,
+    emissiveIntensity: .08,
+    roughness: .34,
   });
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(.055, .075, 4.8, 8), metal);
   pole.position.y = 2.4;
@@ -2792,8 +2815,30 @@ function addStreetLight(scene, x, z, side = 1, rotation = 0) {
   arm.position.set(0, 4.65, side * .48);
   const lamp = new THREE.Mesh(new THREE.BoxGeometry(.32, .10, .48), lampMaterial);
   lamp.position.set(0, 4.58, side * .98);
+
+  const pool = new THREE.PointLight(0xffc878, 0, 11.5, 1.65);
+  pool.position.set(0, 4.15, side * .98);
+  pool.castShadow = false;
+
+  const reflectionMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffc36b,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  reflectionMaterial.userData.dryGlow = .055;
+  reflectionMaterial.userData.wetGlow = .30;
+  const reflection = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 4.8), reflectionMaterial);
+  reflection.rotation.x = -Math.PI / 2;
+  reflection.position.set(0, .052, side * 2.55);
+  reflection.renderOrder = 2;
+
   streetLampMaterials.push(lampMaterial);
-  group.add(pole, arm, lamp);
+  streetLightSources.push(pool);
+  wetReflectionMaterials.push(reflectionMaterial);
+  group.add(pole, arm, lamp, pool, reflection);
   group.position.set(x, 0, z);
   group.rotation.y = rotation;
   scene.add(group);
@@ -3977,7 +4022,14 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: .9 });
   const roofMat = new THREE.MeshStandardMaterial({ color: roofColor, roughness: .98 });
   const darkWood = new THREE.MeshStandardMaterial({ color: 0x573a2b, roughness: .92 });
-  const windowMat = new THREE.MeshStandardMaterial({ color: 0x6fa4b8, roughness: .2, metalness: .14 });
+  const windowMat = new THREE.MeshStandardMaterial({
+    color: 0x6fa4b8,
+    roughness: .18,
+    metalness: .12,
+    emissive: 0xffc978,
+    emissiveIntensity: .04,
+  });
+  buildingLightMaterials.push(windowMat);
   const foundation = new THREE.Mesh(new THREE.BoxGeometry(9.25, .32, 8.25), new THREE.MeshStandardMaterial({ color: 0x898072, roughness: 1 }));
   foundation.position.y = .16;
   const walls = new THREE.Mesh(new THREE.BoxGeometry(8.65, 4.4, 7.5), wallMat);
@@ -4025,7 +4077,29 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   });
   const porchLamp = new THREE.Mesh(new THREE.SphereGeometry(.12, 10, 8), porchLampMaterial);
   porchLamp.position.set(.95, 3.22, 3.98);
-  group.add(skirting, facadeBand, door, porchLamp);
+  buildingLightMaterials.push(porchLampMaterial);
+
+  const porchLight = new THREE.PointLight(0xffbd6a, 0, 8.5, 1.8);
+  porchLight.position.set(.95, 3.05, 4.05);
+  porchLight.castShadow = false;
+  buildingLightSources.push(porchLight);
+
+  const porchReflectionMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffb75e,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  porchReflectionMaterial.userData.dryGlow = .035;
+  porchReflectionMaterial.userData.wetGlow = .22;
+  const porchReflection = new THREE.Mesh(new THREE.PlaneGeometry(2.15, 2.8), porchReflectionMaterial);
+  porchReflection.rotation.x = -Math.PI / 2;
+  porchReflection.position.set(.60, .055, 4.75);
+  porchReflection.renderOrder = 2;
+  wetReflectionMaterials.push(porchReflectionMaterial);
+  group.add(skirting, facadeBand, door, porchLamp, porchLight, porchReflection);
   [[-2.75, 3.82], [2.75, 3.82]].forEach(([windowX, windowZ]) => {
     const frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.42, .13), darkWood);
     const glass = new THREE.Mesh(new THREE.BoxGeometry(1.45, 1.17, .145), windowMat);
@@ -4081,8 +4155,15 @@ function addShop(scene, x, z) {
   body.position.y = 1.9;
   const awning = new THREE.Mesh(new THREE.BoxGeometry(10.1, .35, 1.8), new THREE.MeshStandardMaterial({ color: 0xb83f36, roughness: .9 }));
   awning.position.set(0, 3.35, 3.2);
-  const sign = new THREE.Mesh(new THREE.BoxGeometry(5.5, .9, .1), new THREE.MeshStandardMaterial({ color: 0x276a7e, roughness: .72 }));
+  const signMaterial = new THREE.MeshStandardMaterial({
+    color: 0x276a7e,
+    emissive: 0x4eb6c7,
+    emissiveIntensity: .04,
+    roughness: .62,
+  });
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(5.5, .9, .1), signMaterial);
   sign.position.set(0, 4.25, 2.93);
+  buildingLightMaterials.push(signMaterial);
   const shutterMat = new THREE.MeshStandardMaterial({ color: 0x6e5845, roughness: .96, metalness: .08 });
   const shutter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.05, .12), shutterMat);
   shutter.position.set(0, 1.82, 2.96);
@@ -4110,6 +4191,38 @@ function addShop(scene, x, z) {
   );
   counter.position.set(-3.0, .62, 3.22);
   group.add(counter);
+
+  const shopLampMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffe5ac,
+    emissive: 0xffbd5b,
+    emissiveIntensity: .04,
+    roughness: .38,
+  });
+  const shopLamp = new THREE.Mesh(new THREE.BoxGeometry(2.9, .10, .16), shopLampMaterial);
+  shopLamp.position.set(0, 3.03, 3.30);
+  buildingLightMaterials.push(shopLampMaterial);
+
+  const shopLight = new THREE.PointLight(0xffb95d, 0, 9.5, 1.7);
+  shopLight.position.set(0, 2.82, 3.35);
+  shopLight.castShadow = false;
+  buildingLightSources.push(shopLight);
+
+  const shopReflectionMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffb85f,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  shopReflectionMaterial.userData.dryGlow = .045;
+  shopReflectionMaterial.userData.wetGlow = .28;
+  const shopReflection = new THREE.Mesh(new THREE.PlaneGeometry(4.3, 3.2), shopReflectionMaterial);
+  shopReflection.rotation.x = -Math.PI / 2;
+  shopReflection.position.set(0, .054, 4.1);
+  shopReflection.renderOrder = 2;
+  wetReflectionMaterials.push(shopReflectionMaterial);
+  group.add(shopLamp, shopLight, shopReflection);
   group.position.set(x, 0, z);
   scene.add(group);
 }
