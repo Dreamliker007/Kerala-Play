@@ -39,6 +39,13 @@ const GARAGE_CATALOG = Object.freeze({
   kerala_compact: { id: 'kerala_compact', label: 'Kerala Compact', kind: 'taxi', price: 2200, description: 'Compact personal car with better weather protection.' },
 });
 const PERSONAL_VEHICLE_RADIUS = 4.5;
+const VEHICLE_INSURANCE_TERM = 30 * 24 * 60 * 60 * 1000;
+const VEHICLE_INSURANCE_COST = Object.freeze({ bike: 90, taxi: 220 });
+const DISTRICT_REGISTRATION_PREFIX = Object.freeze({
+  Alappuzha: 'KL-04', Ernakulam: 'KL-07', Idukki: 'KL-06', Kannur: 'KL-13', Kasaragod: 'KL-14',
+  Kollam: 'KL-02', Kottayam: 'KL-05', Kozhikode: 'KL-11', Malappuram: 'KL-10', Palakkad: 'KL-09',
+  Pathanamthitta: 'KL-03', Thiruvananthapuram: 'KL-01', Thrissur: 'KL-08', Wayanad: 'KL-12',
+});
 const VEHICLE_STATIONS = Object.freeze({
   fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 11, z: -12, radius: 7 },
   service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
@@ -264,6 +271,63 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     db.transactions.push(transaction); dirty = true;
     return transaction;
   }
+  function registrationNumberFor(user) {
+    const prefix = DISTRICT_REGISTRATION_PREFIX[user.district] || 'KL-99';
+    const existing = new Set();
+    for (const owner of db.users) {
+      for (const vehicle of owner.jobState?.garage?.owned || []) {
+        if (vehicle?.registration) existing.add(vehicle.registration);
+      }
+    }
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const letters = String.fromCharCode(65 + randomInt(26)) + String.fromCharCode(65 + randomInt(26));
+      const number = String(randomInt(1, 10000)).padStart(4, '0');
+      const registration = `${prefix}-${letters}-${number}`;
+      if (!existing.has(registration)) return registration;
+    }
+    return `${prefix}-KP-${String(randomInt(1, 10000)).padStart(4, '0')}`;
+  }
+
+  function vehicleResaleValue(vehicle) {
+    const model = GARAGE_CATALOG[vehicle.modelId];
+    if (!model) return 0;
+    const condition = Math.max(15, Math.min(100, Number(vehicle.condition) || 15));
+    return Math.max(100, Math.floor(model.price * (.45 + .35 * (condition / 100))));
+  }
+
+  function vehicleInsuranceSummary(vehicle) {
+    const until = Math.max(0, Number(vehicle.insuranceUntil) || 0);
+    const remainingMs = Math.max(0, until - now());
+    return { insuranceUntil: until, insuranceActive: remainingMs > 0, insuranceRemainingMs: remainingMs };
+  }
+
+  function usedMarketSummary(viewer) {
+    const listings = [];
+    for (const owner of db.users) {
+      const state = jobStateFor(owner);
+      for (const vehicle of state.garage.owned) {
+        if (!(Number(vehicle.salePrice) > 0) || !Number(vehicle.listedAt)) continue;
+        const model = GARAGE_CATALOG[vehicle.modelId];
+        listings.push({
+          vehicleId: vehicle.id,
+          modelId: vehicle.modelId,
+          label: model.label,
+          kind: model.kind,
+          registration: vehicle.registration,
+          fuel: Math.round(vehicle.fuel * 10) / 10,
+          condition: Math.round(vehicle.condition),
+          price: Number(vehicle.salePrice),
+          listedAt: Number(vehicle.listedAt),
+          sellerName: owner.displayName || (/^\d+$/.test(owner.username) ? 'Explorer' : owner.username),
+          ownListing: owner.id === viewer.id,
+          ...vehicleInsuranceSummary(vehicle),
+        });
+      }
+    }
+    listings.sort((a, b) => b.listedAt - a.listedAt);
+    return { listings: listings.slice(0, 50) };
+  }
+
   function jobStateFor(user) {
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
@@ -279,9 +343,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       vehicle.condition = Math.max(15, Math.min(VEHICLE_CONDITION_MAX, Number(vehicle.condition)));
       if (typeof vehicle.entered !== 'boolean') vehicle.entered = false;
       if (!Number.isFinite(Number(vehicle.lastImpactAt))) vehicle.lastImpactAt = 0;
+      if (typeof vehicle.registration !== 'string' || !vehicle.registration.trim()) { vehicle.registration = registrationNumberFor(user); dirty = true; }
+      if (!Number.isFinite(Number(vehicle.insuranceUntil))) { vehicle.insuranceUntil = now() + VEHICLE_INSURANCE_TERM; dirty = true; }
+      if (!Number.isFinite(Number(vehicle.listedAt))) vehicle.listedAt = 0;
+      if (!Number.isFinite(Number(vehicle.salePrice))) vehicle.salePrice = 0;
+      if (!Number.isInteger(Number(vehicle.ownerChanges))) vehicle.ownerChanges = 0;
     }
-    if (garage.selectedId && !garage.owned.some(vehicle => vehicle.id === garage.selectedId)) garage.selectedId = garage.owned[0]?.id || null;
-    if (!garage.selectedId && garage.owned.length) garage.selectedId = garage.owned[0].id;
+    if (garage.selectedId && !garage.owned.some(vehicle => vehicle.id === garage.selectedId && !(Number(vehicle.salePrice) > 0))) garage.selectedId = garage.owned.find(vehicle => !(Number(vehicle.salePrice) > 0))?.id || null;
+    if (!garage.selectedId && garage.owned.length) garage.selectedId = garage.owned.find(vehicle => !(Number(vehicle.salePrice) > 0))?.id || null;
     if (garage.activeVehicleId && !garage.owned.some(vehicle => vehicle.id === garage.activeVehicleId)) garage.activeVehicleId = null;
     const active = user.jobState.active;
     if (active && (!Array.isArray(active.checkpoints) || Number(active.expiresAt) <= now())) {
@@ -354,6 +423,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       condition: Math.round(vehicle.condition),
       conditionMax: VEHICLE_CONDITION_MAX,
       stations: VEHICLE_STATIONS,
+      registration: vehicle.registration,
+      resaleValue: vehicleResaleValue(vehicle),
+      forSale: Number(vehicle.salePrice) > 0,
+      salePrice: Number(vehicle.salePrice) || 0,
+      ...vehicleInsuranceSummary(vehicle),
     };
   }
 
@@ -378,6 +452,13 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           kind: model.kind,
           fuel: Math.round(vehicle.fuel * 10) / 10,
           condition: Math.round(vehicle.condition),
+          registration: vehicle.registration,
+          resaleValue: vehicleResaleValue(vehicle),
+          forSale: Number(vehicle.salePrice) > 0,
+          salePrice: Number(vehicle.salePrice) || 0,
+          ownerChanges: Number(vehicle.ownerChanges) || 0,
+          insuranceRenewalCost: VEHICLE_INSURANCE_COST[model.kind],
+          ...vehicleInsuranceSummary(vehicle),
           selected: garage.selectedId === vehicle.id,
           active: garage.activeVehicleId === vehicle.id,
           entered: !!vehicle.entered,
@@ -602,6 +683,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           parkedZ: position.z,
           entered: false,
           lastImpactAt: 0,
+          registration: registrationNumberFor(user),
+          insuranceUntil: now() + VEHICLE_INSURANCE_TERM,
+          listedAt: 0,
+          salePrice: 0,
+          ownerChanges: 0,
           purchasedAt: now(),
         };
         state.garage.owned.push(vehicle);
