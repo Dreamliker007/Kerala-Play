@@ -83,7 +83,10 @@ const puddleMaterials = [];
 const puddleRipples = [];
 const drainWaterSurfaces = [];
 const roofRunoffJets = [];
+const farVisualDetails = [];
 let monsoonWaterTimer = 0;
+let farVisualTimer = 0;
+let lastContactShadowUpdateAt = 0;
 const fruitGeometry = new THREE.SphereGeometry(.14, 6, 5);
 const fruitMaterial = new THREE.MeshStandardMaterial({ color: 0xe4a737, roughness: .72 });
 const birdBodyGeometry = new THREE.SphereGeometry(.10, 6, 5);
@@ -534,6 +537,9 @@ function attachContactShadow(root, radiusX = .48, radiusZ = .32, opacity = .18) 
 }
 
 function updateDynamicContactShadows(state) {
+  const now = performance.now();
+  if (now - lastContactShadowUpdateAt < 180) return;
+  lastContactShadowUpdateAt = now;
   const daylight = THREE.MathUtils.clamp(Number(state?.daylight ?? 1), 0, 1);
   const overcast = THREE.MathUtils.clamp(Number(state?.overcast || 0), 0, 1);
   const rain = THREE.MathUtils.clamp(Number(state?.rain || 0), 0, 1);
@@ -2096,6 +2102,7 @@ try {
     requestAnimationFrame(gameLoop);
     const delta = Math.min(clock.getDelta(), .05);
     villageTime += delta;
+    updateFarVisualDetails(delta);
     npcAccumulator += delta; trafficAccumulator += delta; mapAccumulator += delta; interactionAccumulator += delta;
     if (npcAccumulator >= (isMobile ? .10 : .05)) {
       updateVillagers(villageTime);
@@ -3206,6 +3213,25 @@ function addRoadsideLife(scene) {
 }
 
 
+function registerFarVisual(object, x, z, maxDistance = 52) {
+  if (!object) return object;
+  farVisualDetails.push({ object, x: Number(x), z: Number(z), maxDistance: Number(maxDistance) });
+  return object;
+}
+
+function updateFarVisualDetails(delta) {
+  farVisualTimer += delta;
+  if (farVisualTimer < .32 || !playerRef) return;
+  farVisualTimer = 0;
+  for (const detail of farVisualDetails) {
+    const distance = Math.hypot(
+      playerRef.position.x - detail.x,
+      playerRef.position.z - detail.z,
+    );
+    detail.object.visible = distance <= detail.maxDistance;
+  }
+}
+
 function createWorldSignTexture({
   title,
   subtitle = '',
@@ -3285,6 +3311,7 @@ function addRoadsideIdentitySigns(scene) {
     root.position.set(x, 0, z);
     root.rotation.y = rotation;
     applyDynamicHighQuality(root);
+    registerFarVisual(root, x, z, 60);
     scene.add(root);
   };
 
@@ -3330,6 +3357,7 @@ function addRoadsideIdentitySigns(scene) {
   milestone.position.set(10.1, 58.5, 0);
   milestone.rotation.y = Math.PI;
   applyDynamicHighQuality(milestone);
+  registerFarVisual(milestone, 10.1, 58.5, 58);
   scene.add(milestone);
 }
 
@@ -3379,6 +3407,8 @@ function addBusStop(scene, x, z, rotation = 0, stopName = 'KERALA PLAY') {
     height: 220,
   }, .44, .55);
   poleBoard.position.set(2.65, 2.36, .165);
+  registerFarVisual(stopBoard, x, z, 52);
+  registerFarVisual(poleBoard, x, z, 48);
 
   group.add(floor, roof, back, bench, benchBack, signPost, sign, stopBoard, poleBoard);
   group.position.set(x, 0, z);
@@ -3542,6 +3572,7 @@ function addRoadsideClutter(scene) {
     root.add(crate, crate2, bin);
     root.position.set(x, 0, z);
     root.rotation.y = index * .6;
+    registerFarVisual(root, x, z, 44);
     scene.add(root);
   });
 
@@ -3556,6 +3587,7 @@ function addRoadsideClutter(scene) {
     brace.position.y = .38;
     root.add(post, board, brace);
     root.position.set(x, 0, z);
+    registerFarVisual(root, x, z, 48);
     scene.add(root);
   });
 }
@@ -3969,7 +4001,9 @@ function buildWorld(scene) {
   puddleRipples.length = 0;
   drainWaterSurfaces.length = 0;
   roofRunoffJets.length = 0;
+  farVisualDetails.length = 0;
   monsoonWaterTimer = 0;
+  farVisualTimer = 0;
   const groundTexture = createGroundSurfaceTexture();
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(160, 160),
@@ -5286,6 +5320,7 @@ function addHouse(scene, x, z, wallColor, roofColor) {
     height: 150,
   }, 1.38, .48);
   namePlate.position.set(-1.15, 3.24, 3.895);
+  registerFarVisual(namePlate, x, z, 46);
   const porchLampMaterial = new THREE.MeshStandardMaterial({
     color: 0xffedc2,
     emissive: 0xffc66c,
@@ -5407,6 +5442,7 @@ function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ
     accent: '#f0c45c',
   }, 5.28, .78);
   signText.position.set(0, 4.25, 2.985);
+  registerFarVisual(signText, x, z, 54);
   const shutterMat = new THREE.MeshStandardMaterial({ color: 0x6e5845, roughness: .96, metalness: .08 });
   const shutter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.05, .12), shutterMat);
   shutter.position.set(0, 1.82, 2.96);
