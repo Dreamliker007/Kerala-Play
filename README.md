@@ -373,3 +373,14 @@ NPCs can now carry lightweight procedural umbrellas when rain begins. Bus-stop w
 The village population also changes with time. Selected walkers, social groups, customers and two of the three zebra-crossing pedestrians leave the street late at night, while a smaller number of locals, bus-stop waiters and essential shop activity remain. Walking pace and social/task animation also slow in the evening/night.
 
 Existing zebra-crossing traffic yielding remains tied only to currently visible, actively crossing pedestrians. No pathfinding, server-side NPC AI, backend/database migration, economy change or player movement rule is introduced.
+
+
+## NPC Interaction + Local Conversations (V88)
+
+V88 makes village NPCs directly interactive while preserving the lightweight local-simulation model.
+
+When the player is on foot and within roughly 3.2 metres of a visible non-crossing villager, the existing world interaction button becomes a **TALK · NAME** action. Home, rest, vehicle service, traffic checkpoint and active-job interactions keep higher priority, so conversations do not block gameplay actions.
+
+Talking makes the NPC pause, face the player and use a short natural greeting/hand gesture. Replies vary by NPC role, including shopkeepers, customers, bus-stop waiters, shoppers, phone users, social locals and general villagers. Dialogue also reacts to time of day and current weather, with rain, heavy-rain, cloudy and night-specific responses.
+
+The interaction is local and cosmetic: it does not add server AI, pathfinding, economy rewards, database writes or Supabase changes. NPC day/night and umbrella/shelter routines from V87 continue immediately after the short conversation ends.
