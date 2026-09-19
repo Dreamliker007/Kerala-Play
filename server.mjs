@@ -50,13 +50,15 @@ const VEHICLE_STATIONS = Object.freeze({
   fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 11, z: -12, radius: 7 },
   service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
 });
+const TRAFFIC_CHECKPOINT = Object.freeze({ id: 'main-check', label: 'Kerala Play Traffic Checkpoint', x: 5.4, z: 18, radius: 7 });
+const TRAFFIC_CHALLAN_AMOUNTS = Object.freeze({ insurance_expired: 40, speeding: 25 });
 const MOVEMENT_PROFILES = Object.freeze({
   walk: { rate: 8.5, maxCredit: 24 },
   bike: { rate: 16, maxCredit: 40 },
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [] } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -113,6 +115,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) { user.jobState.completed = {}; migrated = true; }
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) { user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null }; migrated = true; }
     if (!Array.isArray(user.jobState.garage.owned)) { user.jobState.garage.owned = []; migrated = true; }
+    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) { user.jobState.traffic = { challans: [] }; migrated = true; }
+    if (!Array.isArray(user.jobState.traffic.challans)) { user.jobState.traffic.challans = []; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -202,7 +206,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       user.worldX = x; user.worldZ = z; user.worldRotation = rotation; user.worldUpdatedAt = now();
       dirty = true;
     }
-    const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now() };
+    const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now(), trafficSpeedStrikes: 0, trafficLastChallanAt: 0 };
     presence.set(user.id, state);
     const garage = jobStateFor(user).garage;
     const personal = garage.activeVehicleId ? garage.owned.find(vehicle => vehicle.id === garage.activeVehicleId) : null;
@@ -333,6 +337,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) user.jobState.completed = {};
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null };
+    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [] };
+    if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
+    user.jobState.traffic.challans = user.jobState.traffic.challans.filter(challan => challan && typeof challan === 'object' && typeof challan.id === 'string');
     const garage = user.jobState.garage;
     if (!Array.isArray(garage.owned)) garage.owned = [];
     garage.owned = garage.owned.filter(vehicle => vehicle && typeof vehicle === 'object' && GARAGE_CATALOG[vehicle.modelId]);
