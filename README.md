@@ -172,3 +172,12 @@ Kerala Play now has a persistent Kerala Phone alerts panel with an unread badge.
 Notifications use stable IDs and per-player read state so refreshing the panel does not create duplicate unread alerts. Players can mark individual alerts or all current alerts as read. Relevant alerts can jump directly to Wallet, Home, Garage or Jobs. Active sessions refresh live reminders periodically and receive server-sent notification events for immediate updates.
 
 Notification state is stored inside the existing job_state JSONB, so V68 requires no new Supabase migration.
+
+
+## Landscape-First Mobile Mode (V69)
+
+Kerala Play is now landscape-first on phones. In portrait on a touch phone, the game shows a full-screen rotate prompt instead of squeezing the HUD into a narrow layout. The ENTER LANDSCAPE action requests fullscreen and a landscape orientation lock where the browser supports the Screen Orientation API; manual rotation remains the fallback on browsers such as iOS Safari.
+
+Phone landscape gets its own low-height HUD layout: compact profile/mission cards, a horizontally scrollable quick-action strip, smaller joystick and RUN controls, compact driving controls, and game panels sized for the wider viewport. Desktop and normal tablet layouts keep their existing behavior.
+
+The PWA manifest declares landscape orientation. Capacitor Android builds also run a post-add/post-sync script that patches the generated MainActivity with `android:screenOrientation="landscape"`, so generated Android builds stay landscape without committing the ignored `android/` project.
