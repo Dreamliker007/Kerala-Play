@@ -497,3 +497,77 @@ test('job vehicle fuel damage refuel and repair stay server controlled', async t
   assert.equal(repaired.data.service.cost, 9);
   assert.equal(repaired.data.wallet.balance, balanceAfterFuel - 9);
 });
+
+
+test('personal garage purchase retrieve driving storage and persistence stay server controlled', async t => {
+  const app = await setup(t), alice = app.client();
+  await signup(alice, 'GarageAlice');
+
+  let garage = (await alice('/api/garage')).data;
+  assert.equal(garage.owned.length, 0);
+  assert.equal(garage.catalog.find(model => model.id === 'kerala_bike').price, 700);
+  assert.equal(garage.catalog.find(model => model.id === 'kerala_compact').price, 2200);
+
+  const starter = await alice('/api/jobs/starter-delivery/complete', {});
+  assert.equal(starter.status, 200);
+  assert.equal(starter.data.wallet.balance, 750);
+
+  const bought = await alice('/api/garage/buy', { modelId: 'kerala_bike', price: 1 });
+  assert.equal(bought.status, 201);
+  assert.equal(bought.data.purchase.price, 700, 'Vehicle price must be server controlled');
+  assert.equal(bought.data.wallet.balance, 50);
+  assert.equal(bought.data.garage.owned.length, 1);
+  assert.equal(bought.data.garage.owned[0].fuel, 100);
+  assert.equal(bought.data.garage.owned[0].condition, 100);
+  assert.equal((await alice('/api/garage/buy', { modelId: 'kerala_bike' })).status, 409, 'Duplicate model purchase must fail');
+  assert.equal((await alice('/api/garage/buy', { modelId: 'kerala_compact' })).status, 409, 'Insufficient Kerala Cash must fail');
+
+  const vehicleId = bought.data.garage.owned[0].id;
+  let retrieved = await alice('/api/garage/vehicle', { action: 'retrieve', vehicleId });
+  assert.equal(retrieved.status, 200);
+  let active = retrieved.data.garage.activeVehicle;
+  assert.equal(active.vehicleId, vehicleId);
+  assert.equal(active.entered, false);
+  assert.equal(active.source, 'personal');
+  assert.equal((await alice('/api/jobs/delivery/start', {})).status, 409, 'A retrieved personal vehicle must be stored before starting a job');
+  assert.equal((await alice('/api/world/move', { x: active.x, z: active.z, rotation: 0, moving: true, mode: 'bike' })).status, 409, 'Personal vehicle mode must fail before entering');
+
+  app.advance(1_000);
+  assert.equal((await alice('/api/world/move', { x: active.x, z: active.z, rotation: 0, moving: true })).status, 200);
+  let entered = await alice('/api/garage/vehicle', { action: 'enter', vehicleId });
+  assert.equal(entered.status, 200);
+  active = entered.data.garage.activeVehicle;
+  assert.equal(active.entered, true);
+  assert.equal(active.kind, 'bike');
+
+  app.advance(1_000);
+  const moved = await alice('/api/world/move', { x: active.x, z: active.z + 4, rotation: 0, moving: true, mode: 'bike' });
+  assert.equal(moved.status, 200);
+  assert.equal(moved.data.vehicle.source, 'personal');
+  assert.ok(moved.data.vehicle.fuel < 100, 'Personal driving must burn persistent fuel');
+  const fuelAfterDrive = moved.data.vehicle.fuel;
+
+  const impact = await alice('/api/garage/vehicle/impact', { vehicleId, severity: 1 });
+  assert.equal(impact.status, 200);
+  assert.equal(impact.data.vehicle.condition, 98);
+
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x: active.x, z: active.z + 4, rotation: 0, moving: false, mode: 'bike' })).status, 200);
+  const exited = await alice('/api/garage/vehicle', { action: 'exit', vehicleId });
+  assert.equal(exited.status, 200);
+  assert.equal(exited.data.garage.activeVehicle.entered, false);
+  const stored = await alice('/api/garage/vehicle', { action: 'store', vehicleId });
+  assert.equal(stored.status, 200);
+  assert.equal(stored.data.garage.activeVehicle, null);
+
+  await app.restart();
+  assert.equal((await alice('/api/session')).data.user, null);
+  assert.equal((await alice('/api/auth/login', { identifier: 'GarageAlice', password: 'test-password-2026' })).status, 200);
+  garage = (await alice('/api/garage')).data;
+  assert.equal(garage.owned.length, 1);
+  assert.equal(garage.owned[0].id, vehicleId);
+  assert.ok(garage.owned[0].fuel <= fuelAfterDrive + .1);
+  assert.equal(garage.owned[0].condition, 98);
+  assert.equal(garage.activeVehicle, null);
+  assert.equal(garage.selectedId, vehicleId);
+});
