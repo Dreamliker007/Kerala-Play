@@ -349,3 +349,16 @@ Traffic vehicles no longer cruise at perfectly identical constant speeds: each v
 Shop fronts gain lightweight stools, a standing table, produce baskets, sacks and customers/shopkeepers with task or conversation poses. These use the existing lightweight NPC behavior system rather than pathfinding or server AI.
 
 No backend, database, economy, ownership or Supabase migration is required. Traffic remains local ambient simulation and existing server-authoritative player movement/driving rules are unchanged.
+
+
+## Night Lighting + Monsoon Reflections (V86)
+
+V86 upgrades the High-quality-only world after dark and during rain without changing gameplay rules.
+
+Street lamps now use lightweight real point-light pools in addition to emissive lamp meshes. Each lamp also has a subtle ground glow that strengthens on wet roads. Houses gain warm emissive windows and porch light pools, while roadside shops gain lit signage, warm front lighting and wet-ground glow.
+
+Rain now lowers road roughness further and slightly increases metallic/specular response so the existing high-quality lighting can read on wet asphalt. Puddles become smoother and more reflective as rain builds, while their visibility also reacts to darkness/overcast conditions.
+
+The atmosphere now adjusts ACES exposure gently by daylight and overcast state so night remains readable without flattening monsoon contrast. Moon/hemisphere lighting is also rebalanced for clearer silhouettes at night.
+
+All added local lights keep shadows disabled to preserve mobile performance; the main sun remains the shadow-casting light. No backend, database, economy, traffic-authority or Supabase migration changes are required.
