@@ -64,6 +64,7 @@ const dmInput = document.querySelector('#dm-input');
 const assetNotice = document.querySelector('#asset-notice');
 const toast = document.querySelector('#toast');
 document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
+const runtimeIsMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
 const villagers = [];
 const ambientAnimals = [];
 const windVegetation = [];
@@ -1963,7 +1964,7 @@ social = initSocial({ onUser: acceptUser, onPlayers: players => { connectionRead
   onDisconnect: () => { connectionReady = false; synchronizePlayers([]); }, onToast: showToast });
 
 try {
-  const isMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
+  const isMobile = runtimeIsMobile;
   // Keep MSAA available on mobile so the High preset can actually remove the
   // jagged road/wire/vehicle edges seen in landscape playtests. Low/Balanced
   // still control cost mainly through pixel ratio and disabled shadows.
@@ -4007,7 +4008,7 @@ function addTownStreetDetails(scene) {
 
 function updateWindWorld(time, delta) {
   windUpdateTimer += delta;
-  const windInterval = isMobile ? .12 : .08;
+  const windInterval = runtimeIsMobile ? .12 : .08;
   if (windUpdateTimer < windInterval) return;
   windUpdateTimer = 0;
   const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
@@ -4086,7 +4087,7 @@ function updateWindWorld(time, delta) {
 
 function updateMonsoonWaterVisuals(time, delta) {
   monsoonWaterTimer += delta;
-  const waterInterval = isMobile ? .09 : .055;
+  const waterInterval = runtimeIsMobile ? .09 : .055;
   if (monsoonWaterTimer < waterInterval) return;
   monsoonWaterTimer = 0;
 
