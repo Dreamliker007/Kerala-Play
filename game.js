@@ -2523,12 +2523,17 @@ function circleHitsBox(x, z, radius, boxX, boxZ, halfWidth, halfDepth) {
 }
 
 function trafficFootprint(config) {
-  const bus = config?.kind === 'bus';
-  const halfWidth = bus ? 1.22 : .86;
-  const halfLength = bus ? 2.72 : 1.66;
+  const kind = config?.kind;
+  const dimensions = kind === 'bus'
+    ? { halfWidth: 1.22, halfLength: 2.72 }
+    : kind === 'auto'
+      ? { halfWidth: .72, halfLength: 1.22 }
+      : kind === 'bike'
+        ? { halfWidth: .42, halfLength: .92 }
+        : { halfWidth: .86, halfLength: 1.66 };
   return config?.axis === 'x'
-    ? { halfWidth: halfLength, halfDepth: halfWidth }
-    : { halfWidth, halfDepth: halfLength };
+    ? { halfWidth: dimensions.halfLength, halfDepth: dimensions.halfWidth }
+    : { halfWidth: dimensions.halfWidth, halfDepth: dimensions.halfLength };
 }
 
 function positionBlocked(x, z, radius = .45) {
@@ -3155,6 +3160,9 @@ function addTownStreetDetails(scene) {
   addJunctionSignal(scene);
   addParkedVehicle(scene, 'car', 0x7d8b91, 10.8, 56.5, Math.PI);
   addParkedVehicle(scene, 'car', 0x8c4e45, -47.5, -29.7, Math.PI / 2);
+  addParkedVehicle(scene, 'bike', 0x316d58, -10.7, 9.2, Math.PI);
+  addParkedVehicle(scene, 'bike', 0x8b3e35, 11.2, 41.1, 0);
+  addParkedVehicle(scene, 'auto', 0x2b773f, -57.0, -29.7, Math.PI / 2);
 }
 
 function buildWorld(scene) {
@@ -3204,9 +3212,12 @@ function buildWorld(scene) {
   addRoadsideLife(scene);
   addTownStreetDetails(scene);
   addKeralaStreetRealism(scene);
-  addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737 });
-  addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -76, max: 76, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d });
-  addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5 });
+  addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737, flowPhase: .4 });
+  addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -3.0, min: -76, max: 76, progress: -18, direction: 1, speed: 7.8, color: 0x356f8b, flowPhase: 2.1 });
+  addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -76, max: 76, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d, flowPhase: 1.2 });
+  addRoadVehicle(scene, { kind: 'auto', axis: 'z', fixed: 3.15, min: -76, max: 76, progress: 20, direction: -1, speed: 5.8, color: 0x2b773f, flowPhase: 3.8 });
+  addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5, flowPhase: .8 });
+  addRoadVehicle(scene, { kind: 'bike', axis: 'x', fixed: -24.4, min: -69, max: 10, progress: -31, direction: 1, speed: 7.2, color: 0x8b3e35, flowPhase: 4.4 });
 
   addPhotoHouse(scene, -24, -36, 10.2, 6.8);
   const rentalHomeMarker = new THREE.Group();
@@ -3582,12 +3593,123 @@ function updateJunctionSignal(state) {
   apply(junctionSignalVisual.side, state.side);
 }
 
+function createAutoRickshaw(color = 0x26763f) {
+  const auto = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: .68, metalness: .025 });
+  const canopyMat = new THREE.MeshStandardMaterial({ color: 0x171c1b, roughness: .92 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x303735, roughness: .78, metalness: .10 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x24454e, roughness: .22, transparent: true, opacity: .90 });
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x111516, roughness: .96 });
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0xaeb5b4, roughness: .48, metalness: .55 });
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0xffe8a6, emissive: 0xffd46b, emissiveIntensity: .25, roughness: .38 });
+  const tailMat = new THREE.MeshStandardMaterial({ color: 0xb83028, emissive: 0x74150f, emissiveIntensity: .14, roughness: .52 });
+
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(1.32, .24, 2.26), trimMat);
+  floor.position.y = .34;
+  const lower = new THREE.Mesh(new THREE.BoxGeometry(1.28, .62, 2.08), bodyMat);
+  lower.position.set(0, .72, -.03);
+  const rearCabin = new THREE.Mesh(new THREE.BoxGeometry(1.24, 1.16, 1.18), bodyMat);
+  rearCabin.position.set(0, 1.34, -.38);
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.34, .18, 1.62), canopyMat);
+  canopy.position.set(0, 1.98, -.16);
+  const windscreen = new THREE.Mesh(new THREE.BoxGeometry(1.02, .68, .055), glassMat);
+  windscreen.position.set(0, 1.48, .72);
+  windscreen.rotation.x = -.08;
+  const frontApron = new THREE.Mesh(new THREE.BoxGeometry(1.02, .58, .62), bodyMat);
+  frontApron.position.set(0, .82, .82);
+  const bumper = new THREE.Mesh(new THREE.BoxGeometry(.92, .11, .10), trimMat);
+  bumper.position.set(0, .45, 1.17);
+  auto.add(floor, lower, rearCabin, canopy, windscreen, frontApron, bumper);
+
+  const sideOpeningMat = new THREE.MeshStandardMaterial({ color: 0x1e2825, roughness: .84 });
+  for (const side of [-1, 1]) {
+    const opening = new THREE.Mesh(new THREE.BoxGeometry(.045, .72, .80), sideOpeningMat);
+    opening.position.set(side * .645, 1.48, -.18);
+    auto.add(opening);
+  }
+
+  const frontLamp = new THREE.Mesh(new THREE.SphereGeometry(.095, 8, 6), lampMat);
+  frontLamp.position.set(0, 1.02, 1.16);
+  const leftTail = new THREE.Mesh(new THREE.BoxGeometry(.12, .14, .055), tailMat);
+  const rightTail = leftTail.clone();
+  leftTail.position.set(-.39, .73, -1.10);
+  rightTail.position.set(.39, .73, -1.10);
+  auto.add(frontLamp, leftTail, rightTail);
+
+  const wheels = [];
+  const frontWheels = [];
+  const wheelGeometry = new THREE.CylinderGeometry(.235, .235, .13, 12);
+  const makeWheel = (x, z, front = false) => {
+    const root = new THREE.Group();
+    root.position.set(x, .31, z);
+    const wheel = new THREE.Mesh(wheelGeometry, tireMat);
+    wheel.rotation.z = Math.PI / 2;
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.105, .105, .145, 10), rimMat);
+    hub.rotation.z = Math.PI / 2;
+    root.add(wheel, hub);
+    auto.add(root);
+    wheels.push(root);
+    if (front) frontWheels.push(root);
+  };
+  makeWheel(0, .86, true);
+  makeWheel(-.58, -.72);
+  makeWheel(.58, -.72);
+
+  auto.userData.headlightMaterials = [lampMat];
+  auto.userData.tailLightMaterials = [tailMat];
+  auto.userData.wheels = wheels;
+  auto.userData.frontWheels = frontWheels;
+  auto.userData.bodyParts = [lower, rearCabin, canopy, frontApron];
+  auto.userData.wheelRadius = .235;
+  return auto;
+}
+
+function createTrafficBike(color = 0x2d6f55) {
+  const bike = createDeliveryBike();
+  const rider = new THREE.Group();
+  const shirt = new THREE.MeshStandardMaterial({ color, roughness: .88 });
+  const trousers = new THREE.MeshStandardMaterial({ color: 0x26303a, roughness: .92 });
+  const skin = new THREE.MeshStandardMaterial({ color: 0xa96d4c, roughness: .88 });
+  const helmet = new THREE.MeshStandardMaterial({ color: 0x24282b, roughness: .68, metalness: .06 });
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(.40, .62, .28), shirt);
+  torso.position.set(0, 1.39, -.06);
+  torso.rotation.x = -.14;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.18, 10, 8), skin);
+  head.position.set(0, 1.82, .08);
+  const helmetShell = new THREE.Mesh(new THREE.SphereGeometry(.195, 10, 7, 0, Math.PI * 2, 0, Math.PI * .58), helmet);
+  helmetShell.position.set(0, 1.88, .08);
+  const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(.12, .52, .12), trousers);
+  const rightLeg = leftLeg.clone();
+  leftLeg.position.set(-.14, 1.05, -.18);
+  rightLeg.position.set(.14, 1.05, -.18);
+  leftLeg.rotation.x = .58;
+  rightLeg.rotation.x = .58;
+  const leftArm = new THREE.Mesh(new THREE.BoxGeometry(.10, .50, .10), skin);
+  const rightArm = leftArm.clone();
+  leftArm.position.set(-.24, 1.47, .26);
+  rightArm.position.set(.24, 1.47, .26);
+  leftArm.rotation.x = -.82;
+  rightArm.rotation.x = -.82;
+  rider.add(torso, head, helmetShell, leftLeg, rightLeg, leftArm, rightArm);
+  bike.add(rider);
+  bike.scale.setScalar(.96);
+  return bike;
+}
+
+function createTrafficVehicleVisual(kind, color) {
+  if (kind === 'auto') return createAutoRickshaw(color);
+  if (kind === 'bike') return createTrafficBike(color);
+  return createRoadVehicle(kind, color);
+}
+
 function addParkedVehicle(scene, kind, color, x, z, rotation = 0) {
-  const vehicle = createRoadVehicle(kind, color);
+  const vehicle = createTrafficVehicleVisual(kind, color);
   ambientVehicleLightMaterials.push(...(vehicle.userData.headlightMaterials || []));
   vehicle.position.set(x, 0, z);
   vehicle.rotation.y = rotation;
-  vehicle.scale.setScalar(kind === 'bus' ? .96 : .92);
+  const parkedScale = kind === 'bus' ? .96 : kind === 'bike' ? .86 : kind === 'auto' ? .92 : .92;
+  vehicle.scale.multiplyScalar(parkedScale);
   vehicle.userData.parked = true;
   vehicle.traverse(object => {
     if (object.isMesh) {
@@ -3596,12 +3718,13 @@ function addParkedVehicle(scene, kind, color, x, z, rotation = 0) {
     }
   });
   scene.add(vehicle);
-  addCircleCollider(x, z, kind === 'bus' ? 1.45 : .90, 'parked-vehicle');
+  const parkedRadius = kind === 'bus' ? 1.45 : kind === 'auto' ? .76 : kind === 'bike' ? .48 : .90;
+  addCircleCollider(x, z, parkedRadius, 'parked-vehicle');
   return vehicle;
 }
 
 function addRoadVehicle(scene, config) {
-  const vehicle = createRoadVehicle(config.kind, config.color);
+  const vehicle = createTrafficVehicleVisual(config.kind, config.color);
   ambientVehicleLightMaterials.push(...(vehicle.userData.headlightMaterials || []));
   vehicle.userData.traffic = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
   if (config.axis === 'z') {
@@ -3628,7 +3751,10 @@ function updateTraffic(delta) {
   traffic.forEach(vehicle => {
     const config = vehicle.userData.traffic;
     const baseSpeed = Number(config.baseSpeed || config.speed || 0);
-    let targetSpeed = baseSpeed;
+    const flowPhase = Number(config.flowPhase || 0);
+    const flowAmount = Number(config.flowAmount ?? (config.kind === 'bike' ? .10 : config.kind === 'auto' ? .07 : .04));
+    const naturalCruise = 1 - flowAmount * .5 + Math.sin(villageTime * .42 + flowPhase) * flowAmount * .5;
+    let targetSpeed = baseSpeed * naturalCruise;
 
     if (playerRef && vehicleMode !== 'walk') {
       const playerDistance = Math.hypot(playerRef.position.x - vehicle.position.x, playerRef.position.z - vehicle.position.z);
@@ -3643,8 +3769,12 @@ function updateTraffic(delta) {
       const otherConfig = other.userData.traffic;
       if (otherConfig.axis !== config.axis || Math.abs(Number(otherConfig.fixed) - Number(config.fixed)) > 1.1) continue;
       const gap = (Number(otherConfig.progress) - Number(config.progress)) * Number(config.direction);
-      if (gap > 0 && gap < 4.4) targetSpeed = 0;
-      else if (gap >= 4.4 && gap < 8) targetSpeed = Math.min(targetSpeed, baseSpeed * .35);
+      const selfLength = trafficFootprint(config);
+      const otherLength = trafficFootprint(otherConfig);
+      const stopGap = Math.max(3.0, (config.axis === 'x' ? selfLength.halfWidth + otherLength.halfWidth : selfLength.halfDepth + otherLength.halfDepth) + 1.3);
+      const slowGap = stopGap + 4.0;
+      if (gap > 0 && gap < stopGap) targetSpeed = 0;
+      else if (gap >= stopGap && gap < slowGap) targetSpeed = Math.min(targetSpeed, baseSpeed * .35);
     }
 
     const junctionProgress = config.axis === 'x' ? 0 : -24.5;
