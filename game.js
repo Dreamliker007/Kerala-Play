@@ -2431,6 +2431,29 @@ function updateVillagers(time) {
     if (!human) return;
     const parts = human.userData.parts || {};
     const rainReaction = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+    const hour = Number(worldWeatherState.hour ?? 12);
+    const night = hour >= 20 || hour < 5.25;
+    const lateEvening = hour >= 18.5 || hour < 6.0;
+    const hiddenByRoutine = data.nightHide && night && !data.nightActive;
+    villager.visible = !hiddenByRoutine;
+    if (!villager.visible) {
+      data.crossingActive = false;
+      return;
+    }
+
+    const usingUmbrella = rainReaction > .18 && !data.hasRainShelter;
+    if (data.umbrella) {
+      data.umbrella.visible = usingUmbrella;
+      data.umbrella.rotation.y = Math.sin(time * .22 + data.routinePhase) * .035;
+    }
+
+    const applyRainShelter = () => {
+      if (!data.hasRainShelter || rainReaction < .42) return false;
+      const shelterBlend = THREE.MathUtils.smoothstep(rainReaction, .42, .84);
+      villager.position.x = THREE.MathUtils.lerp(villager.position.x, data.rainShelterX, shelterBlend);
+      villager.position.z = THREE.MathUtils.lerp(villager.position.z, data.rainShelterZ, shelterBlend);
+      return shelterBlend > .45;
+    };
 
     // Restore the relaxed arm posture before applying activity/weather poses.
     if (parts.leftArm) parts.leftArm.rotation.z = -.055;
@@ -2442,20 +2465,30 @@ function updateVillagers(time) {
       if (rainReaction <= .08) return;
       if (parts.head) parts.head.rotation.x = rainReaction * .09;
       if (parts.torso) parts.torso.rotation.x = rainReaction * .03;
-      if (parts.leftArm) parts.leftArm.rotation.z += rainReaction * .035;
-      if (parts.rightArm) parts.rightArm.rotation.z -= rainReaction * .035;
+      if (usingUmbrella) {
+        if (parts.rightArm) {
+          parts.rightArm.rotation.x = -.82;
+          parts.rightArm.rotation.z = -.08;
+        }
+        if (parts.rightElbow) parts.rightElbow.rotation.x = .92;
+        if (parts.leftArm) parts.leftArm.rotation.z += rainReaction * .025;
+      } else {
+        if (parts.leftArm) parts.leftArm.rotation.z += rainReaction * .035;
+        if (parts.rightArm) parts.rightArm.rotation.z -= rainReaction * .035;
+      }
     };
 
     data.crossingActive = false;
 
     if (data.behavior === 'social') {
       villager.position.set(data.startX, 0, data.startZ);
+      const sheltered = applyRainShelter();
       const dx = Number(data.targetX) - villager.position.x;
       const dz = Number(data.targetZ) - villager.position.z;
       villager.rotation.y = Math.atan2(dx, dz);
       animateHuman(human, time * .55 + data.offset, 0);
 
-      const talkBeat = Math.sin(time * .72 + data.offset);
+      const talkBeat = Math.sin(time * (lateEvening ? .46 : .72) + data.offset) * (sheltered ? .55 : 1);
       if (parts.head) {
         parts.head.rotation.y = talkBeat * .10;
         parts.head.rotation.z = Math.sin(time * .38 + data.offset) * .025;
@@ -2469,9 +2502,10 @@ function updateVillagers(time) {
 
     if (data.behavior === 'task') {
       villager.position.set(data.startX, 0, data.startZ);
+      const sheltered = applyRainShelter();
       villager.rotation.y = Number(data.facing || 0);
       animateHuman(human, time * .55 + data.offset, 0);
-      const workBeat = (Math.sin(time * .95 + data.offset) + 1) * .5;
+      const workBeat = (Math.sin(time * (lateEvening ? .58 : .95) + data.offset) + 1) * .5 * (sheltered ? .68 : 1);
       if (parts.rightArm) parts.rightArm.rotation.x = -.22 - workBeat * .46;
       if (parts.rightElbow) parts.rightElbow.rotation.x = .38 + workBeat * .48;
       if (parts.head) parts.head.rotation.y = Math.sin(time * .34 + data.offset) * .12;
@@ -2481,6 +2515,7 @@ function updateVillagers(time) {
 
     if (data.behavior === 'phone') {
       villager.position.set(data.startX, 0, data.startZ);
+      applyRainShelter();
       villager.rotation.y = Number(data.facing || 0);
       animateHuman(human, time * .45 + data.offset, 0);
       if (parts.rightArm) parts.rightArm.rotation.x = -1.0;
@@ -2495,6 +2530,7 @@ function updateVillagers(time) {
 
     if (data.behavior === 'idle') {
       villager.position.set(data.startX, 0, data.startZ);
+      applyRainShelter();
       villager.rotation.y = Number(data.facing || 0);
       animateHuman(human, time * .55 + data.offset, 0);
       if (parts.head) parts.head.rotation.y = Math.sin(time * .42 + data.offset) * .11;
@@ -2503,7 +2539,8 @@ function updateVillagers(time) {
       return;
     }
 
-    const weatherSpeed = data.speed * (1 - rainReaction * .20);
+    const routineSpeed = night ? .56 : lateEvening ? .78 : 1;
+    const weatherSpeed = data.speed * routineSpeed * (1 - rainReaction * .22);
     const motion = npcPingPongState(time, weatherSpeed, data.offset);
 
     if (data.behavior === 'crossing') {
@@ -4392,6 +4429,31 @@ function addPalm(scene, x, z, scale) {
   scene.add(palm);
 }
 
+function createNpcUmbrella(index) {
+  const colors = [0x2d5f86, 0x8a3f46, 0x3f754d, 0x6e557f, 0xb47b32];
+  const root = new THREE.Group();
+  const canopyMat = new THREE.MeshStandardMaterial({
+    color: colors[index % colors.length],
+    roughness: .68,
+    metalness: .02,
+    side: THREE.DoubleSide,
+  });
+  const shaftMat = new THREE.MeshStandardMaterial({ color: 0x3b4142, roughness: .58, metalness: .38 });
+  const canopy = new THREE.Mesh(new THREE.ConeGeometry(.68, .28, 14, 1, true), canopyMat);
+  canopy.position.y = 2.22;
+  canopy.rotation.x = Math.PI;
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(.055, 8, 6), shaftMat);
+  cap.position.y = 2.39;
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.018, .022, 1.25, 6), shaftMat);
+  shaft.position.set(.18, 1.68, .02);
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(.07, .018, 5, 10, Math.PI * 1.2), shaftMat);
+  handle.position.set(.18, 1.07, .02);
+  handle.rotation.z = Math.PI * .25;
+  root.add(canopy, cap, shaft, handle);
+  root.visible = false;
+  return root;
+}
+
 function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options = {}) {
   const index = villagers.length;
   const names = ['Anu', 'Vivek', 'Meera', 'Arun', 'Nisha', 'Riyas', 'Asha', 'Manu', 'Liya', 'Nabeel', 'Sreeja', 'Jose'];
@@ -4406,7 +4468,9 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
   const villager = new THREE.Group();
   const human = createHuman({ gender, ...style, styleSeed: index + 1 });
   human.scale.setScalar(.9 * scale + .2);
-  villager.add(human);
+  const umbrella = createNpcUmbrella(index);
+  umbrella.scale.setScalar(.9 * scale + .2);
+  villager.add(human, umbrella);
   villager.position.set(x, 0, z);
   const npcName = options.name || names[index % names.length];
   const behavior = options.behavior || 'patrol';
@@ -4428,6 +4492,13 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
     name: npcName,
     role: options.role || 'Local',
     gender,
+    umbrella,
+    rainShelterX: Number(options.shelterX ?? x),
+    rainShelterZ: Number(options.shelterZ ?? z),
+    hasRainShelter: Number.isFinite(Number(options.shelterX)) && Number.isFinite(Number(options.shelterZ)),
+    nightHide: !!options.nightHide,
+    nightActive: !!options.nightActive,
+    routinePhase: Number(options.routinePhase ?? offset),
   };
   updateNameLabel(villager, npcName + ' · ' + villager.userData.role, 'npc-' + index);
   villagers.push(villager);
