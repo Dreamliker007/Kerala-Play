@@ -502,3 +502,16 @@ Compound walls now receive irregular moss strips along selected caps, while seve
 The pass uses simple local geometry/material overlays rather than large image textures or decals, keeping it practical for the High-quality mobile target.
 
 This is visual-only. Building colliders, navigation, weather physics, economy, backend/database and Supabase behavior are unchanged.
+
+
+## High Quality Mobile Optimization (V99)
+
+V99 improves Android/browser runtime cost without adding Low/Standard graphics modes or reducing the always-High visual target.
+
+Dynamic vegetation motion now updates at a slightly lower cadence on mobile and skips animation work for trees/palms/banana plants more than roughly 62 metres from the player; the meshes remain fully rendered, so distant vegetation does not disappear. Monsoon puddle/drain animation similarly uses a mobile-friendly update cadence and skips invisible/far ripple/flow work.
+
+Ambient animal animation pauses only at long distance, while the animals themselves remain part of the world. Wet-traffic spray/wiper particle updates also stop beyond a distance where those micro-effects are not readable, while traffic movement, headlights and brake-light state continue normally.
+
+Tiny decorative details such as roadside clutter, house-name plates and distant sign text use coarse distance visibility checks. Full detail returns automatically as the player approaches. Contact-shadow weather response and the world-interaction HUD are also throttled to sensible cadences instead of doing redundant work every rendered frame.
+
+No renderer quality selector is reintroduced: pixel ratio, antialiasing, High-quality shadows, ACES tone mapping and the High-only policy remain unchanged. No gameplay, server movement, traffic authority, economy, backend/database or Supabase behavior changes.
