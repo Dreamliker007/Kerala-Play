@@ -2153,19 +2153,204 @@ function recoverVehicleOverlap(object, radius) {
   return true;
 }
 
+function visualRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+function createGroundSurfaceTexture() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const context = canvas.getContext('2d');
+  const random = visualRandom(7301);
+  context.fillStyle = '#5f7f48';
+  context.fillRect(0, 0, size, size);
+
+  for (let i = 0; i < 420; i++) {
+    const x = random() * size;
+    const y = random() * size;
+    const radius = 2 + random() * 10;
+    const green = 74 + Math.floor(random() * 42);
+    const red = 70 + Math.floor(random() * 35);
+    const blue = 42 + Math.floor(random() * 24);
+    context.fillStyle = `rgba(${red},${green + 40},${blue},${.035 + random() * .09})`;
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  for (let i = 0; i < 900; i++) {
+    const shade = 70 + Math.floor(random() * 55);
+    context.fillStyle = `rgba(${shade - 18},${shade + 22},${Math.max(36, shade - 30)},${.08 + random() * .12})`;
+    context.fillRect(random() * size, random() * size, .8 + random() * 1.7, 1 + random() * 2.6);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(13, 13);
+  return texture;
+}
+
+function createRoadSurfaceTexture() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const context = canvas.getContext('2d');
+  const random = visualRandom(1976);
+  context.fillStyle = '#303438';
+  context.fillRect(0, 0, size, size);
+
+  for (let i = 0; i < 1600; i++) {
+    const value = 38 + Math.floor(random() * 38);
+    context.fillStyle = `rgba(${value},${value + 2},${value + 3},${.08 + random() * .13})`;
+    const width = .5 + random() * 2.2;
+    context.fillRect(random() * size, random() * size, width, .5 + random() * 1.5);
+  }
+
+  context.strokeStyle = 'rgba(15,18,20,.10)';
+  context.lineWidth = 1;
+  for (let i = 0; i < 18; i++) {
+    const x = random() * size;
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.bezierCurveTo(x + random() * 8 - 4, 70, x + random() * 10 - 5, 170, x + random() * 8 - 4, size);
+    context.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(5, 28);
+  return texture;
+}
+
+function addRoadSurfaceDetails(scene) {
+  const shoulderMaterial = new THREE.MeshStandardMaterial({ color: 0x8a8575, roughness: 1 });
+  const whiteLineMaterial = new THREE.MeshStandardMaterial({ color: 0xe8e8df, roughness: .76 });
+  const reflectorMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffe8a8,
+    emissive: 0xffc85f,
+    emissiveIntensity: .18,
+    roughness: .58,
+  });
+
+  for (const x of [-8.55, 8.55]) {
+    const shoulder = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 160), shoulderMaterial);
+    shoulder.rotation.x = -Math.PI / 2;
+    shoulder.position.set(x, .011, 0);
+    shoulder.receiveShadow = true;
+    scene.add(shoulder);
+
+    const edgeLine = new THREE.Mesh(new THREE.PlaneGeometry(.11, 158), whiteLineMaterial);
+    edgeLine.rotation.x = -Math.PI / 2;
+    edgeLine.position.set(Math.sign(x) * 7.42, .035, 0);
+    scene.add(edgeLine);
+  }
+
+  for (const z of [-28.55, -15.45]) {
+    const shoulder = new THREE.Mesh(new THREE.PlaneGeometry(88, .95), shoulderMaterial);
+    shoulder.rotation.x = -Math.PI / 2;
+    shoulder.position.set(-28, .012, z);
+    shoulder.receiveShadow = true;
+    scene.add(shoulder);
+
+    const edgeLine = new THREE.Mesh(new THREE.PlaneGeometry(86.5, .11), whiteLineMaterial);
+    edgeLine.rotation.x = -Math.PI / 2;
+    edgeLine.position.set(-28, .036, z < -22 ? -27.42 : -16.58);
+    scene.add(edgeLine);
+  }
+
+  for (let z = -68; z <= 68; z += 8) {
+    for (const x of [-7.1, 7.1]) {
+      const reflector = new THREE.Mesh(new THREE.BoxGeometry(.12, .035, .26), reflectorMaterial);
+      reflector.position.set(x, .055, z);
+      scene.add(reflector);
+    }
+  }
+}
+
+function addStreetLight(scene, x, z, side = 1, rotation = 0) {
+  const group = new THREE.Group();
+  const metal = new THREE.MeshStandardMaterial({ color: 0x444b4e, roughness: .7, metalness: .32 });
+  const lampMaterial = new THREE.MeshStandardMaterial({
+    color: 0xfff0c7,
+    emissive: 0xffc86f,
+    emissiveIntensity: .22,
+    roughness: .42,
+  });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(.055, .075, 4.8, 8), metal);
+  pole.position.y = 2.4;
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(.07, .07, 1.05), metal);
+  arm.position.set(0, 4.65, side * .48);
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(.32, .10, .48), lampMaterial);
+  lamp.position.set(0, 4.58, side * .98);
+  group.add(pole, arm, lamp);
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  scene.add(group);
+}
+
+function addRoadsideLife(scene) {
+  const grassGeometry = new THREE.ConeGeometry(.085, .48, 3);
+  grassGeometry.translate(0, .24, 0);
+  const grassMaterial = new THREE.MeshStandardMaterial({ color: 0x4f7439, roughness: 1 });
+  const positions = [];
+  const random = visualRandom(8819);
+
+  for (let i = 0; i < 92; i++) {
+    const side = i % 2 ? 1 : -1;
+    const x = side * (10 + random() * 11);
+    const z = -75 + random() * 150;
+    if (Math.abs(z + 22) < 9 && side < 0) continue;
+    positions.push([x, z, .65 + random() * .85, random() * Math.PI]);
+  }
+  for (let i = 0; i < 48; i++) {
+    const x = -67 + random() * 78;
+    const side = i % 2 ? 1 : -1;
+    const z = -22 + side * (8.5 + random() * 6.5);
+    if (Math.abs(x) < 11) continue;
+    positions.push([x, z, .65 + random() * .8, random() * Math.PI]);
+  }
+
+  const grass = new THREE.InstancedMesh(grassGeometry, grassMaterial, positions.length);
+  const dummy = new THREE.Object3D();
+  positions.forEach(([x, z, scale, yaw], index) => {
+    dummy.position.set(x, .015, z);
+    dummy.rotation.set(0, yaw, 0);
+    dummy.scale.set(scale, scale, scale);
+    dummy.updateMatrix();
+    grass.setMatrixAt(index, dummy.matrix);
+  });
+  grass.instanceMatrix.needsUpdate = true;
+  grass.receiveShadow = true;
+  scene.add(grass);
+
+  [-57, -31, -5, 25, 51].forEach((z, index) => {
+    addStreetLight(scene, index % 2 ? -9.4 : 9.4, z, index % 2 ? 1 : -1);
+  });
+  [-58, -38, -6].forEach((x, index) => {
+    addStreetLight(scene, x, index % 2 ? -29.2 : -14.8, index % 2 ? 1 : -1, Math.PI / 2);
+  });
+}
+
 function buildWorld(scene) {
   staticColliders.length = 0;
-  const groundCanvas = document.createElement('canvas'); groundCanvas.width = groundCanvas.height = 128;
-  const groundContext = groundCanvas.getContext('2d');
-  groundContext.fillStyle = '#65854a'; groundContext.fillRect(0, 0, 128, 128);
-  for (let i = 0; i < 2400; i++) { groundContext.fillStyle = i % 3 ? '#779655' : '#54713c'; groundContext.fillRect((i * 47) % 128, (i * 73 + Math.floor(i / 128) * 29) % 128, 2, 2); }
-  const texture = new THREE.CanvasTexture(groundCanvas); texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(32, 32);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.MeshStandardMaterial({ map: texture, roughness: 1 }));
-  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+  const groundTexture = createGroundSurfaceTexture();
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(160, 160),
+    new THREE.MeshStandardMaterial({ map: groundTexture, color: 0xc6d2ba, roughness: .96, metalness: 0 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
 
-
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x34393b, roughness: .94, metalness: .02 });
+  const roadTexture = createRoadSurfaceTexture();
+  const roadMat = new THREE.MeshStandardMaterial({ map: roadTexture, color: 0xb9bec0, roughness: .91, metalness: .015 });
   const road = new THREE.Mesh(new THREE.PlaneGeometry(16, 160), roadMat);
   road.rotation.x = -Math.PI / 2;
   road.position.y = .016;
@@ -2189,6 +2374,8 @@ function buildWorld(scene) {
     line.position.set(x, .031, -22);
     scene.add(line);
   }
+  addRoadSurfaceDetails(scene);
+  addRoadsideLife(scene);
   addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737 });
   addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -76, max: 76, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d });
   addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5 });
