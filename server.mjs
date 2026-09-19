@@ -1370,6 +1370,26 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           const fuel = active?.vehicleEntered ? Number(active.vehicleFuel) : Number(personal?.fuel);
           requireValue(fuel > .05, 409, 'Vehicle fuel is empty. Refuel at Kerala Fuel Station.');
         }
+        let trafficNotice = null;
+        if (personal?.entered && personalModel && elapsed >= .12 && elapsed <= 1.5 && distance > .25) {
+          const midpointX = (state.x + body.x) / 2;
+          const midpointZ = (state.z + body.z) / 2;
+          const zone = trafficZoneAt(midpointX, midpointZ);
+          const speedKmh = Math.round((distance / Math.max(.05, elapsed)) * 6);
+          if (speedKmh > zone.limit + 4) {
+            state.trafficSpeedStrikes = Math.min(4, Number(state.trafficSpeedStrikes || 0) + 1);
+            if (state.trafficSpeedStrikes >= 2 && now() - Number(state.trafficLastChallanAt || 0) >= 45000) {
+              const createdResult = createTrafficChallan(user, personal, 'speeding', 'server-speed-check', { speedKmh, limit: zone.limit, zone: zone.label });
+              if (createdResult.created) trafficNotice = createdResult.challan;
+              state.trafficLastChallanAt = now();
+              state.trafficSpeedStrikes = 0;
+            }
+          } else {
+            state.trafficSpeedStrikes = Math.max(0, Number(state.trafficSpeedStrikes || 0) - 1);
+          }
+        } else if (requestedMode === 'walk' || distance <= .05) {
+          state.trafficSpeedStrikes = 0;
+        }
         const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
         state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving; state.mode = requestedMode;
@@ -1390,7 +1410,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
         const activeVehicle = active && activeJob?.vehicle ? jobsSummary(user).active?.vehicle || null : (personal?.entered ? garageSummary(user).activeVehicle : null);
-        send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks, vehicle: activeVehicle }); return;
+        send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks, vehicle: activeVehicle, trafficNotice }); return;
       }
       const voiceMatch = path.match(/^\/api\/voice\/signal\/([^/]+)$/);
       if (voiceMatch && request.method === 'POST') {
