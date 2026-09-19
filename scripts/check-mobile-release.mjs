@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 const config = JSON.parse(await readFile(new URL('../capacitor.config.json', import.meta.url), 'utf8'));
+const manifest = JSON.parse(await readFile(new URL('../manifest.webmanifest', import.meta.url), 'utf8'));
+const landscapePatcher = await readFile(new URL('./lock-android-landscape.mjs', import.meta.url), 'utf8');
 
 const errors = [];
 
@@ -12,6 +14,8 @@ if (!config.server?.url?.startsWith('https://')) errors.push('Android release se
 if (config.server?.url !== 'https://keralaplay.in') errors.push(`Unexpected production URL: ${config.server?.url || '(missing)'}`);
 if (config.server?.cleartext !== false) errors.push('server.cleartext must be false for release.');
 if (config.android?.allowMixedContent !== false) errors.push('android.allowMixedContent must be false for release.');
+if (manifest.orientation !== 'landscape') errors.push(`Web app manifest orientation must be landscape, found ${manifest.orientation || '(missing)'}.`);
+if (!landscapePatcher.includes('android:screenOrientation="landscape"')) errors.push('Android landscape patcher is missing the landscape orientation lock.');
 
 if (errors.length) {
   console.error('Kerala Play Android release check failed:');

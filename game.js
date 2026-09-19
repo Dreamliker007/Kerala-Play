@@ -1397,7 +1397,16 @@ function wireInterface() {
     mapLabelToggle.textContent = mapLabelsVisible ? 'Labels on' : 'Labels'; renderMapLandmarks();
   });
   taskToggle.addEventListener('click', () => setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'));
-  fullscreenToggle?.addEventListener('click', async () => { try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); else await document.exitFullscreen(); } catch { showToast('Fullscreen is unavailable in this browser'); } });
+  fullscreenToggle?.addEventListener('click', async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (window.requestKeralaLandscape) await window.requestKeralaLandscape();
+        else await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch { showToast('Fullscreen is unavailable in this browser'); }
+  });
   taskClose.addEventListener('click', () => setOpenPanel());
   missionCard.addEventListener('click', () => { if (activeJobMission) document.querySelector('#jobs-toggle')?.click(); else setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'); });
   challengePlay.addEventListener('click', playCoconutChallenge);

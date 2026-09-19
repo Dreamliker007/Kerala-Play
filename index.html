@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#4a8cda">
+  <meta name="screen-orientation" content="landscape">
+  <link rel="manifest" href="./manifest.webmanifest">
   <title>Kerala Play — Living Kerala</title>
   <style>
     :root { color-scheme: dark; }
@@ -112,6 +114,53 @@
     #needs-hud span.critical { color:#ff9c86; }
     #needs-hud b { font-size:9px; }
     @media (max-width:560px) { #needs-hud { bottom:calc(env(safe-area-inset-bottom) + 52px); gap:4px; padding:4px 6px; font-size:8px; opacity:.9; } #needs-hud span { min-width:36px; } }
+    #rotate-device { display:none; position:fixed; inset:0; z-index:50; place-items:center; padding:24px; background:radial-gradient(circle at 50% 35%,rgba(22,70,82,.98),rgba(6,24,30,.995)); color:#fff; text-align:center; pointer-events:auto; }
+    #rotate-device .rotate-card { width:min(320px,86vw); padding:22px 18px; border:1px solid rgba(255,255,255,.18); border-radius:18px; background:rgba(255,255,255,.055); box-shadow:0 14px 40px rgba(0,0,0,.35); }
+    #rotate-device .rotate-icon { display:block; margin-bottom:10px; font-size:44px; }
+    #rotate-device strong { display:block; font-size:18px; }
+    #rotate-device p { margin:8px 0 14px; color:#c7e5dc; font-size:12px; line-height:1.45; }
+    #rotate-landscape { border:1px solid rgba(255,255,255,.22); border-radius:11px; padding:10px 14px; color:#fff; background:#2b7d5b; font:900 12px system-ui,sans-serif; cursor:pointer; }
+    @media (orientation:portrait) and (max-width:900px) and (hover:none) and (pointer:coarse) {
+      #rotate-device { display:grid; }
+    }
+    @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) {
+      #hint, #camera-note { display:none; }
+      #brand { top:calc(env(safe-area-inset-top) + 6px); left:calc(env(safe-area-inset-left) + 8px); padding:6px 8px; border-radius:9px; font-size:11px; opacity:.9; }
+      #profile-chip { top:calc(env(safe-area-inset-top) + 42px); left:calc(env(safe-area-inset-left) + 8px); max-width:120px; padding:5px 7px; border-radius:8px; opacity:.88; }
+      #profile-name { font-size:10px; }
+      #profile-district { font-size:8px; }
+      #progress-chip { top:calc(env(safe-area-inset-top) + 78px); left:calc(env(safe-area-inset-left) + 8px); max-width:120px; padding:4px 7px; font-size:8px; }
+      #mission-card { top:calc(env(safe-area-inset-top) + 108px); left:calc(env(safe-area-inset-left) + 8px); width:118px; padding:6px 7px; border-radius:8px; font-size:8px; opacity:.82; }
+      #mission-card strong { font-size:8px; }
+      #mission-text { display:block; max-width:104px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      #landmark-status { display:none; }
+      #online-chip { top:calc(env(safe-area-inset-top) + 6px); right:calc(env(safe-area-inset-right) + 8px); max-width:72px; padding:5px 6px; font-size:8px; }
+      #quick-actions { top:calc(env(safe-area-inset-top) + 6px); right:calc(env(safe-area-inset-right) + 86px); left:142px; display:flex; gap:4px; overflow-x:auto; overflow-y:hidden; max-width:none; padding-bottom:3px; scrollbar-width:none; }
+      #quick-actions::-webkit-scrollbar { display:none; }
+      .hud-icon { flex:0 0 36px; width:36px; height:36px; border-radius:10px; font-size:14px; }
+      .hud-icon span { font-size:6px; letter-spacing:0; }
+      #joystick-zone { width:42vw; height:58vh; min-width:0; min-height:0; }
+      #joystick-base { width:94px; height:94px; left:calc(env(safe-area-inset-left) + 18px); bottom:calc(env(safe-area-inset-bottom) + 14px); opacity:.52; }
+      #joystick-knob { width:44px; height:44px; left:23px; top:23px; }
+      #run { width:62px; height:62px; right:calc(env(safe-area-inset-right) + 14px); bottom:calc(env(safe-area-inset-bottom) + 18px); font-size:11px; opacity:.76; }
+      #world-interact { right:calc(env(safe-area-inset-right) + 10px); bottom:calc(env(safe-area-inset-bottom) + 88px); min-width:92px; max-width:122px; padding:7px 8px; border-radius:9px; font-size:8px; }
+      #vehicle-action { right:calc(env(safe-area-inset-right) + 10px); bottom:calc(env(safe-area-inset-bottom) + 122px); min-width:92px; max-width:122px; padding:7px 8px; border-radius:9px; font-size:8px; }
+      #drive-tools { right:calc(env(safe-area-inset-right) + 82px); bottom:calc(env(safe-area-inset-bottom) + 18px); gap:5px; }
+      .drive-tool { width:42px; height:42px; font-size:6px; }
+      .drive-tool span { font-size:13px; }
+      #road-status { bottom:calc(env(safe-area-inset-bottom) + 6px); min-width:140px; max-width:46vw; padding:4px 6px; font-size:7px; }
+      #needs-hud { bottom:calc(env(safe-area-inset-bottom) + 34px); gap:3px; padding:3px 5px; font-size:7px; opacity:.88; }
+      #needs-hud span { min-width:32px; }
+      #minimap, #chat-panel, #people-panel, #task-panel, #phone-panel, #wallet-panel, #home-panel, #garage-panel, #jobs-panel, #dm-panel {
+        top:calc(env(safe-area-inset-top) + 50px);
+        right:calc(env(safe-area-inset-right) + 8px);
+        width:min(350px,46vw);
+        max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 62px);
+        padding:9px;
+        border-radius:11px;
+      }
+      #kerala-map { height:min(58dvh,220px); }
+    }
     @media (min-width: 740px) { #joystick-zone { width: 330px; height: 330px; } #joystick-base { left: 44px; bottom: 38px; } #run { right: 44px; bottom: 46px; } }
     @media (max-width: 560px) {
       #brand { padding:7px 9px; font-size:13px; }
@@ -145,8 +194,16 @@
   <link rel="stylesheet" href="./game.css">
 </head>
 <body>
+  <div id="rotate-device" role="dialog" aria-label="Rotate device to landscape">
+    <div class="rotate-card">
+      <span class="rotate-icon" aria-hidden="true">📱↻</span>
+      <strong>Landscape mode</strong>
+      <p>Kerala Play is designed for a wider game view. Rotate your phone sideways for the best controls.</p>
+      <button id="rotate-landscape" type="button">ENTER LANDSCAPE</button>
+    </div>
+  </div>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V68</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V69</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>

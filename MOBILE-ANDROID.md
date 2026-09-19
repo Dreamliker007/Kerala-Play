@@ -40,3 +40,14 @@ Before distributing the app, deploy the Kerala Play server behind HTTPS and conf
 ## Build output
 
 For testing, Android Studio can generate an APK. For Google Play distribution, create a signed Android App Bundle (`.aab`).
+
+
+## Landscape mode
+
+Kerala Play is landscape-first on phones. The hosted web client shows a rotate prompt in portrait and requests landscape when supported. The PWA manifest also declares landscape orientation.
+
+The Android project is generated locally and is ignored by Git, so the npm scripts patch the generated MainActivity automatically:
+
+- `npm run mobile:add` creates Android and then sets `android:screenOrientation="landscape"`.
+- `npm run mobile:sync` refreshes assets and reapplies the same landscape lock.
+- `npm run mobile:landscape` can reapply the lock manually.

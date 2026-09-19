@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Kerala Play persistent social world",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node public-server.mjs",
     "start:production": "node production-server.mjs",
@@ -12,10 +14,11 @@
     "production:import-local": "node scripts/import-local-game.mjs",
     "test": "node --test server.test.mjs",
     "mobile:prepare": "node scripts/prepare-mobile.mjs",
-    "mobile:add": "npm run mobile:prepare && npx cap add android",
-    "mobile:sync": "npm run mobile:prepare && npx cap sync android",
+    "mobile:add": "npm run mobile:prepare && npx cap add android && npm run mobile:landscape",
+    "mobile:sync": "npm run mobile:prepare && npx cap sync android && npm run mobile:landscape",
     "mobile:open": "npm run mobile:sync && npx cap open android",
-    "mobile:release:check": "node scripts/check-mobile-release.mjs"
+    "mobile:release:check": "node scripts/check-mobile-release.mjs",
+    "mobile:landscape": "node scripts/lock-android-landscape.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
