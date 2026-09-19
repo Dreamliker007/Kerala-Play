@@ -3644,14 +3644,8 @@ function updateMonsoonWaterVisuals(time, delta) {
     flow.material.roughness = Math.max(.055, .20 - rain * .11);
     flow.material.metalness = .08 + rain * .16;
     const travel = ((time * (.20 + rain * .55) + flow.phase) % 1) - .5;
-    if (flow.axis === 'z') {
-      flow.mesh.position.x += Math.sin(time * 1.8 + flow.phase) * .00025 * activeRain;
-      flow.mesh.material.emissive?.setHex?.(0x000000);
-      flow.mesh.rotation.y = travel * .0008;
-    } else {
-      flow.mesh.position.z += Math.sin(time * 1.8 + flow.phase) * .00025 * activeRain;
-      flow.mesh.rotation.z = travel * .0008;
-    }
+    if (flow.axis === 'z') flow.mesh.rotation.y = travel * .0008;
+    else flow.mesh.rotation.z = travel * .0008;
     flow.mesh.visible = activeRain > .02;
   }
 
