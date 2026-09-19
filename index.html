@@ -120,6 +120,7 @@
     #rotate-device strong { display:block; font-size:18px; }
     #rotate-device p { margin:8px 0 14px; color:#c7e5dc; font-size:12px; line-height:1.45; }
     #rotate-landscape { border:1px solid rgba(255,255,255,.22); border-radius:11px; padding:10px 14px; color:#fff; background:#2b7d5b; font:900 12px system-ui,sans-serif; cursor:pointer; }
+    #rotate-landscape:disabled { opacity:.72; cursor:wait; }
     @media (orientation:portrait) and (max-width:900px) and (hover:none) and (pointer:coarse) {
       #rotate-device { display:grid; }
     }
@@ -629,7 +630,7 @@
     </div>
   </div>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:10px;opacity:.68">V79</span></div>
+    <div id="brand">Kerala Play <span style="font-size:10px;opacity:.68">V80</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
