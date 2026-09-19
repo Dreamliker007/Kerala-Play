@@ -24,3 +24,5 @@ jobs:
           node-version: "20"
       - name: Run server tests
         run: npm test
+      - name: Run Android release config check
+        run: npm run mobile:release:check
