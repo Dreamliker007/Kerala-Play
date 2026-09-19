@@ -515,3 +515,14 @@ Ambient animal animation pauses only at long distance, while the animals themsel
 Tiny decorative details such as roadside clutter, house-name plates and distant sign text use coarse distance visibility checks. Full detail returns automatically as the player approaches. Contact-shadow weather response and the world-interaction HUD are also throttled to sensible cadences instead of doing redundant work every rendered frame.
 
 No renderer quality selector is reintroduced: pixel ratio, antialiasing, High-quality shadows, ACES tone mapping and the High-only policy remain unchanged. No gameplay, server movement, traffic authority, economy, backend/database or Supabase behavior changes.
+
+
+## Ground Contact + Footstep Realism (V100)
+
+V100 marks a movement-immersion milestone by making on-foot ground contact react to surface and weather without changing any authoritative movement values.
+
+Walking/running now uses a pooled footstep effect system tied to the existing gait phase. In rain, footsteps create small pale splash droplets; on dry off-road ground they produce subtle earth-toned dust; on dry paved roads only a very light neutral contact puff is used. Running increases particle count and splash height while preserving the same movement speed/rules.
+
+The local player's existing V95 contact shadow also gains a very small gait-synchronised compression/expansion pulse so each step feels more grounded without adding expensive dynamic lights or extra shadow maps.
+
+The particle pools are allocated once and reused, with inactive particles parked out of view instead of creating/removing objects every step. No external assets, backend/database changes, collision changes, stamina rules, server movement changes or Supabase migration are introduced.
