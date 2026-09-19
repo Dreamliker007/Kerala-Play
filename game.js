@@ -89,6 +89,7 @@ let monsoonWaterTimer = 0;
 let farVisualTimer = 0;
 let lastContactShadowUpdateAt = 0;
 let footstepEffects = null;
+let footstepEffectsFailed = false;
 let lastFootstepBeat = -1;
 let footstepSide = -1;
 const fruitGeometry = new THREE.SphereGeometry(.14, 6, 5);
@@ -1444,6 +1445,9 @@ window.addEventListener('kerala-home-state', event => {
 
 window.addEventListener('error', event => {
   console.error(event.error || event.message);
+  // Resource/ResizeObserver/browser-level notices should not be presented as
+  // a fatal game error. Only surface real JavaScript exceptions.
+  if (!(event.error instanceof Error)) return;
   showAssetNotice('A game error occurred. Reload if the controls stop responding.');
 });
 window.addEventListener('unhandledrejection', event => {
@@ -2385,8 +2389,18 @@ try {
           const actualX = player.position.x - beforeX;
           const actualZ = player.position.z - beforeZ;
           const desiredYaw = Math.atan2(actualX, actualZ);
-          const turnSpeed = runningNow ? 5.6 : 6.8;
-          player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
+          const yawDelta = Math.atan2(
+            Math.sin(desiredYaw - player.rotation.y),
+            Math.cos(desiredYaw - player.rotation.y)
+          );
+          // Prevent visible moonwalking when the input direction reverses:
+          // snap large reversals, but keep smaller turns smooth.
+          if (Math.abs(yawDelta) > Math.PI * .42) {
+            player.rotation.y = desiredYaw;
+          } else {
+            const turnSpeed = runningNow ? 10.5 : 12.0;
+            player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
+          }
           if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
           const animationAmount = Math.min(1, movedDistance / Math.max(.0001, ((runningNow ? 5.4 : 3.05) * needsFactor) * delta));
           walkPhase += delta * (runningNow ? 12 : 8) * Math.max(.22, animationAmount);
@@ -2402,7 +2416,14 @@ try {
       }
     }
 
-    updateFootstepEffects(delta, player, movingNow, runHeld);
+    if (!footstepEffectsFailed) {
+      try {
+        updateFootstepEffects(delta, player, movingNow, runHeld);
+      } catch (error) {
+        footstepEffectsFailed = true;
+        console.warn('Footstep visuals disabled after a runtime error:', error);
+      }
+    }
 
     const drivingCamera = vehicleMode !== 'walk';
     const walkingMotion = !drivingCamera && movingNow ? (runHeld ? 1 : .62) : 0;
@@ -4153,6 +4174,7 @@ function buildWorld(scene) {
   farVisualTimer = 0;
   lastFootstepBeat = -1;
   footstepSide = -1;
+  footstepEffectsFailed = false;
   const groundTexture = createGroundSurfaceTexture();
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(160, 160),
