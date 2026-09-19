@@ -82,7 +82,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -145,6 +145,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) { user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 }; migrated = true; }
     if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) { user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }; migrated = true; }
     if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) { user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] }; migrated = true; }
+    if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) { user.jobState.notifications = { items: [], read: {} }; migrated = true; }
+    if (!Array.isArray(user.jobState.notifications.items)) { user.jobState.notifications.items = []; migrated = true; }
+    if (!user.jobState.notifications.read || typeof user.jobState.notifications.read !== 'object' || Array.isArray(user.jobState.notifications.read)) { user.jobState.notifications.read = {}; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -303,6 +306,165 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     db.transactions.push(transaction); dirty = true;
     return transaction;
   }
+  function addNotification(user, { sourceKey, kind = 'system', title, message, severity = 'info', target = '' }) {
+    const notifications = jobStateFor(user).notifications;
+    if (sourceKey && notifications.items.some(item => item.sourceKey === sourceKey)) {
+      return notifications.items.find(item => item.sourceKey === sourceKey);
+    }
+    const item = {
+      id: randomUUID(),
+      sourceKey: sourceKey || '',
+      kind,
+      title: String(title || 'Kerala Play'),
+      message: String(message || ''),
+      severity: ['info', 'warning', 'critical', 'success'].includes(severity) ? severity : 'info',
+      target: ['wallet', 'home', 'garage', 'jobs'].includes(target) ? target : '',
+      createdAt: now(),
+    };
+    notifications.items.push(item);
+    if (notifications.items.length > 80) notifications.items = notifications.items.slice(-80);
+    dirty = true;
+    emit(user.id, 'notification', { item });
+    return item;
+  }
+
+  function liveNotificationItems(user) {
+    const state = jobStateFor(user);
+    const items = [];
+    const timestamp = now();
+    const home = homeSummary(user);
+    if (home.accessBlocked) {
+      items.push({
+        id: `reminder:home-blocked:${home.rentDueAt}:${home.utilityDueAt}`,
+        kind: 'home', title: 'Home access needs attention',
+        message: 'Sleep access is paused. Pay overdue rent or utilities to restore it.',
+        severity: 'critical', target: 'home', createdAt: Math.min(home.rentGraceUntil, home.utilityGraceUntil),
+      });
+    } else {
+      const homeReminders = [
+        ['rent', home.rentDueAt, home.rentOverdue, home.home.rent, 'Rent'],
+        ['utilities', home.utilityDueAt, home.utilityOverdue, home.home.utilities, 'Utilities'],
+      ];
+      for (const [key, dueAt, overdue, amount, label] of homeReminders) {
+        const remaining = Number(dueAt) - timestamp;
+        if (overdue || remaining <= 2 * 60 * 60 * 1000) {
+          items.push({
+            id: `reminder:home-${key}:${dueAt}`,
+            kind: 'home',
+            title: overdue ? `${label} overdue` : `${label} due soon`,
+            message: `${label} payment ₹${amount} · ${overdue ? 'pay during the grace period' : 'due within 2 hours'}.`,
+            severity: overdue ? 'warning' : 'info',
+            target: 'home',
+            createdAt: overdue ? Number(dueAt) : timestamp,
+          });
+        }
+      }
+    }
+
+    const needs = needsSummary(user);
+    for (const [key, label] of [['hunger', 'Hunger'], ['thirst', 'Thirst'], ['energy', 'Energy']]) {
+      const value = Number(needs[key]);
+      if (value <= 15) {
+        const level = value <= 7 ? 'critical' : 'warning';
+        items.push({
+          id: `reminder:needs:${key}:${level}`,
+          kind: 'needs',
+          title: `Low ${label.toLowerCase()}`,
+          message: `${label} is ${Math.round(value)}%. ${key === 'energy' ? 'Rest or sleep, or use the Village Shop.' : 'Use the Village Shop to recover.'}`,
+          severity: level,
+          target: key === 'energy' ? 'home' : 'wallet',
+          createdAt: Number(needs.updatedAt) || timestamp,
+        });
+      }
+    }
+
+    for (const vehicle of state.garage.owned) {
+      const model = GARAGE_CATALOG[vehicle.modelId];
+      const insurance = vehicleInsuranceSummary(vehicle);
+      if (!insurance.insuranceActive || insurance.insuranceRemainingMs <= 3 * 24 * 60 * 60 * 1000) {
+        items.push({
+          id: `reminder:insurance:${vehicle.id}:${insurance.insuranceUntil}`,
+          kind: 'vehicle',
+          title: insurance.insuranceActive ? 'Vehicle insurance due soon' : 'Vehicle insurance expired',
+          message: `${model.label} · ${vehicle.registration} · ${insurance.insuranceActive ? 'renew within 3 days' : 'renew insurance'}.`,
+          severity: insurance.insuranceActive ? 'warning' : 'critical',
+          target: 'garage',
+          createdAt: insurance.insuranceActive ? timestamp : Number(insurance.insuranceUntil || timestamp),
+        });
+      }
+    }
+
+    const licence = drivingLicenceSummary(user);
+    if (licence.type !== 'none' && (!licence.active || licence.remainingMs <= 3 * 24 * 60 * 60 * 1000)) {
+      items.push({
+        id: `reminder:licence:${licence.number}:${licence.validUntil}`,
+        kind: 'vehicle',
+        title: licence.active ? 'Driving licence due soon' : 'Driving licence expired',
+        message: `${licence.label} · ${licence.active ? 'renew within 3 days' : 'renew before driving'}.`,
+        severity: licence.active ? 'warning' : 'critical',
+        target: 'garage',
+        createdAt: licence.active ? timestamp : Number(licence.validUntil || timestamp),
+      });
+    }
+
+    const jobs = jobsSummary(user);
+    if (jobs.active?.ready) {
+      items.push({
+        id: `reminder:job-ready:${jobs.active.taskId}`,
+        kind: 'job',
+        title: 'Job ready to complete',
+        message: `${jobs.active.title} is ready. Open Jobs to collect the salary.`,
+        severity: 'success',
+        target: 'jobs',
+        createdAt: Number(jobs.active.readyAt || timestamp),
+      });
+    }
+    if (!jobs.active) {
+      for (const job of jobs.jobs) {
+        if (job.completedCount > 0 && job.cooldownUntil > 0 && job.cooldownRemainingMs === 0) {
+          items.push({
+            id: `reminder:job-available:${job.id}:${job.cooldownUntil}`,
+            kind: 'job',
+            title: `${job.title} available again`,
+            message: `Cooldown finished · ${job.title} can be started now.`,
+            severity: 'info',
+            target: 'jobs',
+            createdAt: Number(job.cooldownUntil),
+          });
+        }
+      }
+    }
+
+    const eventSources = new Set(state.notifications.items.map(item => item.sourceKey));
+    for (const challan of state.traffic.challans) {
+      if (Number(challan.paidAt) || eventSources.has(`challan:${challan.id}`)) continue;
+      items.push({
+        id: `reminder:challan:${challan.id}`,
+        kind: 'traffic', title: 'Unpaid traffic challan',
+        message: `${challan.description} · ₹${challan.amount} unpaid.`,
+        severity: 'warning', target: 'garage', createdAt: Number(challan.createdAt || timestamp),
+      });
+    }
+    return items;
+  }
+
+  function notificationsSummary(user) {
+    const state = jobStateFor(user);
+    const stored = state.notifications.items.map(item => ({ ...item, live: false }));
+    const live = liveNotificationItems(user).map(item => ({ ...item, live: true }));
+    const deduped = new Map();
+    for (const item of [...stored, ...live]) deduped.set(item.id, item);
+    const items = [...deduped.values()]
+      .map(item => ({ ...item, read: !!state.notifications.read[item.id] }))
+      .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
+      .slice(0, 60);
+    return {
+      unreadCount: items.filter(item => !item.read).length,
+      items,
+      generatedAt: now(),
+    };
+  }
+
   function bankAccountNumberFor(user) {
     const digest = createHash('sha256').update(`kerala-bank:${user.id}`).digest('hex');
     const digits = String(parseInt(digest.slice(0, 12), 16) % 100_000_000).padStart(8, '0');
@@ -484,6 +646,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     };
     traffic.challans.push(challan);
     if (traffic.challans.length > 80) traffic.challans = traffic.challans.slice(-80);
+    addNotification(user, {
+      sourceKey: `challan:${challan.id}`,
+      kind: 'traffic',
+      title: 'Traffic challan issued',
+      message: `${challan.description} · ₹${challan.amount}.`,
+      severity: 'warning',
+      target: 'garage',
+    });
     dirty = true;
     return { challan, created: true };
   }
@@ -619,6 +789,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 };
     if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 };
     if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] };
+    if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) user.jobState.notifications = { items: [], read: {} };
+    if (!Array.isArray(user.jobState.notifications.items)) user.jobState.notifications.items = [];
+    if (!user.jobState.notifications.read || typeof user.jobState.notifications.read !== 'object' || Array.isArray(user.jobState.notifications.read)) user.jobState.notifications.read = {};
     if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
     const needs = user.jobState.needs;
     for (const key of ['hunger', 'thirst', 'energy']) {
@@ -627,6 +800,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     }
     if (!Number.isFinite(Number(needs.updatedAt)) || Number(needs.updatedAt) <= 0) needs.updatedAt = now();
     if (!Number.isFinite(Number(needs.lastRestAt))) needs.lastRestAt = 0;
+    const notifications = user.jobState.notifications;
+    notifications.items = notifications.items.filter(item => item && typeof item === 'object' && typeof item.id === 'string').slice(-80);
+    const readEntries = Object.entries(notifications.read).filter(([, value]) => Number.isFinite(Number(value)) && Number(value) > 0).slice(-200);
+    notifications.read = Object.fromEntries(readEntries);
     const bank = user.jobState.bank;
     if (!Number.isSafeInteger(Number(bank.balance)) || Number(bank.balance) < 0 || Number(bank.balance) > BANK_LIMIT) bank.balance = 0;
     if (typeof bank.accountNumber !== 'string') bank.accountNumber = '';
@@ -966,6 +1143,28 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/wallet' && request.method === 'GET') {
         send(response, 200, walletSummary(user)); return;
       }
+      if (path === '/api/notifications' && request.method === 'GET') {
+        send(response, 200, notificationsSummary(user)); return;
+      }
+      if (path === '/api/notifications/read' && request.method === 'POST') {
+        limited(`notifications-read:${user.id}`, 80, 60000);
+        const body = await jsonBody(request);
+        const summary = notificationsSummary(user);
+        const currentIds = new Set(summary.items.map(item => item.id));
+        const notifications = jobStateFor(user).notifications;
+        const timestamp = now();
+        if (body.all === true) {
+          for (const id of currentIds) notifications.read[id] = timestamp;
+        } else {
+          requireValue(typeof body.id === 'string' && currentIds.has(body.id), 404, 'Notification not found.');
+          notifications.read[body.id] = timestamp;
+        }
+        const entries = Object.entries(notifications.read).slice(-200);
+        notifications.read = Object.fromEntries(entries);
+        dirty = true;
+        await persist();
+        send(response, 200, notificationsSummary(user)); return;
+      }
       if (path === '/api/bank' && request.method === 'GET') {
         send(response, 200, bankSummary(user)); return;
       }
@@ -1021,6 +1220,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         });
         const received = bankTransaction(recipient, amount, 'upi_received', `UPI from ${senderUpi}`, {
           transferId, counterparty: senderUpi,
+        });
+        addNotification(recipient, {
+          sourceKey: `upi:${transferId}:received`,
+          kind: 'money',
+          title: 'UPI received',
+          message: `₹${amount} received from ${senderUpi} in Kerala Bank.`,
+          severity: 'success',
+          target: 'wallet',
         });
         await persist();
         emit(recipient.id, 'bank', {});
@@ -1129,6 +1336,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(!user.economyActions.includes('starter-delivery'), 409, 'Starter Delivery salary was already claimed.');
         user.economyActions.push('starter-delivery');
         const transaction = walletTransaction(user, STARTER_JOB_REWARD, 'salary', 'Starter Delivery salary');
+        addNotification(user, {
+          sourceKey: `salary:${transaction.id}`,
+          kind: 'money',
+          title: 'Salary credited',
+          message: `Starter Delivery · ₹${STARTER_JOB_REWARD} credited to Kerala Cash.`,
+          severity: 'success',
+          target: 'wallet',
+        });
         await persist();
         send(response, 200, { wallet: walletSummary(user), reward: STARTER_JOB_REWARD, transaction }); return;
       }
@@ -1310,6 +1525,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const model = GARAGE_CATALOG[vehicle.modelId];
         const buyerTransaction = walletTransaction(user, -price, 'used_vehicle_purchase', `${model.label} used purchase · ${vehicle.registration}`);
         const sellerTransaction = walletTransaction(seller, price, 'used_vehicle_sale', `${model.label} sold · ${vehicle.registration}`);
+        addNotification(seller, {
+          sourceKey: `vehicle-sale:${sellerTransaction.id}`,
+          kind: 'market',
+          title: 'Vehicle sold',
+          message: `${model.label} · ${vehicle.registration} sold for ₹${price}.`,
+          severity: 'success',
+          target: 'wallet',
+        });
         sellerState.garage.owned = sellerState.garage.owned.filter(item => item.id !== vehicle.id);
         if (sellerState.garage.selectedId === vehicle.id) sellerState.garage.selectedId = sellerState.garage.owned.find(item => !(Number(item.salePrice) > 0))?.id || null;
         vehicle.salePrice = 0;
@@ -1677,6 +1900,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         state.cooldowns[jobId] = timestamp + job.cooldownMs;
         state.completed[jobId] = Math.max(0, Number(state.completed[jobId] || 0)) + 1;
         const transaction = walletTransaction(user, job.reward, 'salary', `${job.title} salary`);
+        addNotification(user, {
+          sourceKey: `salary:${transaction.id}`,
+          kind: 'money',
+          title: 'Salary credited',
+          message: `${job.title} · ₹${job.reward} credited to Kerala Cash.`,
+          severity: 'success',
+          target: 'wallet',
+        });
         await persist();
         send(response, 200, { jobs: jobsSummary(user), wallet: walletSummary(user), reward: job.reward, transaction, completed: { jobId, title: job.title, count: state.completed[jobId] } }); return;
       }

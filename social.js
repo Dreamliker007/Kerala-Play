@@ -102,6 +102,17 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const peopleToggle = $('people-toggle');
   const chatToggle = $('chat-toggle');
   const proximityVoiceToggle = $('proximity-voice-toggle');
+  const phonePanel = $('phone-panel');
+  const phoneToggle = $('phone-toggle');
+  const phoneClose = $('phone-close');
+  const phoneBadge = $('phone-badge');
+  const phoneSummaryText = $('phone-summary-text');
+  const phoneNotifications = $('phone-notifications');
+  const phoneMarkAll = $('phone-mark-all');
+  const phoneRefresh = $('phone-refresh');
+  const phoneError = $('phone-error');
+  let notificationsSnapshot = null;
+  let notificationsTimer = null;
   const walletPanel = $('wallet-panel');
   const walletToggle = $('wallet-toggle');
   const walletClose = $('wallet-close');
@@ -192,9 +203,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function closePanels() {
     cancelRecording(); stopTalking();
-    for (const panel of [peoplePanel, dmPanel, chatPanel, walletPanel, homePanel, garagePanel, jobsPanel]) panel?.classList.remove('open');
+    for (const panel of [peoplePanel, dmPanel, chatPanel, phonePanel, walletPanel, homePanel, garagePanel, jobsPanel]) panel?.classList.remove('open');
     peopleToggle?.setAttribute('aria-expanded', 'false');
     chatToggle?.setAttribute('aria-expanded', 'false');
+    phoneToggle?.setAttribute('aria-expanded', 'false');
     walletToggle?.setAttribute('aria-expanded', 'false');
     homeToggle?.setAttribute('aria-expanded', 'false');
     garageToggle?.setAttribute('aria-expanded', 'false');
@@ -211,6 +223,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (panel === chatPanel || panel === dmPanel) chatToggle?.classList.remove('unread');
     peopleToggle?.setAttribute('aria-expanded', String(panel === peoplePanel));
     chatToggle?.setAttribute('aria-expanded', String(panel === dmPanel || panel === chatPanel));
+    phoneToggle?.setAttribute('aria-expanded', String(panel === phonePanel));
     walletToggle?.setAttribute('aria-expanded', String(panel === walletPanel));
     homeToggle?.setAttribute('aria-expanded', String(panel === homePanel));
     garageToggle?.setAttribute('aria-expanded', String(panel === garagePanel));
@@ -581,6 +594,81 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     renderBank(bank);
     return { wallet, bank };
   }
+  function renderNotifications(summary) {
+    notificationsSnapshot = summary || { unreadCount: 0, items: [] };
+    const unread = Number(notificationsSnapshot.unreadCount || 0);
+    if (phoneBadge) {
+      phoneBadge.hidden = unread <= 0;
+      phoneBadge.textContent = unread > 99 ? '99+' : String(unread);
+    }
+    if (phoneSummaryText) phoneSummaryText.textContent = unread ? `${unread} unread alert${unread === 1 ? '' : 's'}` : 'No unread alerts';
+    if (phoneMarkAll) phoneMarkAll.disabled = unread <= 0;
+    if (!phoneNotifications) return;
+    phoneNotifications.replaceChildren();
+    const items = Array.isArray(notificationsSnapshot.items) ? notificationsSnapshot.items : [];
+    if (!items.length) {
+      phoneNotifications.append(node('p', 'social-empty', 'No notifications right now.'));
+      return;
+    }
+    for (const item of items) {
+      const card = node('article', `phone-alert ${item.severity || 'info'}${item.read ? '' : ' unread'}`);
+      card.dataset.notificationId = item.id;
+      const head = node('div', 'phone-alert-head');
+      const title = node('strong', '', item.title || 'Kerala Play');
+      const created = new Date(Number(item.createdAt || 0));
+      const time = document.createElement('time');
+      time.textContent = Number.isNaN(created.getTime()) ? '' : created.toLocaleString();
+      head.append(title, time);
+      const message = node('p', '', item.message || '');
+      const actions = node('div', 'phone-alert-actions');
+      if (item.target) {
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.dataset.alertTarget = item.target;
+        open.dataset.alertId = item.id;
+        open.textContent = `Open ${item.target.toUpperCase()}`;
+        actions.append(open);
+      }
+      if (!item.read) {
+        const read = document.createElement('button');
+        read.type = 'button';
+        read.className = 'secondary';
+        read.dataset.alertRead = item.id;
+        read.textContent = 'Mark read';
+        actions.append(read);
+      }
+      card.append(head, message);
+      if (actions.childElementCount) card.append(actions);
+      phoneNotifications.append(card);
+    }
+  }
+
+  async function refreshNotifications() {
+    if (!user) return null;
+    const summary = await api('/api/notifications');
+    renderNotifications(summary);
+    return summary;
+  }
+
+  async function markNotificationRead(id, all = false) {
+    const summary = await api('/api/notifications/read', all ? { all: true } : { id });
+    renderNotifications(summary);
+    return summary;
+  }
+
+  function openPhone() {
+    if (!requireUser()) return;
+    showPanel(phonePanel);
+    run(refreshNotifications, phoneError);
+  }
+
+  function openNotificationTarget(target) {
+    if (target === 'wallet') openWallet();
+    else if (target === 'home') openHome();
+    else if (target === 'garage') openGarage();
+    else if (target === 'jobs') openJobs();
+  }
+
   function renderNeeds(summary) {
     needsSnapshot = summary || null;
     window.dispatchEvent(new CustomEvent('kerala-needs-state', { detail: needsSnapshot }));
@@ -1515,7 +1603,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     listen('profile', value => { if (value.user?.id === user?.id) setUser(value.user); run(refreshPeople, peopleError); });
     listen('bank', () => {
       if (walletPanel?.classList.contains('open')) run(refreshBank, walletError);
-      else toast('Kerala Pay · money received in your bank');
+    });
+    listen('notification', value => {
+      run(refreshNotifications, phoneError);
+      if (!phonePanel?.classList.contains('open') && value?.item?.title) toast(value.item.title);
     });
     listen('signal', handleSignal);
     listen('proximity-signal', handleProximitySignal);
@@ -1540,16 +1631,24 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     await run(refreshNeeds, walletError);
     await run(refreshHome, homeError);
     await run(refreshBank, walletError);
+    await run(refreshNotifications, phoneError);
+    if (notificationsTimer) clearInterval(notificationsTimer);
+    notificationsTimer = setInterval(() => { if (user) run(refreshNotifications, phoneError); }, 60000);
   }
   function endSession(message = '') {
     sessionVersion++;
     source?.close(); source = null;
     cleanupVoice(); clearMessageURLs();
+    if (notificationsTimer) { clearInterval(notificationsTimer); notificationsTimer = null; }
     peopleVersion++; messageVersion++; profileVersion++;
     people = []; peopleSignature = ''; activePeer = null; profileId = null;
     closePanels(); closeProfile();
     setUser(null); setConnection(false); onPlayers([]); onDisconnect();
     if (walletBalance) walletBalance.textContent = '₹0';
+    notificationsSnapshot = null;
+    phoneNotifications?.replaceChildren();
+    if (phoneBadge) { phoneBadge.hidden = true; phoneBadge.textContent = '0'; }
+    if (phoneSummaryText) phoneSummaryText.textContent = 'No unread alerts';
     walletTransactions?.replaceChildren();
     if (starterDelivery) { starterDelivery.disabled = false; starterDelivery.textContent = 'Complete Starter Delivery · +₹250'; }
     jobsSnapshot = null; jobsList?.replaceChildren(); window.dispatchEvent(new CustomEvent('kerala-job-mission', { detail: null })); if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
@@ -1560,6 +1659,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   profileChip?.addEventListener('click', () => openProfile());
   peopleToggle?.addEventListener('click', () => peoplePanel.classList.contains('open') ? closePanels() : openPeople());
   chatToggle?.addEventListener('click', () => chatPanel.classList.contains('open') || dmPanel.classList.contains('open') ? closePanels() : openChat());
+  phoneToggle?.addEventListener('click', () => phonePanel?.classList.contains('open') ? closePanels() : openPhone());
+  phoneClose?.addEventListener('click', () => { closePanels(); phoneToggle?.focus(); });
+  phoneRefresh?.addEventListener('click', () => run(refreshNotifications, phoneError));
+  phoneMarkAll?.addEventListener('click', () => run(() => markNotificationRead('', true), phoneError));
   walletToggle?.addEventListener('click', () => walletPanel?.classList.contains('open') ? closePanels() : openWallet());
   walletClose?.addEventListener('click', () => { closePanels(); walletToggle?.focus(); });
   walletRefresh?.addEventListener('click', () => run(refreshWallet, walletError));
@@ -1575,6 +1678,20 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   jobsToggle?.addEventListener('click', () => jobsPanel?.classList.contains('open') ? closePanels() : openJobs());
   jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
   jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
+  phoneNotifications?.addEventListener('click', event => {
+    const readButton = event.target.closest('button[data-alert-read]');
+    if (readButton) {
+      run(() => markNotificationRead(readButton.dataset.alertRead), phoneError);
+      return;
+    }
+    const openButton = event.target.closest('button[data-alert-target]');
+    if (!openButton) return;
+    run(async () => {
+      if (openButton.dataset.alertId) await markNotificationRead(openButton.dataset.alertId);
+      openNotificationTarget(openButton.dataset.alertTarget);
+    }, phoneError);
+  });
+
   const payHomeCharge = (button, kind) => {
     if (!button || button.disabled) return;
     run(async () => {
