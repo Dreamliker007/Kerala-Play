@@ -419,6 +419,21 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         createdAt: Number(jobs.active.readyAt || timestamp),
       });
     }
+    if (!jobs.active) {
+      for (const job of jobs.jobs) {
+        if (job.completedCount > 0 && job.cooldownUntil > 0 && job.cooldownRemainingMs === 0) {
+          items.push({
+            id: `reminder:job-available:${job.id}:${job.cooldownUntil}`,
+            kind: 'job',
+            title: `${job.title} available again`,
+            message: `Cooldown finished · ${job.title} can be started now.`,
+            severity: 'info',
+            target: 'jobs',
+            createdAt: Number(job.cooldownUntil),
+          });
+        }
+      }
+    }
 
     const eventSources = new Set(state.notifications.items.map(item => item.sourceKey));
     for (const challan of state.traffic.challans) {
@@ -631,6 +646,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     };
     traffic.challans.push(challan);
     if (traffic.challans.length > 80) traffic.challans = traffic.challans.slice(-80);
+    addNotification(user, {
+      sourceKey: `challan:${challan.id}`,
+      kind: 'traffic',
+      title: 'Traffic challan issued',
+      message: `${challan.description} · ₹${challan.amount}.`,
+      severity: 'warning',
+      target: 'garage',
+    });
     dirty = true;
     return { challan, created: true };
   }
@@ -1120,6 +1143,28 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/wallet' && request.method === 'GET') {
         send(response, 200, walletSummary(user)); return;
       }
+      if (path === '/api/notifications' && request.method === 'GET') {
+        send(response, 200, notificationsSummary(user)); return;
+      }
+      if (path === '/api/notifications/read' && request.method === 'POST') {
+        limited(`notifications-read:${user.id}`, 80, 60000);
+        const body = await jsonBody(request);
+        const summary = notificationsSummary(user);
+        const currentIds = new Set(summary.items.map(item => item.id));
+        const notifications = jobStateFor(user).notifications;
+        const timestamp = now();
+        if (body.all === true) {
+          for (const id of currentIds) notifications.read[id] = timestamp;
+        } else {
+          requireValue(typeof body.id === 'string' && currentIds.has(body.id), 404, 'Notification not found.');
+          notifications.read[body.id] = timestamp;
+        }
+        const entries = Object.entries(notifications.read).slice(-200);
+        notifications.read = Object.fromEntries(entries);
+        dirty = true;
+        await persist();
+        send(response, 200, notificationsSummary(user)); return;
+      }
       if (path === '/api/bank' && request.method === 'GET') {
         send(response, 200, bankSummary(user)); return;
       }
@@ -1175,6 +1220,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         });
         const received = bankTransaction(recipient, amount, 'upi_received', `UPI from ${senderUpi}`, {
           transferId, counterparty: senderUpi,
+        });
+        addNotification(recipient, {
+          sourceKey: `upi:${transferId}:received`,
+          kind: 'money',
+          title: 'UPI received',
+          message: `₹${amount} received from ${senderUpi} in Kerala Bank.`,
+          severity: 'success',
+          target: 'wallet',
         });
         await persist();
         emit(recipient.id, 'bank', {});
@@ -1283,6 +1336,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(!user.economyActions.includes('starter-delivery'), 409, 'Starter Delivery salary was already claimed.');
         user.economyActions.push('starter-delivery');
         const transaction = walletTransaction(user, STARTER_JOB_REWARD, 'salary', 'Starter Delivery salary');
+        addNotification(user, {
+          sourceKey: `salary:${transaction.id}`,
+          kind: 'money',
+          title: 'Salary credited',
+          message: `Starter Delivery · ₹${STARTER_JOB_REWARD} credited to Kerala Cash.`,
+          severity: 'success',
+          target: 'wallet',
+        });
         await persist();
         send(response, 200, { wallet: walletSummary(user), reward: STARTER_JOB_REWARD, transaction }); return;
       }
@@ -1464,6 +1525,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const model = GARAGE_CATALOG[vehicle.modelId];
         const buyerTransaction = walletTransaction(user, -price, 'used_vehicle_purchase', `${model.label} used purchase · ${vehicle.registration}`);
         const sellerTransaction = walletTransaction(seller, price, 'used_vehicle_sale', `${model.label} sold · ${vehicle.registration}`);
+        addNotification(seller, {
+          sourceKey: `vehicle-sale:${sellerTransaction.id}`,
+          kind: 'market',
+          title: 'Vehicle sold',
+          message: `${model.label} · ${vehicle.registration} sold for ₹${price}.`,
+          severity: 'success',
+          target: 'wallet',
+        });
         sellerState.garage.owned = sellerState.garage.owned.filter(item => item.id !== vehicle.id);
         if (sellerState.garage.selectedId === vehicle.id) sellerState.garage.selectedId = sellerState.garage.owned.find(item => !(Number(item.salePrice) > 0))?.id || null;
         vehicle.salePrice = 0;
@@ -1831,6 +1900,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         state.cooldowns[jobId] = timestamp + job.cooldownMs;
         state.completed[jobId] = Math.max(0, Number(state.completed[jobId] || 0)) + 1;
         const transaction = walletTransaction(user, job.reward, 'salary', `${job.title} salary`);
+        addNotification(user, {
+          sourceKey: `salary:${transaction.id}`,
+          kind: 'money',
+          title: 'Salary credited',
+          message: `${job.title} · ₹${job.reward} credited to Kerala Cash.`,
+          severity: 'success',
+          target: 'wallet',
+        });
         await persist();
         send(response, 200, { jobs: jobsSummary(user), wallet: walletSummary(user), reward: job.reward, transaction, completed: { jobId, title: job.title, count: state.completed[jobId] } }); return;
       }
