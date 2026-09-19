@@ -3241,7 +3241,7 @@ function createWorldSignTexture({
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = Math.min(8, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+  texture.anisotropy = 4;
   texture.needsUpdate = true;
   return texture;
 }
