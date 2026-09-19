@@ -2585,6 +2585,192 @@ function addRoadsideLife(scene) {
   });
 }
 
+
+function addBusStop(scene, x, z, rotation = 0) {
+  const group = new THREE.Group();
+  const concrete = new THREE.MeshStandardMaterial({ color: 0xbeb9aa, roughness: .96 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x465156, roughness: .72, metalness: .28 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x2f6573, roughness: .78 });
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x765138, roughness: .9 });
+  const signMat = new THREE.MeshStandardMaterial({ color: 0x2c6f4f, roughness: .74 });
+  const boardMat = new THREE.MeshStandardMaterial({ color: 0xe9e4d7, roughness: .86 });
+
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(4.7, .12, 1.55), concrete);
+  floor.position.y = .06;
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(4.95, .16, 1.75), roofMat);
+  roof.position.set(0, 2.55, 0);
+  [-2.05, 2.05].forEach(px => {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(.11, 2.45, .11), metal);
+    post.position.set(px, 1.25, -.55);
+    group.add(post);
+  });
+
+  const back = new THREE.Mesh(new THREE.BoxGeometry(4.45, 1.55, .09), boardMat);
+  back.position.set(0, 1.48, -.66);
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(2.7, .13, .48), seatMat);
+  bench.position.set(0, .66, -.18);
+  const benchBack = new THREE.Mesh(new THREE.BoxGeometry(2.7, .58, .10), seatMat);
+  benchBack.position.set(0, .98, -.40);
+
+  const signPost = new THREE.Mesh(new THREE.CylinderGeometry(.045, .055, 2.6, 7), metal);
+  signPost.position.set(2.65, 1.30, .12);
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(.52, .68, .07), signMat);
+  sign.position.set(2.65, 2.36, .12);
+
+  group.add(floor, roof, back, bench, benchBack, signPost, sign);
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  group.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+  scene.add(group);
+
+  const horizontal = Math.abs(Math.sin(rotation)) > .7;
+  addBoxCollider(x, z, horizontal ? .92 : 2.45, horizontal ? 2.45 : .92, 'bus-stop');
+}
+
+function addCompoundWall(scene, x, z, width, depth, opening = 'front') {
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xc8bfae, roughness: 1 });
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x8e8475, roughness: 1 });
+  const wallHeight = .72;
+  const thickness = .16;
+  const group = new THREE.Group();
+
+  const addSegment = (widthValue, depthValue, px, pz) => {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(widthValue, wallHeight, depthValue), wallMat);
+    wall.position.set(px, wallHeight / 2, pz);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(widthValue + .025, .07, depthValue + .025), capMat);
+    cap.position.set(px, wallHeight + .035, pz);
+    group.add(wall, cap);
+  };
+
+  addSegment(thickness, depth, -width / 2, 0);
+  addSegment(thickness, depth, width / 2, 0);
+  addSegment(width, thickness, 0, -depth / 2);
+
+  const openingWidth = Math.min(3.2, width * .34);
+  if (opening === 'front') {
+    const side = (width - openingWidth) / 2;
+    addSegment(side, thickness, -(openingWidth + side) / 2, depth / 2);
+    addSegment(side, thickness, (openingWidth + side) / 2, depth / 2);
+  } else {
+    addSegment(width, thickness, 0, depth / 2);
+  }
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+}
+
+function addUtilityPoles(scene) {
+  const concrete = new THREE.MeshStandardMaterial({ color: 0x8b8c87, roughness: .94 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x4c5153, roughness: .78, metalness: .18 });
+  const insulator = new THREE.MeshStandardMaterial({ color: 0x6e5542, roughness: .84 });
+  const wireMaterial = new THREE.LineBasicMaterial({ color: 0x25292a, transparent: true, opacity: .72 });
+  const zPositions = [-64, -46, -28, -10, 26, 44, 62];
+  const poleX = -13.0;
+  const wirePoints = [[], [], []];
+
+  zPositions.forEach(z => {
+    const pole = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.075, .105, 5.6, 8), concrete);
+    shaft.position.y = 2.8;
+    const crossbar = new THREE.Mesh(new THREE.BoxGeometry(1.25, .09, .09), metal);
+    crossbar.position.y = 5.30;
+    pole.add(shaft, crossbar);
+    [-.46, 0, .46].forEach((xOffset, index) => {
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(.045, .045, .16, 7), insulator);
+      cap.position.set(xOffset, 5.43, 0);
+      pole.add(cap);
+      wirePoints[index].push(new THREE.Vector3(poleX + xOffset, 5.47, z));
+    });
+    pole.position.set(poleX, 0, z);
+    scene.add(pole);
+  });
+
+  wirePoints.forEach(points => {
+    const sagged = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i], b = points[i + 1];
+      for (let step = 0; step < 5; step++) {
+        const t = step / 5;
+        const point = a.clone().lerp(b, t);
+        point.y -= Math.sin(t * Math.PI) * .22;
+        sagged.push(point);
+      }
+    }
+    sagged.push(points[points.length - 1].clone());
+    const geometry = new THREE.BufferGeometry().setFromPoints(sagged);
+    scene.add(new THREE.Line(geometry, wireMaterial));
+  });
+}
+
+function addJunctionMarkings(scene) {
+  const white = new THREE.MeshStandardMaterial({ color: 0xf0efe7, roughness: .78 });
+  for (let i = -3; i <= 3; i++) {
+    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(.72, 4.7), white);
+    stripe.rotation.x = -Math.PI / 2;
+    stripe.position.set(i * 1.05, .044, -14.3);
+    scene.add(stripe);
+  }
+
+  const stopLine = new THREE.Mesh(new THREE.PlaneGeometry(7.0, .24), white);
+  stopLine.rotation.x = -Math.PI / 2;
+  stopLine.position.set(-8.9, .044, -22);
+  stopLine.rotation.z = Math.PI / 2;
+  scene.add(stopLine);
+}
+
+function addRoadsideClutter(scene) {
+  const wood = new THREE.MeshStandardMaterial({ color: 0x765033, roughness: .94 });
+  const crateMat = new THREE.MeshStandardMaterial({ color: 0xaa7b42, roughness: .95 });
+  const plasticBlue = new THREE.MeshStandardMaterial({ color: 0x356f8b, roughness: .8 });
+  const plasticGreen = new THREE.MeshStandardMaterial({ color: 0x3c7557, roughness: .82 });
+  const signMat = new THREE.MeshStandardMaterial({ color: 0xe7d59b, roughness: .82 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x555b5c, roughness: .74, metalness: .22 });
+
+  [[-12.2,-4],[12.8,5],[-13.5,36],[13.0,-46]].forEach(([x,z], index) => {
+    const root = new THREE.Group();
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(.62, .48, .52), crateMat);
+    crate.position.y = .24;
+    const crate2 = crate.clone();
+    crate2.position.set(.47, .19, -.12);
+    crate2.scale.set(.78, .78, .78);
+    const bin = new THREE.Mesh(new THREE.CylinderGeometry(.23, .20, .56, 8), index % 2 ? plasticGreen : plasticBlue);
+    bin.position.set(-.50, .28, .06);
+    root.add(crate, crate2, bin);
+    root.position.set(x, 0, z);
+    root.rotation.y = index * .6;
+    scene.add(root);
+  });
+
+  [[-10.8,12],[11.0,55],[-22.0,-30]].forEach(([x,z], index) => {
+    const root = new THREE.Group();
+    const post = new THREE.Mesh(new THREE.BoxGeometry(.08, 1.55, .08), metal);
+    post.position.y = .78;
+    const board = new THREE.Mesh(new THREE.BoxGeometry(1.05, .62, .08), signMat);
+    board.position.y = 1.48;
+    board.rotation.z = index % 2 ? -.025 : .025;
+    const brace = new THREE.Mesh(new THREE.BoxGeometry(.82, .07, .07), wood);
+    brace.position.y = .38;
+    root.add(post, board, brace);
+    root.position.set(x, 0, z);
+    scene.add(root);
+  });
+}
+
+function addTownStreetDetails(scene) {
+  addShop(scene, -14.4, 7.5);
+  addShop(scene, 14.8, 38.5);
+  addBusStop(scene, 11.7, 27.5, 0);
+  addBusStop(scene, -11.7, -50.5, Math.PI);
+
+  addCompoundWall(scene, 28, 24, 11.4, 9.2);
+  addCompoundWall(scene, -36, 33, 11.8, 9.6);
+  addCompoundWall(scene, 18, -32, 10.8, 8.8);
+
+  addUtilityPoles(scene);
+  addJunctionMarkings(scene);
+  addRoadsideClutter(scene);
+}
+
 function buildWorld(scene) {
   staticColliders.length = 0;
   const groundTexture = createGroundSurfaceTexture();
@@ -2623,6 +2809,7 @@ function buildWorld(scene) {
   }
   addRoadSurfaceDetails(scene);
   addRoadsideLife(scene);
+  addTownStreetDetails(scene);
   addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737 });
   addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -76, max: 76, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d });
   addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5 });
@@ -2652,6 +2839,9 @@ function buildWorld(scene) {
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
   addPhotoVillager(scene, -9, 19, 8, .5, 4, .75);
   addPhotoVillager(scene, 10, 50, 7, .42, 1, .68);
+  addPhotoVillager(scene, -8.9, 8, 4.8, .38, 3, .72);
+  addPhotoVillager(scene, 8.9, 31, 5.4, .35, 1.3, .70);
+  addPhotoVillager(scene, -9.2, -43, 3.8, .40, 5.4, .69);
 }
 
 function buildLandmarkWorld(scene) {
@@ -3160,7 +3350,7 @@ function addPalm(scene, x, z, scale) {
 
 function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
   const index = villagers.length;
-  const names = ['Anu', 'Vivek', 'Meera', 'Arun'];
+  const names = ['Anu', 'Vivek', 'Meera', 'Arun', 'Nisha', 'Riyas', 'Asha', 'Manu'];
   const gender = index % 2 ? 'male' : 'female';
   const styles = [
     { shirt: 0xa95762, trousers: 0x2e3447, skin: 0xa96d4c, hair: 0x171311, shoes: 0x372b26, accent: 0xd8aa55 },
@@ -3174,8 +3364,9 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
   human.scale.setScalar(.9 * scale + .2);
   villager.add(human);
   villager.position.set(x, 0, z);
-  villager.userData = { human, startZ: z, distance, speed, offset, npc: true, name: names[index], gender };
-  updateNameLabel(villager, names[index] + ' · Guide', 'npc-' + index);
+  const npcName = names[index % names.length];
+  villager.userData = { human, startZ: z, distance, speed, offset, npc: true, name: npcName, gender };
+  updateNameLabel(villager, npcName + ' · Local', 'npc-' + index);
   villagers.push(villager);
   scene.add(villager);
 }
