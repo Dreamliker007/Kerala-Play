@@ -66,6 +66,9 @@ const toast = document.querySelector('#toast');
 document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
 const villagers = [];
 const ambientAnimals = [];
+const windVegetation = [];
+const windWires = [];
+let roadsideGrassWind = null;
 const traffic = [];
 const staticColliders = [];
 const streetLampMaterials = [];
@@ -2203,6 +2206,7 @@ try {
       inChallenge: !!challengeRound,
     });
     updateWorldWeatherVisuals(weatherState);
+    updateWindWorld(villageTime);
     updateVehicleRainSpray(delta);
     renderer.render(scene, camera);
     if (isMobile && !atmosphere) {
@@ -3042,6 +3046,7 @@ function addRoadsideLife(scene) {
   }
 
   const grass = new THREE.InstancedMesh(grassGeometry, grassMaterial, positions.length);
+  grass.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const dummy = new THREE.Object3D();
   positions.forEach(([x, z, scale, yaw], index) => {
     dummy.position.set(x, .015, z);
@@ -3052,6 +3057,7 @@ function addRoadsideLife(scene) {
   });
   grass.instanceMatrix.needsUpdate = true;
   grass.receiveShadow = true;
+  roadsideGrassWind = { mesh: grass, positions, dummy };
   scene.add(grass);
 
   [-57, -31, -5, 25, 51].forEach((z, index) => {
@@ -3175,7 +3181,14 @@ function addUtilityPoles(scene) {
     }
     sagged.push(points[points.length - 1].clone());
     const geometry = new THREE.BufferGeometry().setFromPoints(sagged);
-    scene.add(new THREE.Line(geometry, wireMaterial));
+    const line = new THREE.Line(geometry, wireMaterial);
+    const attribute = geometry.getAttribute('position');
+    windWires.push({
+      attribute,
+      base: Float32Array.from(attribute.array),
+      phase: windWires.length * 1.37,
+    });
+    scene.add(line);
   });
 }
 
@@ -3247,6 +3260,7 @@ function addBananaPlant(scene, x, z, scale = 1, yaw = 0) {
 
   const leafGeometry = new THREE.PlaneGeometry(.78, 2.55, 1, 3);
   leafGeometry.translate(0, 1.18, 0);
+  const leaves = [];
   for (let index = 0; index < 7; index++) {
     const leaf = new THREE.Mesh(leafGeometry, leafMat);
     const angle = index / 7 * Math.PI * 2;
@@ -3257,11 +3271,19 @@ function addBananaPlant(scene, x, z, scale = 1, yaw = 0) {
     leaf.rotation.z = (index % 2 ? 1 : -1) * .08;
     leaf.scale.set(.92 + (index % 3) * .06, .88 + (index % 2) * .08, 1);
     leaf.castShadow = true;
+    leaf.userData.windBaseX = leaf.rotation.x;
+    leaf.userData.windBaseZ = leaf.rotation.z;
+    leaves.push(leaf);
     group.add(leaf);
   }
   group.position.set(x, 0, z);
   group.rotation.y = yaw;
   group.scale.setScalar(scale);
+  windVegetation.push({
+    kind: 'banana',
+    leaves,
+    phase: windVegetation.length * 1.17 + x * .07 + z * .04,
+  });
   scene.add(group);
 }
 
@@ -3450,6 +3472,77 @@ function addTownStreetDetails(scene) {
   addParkedVehicle(scene, 'bike', 0x316d58, -10.7, 9.2, Math.PI);
   addParkedVehicle(scene, 'bike', 0x8b3e35, 11.2, 41.1, 0);
   addParkedVehicle(scene, 'auto', 0x2b773f, -57.0, -29.7, Math.PI / 2);
+}
+
+function updateWindWorld(time) {
+  const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+  const overcast = THREE.MathUtils.clamp(Number(worldWeatherState.overcast || 0), 0, 1);
+  const windStrength = .18 + overcast * .34 + rain * .62;
+  const gust = .62 + Math.sin(time * .74) * .22 + Math.sin(time * 1.63 + .8) * .16;
+  const wind = windStrength * Math.max(.24, gust);
+
+  for (const item of windVegetation) {
+    const phase = Number(item.phase || 0);
+    if (item.kind === 'palm') {
+      const swayX = Math.sin(time * .86 + phase) * .011 * wind;
+      const swayZ = Math.cos(time * .63 + phase * 1.2) * .014 * wind;
+      for (const node of [item.fronds, item.stems]) {
+        if (!node) continue;
+        node.rotation.x = Number(node.userData.windBaseX || 0) + swayX;
+        node.rotation.z = Number(node.userData.windBaseZ || 0) + swayZ;
+      }
+      continue;
+    }
+
+    if (item.kind === 'banana') {
+      item.leaves.forEach((leaf, index) => {
+        const flutter = Math.sin(time * (1.15 + index * .045) + phase + index * .71);
+        const gustFlutter = Math.sin(time * 3.1 + phase + index * .39);
+        leaf.rotation.x = Number(leaf.userData.windBaseX || 0) + flutter * .020 * wind;
+        leaf.rotation.z = Number(leaf.userData.windBaseZ || 0) + (flutter * .026 + gustFlutter * .008) * wind;
+      });
+      continue;
+    }
+
+    if (item.kind === 'tree') {
+      item.nodes.forEach((node, index) => {
+        const sway = Math.sin(time * .78 + phase + index * .47);
+        const flutter = Math.sin(time * 1.94 + phase + index * .83);
+        node.rotation.x = Number(node.userData.windBaseX || 0) + sway * .006 * wind;
+        node.rotation.z = Number(node.userData.windBaseZ || 0) + (sway * .010 + flutter * .003) * wind;
+      });
+    }
+  }
+
+  if (roadsideGrassWind) {
+    const { mesh, positions, dummy } = roadsideGrassWind;
+    positions.forEach(([x, z, scale, yaw], index) => {
+      const sway = Math.sin(time * 1.8 + index * .31) * .045 * wind;
+      const sideSway = Math.cos(time * 1.37 + index * .19) * .028 * wind;
+      dummy.position.set(x, .015, z);
+      dummy.rotation.set(sway, yaw, sideSway);
+      dummy.scale.set(scale, scale, scale);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  for (const wire of windWires) {
+    const array = wire.attribute.array;
+    const base = wire.base;
+    const phase = Number(wire.phase || 0);
+    for (let index = 0; index < wire.attribute.count; index++) {
+      const offset = index * 3;
+      const localStep = index % 5;
+      const anchorFactor = Math.sin(localStep / 5 * Math.PI);
+      const sway = Math.sin(time * 1.05 + phase + index * .09) * .035 * wind * anchorFactor;
+      array[offset] = base[offset] + sway;
+      array[offset + 1] = base[offset + 1] + Math.abs(sway) * .12;
+      array[offset + 2] = base[offset + 2];
+    }
+    wire.attribute.needsUpdate = true;
+  }
 }
 
 function buildWorld(scene) {
@@ -4701,6 +4794,7 @@ function addTree(scene, x, z, scale, withFruit = false) {
   });
 
   const canopyGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const foliageNodes = [];
   const clusters = [
     [0, 5.35, 0, 1.95, 1.22, 1.55],
     [-1.18, 5.12, .22, 1.42, 1.02, 1.22],
@@ -4716,13 +4810,21 @@ function addTree(scene, x, z, scale, withFruit = false) {
     leaves.position.set(lx + (random() - .5) * .18, ly + (random() - .5) * .12, lz + (random() - .5) * .18);
     leaves.scale.set(sx * (.93 + random() * .12), sy * (.94 + random() * .10), sz * (.93 + random() * .12));
     leaves.rotation.y = random() * Math.PI;
+    leaves.userData.windBaseX = leaves.rotation.x;
+    leaves.userData.windBaseZ = leaves.rotation.z;
     leaves.castShadow = true;
+    foliageNodes.push(leaves);
     group.add(leaves);
   });
 
   if (withFruit) addFruitClusters(group);
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
+  windVegetation.push({
+    kind: 'tree',
+    nodes: foliageNodes,
+    phase: windVegetation.length * .93 + x * .045 - z * .03,
+  });
   scene.add(group);
 }
 
@@ -4814,6 +4916,10 @@ function addPalm(scene, x, z, scale) {
   const stems = new THREE.LineSegments(stemGeometry, stemMaterial);
   fronds.rotation.y = random() * .14;
   stems.rotation.y = fronds.rotation.y;
+  fronds.userData.windBaseX = fronds.rotation.x;
+  fronds.userData.windBaseZ = fronds.rotation.z;
+  stems.userData.windBaseX = stems.rotation.x;
+  stems.userData.windBaseZ = stems.rotation.z;
   palm.add(fronds, stems);
 
   for (let i = 0; i < 5; i++) {
@@ -4825,6 +4931,12 @@ function addPalm(scene, x, z, scale) {
 
   palm.position.set(x, 0, z);
   palm.scale.setScalar(scale);
+  windVegetation.push({
+    kind: 'palm',
+    fronds,
+    stems,
+    phase: windVegetation.length * .81 + x * .035 + z * .025,
+  });
   scene.add(palm);
 }
 
