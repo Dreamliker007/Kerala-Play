@@ -526,3 +526,12 @@ Walking/running now uses a pooled footstep effect system tied to the existing ga
 The local player's existing V95 contact shadow also gains a very small gait-synchronised compression/expansion pulse so each step feels more grounded without adding expensive dynamic lights or extra shadow maps.
 
 The particle pools are allocated once and reused, with inactive particles parked out of view instead of creating/removing objects every step. No external assets, backend/database changes, collision changes, stamina rules, server movement changes or Supabase migration are introduced.
+
+
+## V100.1 Mobile Startup Hotfix
+
+V100.1 fixes a production startup crash introduced by the V99 mobile optimization pass. The wind and monsoon-water update helpers are module-level functions, but they were reading an `isMobile` constant that existed only inside the renderer initialization block. The first game-loop call therefore threw a `ReferenceError` and displayed the generic startup fallback screen.
+
+A module-level `runtimeIsMobile` flag is now shared by the renderer and the weather-effect update helpers. The browser fallback text was also changed so the production site no longer tells players to run a local npm server.
+
+No gameplay, graphics-quality, movement, economy, backend/database or Supabase behavior changes.
