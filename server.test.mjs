@@ -949,3 +949,68 @@ test('rental home rent utilities grace sleep and persistence stay server control
   assert.ok(home.lastSleepAt > firstSleepAt);
   assert.equal((await alice('/api/wallet')).data.balance, 420);
 });
+
+
+test('Kerala Bank cash movement UPI transfers and persistence stay server controlled', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  await signup(alice, 'BankAlice');
+  await signup(bob, 'BankBob');
+
+  let bank = (await alice('/api/bank')).data;
+  assert.equal(bank.balance, 0);
+  assert.match(bank.accountNumber, /^KPB-\d{4}-\d{4}$/);
+  assert.equal(bank.upiId, 'bankalice@keralapay');
+  assert.equal(bank.transferMax, 100000);
+  const aliceAccount = bank.accountNumber;
+
+  const deposit = await alice('/api/bank/cash', { action: 'deposit', amount: 300, fakeBalance: 999999 });
+  assert.equal(deposit.status, 200);
+  assert.equal(deposit.data.amount, 300);
+  assert.equal(deposit.data.wallet.balance, 200);
+  assert.equal(deposit.data.bank.balance, 300);
+  assert.equal(deposit.data.bank.transactions[0].kind, 'cash_deposit');
+  assert.equal(deposit.data.wallet.transactions[0].kind, 'bank_deposit');
+
+  assert.equal((await alice('/api/bank/cash', { action: 'deposit', amount: 201 })).status, 409);
+  assert.equal((await alice('/api/bank/cash', { action: 'withdraw', amount: 301 })).status, 409);
+  assert.equal((await alice('/api/bank/cash', { action: 'withdraw', amount: 100001 })).status, 400);
+
+  const upi = await alice('/api/bank/upi', { recipient: 'BankBob@keralapay', amount: 125, fee: 9999 });
+  assert.equal(upi.status, 200);
+  assert.equal(upi.data.amount, 125);
+  assert.equal(upi.data.recipient.upiId, 'bankbob@keralapay');
+  assert.equal(upi.data.bank.balance, 175);
+  assert.equal(upi.data.transaction.kind, 'upi_sent');
+  assert.ok(upi.data.transferId);
+
+  const bobBank = (await bob('/api/bank')).data;
+  assert.equal(bobBank.balance, 125);
+  assert.equal(bobBank.upiId, 'bankbob@keralapay');
+  assert.equal(bobBank.transactions[0].kind, 'upi_received');
+  assert.equal(bobBank.transactions[0].counterparty, 'bankalice@keralapay');
+  assert.equal(bobBank.transactions[0].transferId, upi.data.transferId);
+
+  assert.equal((await alice('/api/bank/upi', { recipient: 'BankAlice', amount: 1 })).status, 409);
+  assert.equal((await alice('/api/bank/upi', { recipient: 'MissingPlayer', amount: 1 })).status, 404);
+  assert.equal((await alice('/api/bank/upi', { recipient: 'BankBob', amount: 176 })).status, 409);
+
+  const withdraw = await bob('/api/bank/cash', { action: 'withdraw', amount: 25 });
+  assert.equal(withdraw.status, 200);
+  assert.equal(withdraw.data.bank.balance, 100);
+  assert.equal(withdraw.data.wallet.balance, 525);
+  assert.equal(withdraw.data.bank.transactions[0].kind, 'cash_withdrawal');
+
+  await app.restart();
+  assert.equal((await alice('/api/auth/login', { identifier: 'BankAlice', password: 'test-password-2026' })).status, 200);
+  assert.equal((await bob('/api/auth/login', { identifier: 'BankBob', password: 'test-password-2026' })).status, 200);
+
+  bank = (await alice('/api/bank')).data;
+  assert.equal(bank.balance, 175);
+  assert.equal(bank.accountNumber, aliceAccount);
+  assert.equal(bank.transactions[0].kind, 'upi_sent');
+
+  const bobAfterRestart = (await bob('/api/bank')).data;
+  assert.equal(bobAfterRestart.balance, 100);
+  assert.equal((await bob('/api/wallet')).data.balance, 525);
+  assert.ok(bobAfterRestart.transactions.some(transaction => transaction.kind === 'upi_received'));
+});
