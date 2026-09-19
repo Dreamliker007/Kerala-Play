@@ -306,6 +306,150 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     db.transactions.push(transaction); dirty = true;
     return transaction;
   }
+  function addNotification(user, { sourceKey, kind = 'system', title, message, severity = 'info', target = '' }) {
+    const notifications = jobStateFor(user).notifications;
+    if (sourceKey && notifications.items.some(item => item.sourceKey === sourceKey)) {
+      return notifications.items.find(item => item.sourceKey === sourceKey);
+    }
+    const item = {
+      id: randomUUID(),
+      sourceKey: sourceKey || '',
+      kind,
+      title: String(title || 'Kerala Play'),
+      message: String(message || ''),
+      severity: ['info', 'warning', 'critical', 'success'].includes(severity) ? severity : 'info',
+      target: ['wallet', 'home', 'garage', 'jobs'].includes(target) ? target : '',
+      createdAt: now(),
+    };
+    notifications.items.push(item);
+    if (notifications.items.length > 80) notifications.items = notifications.items.slice(-80);
+    dirty = true;
+    emit(user.id, 'notification', { item });
+    return item;
+  }
+
+  function liveNotificationItems(user) {
+    const state = jobStateFor(user);
+    const items = [];
+    const timestamp = now();
+    const home = homeSummary(user);
+    if (home.accessBlocked) {
+      items.push({
+        id: `reminder:home-blocked:${home.rentDueAt}:${home.utilityDueAt}`,
+        kind: 'home', title: 'Home access needs attention',
+        message: 'Sleep access is paused. Pay overdue rent or utilities to restore it.',
+        severity: 'critical', target: 'home', createdAt: Math.min(home.rentGraceUntil, home.utilityGraceUntil),
+      });
+    } else {
+      const homeReminders = [
+        ['rent', home.rentDueAt, home.rentOverdue, home.home.rent, 'Rent'],
+        ['utilities', home.utilityDueAt, home.utilityOverdue, home.home.utilities, 'Utilities'],
+      ];
+      for (const [key, dueAt, overdue, amount, label] of homeReminders) {
+        const remaining = Number(dueAt) - timestamp;
+        if (overdue || remaining <= 2 * 60 * 60 * 1000) {
+          items.push({
+            id: `reminder:home-${key}:${dueAt}`,
+            kind: 'home',
+            title: overdue ? `${label} overdue` : `${label} due soon`,
+            message: `${label} payment ₹${amount} · ${overdue ? 'pay during the grace period' : 'due within 2 hours'}.`,
+            severity: overdue ? 'warning' : 'info',
+            target: 'home',
+            createdAt: overdue ? Number(dueAt) : timestamp,
+          });
+        }
+      }
+    }
+
+    const needs = needsSummary(user);
+    for (const [key, label] of [['hunger', 'Hunger'], ['thirst', 'Thirst'], ['energy', 'Energy']]) {
+      const value = Number(needs[key]);
+      if (value <= 15) {
+        const level = value <= 7 ? 'critical' : 'warning';
+        items.push({
+          id: `reminder:needs:${key}:${level}`,
+          kind: 'needs',
+          title: `Low ${label.toLowerCase()}`,
+          message: `${label} is ${Math.round(value)}%. ${key === 'energy' ? 'Rest or sleep, or use the Village Shop.' : 'Use the Village Shop to recover.'}`,
+          severity: level,
+          target: key === 'energy' ? 'home' : 'wallet',
+          createdAt: Number(needs.updatedAt) || timestamp,
+        });
+      }
+    }
+
+    for (const vehicle of state.garage.owned) {
+      const model = GARAGE_CATALOG[vehicle.modelId];
+      const insurance = vehicleInsuranceSummary(vehicle);
+      if (!insurance.insuranceActive || insurance.insuranceRemainingMs <= 3 * 24 * 60 * 60 * 1000) {
+        items.push({
+          id: `reminder:insurance:${vehicle.id}:${insurance.insuranceUntil}`,
+          kind: 'vehicle',
+          title: insurance.insuranceActive ? 'Vehicle insurance due soon' : 'Vehicle insurance expired',
+          message: `${model.label} · ${vehicle.registration} · ${insurance.insuranceActive ? 'renew within 3 days' : 'renew insurance'}.`,
+          severity: insurance.insuranceActive ? 'warning' : 'critical',
+          target: 'garage',
+          createdAt: insurance.insuranceActive ? timestamp : Number(insurance.insuranceUntil || timestamp),
+        });
+      }
+    }
+
+    const licence = drivingLicenceSummary(user);
+    if (licence.type !== 'none' && (!licence.active || licence.remainingMs <= 3 * 24 * 60 * 60 * 1000)) {
+      items.push({
+        id: `reminder:licence:${licence.number}:${licence.validUntil}`,
+        kind: 'vehicle',
+        title: licence.active ? 'Driving licence due soon' : 'Driving licence expired',
+        message: `${licence.label} · ${licence.active ? 'renew within 3 days' : 'renew before driving'}.`,
+        severity: licence.active ? 'warning' : 'critical',
+        target: 'garage',
+        createdAt: licence.active ? timestamp : Number(licence.validUntil || timestamp),
+      });
+    }
+
+    const jobs = jobsSummary(user);
+    if (jobs.active?.ready) {
+      items.push({
+        id: `reminder:job-ready:${jobs.active.taskId}`,
+        kind: 'job',
+        title: 'Job ready to complete',
+        message: `${jobs.active.title} is ready. Open Jobs to collect the salary.`,
+        severity: 'success',
+        target: 'jobs',
+        createdAt: Number(jobs.active.readyAt || timestamp),
+      });
+    }
+
+    const eventSources = new Set(state.notifications.items.map(item => item.sourceKey));
+    for (const challan of state.traffic.challans) {
+      if (Number(challan.paidAt) || eventSources.has(`challan:${challan.id}`)) continue;
+      items.push({
+        id: `reminder:challan:${challan.id}`,
+        kind: 'traffic', title: 'Unpaid traffic challan',
+        message: `${challan.description} · ₹${challan.amount} unpaid.`,
+        severity: 'warning', target: 'garage', createdAt: Number(challan.createdAt || timestamp),
+      });
+    }
+    return items;
+  }
+
+  function notificationsSummary(user) {
+    const state = jobStateFor(user);
+    const stored = state.notifications.items.map(item => ({ ...item, live: false }));
+    const live = liveNotificationItems(user).map(item => ({ ...item, live: true }));
+    const deduped = new Map();
+    for (const item of [...stored, ...live]) deduped.set(item.id, item);
+    const items = [...deduped.values()]
+      .map(item => ({ ...item, read: !!state.notifications.read[item.id] }))
+      .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
+      .slice(0, 60);
+    return {
+      unreadCount: items.filter(item => !item.read).length,
+      items,
+      generatedAt: now(),
+    };
+  }
+
   function bankAccountNumberFor(user) {
     const digest = createHash('sha256').update(`kerala-bank:${user.id}`).digest('hex');
     const digits = String(parseInt(digest.slice(0, 12), 16) % 100_000_000).padStart(8, '0');
