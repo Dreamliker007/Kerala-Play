@@ -465,3 +465,14 @@ A shared dynamic-quality helper now applies consistent cast/receive-shadow rules
 Villagers, remote players and village animals gain lightweight elliptical contact shadows at ground level. The local player's existing contact shadow now participates in the same system. Contact-shadow opacity reacts to daylight, overcast and rain so objects keep useful grounding without looking like dark stickers during monsoon/night conditions.
 
 This is a rendering-only depth pass. It does not add collision geometry, change sun shadow resolution, alter player/server movement, traffic authority, economy, backend/database or Supabase behavior.
+
+
+## Camera + Movement Immersion (V96)
+
+V96 improves moment-to-moment movement feel without changing movement authority or vehicle physics.
+
+Walking now adds a very small camera bob/sway linked to the existing gait phase, with a slightly stronger but still restrained response while running. Driving uses a smoother chase-camera response, a small steering sway, and gentle acceleration/braking camera inertia rather than a rigid fixed follow.
+
+The field of view now expands gradually with vehicle speed and slightly while running, then eases back to the normal 60-degree view when slowing or stopping. Heavy rain can add a tiny high-frequency camera disturbance, but the amplitude is intentionally kept very low to avoid an aggressive shake effect.
+
+All effects are camera-only. Server-authoritative movement, collisions, vehicle speed/braking values, traffic rules, economy, backend/database and Supabase behavior are unchanged.
