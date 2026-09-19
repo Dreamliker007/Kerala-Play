@@ -667,6 +667,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     else if (target === 'home') openHome();
     else if (target === 'garage') openGarage();
     else if (target === 'jobs') openJobs();
+    else if (target === 'people') openPeople();
   }
 
   function renderNeeds(summary) {
