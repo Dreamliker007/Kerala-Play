@@ -23,6 +23,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   const disposables = [];
   const originalRenderer = { toneMapping: renderer.toneMapping, exposure: renderer.toneMappingExposure, shadows: renderer.shadowMap.enabled, shadowType: renderer.shadowMap.type, pixelRatio: renderer.getPixelRatio() };
   const shadowObjects = [];
+  const texturedMaterials = new Set();
   const unlitMaterials = new Map();
   const emissiveMaterials = new Map();
   const seenMaterials = new Set();
@@ -39,6 +40,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       if (!material || seenMaterials.has(material)) continue;
       seenMaterials.add(material);
       // Tint unlit photo assets gently at night; labels created later remain legible.
+      if (material.map) texturedMaterials.add(material);
       if (material.color && material.map && (material.isMeshBasicMaterial || material.isSpriteMaterial)) {
         unlitMaterials.set(material, material.color.clone());
       }
@@ -81,12 +83,13 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   disposables.push(starGeometry, starMaterial);
 
   const cloudMaterial = new THREE.MeshBasicMaterial({ color: 0xf1f0ec, transparent: true, opacity: .58, depthWrite: false, fog: false });
-  const clouds = new THREE.InstancedMesh(sphereGeometry, cloudMaterial, 18);
+  const maxClouds = 30;
+  const clouds = new THREE.InstancedMesh(sphereGeometry, cloudMaterial, maxClouds);
   const cloudTransform = new THREE.Object3D();
-  for (let index = 0; index < 18; index++) {
+  for (let index = 0; index < maxClouds; index++) {
     const group = Math.floor(index / 3);
-    const angle = group / 6 * Math.PI * 2;
-    cloudTransform.position.set(Math.cos(angle) * (73 + group * 4) + (index % 3 - 1) * 5, 23 + group % 3 * 4, Math.sin(angle) * (73 + group * 4));
+    const angle = group / 10 * Math.PI * 2;
+    cloudTransform.position.set(Math.cos(angle) * (70 + group * 2.8) + (index % 3 - 1) * 5, 22 + group % 3 * 4, Math.sin(angle) * (70 + group * 2.8));
     cloudTransform.scale.set(7 + random() * 3, 1.4 + random(), 3.8 + random() * 2);
     cloudTransform.updateMatrix();
     clouds.setMatrixAt(index, cloudTransform.matrix);
@@ -97,7 +100,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   disposables.push(cloudMaterial);
 
   // Lightweight local rain field. A single LineSegments draw call follows the camera.
-  const maxRainDrops = 420;
+  const maxRainDrops = 620;
   const rainPositions = new Float32Array(maxRainDrops * 6);
   const rainDrops = [];
   for (let index = 0; index < maxRainDrops; index++) {
@@ -272,17 +275,53 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     try { localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ quality, sound: audioEnabled })); } catch { /* Storage can be unavailable in private mode. */ }
   }
   function applyQuality() {
-    const maxRatio = quality === 'low' ? .85 : quality === 'high' ? 1.6 : 1.2;
+    const high = quality === 'high';
+    const balanced = quality === 'balanced';
+    const maxRatio = quality === 'low' ? .82 : high ? 2 : 1.2;
     renderer.setPixelRatio(Math.min(devicePixelRatio || 1, maxRatio));
-    renderer.shadowMap.enabled = quality === 'high';
+    renderer.setSize(innerWidth, innerHeight, false);
+    renderer.shadowMap.enabled = high;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.shadowMap.needsUpdate = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = quality === 'high' ? 1.22 : quality === 'balanced' ? 1.2 : 1.17;
-    if (sun) sun.castShadow = quality === 'high';
+    renderer.toneMappingExposure = high ? 1.20 : balanced ? 1.18 : 1.15;
+
+    const anisotropy = Math.max(1, Math.min(renderer.capabilities.getMaxAnisotropy?.() || 1, high ? 8 : balanced ? 4 : 1));
+    scene.traverse(object => {
+      if (!object.isMesh && !object.isSprite) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      if (object.isMesh && high) {
+        const opaque = materials.every(material => material && !material.transparent && !material.wireframe);
+        object.castShadow = opaque && (object.geometry?.type !== 'PlaneGeometry' || object.isInstancedMesh);
+        object.receiveShadow = opaque;
+      }
+      for (const material of materials) {
+        if (!material) continue;
+        material.dithering = high;
+        if (material.map) {
+          texturedMaterials.add(material);
+          material.map.anisotropy = anisotropy;
+          material.map.needsUpdate = true;
+        }
+      }
+    });
+
+    if (sun) {
+      sun.castShadow = high;
+      if (sun.shadow) {
+        const size = high ? 2048 : 1024;
+        if (sun.shadow.mapSize.x !== size || sun.shadow.mapSize.y !== size) {
+          sun.shadow.mapSize.set(size, size);
+          sun.shadow.map?.dispose?.();
+          sun.shadow.map = null;
+        }
+      }
+    }
     stars.visible = quality !== 'low';
+    clouds.count = high ? 30 : balanced ? 21 : 12;
     clouds.visible = quality !== 'low' || currentWeather.overcast > .3;
-    rainGeometry.setDrawRange(0, (quality === 'high' ? 420 : quality === 'balanced' ? 280 : 150) * 2);
+    rainGeometry.setDrawRange(0, (high ? 620 : balanced ? 300 : 150) * 2);
+    rainMaterial.opacity = Math.min(rainMaterial.opacity, high ? .72 : balanced ? .62 : .46);
     qualitySelect.value = quality;
   }
   function setQuality(value) {
@@ -373,9 +412,9 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     cloudMaterial.opacity = .45 + overcast * .43;
     cloudMaterial.color.copy(nightLightColor).lerp(whiteColor, daylight).lerp(warmColor, twilight).lerp(stormCloud, overcast * .76).multiplyScalar(.35 + daylight * .65);
 
-    const rainLimit = quality === 'high' ? 420 : quality === 'balanced' ? 280 : 150;
+    const rainLimit = quality === 'high' ? 620 : quality === 'balanced' ? 300 : 150;
     rainField.visible = rain > .035;
-    rainMaterial.opacity = rain * (quality === 'low' ? .46 : .62);
+    rainMaterial.opacity = rain * (quality === 'high' ? .72 : quality === 'balanced' ? .62 : .46);
     rainField.position.set(camera.position.x, 0, camera.position.z);
     if (rainField.visible) {
       const wind = .75 + overcast * 1.3;

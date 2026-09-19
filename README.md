@@ -301,3 +301,14 @@ NPC floating labels use a shorter visibility distance to reduce screen clutter, 
 Broadleaf trees now use tapered trunks, more branch variation and layered irregular foliage clusters. Coconut palms use a fuller procedural crown with a tapered trunk, coconut cluster, shared-style midribs and many feather-like leaflet triangles, producing a denser Kerala roadside silhouette while remaining texture-free and mobile-oriented.
 
 V79 changes client/world visuals and behavior only. No database or Supabase migration is required, and existing server movement validation remains authoritative.
+
+
+## Real High Graphics Mode (V82)
+
+V82 makes the existing High graphics preset materially different from Low/Balanced, based on mobile landscape playtest feedback.
+
+High now keeps hardware anti-aliasing available on mobile, raises the render pixel-ratio cap to 2x where the device allows it, enables PCF soft shadows with a 2048x2048 sun shadow map, and increases texture anisotropy up to 8x. Procedural road/ground textures and other mapped materials therefore remain clearer at oblique camera angles instead of becoming visibly soft.
+
+High also enables material dithering, keeps ACES filmic tone mapping, increases local rain density to 620 line drops, and renders the full 30-instance cloud field. Balanced uses a lower pixel ratio, up to 4x anisotropy, 300 rain drops and fewer clouds. Low keeps shadows disabled, uses the smallest pixel-ratio cap, 1x anisotropy and the lightest weather density.
+
+The preset switch still works at runtime. No backend, database, gameplay, economy or Supabase migration is required.
