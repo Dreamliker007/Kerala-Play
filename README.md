@@ -256,3 +256,16 @@ The pedestrian population is expanded with additional local NPCs using the V74 c
 Town props are intentionally split between gameplay-solid and visual-only objects. Shops and bus shelters receive collision footprints, while utility wires, compound walls and small roadside clutter remain visual-only so they do not unexpectedly block driving routes. No dynamic lights or large texture downloads are added.
 
 V76 does not alter the backend, economy, traffic authority, vehicle ownership or persistence schema, so no Supabase migration is required.
+
+
+## Living World AI + Traffic Behavior (V77)
+
+V77 gives Kerala Play's existing town more visible day-to-day behavior without introducing a heavy AI runtime.
+
+Local NPCs no longer move continuously with a simple sine loop. Walking locals now pause at route ends, idle characters make subtle head/torso movements, bus-stop passengers wait in place, a shopper idles near a roadside shop, and a dedicated pedestrian periodically crosses the V76 zebra crossing.
+
+Ambient traffic now reacts to the world. Main-road vehicles yield while the pedestrian is actively on the zebra crossing. A lightweight two-direction traffic signal cycles the main road and village side road through green, amber and all-red safety phases; AI traffic slows or stops based on its current signal state. Existing same-lane spacing and player-vehicle awareness remain in place.
+
+The town bus now approaches both V76 bus stops more slowly, pauses briefly at the stop, then continues its route and can service the stops again on later route laps. Two static parked cars add roadside activity while also acting as physical obstacles.
+
+All behavior is deterministic and local to the visual simulation. V77 does not add server AI, database changes, economy changes or a Supabase migration, and existing server-authoritative player movement and vehicle rules remain unchanged.
