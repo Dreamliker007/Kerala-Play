@@ -699,6 +699,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     toast(action === 'enter' ? `${active.label} ready · personal driving active` : `${active.label} parked`);
   }
   window.addEventListener('kerala-personal-vehicle', event => run(() => performPersonalVehicleAction(event.detail?.action), garageError));
+  window.addEventListener('kerala-garage-state-local', event => { if (event.detail) renderGarage(event.detail); });
 
   async function performVehicleService(action, source = 'job') {
     if (!user || !['refuel', 'repair'].includes(action)) return;
