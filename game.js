@@ -65,6 +65,7 @@ const assetNotice = document.querySelector('#asset-notice');
 const toast = document.querySelector('#toast');
 document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
 const villagers = [];
+const ambientAnimals = [];
 const traffic = [];
 const staticColliders = [];
 const streetLampMaterials = [];
@@ -2023,7 +2024,11 @@ try {
     const delta = Math.min(clock.getDelta(), .05);
     villageTime += delta;
     npcAccumulator += delta; trafficAccumulator += delta; mapAccumulator += delta;
-    if (npcAccumulator >= (isMobile ? .10 : .05)) { updateVillagers(villageTime); npcAccumulator = 0; }
+    if (npcAccumulator >= (isMobile ? .10 : .05)) {
+      updateVillagers(villageTime);
+      updateAmbientAnimals(villageTime, npcAccumulator);
+      npcAccumulator = 0;
+    }
     if (trafficAccumulator >= (isMobile ? .05 : .025)) { updateTraffic(trafficAccumulator); trafficAccumulator = 0; }
     animateJobMissionVisual(villageTime);
     updateWorldInteract();
@@ -3517,6 +3522,17 @@ function buildWorld(scene) {
   addBird(scene, 39.4, 5.6, -24.8, -.8);
   addBird(scene, -42.4, 5.2, 26.5, 1.1);
   addBird(scene, 42.4, 5.4, 42.6, -.45);
+
+  // Lightweight village animals stay off the carriageway and react locally to
+  // nearby players/vehicles without becoming gameplay colliders.
+  addAmbientAnimal(scene, 'dog', 12.8, 8.2, { radius: 2.2, phase: .5, scale: .92 });
+  addAmbientAnimal(scene, 'dog', -21.5, 34.8, { radius: 1.8, phase: 2.4, scale: .88 });
+  addAmbientAnimal(scene, 'chicken', -18.2, 11.7, { radius: 1.4, phase: 1.3, scale: .82 });
+  addAmbientAnimal(scene, 'chicken', -19.0, 12.6, { radius: 1.2, phase: 3.1, scale: .76 });
+  addAmbientAnimal(scene, 'chicken', 24.8, 31.2, { radius: 1.5, phase: 4.7, scale: .80 });
+  addAmbientAnimal(scene, 'goat', 32.5, 14.5, { radius: 2.0, phase: 2.0, scale: .88 });
+  addAmbientAnimal(scene, 'goat', -31.5, 44.0, { radius: 1.8, phase: 4.1, scale: .84 });
+  addAmbientAnimal(scene, 'cow', 45.0, -12.5, { radius: 1.7, phase: .9, scale: .90 });
   addPond(scene, 39, -4);
   addBench(scene, -10, -10);
   addFuelStation(scene, 11, -12);
@@ -4174,7 +4190,6 @@ function addFruitClusters(parent) {
 }
 
 function addBird(scene, x, y, z, yaw = 0) {
-  if (typeof isMobile !== 'undefined' && isMobile) return;
   const bird = new THREE.Group();
   const body = new THREE.Mesh(birdBodyGeometry, birdMaterial);
   body.scale.set(.8, .75, 1.55);
@@ -4188,7 +4203,250 @@ function addBird(scene, x, y, z, yaw = 0) {
   bird.add(body, leftWing, rightWing);
   bird.position.set(x, y, z);
   bird.rotation.y = yaw;
+  bird.userData.ambientAnimal = {
+    kind: 'bird',
+    startX: x,
+    startY: y,
+    startZ: z,
+    phase: ambientAnimals.length * 1.73 + yaw,
+    speed: .42 + (ambientAnimals.length % 3) * .06,
+    radius: 2.1 + (ambientAnimals.length % 2) * .8,
+    leftWing,
+    rightWing,
+  };
+  ambientAnimals.push(bird);
   scene.add(bird);
+  return bird;
+}
+
+function createVillageAnimal(kind, color) {
+  const root = new THREE.Group();
+  const coat = new THREE.MeshStandardMaterial({ color, roughness: .94 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2b2926, roughness: .96 });
+  const light = new THREE.MeshStandardMaterial({ color: 0xd8c7a6, roughness: .96 });
+  const parts = {};
+
+  if (kind === 'dog') {
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(.26, .72, 5, 8), coat);
+    body.rotation.z = Math.PI / 2;
+    body.position.set(0, .60, 0);
+    const chest = new THREE.Mesh(new THREE.SphereGeometry(.29, 10, 8), coat);
+    chest.position.set(0, .68, .38);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.25, 10, 8), coat);
+    head.position.set(0, .88, .67);
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(.22, .16, .24), light);
+    muzzle.position.set(0, .80, .90);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(.055, 7, 6), dark);
+    nose.position.set(0, .84, 1.035);
+    root.add(body, chest, head, muzzle, nose);
+    [-1, 1].forEach(side => {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(.095, .23, 6), dark);
+      ear.position.set(side * .15, 1.08, .66);
+      ear.rotation.z = side * .18;
+      root.add(ear);
+    });
+    const legGeometry = new THREE.CylinderGeometry(.055, .065, .47, 7);
+    [[-.19,.28], [.19,.28], [-.19,-.28], [.19,-.28]].forEach(([x,z], index) => {
+      const leg = new THREE.Mesh(legGeometry, coat);
+      leg.position.set(x, .28, z);
+      root.add(leg);
+      parts['leg' + index] = leg;
+    });
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(.035, .055, .48, 7), coat);
+    tail.position.set(0, .78, -.62);
+    tail.rotation.x = -.88;
+    root.add(tail);
+    parts.head = head;
+    parts.tail = tail;
+  } else if (kind === 'chicken') {
+    const body = new THREE.Mesh(new THREE.SphereGeometry(.28, 10, 8), coat);
+    body.scale.set(.90, 1, 1.25);
+    body.position.set(0, .43, 0);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.14, 9, 7), coat);
+    head.position.set(0, .72, .26);
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(.06, .18, 6), new THREE.MeshStandardMaterial({ color: 0xd79a28, roughness: .86 }));
+    beak.position.set(0, .70, .43);
+    beak.rotation.x = Math.PI / 2;
+    const comb = new THREE.Mesh(new THREE.SphereGeometry(.07, 7, 5), new THREE.MeshStandardMaterial({ color: 0xbc382e, roughness: .9 }));
+    comb.scale.set(.7, 1.25, .65);
+    comb.position.set(0, .87, .24);
+    root.add(body, head, beak, comb);
+    [-1, 1].forEach(side => {
+      const wing = new THREE.Mesh(new THREE.SphereGeometry(.18, 8, 6), coat);
+      wing.scale.set(.35, .68, 1);
+      wing.position.set(side * .22, .48, -.01);
+      root.add(wing);
+      parts[side < 0 ? 'leftWing' : 'rightWing'] = wing;
+    });
+    const legGeometry = new THREE.CylinderGeometry(.025, .03, .28, 6);
+    [-.09, .09].forEach((x, index) => {
+      const leg = new THREE.Mesh(legGeometry, new THREE.MeshStandardMaterial({ color: 0xc78d2f, roughness: .9 }));
+      leg.position.set(x, .15, .02);
+      root.add(leg);
+      parts['leg' + index] = leg;
+    });
+    parts.head = head;
+  } else {
+    const cow = kind === 'cow';
+    const scale = cow ? 1.16 : .82;
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(.34 * scale, .92 * scale, 5, 8), coat);
+    body.rotation.z = Math.PI / 2;
+    body.position.set(0, .72 * scale, 0);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(.16 * scale, .20 * scale, .44 * scale, 8), coat);
+    neck.position.set(0, .92 * scale, .48 * scale);
+    neck.rotation.x = -.28;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(.42 * scale, .40 * scale, .52 * scale), coat);
+    head.position.set(0, 1.12 * scale, .70 * scale);
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(.34 * scale, .18 * scale, .18 * scale), light);
+    muzzle.position.set(0, 1.02 * scale, .98 * scale);
+    root.add(body, neck, head, muzzle);
+    const hornMaterial = new THREE.MeshStandardMaterial({ color: 0xc8b990, roughness: .88 });
+    [-1, 1].forEach(side => {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(.045 * scale, .22 * scale, 6), hornMaterial);
+      horn.position.set(side * .18 * scale, 1.36 * scale, .65 * scale);
+      horn.rotation.z = side * .55;
+      root.add(horn);
+    });
+    const legGeometry = new THREE.CylinderGeometry(.06 * scale, .075 * scale, .60 * scale, 7);
+    [[-.22,.30], [.22,.30], [-.22,-.30], [.22,-.30]].forEach(([x,z], index) => {
+      const leg = new THREE.Mesh(legGeometry, dark);
+      leg.position.set(x * scale, .32 * scale, z * scale);
+      root.add(leg);
+      parts['leg' + index] = leg;
+    });
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(.025 * scale, .035 * scale, .52 * scale, 6), coat);
+    tail.position.set(0, .90 * scale, -.62 * scale);
+    tail.rotation.x = -.55;
+    root.add(tail);
+    parts.head = head;
+    parts.tail = tail;
+  }
+
+  root.userData.animalParts = parts;
+  root.traverse(object => {
+    if (object.isMesh) {
+      object.castShadow = true;
+      object.receiveShadow = true;
+    }
+  });
+  return root;
+}
+
+function addAmbientAnimal(scene, kind, x, z, options = {}) {
+  const colors = {
+    dog: [0x8d684a, 0x5b4637, 0xb08a67],
+    chicken: [0xd6c5a2, 0x9d6847, 0xe7dfc5],
+    goat: [0xc6b99d, 0x8e816b, 0xe0d7c4],
+    cow: [0x765a46, 0xb9aa8e, 0x5f554c],
+  };
+  const palette = colors[kind] || colors.dog;
+  const index = ambientAnimals.length;
+  const animal = createVillageAnimal(kind, options.color || palette[index % palette.length]);
+  const scale = Number(options.scale || 1);
+  animal.scale.setScalar(scale);
+  animal.position.set(x, 0, z);
+  animal.rotation.y = Number(options.yaw || 0);
+  animal.userData.ambientAnimal = {
+    kind,
+    startX: x,
+    startZ: z,
+    phase: Number(options.phase ?? index * 1.41),
+    radius: Number(options.radius ?? (kind === 'chicken' ? 1.6 : kind === 'dog' ? 2.4 : 2.0)),
+    speed: Number(options.speed ?? (kind === 'chicken' ? .78 : kind === 'dog' ? .55 : .38)),
+    parts: animal.userData.animalParts || {},
+  };
+  ambientAnimals.push(animal);
+  scene.add(animal);
+  return animal;
+}
+
+function updateAmbientAnimals(time, delta) {
+  const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+  const hour = Number(worldWeatherState.hour ?? 12);
+  const night = hour >= 20 || hour < 5.25;
+
+  for (const animal of ambientAnimals) {
+    const data = animal.userData.ambientAnimal;
+    if (!data) continue;
+
+    if (data.kind === 'bird') {
+      animal.visible = !night && rain < .62;
+      if (!animal.visible) continue;
+      const angle = time * data.speed + data.phase;
+      const radius = data.radius;
+      animal.position.set(
+        data.startX + Math.cos(angle) * radius,
+        data.startY + .45 + Math.sin(time * .72 + data.phase) * .42,
+        data.startZ + Math.sin(angle) * radius,
+      );
+      animal.rotation.y = -angle + Math.PI / 2;
+      const flap = Math.sin(time * 9.5 + data.phase) * .62;
+      data.leftWing.rotation.z = .28 + flap;
+      data.rightWing.rotation.z = -.28 - flap;
+      continue;
+    }
+
+    const hideAtNight = data.kind === 'chicken' || data.kind === 'goat' || data.kind === 'cow';
+    animal.visible = !(hideAtNight && night);
+    if (!animal.visible) continue;
+
+    const parts = data.parts || {};
+    const phase = time * data.speed + data.phase;
+    const weatherSlow = 1 - rain * .42;
+    let targetX = data.startX + Math.sin(phase) * data.radius * weatherSlow;
+    let targetZ = data.startZ + Math.sin(phase * .71 + data.phase * .63) * data.radius * .68 * weatherSlow;
+    let alert = 0;
+
+    if (playerRef?.visible) {
+      const dx = animal.position.x - playerRef.position.x;
+      const dz = animal.position.z - playerRef.position.z;
+      const distance = Math.max(.001, Math.hypot(dx, dz));
+      const reactionRadius = vehicleMode === 'walk'
+        ? (data.kind === 'chicken' ? 3.4 : data.kind === 'dog' ? 3.0 : 3.3)
+        : 5.5;
+      if (distance < reactionRadius) {
+        alert = 1 - distance / reactionRadius;
+        const escape = (data.kind === 'chicken' ? 3.0 : data.kind === 'dog' ? 1.8 : 2.1) * alert;
+        targetX = animal.position.x + dx / distance * escape;
+        targetZ = animal.position.z + dz / distance * escape;
+        const maxRange = data.radius + 3.0;
+        targetX = THREE.MathUtils.clamp(targetX, data.startX - maxRange, data.startX + maxRange);
+        targetZ = THREE.MathUtils.clamp(targetZ, data.startZ - maxRange, data.startZ + maxRange);
+      }
+    }
+
+    const beforeX = animal.position.x;
+    const beforeZ = animal.position.z;
+    const response = (data.kind === 'chicken' ? 2.5 : data.kind === 'dog' ? 1.9 : 1.35) * (1 + alert * 2.5);
+    animal.position.x += (targetX - animal.position.x) * Math.min(1, delta * response);
+    animal.position.z += (targetZ - animal.position.z) * Math.min(1, delta * response);
+    const moveX = animal.position.x - beforeX;
+    const moveZ = animal.position.z - beforeZ;
+    const moving = Math.hypot(moveX, moveZ) > .0015;
+    if (moving) animal.rotation.y = Math.atan2(moveX, moveZ);
+
+    const gait = Math.sin(time * (data.kind === 'chicken' ? 11 : alert > .15 ? 9 : 5.5) + data.phase);
+    Object.entries(parts).forEach(([name, part]) => {
+      if (!name.startsWith('leg') || !part) return;
+      const index = Number(name.slice(3)) || 0;
+      part.rotation.x = gait * (index % 2 ? -1 : 1) * (moving ? .32 : .04);
+    });
+    if (parts.tail) {
+      parts.tail.rotation.z = Math.sin(time * 3.4 + data.phase) * (data.kind === 'dog' ? .28 : .10);
+    }
+    if (parts.head) {
+      if (data.kind === 'chicken' && alert < .2) {
+        parts.head.position.y += Math.max(0, Math.sin(time * 3.2 + data.phase)) * -.035;
+      }
+      parts.head.rotation.y = Math.sin(time * .9 + data.phase) * .08;
+      parts.head.rotation.x = alert * .10;
+    }
+    if (parts.leftWing && parts.rightWing) {
+      const wingBeat = Math.sin(time * 4.5 + data.phase) * (alert > .15 ? .45 : .10);
+      parts.leftWing.rotation.z = wingBeat;
+      parts.rightWing.rotation.z = -wingBeat;
+    }
+  }
 }
 
 function addPhotoHouse(scene, x, z) { addHouse(scene, x, z, 0xf0e5d1, 0x9e533a); }
