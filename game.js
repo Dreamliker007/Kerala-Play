@@ -3203,7 +3203,134 @@ function addRoadsideLife(scene) {
 }
 
 
-function addBusStop(scene, x, z, rotation = 0) {
+function createWorldSignTexture({
+  title,
+  subtitle = '',
+  background = '#1f5f48',
+  foreground = '#fff8e7',
+  accent = '#e2ba58',
+  width = 512,
+  height = 160,
+}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  context.fillStyle = background;
+  context.fillRect(0, 0, width, height);
+
+  context.fillStyle = accent;
+  context.fillRect(0, 0, width, Math.max(8, Math.round(height * .065)));
+  context.fillRect(0, height - Math.max(8, Math.round(height * .065)), width, Math.max(8, Math.round(height * .065)));
+
+  context.strokeStyle = 'rgba(255,255,255,.7)';
+  context.lineWidth = 6;
+  context.strokeRect(8, 8, width - 16, height - 16);
+
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = foreground;
+  context.font = '900 48px "Noto Sans Malayalam", "Noto Sans", sans-serif';
+  context.fillText(String(title || '').toUpperCase(), width / 2, subtitle ? height * .43 : height * .52, width - 44);
+
+  if (subtitle) {
+    context.fillStyle = '#f3dfad';
+    context.font = '700 25px "Noto Sans Malayalam", "Noto Sans", sans-serif';
+    context.fillText(String(subtitle), width / 2, height * .72, width - 42);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function createWorldSignMesh(options, width = 4.8, height = 1.05) {
+  const texture = createWorldSignTexture(options);
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: false,
+    toneMapped: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+  mesh.userData.worldSignTexture = texture;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  return mesh;
+}
+
+function addRoadsideIdentitySigns(scene) {
+  const postMaterial = new THREE.MeshStandardMaterial({ color: 0x555d5e, roughness: .76, metalness: .24 });
+
+  const addBoard = ({ x, z, rotation = 0, title, subtitle, background, width = 3.3, height = .92 }) => {
+    const root = new THREE.Group();
+    const board = createWorldSignMesh({ title, subtitle, background }, width, height);
+    board.position.y = 2.15;
+    board.position.z = .035;
+    const backing = new THREE.Mesh(
+      new THREE.BoxGeometry(width + .14, height + .14, .08),
+      new THREE.MeshStandardMaterial({ color: 0x343b3d, roughness: .72, metalness: .15 })
+    );
+    backing.position.y = 2.15;
+    [-width * .32, width * .32].forEach(px => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(.07, 2.15, .07), postMaterial);
+      post.position.set(px, 1.08, 0);
+      root.add(post);
+    });
+    root.add(backing, board);
+    root.position.set(x, 0, z);
+    root.rotation.y = rotation;
+    applyDynamicHighQuality(root);
+    scene.add(root);
+  };
+
+  addBoard({
+    x: -10.9, z: -35.5, rotation: 0,
+    title: 'MARKET ROAD',
+    subtitle: 'Town Centre →',
+    background: '#246b4b',
+  });
+  addBoard({
+    x: 10.9, z: 5.0, rotation: Math.PI,
+    title: 'BUS STAND',
+    subtitle: '← Main Road',
+    background: '#245979',
+  });
+  addBoard({
+    x: -46.0, z: -29.4, rotation: Math.PI / 2,
+    title: 'VILLAGE ROAD',
+    subtitle: 'Drive Slow · 30',
+    background: '#74572d',
+    width: 3.6,
+  });
+
+  // Kerala-style milestone / distance marker.
+  const milestone = new THREE.Group();
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0xf0e7c9, roughness: .96 });
+  const topMat = new THREE.MeshStandardMaterial({ color: 0xe0b93e, roughness: .86 });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(.78, 1.24, .38), baseMat);
+  base.position.y = .62;
+  const top = new THREE.Mesh(new THREE.BoxGeometry(.80, .40, .40), topMat);
+  top.position.y = 1.42;
+  const label = createWorldSignMesh({
+    title: 'TOWN 2 km',
+    subtitle: 'KERALA PLAY',
+    background: '#f0e7c9',
+    foreground: '#222b28',
+    accent: '#d5a934',
+    width: 320,
+    height: 180,
+  }, .70, .72);
+  label.position.set(0, .82, .205);
+  milestone.add(base, top, label);
+  milestone.position.set(10.1, 58.5, 0);
+  milestone.rotation.y = Math.PI;
+  applyDynamicHighQuality(milestone);
+  scene.add(milestone);
+}
+
+function addBusStop(scene, x, z, rotation = 0, stopName = 'KERALA PLAY') {
   const group = new THREE.Group();
   const concrete = new THREE.MeshStandardMaterial({ color: 0xbeb9aa, roughness: .96 });
   const metal = new THREE.MeshStandardMaterial({ color: 0x465156, roughness: .72, metalness: .28 });
@@ -3234,7 +3361,23 @@ function addBusStop(scene, x, z, rotation = 0) {
   const sign = new THREE.Mesh(new THREE.BoxGeometry(.52, .68, .07), signMat);
   sign.position.set(2.65, 2.36, .12);
 
-  group.add(floor, roof, back, bench, benchBack, signPost, sign);
+  const stopBoard = createWorldSignMesh({
+    title: stopName,
+    subtitle: 'ബസ് സ്റ്റോപ്പ് · BUS STOP',
+    background: '#2c6f4f',
+  }, 3.72, .78);
+  stopBoard.position.set(0, 2.02, -.605);
+
+  const poleBoard = createWorldSignMesh({
+    title: 'BUS',
+    subtitle: 'STOP',
+    background: '#245979',
+    width: 256,
+    height: 220,
+  }, .44, .55);
+  poleBoard.position.set(2.65, 2.36, .165);
+
+  group.add(floor, roof, back, bench, benchBack, signPost, sign, stopBoard, poleBoard);
   group.position.set(x, 0, z);
   group.rotation.y = rotation;
   group.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
@@ -3624,10 +3767,11 @@ function addStreetLifeProps(scene) {
 }
 
 function addTownStreetDetails(scene) {
-  addShop(scene, -14.4, 7.5);
-  addShop(scene, 14.8, 38.5);
-  addBusStop(scene, 11.7, 27.5, 0);
-  addBusStop(scene, -11.7, -50.5, Math.PI);
+  addShop(scene, -14.4, 7.5, 'ANUGRAHA STORES', 'ചായ · SNACKS · GROCERIES');
+  addShop(scene, 14.8, 38.5, 'MALABAR BAKERY', 'BAKERY · TEA · COOL DRINKS');
+  addBusStop(scene, 11.7, 27.5, 0, 'TOWN JUNCTION');
+  addBusStop(scene, -11.7, -50.5, Math.PI, 'SOUTH STOP');
+  addRoadsideIdentitySigns(scene);
 
   addCompoundWall(scene, 28, 24, 11.4, 9.2);
   addCompoundWall(scene, -36, 33, 11.8, 9.6);
@@ -4976,6 +5120,17 @@ function addHouse(scene, x, z, wallColor, roofColor) {
 
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.35, 2.35, .12), darkWood);
   door.position.set(0, 1.6, 3.82);
+  const houseNames = ['ANUGRAHA', 'SANTHI BHAVAN', 'GREEN VILLA', 'SREE NILAYAM'];
+  const houseName = houseNames[Math.abs(Math.round(x * 3 + z * 5)) % houseNames.length];
+  const namePlate = createWorldSignMesh({
+    title: houseName,
+    subtitle: 'HOUSE',
+    background: '#5b4734',
+    accent: '#caa66b',
+    width: 360,
+    height: 150,
+  }, 1.38, .48);
+  namePlate.position.set(-1.15, 3.24, 3.895);
   const porchLampMaterial = new THREE.MeshStandardMaterial({
     color: 0xffedc2,
     emissive: 0xffc66c,
@@ -5006,7 +5161,7 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   porchReflection.position.set(.60, .055, 4.75);
   porchReflection.renderOrder = 2;
   wetReflectionMaterials.push(porchReflectionMaterial);
-  group.add(skirting, facadeBand, door, porchLamp, porchLight, porchReflection);
+  group.add(skirting, facadeBand, door, namePlate, porchLamp, porchLight, porchReflection);
   [[-2.75, 3.82], [2.75, 3.82]].forEach(([windowX, windowZ]) => {
     const frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.42, .13), darkWood);
     const glass = new THREE.Mesh(new THREE.BoxGeometry(1.45, 1.17, .145), windowMat);
@@ -5072,7 +5227,7 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   scene.add(group);
 }
 
-function addShop(scene, x, z) {
+function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ · SNACKS · GROCERIES') {
   addBoxCollider(x, z, 4.8, 3.0, 'shop');
   const group = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(9.4, 3.8, 5.8), new THREE.MeshStandardMaterial({ color: 0xf1e7d2, roughness: .92 }));
@@ -5088,10 +5243,18 @@ function addShop(scene, x, z) {
   const sign = new THREE.Mesh(new THREE.BoxGeometry(5.5, .9, .1), signMaterial);
   sign.position.set(0, 4.25, 2.93);
   buildingLightMaterials.push(signMaterial);
+
+  const signText = createWorldSignMesh({
+    title: shopName,
+    subtitle,
+    background: '#276a7e',
+    accent: '#f0c45c',
+  }, 5.28, .78);
+  signText.position.set(0, 4.25, 2.985);
   const shutterMat = new THREE.MeshStandardMaterial({ color: 0x6e5845, roughness: .96, metalness: .08 });
   const shutter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.05, .12), shutterMat);
   shutter.position.set(0, 1.82, 2.96);
-  group.add(body, awning, sign, shutter);
+  group.add(body, awning, sign, signText, shutter);
 
   const trimMat = new THREE.MeshStandardMaterial({ color: 0x3d4547, roughness: .74, metalness: .22 });
   for (let y = .94; y <= 2.70; y += .22) {

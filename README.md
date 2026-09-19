@@ -476,3 +476,16 @@ Walking now adds a very small camera bob/sway linked to the existing gait phase,
 The field of view now expands gradually with vehicle speed and slightly while running, then eases back to the normal 60-degree view when slowing or stopping. Heavy rain can add a tiny high-frequency camera disturbance, but the amplitude is intentionally kept very low to avoid an aggressive shake effect.
 
 All effects are camera-only. Server-authoritative movement, collisions, vehicle speed/braking values, traffic rules, economy, backend/database and Supabase behavior are unchanged.
+
+
+## Kerala Town Identity + Roadside Signage (V97)
+
+V97 gives the High-quality village a clearer local identity using procedural canvas-textured signage instead of external image assets.
+
+The two roadside shops now have readable named boards, including **Anugraha Stores** and **Malabar Bakery**, with small Kerala-style product/service subtitles. Bus stops gain named destination boards plus bilingual **ബസ് സ്റ്റോപ്പ് · BUS STOP** signage.
+
+Residential houses now receive small front-facing house-name plates selected deterministically from a local name set. The town also gains direction/route boards for Market Road, Bus Stand and Village Road, plus a compact Kerala-style milestone marker.
+
+All sign textures are generated locally at runtime, use SRGB canvas textures, fixed anisotropic filtering and simple plane geometry, so no downloaded signage images or new network dependencies are introduced.
+
+This is a visual identity pass only. No navigation rules, map coordinates, collisions, gameplay, economy, backend/database or Supabase behavior changes.
