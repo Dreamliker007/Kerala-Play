@@ -15,6 +15,8 @@ const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250
 const STARTER_BALANCE = 500;
 const STARTER_JOB_REWARD = 250;
 const WALLET_LIMIT = 2_000_000_000;
+const BANK_LIMIT = 2_000_000_000;
+const BANK_TRANSFER_MAX = 100_000;
 const SHOP_ITEMS = Object.freeze({
   water: { name: 'Water', price: 15, needs: { thirst: 35, energy: 1 } },
   tea: { name: 'Tea', price: 20, needs: { thirst: 16, energy: 10 } },
@@ -80,7 +82,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -142,6 +144,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) { user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 }; migrated = true; }
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) { user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 }; migrated = true; }
     if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) { user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }; migrated = true; }
+    if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) { user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] }; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -300,6 +303,62 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     db.transactions.push(transaction); dirty = true;
     return transaction;
   }
+  function bankAccountNumberFor(user) {
+    const digest = createHash('sha256').update(`kerala-bank:${user.id}`).digest('hex');
+    const digits = String(parseInt(digest.slice(0, 12), 16) % 100_000_000).padStart(8, '0');
+    return `KPB-${digits.slice(0, 4)}-${digits.slice(4)}`;
+  }
+
+  function bankUpiId(user) {
+    return `${String(user.username).toLowerCase()}@keralapay`;
+  }
+
+  function bankSummary(user) {
+    const state = jobStateFor(user);
+    const bank = state.bank;
+    if (!bank.accountNumber) {
+      bank.accountNumber = bankAccountNumberFor(user);
+      dirty = true;
+    }
+    return {
+      balance: Number(bank.balance) || 0,
+      currency: 'KCR',
+      currencyName: 'Kerala Cash',
+      bankName: 'Kerala Bank',
+      accountNumber: bank.accountNumber,
+      upiId: bankUpiId(user),
+      transferMax: BANK_TRANSFER_MAX,
+      transactions: bank.transactions.slice(-30).reverse(),
+    };
+  }
+
+  function bankTransaction(user, amount, kind, description, details = {}) {
+    requireValue(Number.isInteger(amount) && amount !== 0, 500, 'Invalid bank transaction.');
+    const bank = jobStateFor(user).bank;
+    const balanceAfter = Number(bank.balance) + amount;
+    requireValue(
+      Number.isSafeInteger(balanceAfter) && balanceAfter >= 0 && balanceAfter <= BANK_LIMIT,
+      amount < 0 ? 409 : 500,
+      amount < 0 ? 'Not enough money in your Kerala Bank account.' : 'Bank account limit reached.'
+    );
+    bank.balance = balanceAfter;
+    if (!bank.accountNumber) bank.accountNumber = bankAccountNumberFor(user);
+    const entry = {
+      id: randomUUID(),
+      type: amount > 0 ? 'credit' : 'debit',
+      amount: Math.abs(amount),
+      balanceAfter,
+      kind,
+      description,
+      createdAt: now(),
+      ...details,
+    };
+    bank.transactions.push(entry);
+    if (bank.transactions.length > 80) bank.transactions = bank.transactions.slice(-80);
+    dirty = true;
+    return entry;
+  }
+
   function registrationNumberFor(user) {
     const prefix = DISTRICT_REGISTRATION_PREFIX[user.district] || 'KL-99';
     const existing = new Set();
@@ -559,6 +618,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } };
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 };
     if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 };
+    if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] };
     if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
     const needs = user.jobState.needs;
     for (const key of ['hunger', 'thirst', 'energy']) {
@@ -567,6 +627,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     }
     if (!Number.isFinite(Number(needs.updatedAt)) || Number(needs.updatedAt) <= 0) needs.updatedAt = now();
     if (!Number.isFinite(Number(needs.lastRestAt))) needs.lastRestAt = 0;
+    const bank = user.jobState.bank;
+    if (!Number.isSafeInteger(Number(bank.balance)) || Number(bank.balance) < 0 || Number(bank.balance) > BANK_LIMIT) bank.balance = 0;
+    if (typeof bank.accountNumber !== 'string') bank.accountNumber = '';
+    if (!Array.isArray(bank.transactions)) bank.transactions = [];
+    bank.transactions = bank.transactions.filter(entry => entry && typeof entry === 'object' && typeof entry.id === 'string').slice(-80);
     const home = user.jobState.home;
     if (home.status !== 'rented') home.status = 'rented';
     if (!Number.isFinite(Number(home.rentDueAt)) || Number(home.rentDueAt) <= 0) { home.rentDueAt = now() + HOME_DEFINITION.periodMs; dirty = true; }
@@ -900,6 +965,73 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       }
       if (path === '/api/wallet' && request.method === 'GET') {
         send(response, 200, walletSummary(user)); return;
+      }
+      if (path === '/api/bank' && request.method === 'GET') {
+        send(response, 200, bankSummary(user)); return;
+      }
+      if (path === '/api/bank/cash' && request.method === 'POST') {
+        limited(`bank-cash:${user.id}`, 40, 60000);
+        const body = await jsonBody(request);
+        requireValue(body.action === 'deposit' || body.action === 'withdraw', 400, 'Choose deposit or withdraw.');
+        const amount = Number(body.amount);
+        requireValue(Number.isInteger(amount) && amount >= 1 && amount <= BANK_TRANSFER_MAX, 400, `Amount must be between ₹1 and ₹${BANK_TRANSFER_MAX}.`);
+        const state = jobStateFor(user);
+        let walletEntry, bankEntry;
+        if (body.action === 'deposit') {
+          requireValue(Number(state.bank.balance) + amount <= BANK_LIMIT, 409, 'Bank account limit reached.');
+          walletEntry = walletTransaction(user, -amount, 'bank_deposit', 'Deposit to Kerala Bank');
+          bankEntry = bankTransaction(user, amount, 'cash_deposit', 'Wallet → Kerala Bank');
+        } else {
+          requireValue(Number(state.bank.balance) >= amount, 409, 'Not enough money in your Kerala Bank account.');
+          requireValue(user.walletBalance + amount <= WALLET_LIMIT, 409, 'Wallet limit reached.');
+          bankEntry = bankTransaction(user, -amount, 'cash_withdrawal', 'Kerala Bank → Wallet');
+          walletEntry = walletTransaction(user, amount, 'bank_withdrawal', 'Withdraw from Kerala Bank');
+        }
+        await persist();
+        send(response, 200, {
+          action: body.action,
+          amount,
+          bank: bankSummary(user),
+          wallet: walletSummary(user),
+          bankTransaction: bankEntry,
+          walletTransaction: walletEntry,
+        }); return;
+      }
+      if (path === '/api/bank/upi' && request.method === 'POST') {
+        limited(`bank-upi:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const amount = Number(body.amount);
+        requireValue(Number.isInteger(amount) && amount >= 1 && amount <= BANK_TRANSFER_MAX, 400, `UPI amount must be between ₹1 and ₹${BANK_TRANSFER_MAX}.`);
+        const rawRecipient = typeof body.recipient === 'string' ? body.recipient.trim().toLowerCase() : '';
+        const handle = rawRecipient.replace(/@keralapay$/i, '');
+        requireValue(/^(?=.*[a-z])[a-z0-9_]{3,24}$/.test(handle), 400, 'Enter a valid Kerala Pay username or UPI ID.');
+        const recipient = db.users.find(candidate => candidate.username.toLowerCase() === handle);
+        requireValue(recipient, 404, 'Kerala Pay recipient not found.');
+        requireValue(recipient.id !== user.id, 409, 'You cannot send UPI to yourself.');
+        requireValue(!blocked(user.id, recipient.id), 403, 'UPI transfer is unavailable between blocked players.');
+        const senderBank = jobStateFor(user).bank;
+        const recipientBank = jobStateFor(recipient).bank;
+        requireValue(Number(senderBank.balance) >= amount, 409, 'Not enough money in your Kerala Bank account.');
+        requireValue(Number(recipientBank.balance) + amount <= BANK_LIMIT, 409, 'Recipient bank account limit reached.');
+        const transferId = randomUUID();
+        const recipientUpi = bankUpiId(recipient);
+        const senderUpi = bankUpiId(user);
+        const sent = bankTransaction(user, -amount, 'upi_sent', `UPI to ${recipientUpi}`, {
+          transferId, counterparty: recipientUpi,
+        });
+        const received = bankTransaction(recipient, amount, 'upi_received', `UPI from ${senderUpi}`, {
+          transferId, counterparty: senderUpi,
+        });
+        await persist();
+        emit(recipient.id, 'bank', {});
+        send(response, 200, {
+          amount,
+          transferId,
+          recipient: { username: recipient.username, upiId: recipientUpi },
+          bank: bankSummary(user),
+          transaction: sent,
+          receivedTransactionId: received.id,
+        }); return;
       }
       if (path === '/api/needs' && request.method === 'GET') {
         send(response, 200, needsSummary(user)); return;

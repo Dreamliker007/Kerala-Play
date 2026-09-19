@@ -146,7 +146,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V66</span></div>
+    <div id="brand">Kerala Play <span style="font-size:11px;opacity:.8">V67</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -201,6 +201,17 @@
     <section id="wallet-panel" aria-label="Kerala Cash wallet">
       <div class="panel-heading"><span>Kerala Cash</span><button id="wallet-close" class="panel-close" type="button" aria-label="Close wallet">×</button></div>
       <div class="wallet-balance-card"><small>AVAILABLE BALANCE</small><strong id="wallet-balance">₹0</strong><span>Kerala Cash · virtual in-game money</span></div>
+      <div class="bank-balance-card">
+        <small>KERALA BANK</small><strong id="bank-balance">₹0</strong>
+        <span id="bank-account">Account · loading…</span><code id="bank-upi-id">UPI · loading…</code>
+      </div>
+      <div class="wallet-section"><strong>Wallet ↔ Bank</strong><p class="panel-note">Move Kerala Cash between your cash wallet and bank account.</p>
+        <div class="bank-cash-controls"><input id="bank-cash-amount" type="number" min="1" max="100000" step="1" inputmode="numeric" placeholder="Amount"><button type="button" data-bank-cash="deposit">Deposit</button><button type="button" data-bank-cash="withdraw">Withdraw</button></div>
+      </div>
+      <div class="wallet-section"><strong>Kerala Pay UPI</strong><p class="panel-note">Send from your bank balance using a username or username@keralapay.</p>
+        <div class="bank-upi-controls"><input id="bank-upi-recipient" maxlength="40" autocomplete="off" placeholder="username@keralapay"><input id="bank-upi-amount" type="number" min="1" max="100000" step="1" inputmode="numeric" placeholder="Amount"><button id="bank-upi-send" type="button">Send UPI</button></div>
+      </div>
+      <div class="wallet-section"><div class="wallet-history-heading"><strong>Bank Transactions</strong><button id="bank-refresh" type="button">Refresh</button></div><div id="bank-transactions" aria-live="polite"></div></div>
       <div class="wallet-section"><strong>Starter Job</strong><p class="panel-note">Complete the first delivery once and earn ₹250 Kerala Cash.</p><button id="starter-delivery" class="action-button" type="button">Complete Starter Delivery · +₹250</button></div>
       <div class="wallet-section"><strong>Village Shop</strong><p class="panel-note">Prices are verified by the server.</p><div id="wallet-shop" class="wallet-shop-grid">
         <button type="button" data-item-id="water">💧 Water <small>₹15</small></button><button type="button" data-item-id="tea">☕ Tea <small>₹20</small></button><button type="button" data-item-id="snack">🥨 Snack <small>₹35</small></button><button type="button" data-item-id="meal">🍛 Kerala Meal <small>₹80</small></button>
