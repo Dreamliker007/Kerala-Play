@@ -111,6 +111,15 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const starterDelivery = $('starter-delivery');
   const walletRefresh = $('wallet-refresh');
   const walletShop = $('wallet-shop');
+  const bankBalance = $('bank-balance');
+  const bankAccount = $('bank-account');
+  const bankUpiId = $('bank-upi-id');
+  const bankCashAmount = $('bank-cash-amount');
+  const bankUpiRecipient = $('bank-upi-recipient');
+  const bankUpiAmount = $('bank-upi-amount');
+  const bankUpiSend = $('bank-upi-send');
+  const bankRefresh = $('bank-refresh');
+  const bankTransactions = $('bank-transactions');
   const homePanel = $('home-panel');
   const homeToggle = $('home-toggle');
   const homeClose = $('home-close');
@@ -534,6 +543,44 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     renderWallet(wallet);
     return wallet;
   }
+  function renderBank(bank) {
+    if (!bank) return;
+    if (bankBalance) bankBalance.textContent = formatCash(bank.balance);
+    if (bankAccount) bankAccount.textContent = `${bank.bankName || 'Kerala Bank'} · ${bank.accountNumber || 'Account'}`;
+    if (bankUpiId) bankUpiId.textContent = `UPI · ${bank.upiId || ''}`;
+    if (bankCashAmount && bank.transferMax) bankCashAmount.max = String(bank.transferMax);
+    if (bankUpiAmount && bank.transferMax) bankUpiAmount.max = String(bank.transferMax);
+    if (bankTransactions) {
+      bankTransactions.replaceChildren();
+      const transactions = Array.isArray(bank.transactions) ? bank.transactions : [];
+      if (!transactions.length) bankTransactions.append(node('p', 'social-empty', 'No bank transactions yet.'));
+      for (const transaction of transactions) {
+        const row = node('div', `wallet-transaction ${transaction.type === 'debit' ? 'debit' : 'credit'}`);
+        const title = node('strong', '', transaction.description || transaction.kind || 'Bank transaction');
+        const amount = node('b', '', `${transaction.type === 'debit' ? '−' : '+'}${formatCash(transaction.amount)}`);
+        const created = new Date(transaction.createdAt);
+        const counterparty = transaction.counterparty ? ` · ${transaction.counterparty}` : '';
+        const detail = node('small', '', `${Number.isNaN(created.getTime()) ? '' : created.toLocaleString()}${counterparty} · Bank ${formatCash(transaction.balanceAfter)}`);
+        row.append(title, amount, detail);
+        bankTransactions.append(row);
+      }
+    }
+  }
+
+  async function refreshBank() {
+    if (!user) return null;
+    const bank = await api('/api/bank');
+    renderBank(bank);
+    return bank;
+  }
+
+  async function refreshFinance() {
+    if (!user) return null;
+    const [wallet, bank] = await Promise.all([api('/api/wallet'), api('/api/bank')]);
+    renderWallet(wallet);
+    renderBank(bank);
+    return { wallet, bank };
+  }
   function renderNeeds(summary) {
     needsSnapshot = summary || null;
     window.dispatchEvent(new CustomEvent('kerala-needs-state', { detail: needsSnapshot }));
@@ -547,7 +594,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   function openWallet() {
     if (!requireUser()) return;
     showPanel(walletPanel);
-    run(refreshWallet, walletError);
+    run(refreshFinance, walletError);
   }
   function homeDueText(timestamp, overdue) {
     const date = new Date(Number(timestamp));
@@ -1466,6 +1513,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       else { chatToggle?.classList.add('unread'); toast(`New message${people.find(person => person.id === value.peerId)?.username ? ` from ${people.find(person => person.id === value.peerId).username}` : ''}`); }
     });
     listen('profile', value => { if (value.user?.id === user?.id) setUser(value.user); run(refreshPeople, peopleError); });
+    listen('bank', () => {
+      if (walletPanel?.classList.contains('open')) run(refreshBank, walletError);
+      else toast('Kerala Pay · money received in your bank');
+    });
     listen('signal', handleSignal);
     listen('proximity-signal', handleProximitySignal);
   }
@@ -1488,6 +1539,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     await run(refreshGarage, garageError);
     await run(refreshNeeds, walletError);
     await run(refreshHome, homeError);
+    await run(refreshBank, walletError);
   }
   function endSession(message = '') {
     sessionVersion++;
@@ -1511,6 +1563,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   walletToggle?.addEventListener('click', () => walletPanel?.classList.contains('open') ? closePanels() : openWallet());
   walletClose?.addEventListener('click', () => { closePanels(); walletToggle?.focus(); });
   walletRefresh?.addEventListener('click', () => run(refreshWallet, walletError));
+  bankRefresh?.addEventListener('click', () => run(refreshBank, walletError));
   homeToggle?.addEventListener('click', () => homePanel?.classList.contains('open') ? closePanels() : openHome());
   homeClose?.addEventListener('click', () => { closePanels(); homeToggle?.focus(); });
   homeRefresh?.addEventListener('click', () => run(refreshHome, homeError));
@@ -1566,6 +1619,30 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     const result = await api('/api/jobs/starter-delivery/complete', {});
     renderWallet(result.wallet); toast(`Starter Delivery salary credited · ${formatCash(result.reward)}`);
   }, walletError).finally(() => { if (starterDelivery && !starterDelivery.textContent.includes('received')) starterDelivery.disabled = false; }));
+  walletPanel?.addEventListener('click', event => {
+    const cashButton = event.target.closest('button[data-bank-cash]');
+    if (!cashButton || cashButton.disabled) return;
+    run(async () => {
+      const amount = Number(bankCashAmount?.value);
+      cashButton.disabled = true;
+      const result = await api('/api/bank/cash', { action: cashButton.dataset.bankCash, amount });
+      renderWallet(result.wallet);
+      renderBank(result.bank);
+      if (bankCashAmount) bankCashAmount.value = '';
+      toast(`${result.action === 'deposit' ? 'Deposited to Kerala Bank' : 'Withdrawn to Wallet'} · ${formatCash(result.amount)}`);
+    }, walletError).finally(() => { cashButton.disabled = false; });
+  });
+
+  bankUpiSend?.addEventListener('click', () => run(async () => {
+    const recipient = bankUpiRecipient?.value?.trim() || '';
+    const amount = Number(bankUpiAmount?.value);
+    bankUpiSend.disabled = true;
+    const result = await api('/api/bank/upi', { recipient, amount });
+    renderBank(result.bank);
+    if (bankUpiAmount) bankUpiAmount.value = '';
+    toast(`UPI sent · ${formatCash(result.amount)} · ${result.recipient.upiId}`);
+  }, walletError).finally(() => { if (bankUpiSend) bankUpiSend.disabled = false; }));
+
   walletShop?.addEventListener('click', event => {
     const purchaseButton = event.target.closest('button[data-item-id]');
     if (!purchaseButton) return;
