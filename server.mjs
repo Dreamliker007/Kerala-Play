@@ -789,6 +789,47 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/traffic' && request.method === 'GET') {
         send(response, 200, trafficSummary(user)); return;
       }
+      if (path === '/api/traffic/licence' && request.method === 'POST') {
+        limited(`traffic-licence:${user.id}`, 20, 60000);
+        const body = await jsonBody(request);
+        requireValue(['learner', 'full', 'renew'].includes(body.action), 400, 'Choose learner, full or renew.');
+        const state = jobStateFor(user);
+        const licence = state.traffic.licence;
+        let cost = 0;
+        let transaction = null;
+        if (body.action === 'learner') {
+          requireValue(licence.type === 'none', 409, 'A driving licence already exists. Use upgrade or renew.');
+          cost = DRIVING_LICENCE_COSTS.learner;
+          licence.type = 'learner';
+          licence.number = licence.number || licenceNumberFor(user);
+          licence.issuedAt = now();
+          licence.validUntil = now() + DRIVING_LICENCE_TERMS.learner;
+        } else if (body.action === 'full') {
+          requireValue(licence.type === 'learner' && Number(licence.validUntil) > now(), 409, 'An active Learner Permit is required before Full Licence upgrade.');
+          cost = DRIVING_LICENCE_COSTS.full;
+          transaction = walletTransaction(user, -cost, 'driving_licence', `Full Licence upgrade · ${licence.number}`);
+          licence.type = 'full';
+          licence.issuedAt = now();
+          licence.validUntil = now() + DRIVING_LICENCE_TERMS.full;
+        } else {
+          requireValue(licence.type === 'learner' || licence.type === 'full', 409, 'Apply for a Learner Permit first.');
+          cost = licence.type === 'full' ? DRIVING_LICENCE_COSTS.renew_full : DRIVING_LICENCE_COSTS.renew_learner;
+          transaction = walletTransaction(user, -cost, 'driving_licence', `${licence.type === 'full' ? 'Full Licence' : 'Learner Permit'} renewal · ${licence.number}`);
+          licence.validUntil = Math.max(now(), Number(licence.validUntil) || 0) + DRIVING_LICENCE_TERMS[licence.type];
+          if (!Number(licence.issuedAt)) licence.issuedAt = now();
+        }
+        if (body.action === 'learner' && cost > 0) transaction = walletTransaction(user, -cost, 'driving_licence', `Learner Permit · ${licence.number}`);
+        dirty = true;
+        await persist();
+        send(response, 200, {
+          traffic: trafficSummary(user),
+          wallet: walletSummary(user),
+          licence: drivingLicenceSummary(user),
+          action: body.action,
+          cost,
+          transaction,
+        }); return;
+      }
       if (path === '/api/traffic/checkpoint' && request.method === 'POST') {
         limited(`traffic-checkpoint:${user.id}`, 20, 60000);
         await jsonBody(request);
@@ -799,11 +840,22 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(!live.moving, 409, 'Stop the vehicle at the checkpoint.');
         requireValue(Math.hypot(live.x - TRAFFIC_CHECKPOINT.x, live.z - TRAFFIC_CHECKPOINT.z) <= TRAFFIC_CHECKPOINT.radius, 409, 'Move closer to the traffic checkpoint.');
         const insurance = vehicleInsuranceSummary(vehicle);
+        const model = GARAGE_CATALOG[vehicle.modelId];
+        const licence = drivingLicenceSummary(user);
+        const licenceValid = licenceAllowsVehicle(user, model.kind);
         let result = 'clear', challan = null, created = false;
+        const issued = [];
         if (!insurance.insuranceActive) {
           const createdResult = createTrafficChallan(user, vehicle, 'insurance_expired', 'checkpoint');
           challan = createdResult.challan;
           created = createdResult.created;
+          issued.push(createdResult.challan);
+          result = 'challan';
+        } else if (!licenceValid) {
+          const createdResult = createTrafficChallan(user, vehicle, 'licence_invalid', 'checkpoint', { licenceType: licence.type });
+          challan = createdResult.challan;
+          created = createdResult.created;
+          issued.push(createdResult.challan);
           result = 'challan';
         }
         vehicle.lastDocumentCheckAt = now();
@@ -815,7 +867,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
             registration: vehicle.registration,
             rcValid: true,
             insuranceActive: insurance.insuranceActive,
+            licenceValid,
+            licence,
             challan,
+            challans: issued,
             challanCreated: created,
             checkedAt: vehicle.lastDocumentCheckAt,
           },
@@ -1418,23 +1473,40 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         }
         let trafficNotice = null;
         if (personal?.entered && personalModel && elapsed >= .12 && elapsed <= 1.5 && distance > .25) {
-          const midpointX = (state.x + body.x) / 2;
-          const midpointZ = (state.z + body.z) / 2;
-          const zone = trafficZoneAt(midpointX, midpointZ);
-          const speedKmh = Math.round((distance / Math.max(.05, elapsed)) * 6);
-          if (speedKmh > zone.limit + 4) {
-            state.trafficSpeedStrikes = Math.min(4, Number(state.trafficSpeedStrikes || 0) + 1);
-            if (state.trafficSpeedStrikes >= 2 && now() - Number(state.trafficLastChallanAt || 0) >= 45000) {
-              const createdResult = createTrafficChallan(user, personal, 'speeding', 'server-speed-check', { speedKmh, limit: zone.limit, zone: zone.label });
+          const insurance = vehicleInsuranceSummary(personal);
+          const licenceValid = licenceAllowsVehicle(user, personalModel.kind);
+          if (!licenceValid && insurance.insuranceActive) {
+            state.trafficLicenceStrikes = Math.min(5, Number(state.trafficLicenceStrikes || 0) + 1);
+            if (state.trafficLicenceStrikes >= 3 && now() - Number(state.trafficLastLicenceChallanAt || 0) >= 60000) {
+              const createdResult = createTrafficChallan(user, personal, 'licence_invalid', 'server-licence-check', { licenceType: drivingLicenceSummary(user).type });
               if (createdResult.created) trafficNotice = createdResult.challan;
-              state.trafficLastChallanAt = now();
-              state.trafficSpeedStrikes = 0;
+              state.trafficLastLicenceChallanAt = now();
+              state.trafficLicenceStrikes = 0;
             }
           } else {
-            state.trafficSpeedStrikes = Math.max(0, Number(state.trafficSpeedStrikes || 0) - 1);
+            state.trafficLicenceStrikes = Math.max(0, Number(state.trafficLicenceStrikes || 0) - 1);
+          }
+
+          if (!trafficNotice) {
+            const midpointX = (state.x + body.x) / 2;
+            const midpointZ = (state.z + body.z) / 2;
+            const zone = trafficZoneAt(midpointX, midpointZ);
+            const speedKmh = Math.round((distance / Math.max(.05, elapsed)) * 6);
+            if (speedKmh > zone.limit + 4) {
+              state.trafficSpeedStrikes = Math.min(4, Number(state.trafficSpeedStrikes || 0) + 1);
+              if (state.trafficSpeedStrikes >= 2 && now() - Number(state.trafficLastChallanAt || 0) >= 45000) {
+                const createdResult = createTrafficChallan(user, personal, 'speeding', 'server-speed-check', { speedKmh, limit: zone.limit, zone: zone.label });
+                if (createdResult.created) trafficNotice = createdResult.challan;
+                state.trafficLastChallanAt = now();
+                state.trafficSpeedStrikes = 0;
+              }
+            } else {
+              state.trafficSpeedStrikes = Math.max(0, Number(state.trafficSpeedStrikes || 0) - 1);
+            }
           }
         } else if (requestedMode === 'walk' || distance <= .05) {
           state.trafficSpeedStrikes = 0;
+          state.trafficLicenceStrikes = 0;
         }
         const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
