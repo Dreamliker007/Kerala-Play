@@ -796,3 +796,77 @@ test('driving licence lifecycle and unlicensed-driving enforcement stay server c
   assert.equal(traffic.unpaidCount, 1);
   assert.equal(traffic.challans[0].kind, 'licence_invalid');
 });
+
+
+test('daily needs decay shop restoration rest and movement penalties persist server-side', async t => {
+  const app = await setup(t), alice = app.client();
+  await signup(alice, 'NeedsAlice');
+
+  let needs = (await alice('/api/needs')).data;
+  assert.equal(needs.hunger, 100);
+  assert.equal(needs.thirst, 100);
+  assert.equal(needs.energy, 100);
+  assert.equal(needs.canRun, true);
+  assert.equal(needs.movementFactor, 1);
+  assert.deepEqual({ x: needs.restPoint.x, z: needs.restPoint.z }, { x: -10, z: -10 });
+
+  app.advance(2 * 60 * 60 * 1000);
+  needs = (await alice('/api/needs')).data;
+  assert.ok(needs.hunger < 67 && needs.hunger > 65);
+  assert.ok(needs.thirst < 53 && needs.thirst > 51);
+  assert.ok(needs.energy < 75 && needs.energy > 72);
+
+  app.advance(2 * 60 * 60 * 1000);
+  needs = (await alice('/api/needs')).data;
+  assert.ok(needs.thirst <= 5);
+  assert.equal(needs.canRun, false);
+  assert.ok(needs.movementFactor < .7);
+
+  app.advance(3_000);
+  const blockedByLowNeeds = await alice('/api/world/move', { x: -10, z: -10, rotation: 0, moving: true, mode: 'walk' });
+  assert.equal(blockedByLowNeeds.status, 409, 'Low needs must reduce the server-authoritative walking allowance');
+
+  assert.equal((await alice('/api/needs/rest', {})).status, 409, 'Rest must require the player to be near the bench');
+
+  const water = await alice('/api/shop/purchase', { itemId: 'water', price: 1 });
+  assert.equal(water.status, 200);
+  assert.equal(water.data.purchase.price, 15, 'Shop price must remain server controlled');
+  assert.equal(water.data.purchase.needs.thirst, 35);
+  assert.equal(water.data.wallet.balance, 485);
+  assert.ok(water.data.needs.thirst > 38);
+  assert.equal(water.data.needs.movementFactor, 1);
+
+  const snack = await alice('/api/shop/purchase', { itemId: 'snack' });
+  assert.equal(snack.status, 200);
+  assert.equal(snack.data.wallet.balance, 450);
+  assert.ok(snack.data.needs.hunger > water.data.needs.hunger);
+  assert.ok(snack.data.needs.energy > water.data.needs.energy);
+
+  app.advance(3_000);
+  const moved = await alice('/api/world/move', { x: -10, z: -10, rotation: 0, moving: true, mode: 'walk' });
+  assert.equal(moved.status, 200);
+  assert.ok(moved.data.needs.energy < snack.data.needs.energy, 'Walking must consume a small amount of energy');
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x: -10, z: -10, rotation: 0, moving: false, mode: 'walk' })).status, 200);
+
+  const rest = await alice('/api/needs/rest', {});
+  assert.equal(rest.status, 200);
+  assert.equal(rest.data.rested, true);
+  assert.equal(rest.data.restored, 35);
+  assert.ok(rest.data.needs.energy > moved.data.needs.energy);
+  assert.equal((await alice('/api/needs/rest', {})).status, 409, 'Rest must have a server cooldown when energy was restored');
+
+  app.advance(30_000);
+  const restedAgain = await alice('/api/needs/rest', {});
+  assert.equal(restedAgain.status, 200);
+  assert.equal(restedAgain.data.rested, true);
+  assert.equal(restedAgain.data.needs.energy, 100);
+
+  await app.restart();
+  assert.equal((await alice('/api/auth/login', { identifier: 'NeedsAlice', password: 'test-password-2026' })).status, 200);
+  needs = (await alice('/api/needs')).data;
+  assert.equal(needs.energy, 100);
+  assert.ok(needs.hunger < 60);
+  assert.ok(needs.thirst < 50);
+  assert.equal(needs.restPoint.label, 'Village Rest Bench');
+});
