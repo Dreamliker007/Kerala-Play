@@ -35,8 +35,8 @@ const VEHICLE_SPECS = Object.freeze({
   taxi: { fuelBurnPerMeter: 0.22, fuelPricePerPoint: 1, repairPricePerPoint: 2 },
 });
 const VEHICLE_STATIONS = Object.freeze({
-  fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 6, z: -12, radius: 7 },
-  service: { id: 'service', label: 'Village Service Garage', x: -36, z: -22, radius: 7 },
+  fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 11, z: -12, radius: 7 },
+  service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
 });
 const MOVEMENT_PROFILES = Object.freeze({
   walk: { rate: 8.5, maxCredit: 24 },

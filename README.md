@@ -97,3 +97,10 @@ Job vehicles now include a HORN control and toggleable headlights. Nearby AI tra
 Active Delivery Bike and Kerala Taxi missions now track server-persisted fuel and vehicle condition. Driving distance burns fuel on the backend, collision impacts apply capped condition damage, and condition can reduce maximum vehicle performance. The driving HUD and Jobs panel show Fuel and Condition percentages.
 
 A Kerala Fuel Station and Village Service Garage are now placed in the world. Stop the active vehicle near the correct station to get a REFUEL or REPAIR interaction. Refuel and repair costs are deducted from Kerala Cash by the server and appear in wallet transaction history. Fuel, condition, service costs, station proximity and impact throttling are all validated server-side. No new Supabase migration is required because vehicle state continues to live inside the persisted job_state JSON.
+
+
+## Vehicle Collision Recovery (V60)
+
+Vehicle collision now uses the full visual footprint of moving cars and buses instead of a small circular approximation, preventing bikes and taxis from entering the visible body of traffic. Vehicle movement is collision-substepped, the player continuously records a last safe vehicle pose, and any detected overlap automatically restores a nearby safe position with speed reset. Reverse movement remains available after a normal edge collision.
+
+AI traffic also predicts its next position and stops before its body enters the player footprint. Fuel Station and Service Garage server interaction coordinates are aligned with their visible world locations. No new Supabase migration is required.
