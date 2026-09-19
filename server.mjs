@@ -15,6 +15,8 @@ const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250
 const STARTER_BALANCE = 500;
 const STARTER_JOB_REWARD = 250;
 const WALLET_LIMIT = 2_000_000_000;
+const BANK_LIMIT = 2_000_000_000;
+const BANK_TRANSFER_MAX = 100_000;
 const SHOP_ITEMS = Object.freeze({
   water: { name: 'Water', price: 15, needs: { thirst: 35, energy: 1 } },
   tea: { name: 'Tea', price: 20, needs: { thirst: 16, energy: 10 } },
@@ -80,7 +82,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -142,6 +144,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) { user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 }; migrated = true; }
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) { user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 }; migrated = true; }
     if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) { user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }; migrated = true; }
+    if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) { user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] }; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -559,6 +562,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } };
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 };
     if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 };
+    if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] };
     if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
     const needs = user.jobState.needs;
     for (const key of ['hunger', 'thirst', 'energy']) {
@@ -567,6 +571,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     }
     if (!Number.isFinite(Number(needs.updatedAt)) || Number(needs.updatedAt) <= 0) needs.updatedAt = now();
     if (!Number.isFinite(Number(needs.lastRestAt))) needs.lastRestAt = 0;
+    const bank = user.jobState.bank;
+    if (!Number.isSafeInteger(Number(bank.balance)) || Number(bank.balance) < 0 || Number(bank.balance) > BANK_LIMIT) bank.balance = 0;
+    if (typeof bank.accountNumber !== 'string') bank.accountNumber = '';
+    if (!Array.isArray(bank.transactions)) bank.transactions = [];
+    bank.transactions = bank.transactions.filter(entry => entry && typeof entry === 'object' && typeof entry.id === 'string').slice(-80);
     const home = user.jobState.home;
     if (home.status !== 'rented') home.status = 'rented';
     if (!Number.isFinite(Number(home.rentDueAt)) || Number(home.rentDueAt) <= 0) { home.rentDueAt = now() + HOME_DEFINITION.periodMs; dirty = true; }
