@@ -1096,8 +1096,9 @@ function synchronizePlayers(players) {
     }
     if (!remote) {
       remote = new THREE.Group();
+      const remoteSeed = avatarStyleSeed(data.id || data.username);
       const avatar = createHuman({ gender: data.gender, shirt: data.gender === 'female' ? 0xc57e93 : 0x569bb5,
-        trousers: 0x293b50, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x2c2825, accent: 0xe5bb51 });
+        trousers: 0x293b50, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x2c2825, accent: 0xe5bb51, styleSeed: remoteSeed });
       remote.add(avatar); remote.position.set(data.x, 0, data.z);
       remote.userData = {
         avatar, gender: data.gender, phase: 0,
@@ -1891,13 +1892,23 @@ function buildPlayer(player) {
   updateNameLabel(player, profile?.username || '', profile?.id);
 }
 
+function avatarStyleSeed(value) {
+  let hash = 2166136261;
+  for (const char of String(value || 'kerala')) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
 function replacePlayerAvatar(gender) {
   if (!playerRef) return;
   const oldAvatar = playerRef.userData.avatar;
   if (oldAvatar) { playerRef.remove(oldAvatar); disposeObject(oldAvatar); }
+  const styleSeed = avatarStyleSeed(profile?.id || profile?.username || gender);
   const avatarStyle = gender === 'female'
-    ? { gender: 'female', shirt: 0x1e8173, trousers: 0x273253, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x6c3c2c, accent: 0xe5bb51 }
-    : { gender: 'male', shirt: 0x2a759b, trousers: 0x26354a, skin: 0xa96d4c, hair: 0x171616, shoes: 0x27231f, accent: 0x6eaad0 };
+    ? { gender: 'female', shirt: 0x1e8173, trousers: 0x273253, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x6c3c2c, accent: 0xe5bb51, styleSeed }
+    : { gender: 'male', shirt: 0x2a759b, trousers: 0x26354a, skin: 0xa96d4c, hair: 0x171616, shoes: 0x27231f, accent: 0x6eaad0, styleSeed };
   const avatar = createHuman(avatarStyle);
   avatar.position.y = .04;
   playerRef.add(avatar);
@@ -2956,12 +2967,22 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale) {
   const index = villagers.length;
   const names = ['Anu', 'Vivek', 'Meera', 'Arun'];
   const gender = index % 2 ? 'male' : 'female';
+  const styles = [
+    { shirt: 0xa95762, trousers: 0x2e3447, skin: 0xa96d4c, hair: 0x171311, shoes: 0x372b26, accent: 0xd8aa55 },
+    { shirt: 0x557a54, trousers: 0x2a3440, skin: 0x915a40, hair: 0x171514, shoes: 0x292522, accent: 0xb88d4c },
+    { shirt: 0x4f728f, trousers: 0x303548, skin: 0xb97a57, hair: 0x221713, shoes: 0x3b2c24, accent: 0xc98f5a },
+    { shirt: 0x875d45, trousers: 0x293139, skin: 0x855137, hair: 0x141312, shoes: 0x292420, accent: 0xd0b26a },
+  ];
+  const style = styles[index % styles.length];
   const villager = new THREE.Group();
-  const human = createHuman({ gender, shirt: index % 2 ? 0x6d8d5a : 0xb36c70, trousers: 0x242b35, skin: 0x9d6245, hair: 0x161310, shoes: 0x2b2723 });
-  human.scale.setScalar(.9 * scale + .2); villager.add(human); villager.position.set(x, 0, z);
+  const human = createHuman({ gender, ...style, styleSeed: index + 1 });
+  human.scale.setScalar(.9 * scale + .2);
+  villager.add(human);
+  villager.position.set(x, 0, z);
   villager.userData = { human, startZ: z, distance, speed, offset, npc: true, name: names[index], gender };
   updateNameLabel(villager, names[index] + ' · Guide', 'npc-' + index);
-  villagers.push(villager); scene.add(villager);
+  villagers.push(villager);
+  scene.add(villager);
 }
 
 
