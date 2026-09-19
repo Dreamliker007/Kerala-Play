@@ -303,6 +303,62 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     db.transactions.push(transaction); dirty = true;
     return transaction;
   }
+  function bankAccountNumberFor(user) {
+    const digest = createHash('sha256').update(`kerala-bank:${user.id}`).digest('hex');
+    const digits = String(parseInt(digest.slice(0, 12), 16) % 100_000_000).padStart(8, '0');
+    return `KPB-${digits.slice(0, 4)}-${digits.slice(4)}`;
+  }
+
+  function bankUpiId(user) {
+    return `${String(user.username).toLowerCase()}@keralapay`;
+  }
+
+  function bankSummary(user) {
+    const state = jobStateFor(user);
+    const bank = state.bank;
+    if (!bank.accountNumber) {
+      bank.accountNumber = bankAccountNumberFor(user);
+      dirty = true;
+    }
+    return {
+      balance: Number(bank.balance) || 0,
+      currency: 'KCR',
+      currencyName: 'Kerala Cash',
+      bankName: 'Kerala Bank',
+      accountNumber: bank.accountNumber,
+      upiId: bankUpiId(user),
+      transferMax: BANK_TRANSFER_MAX,
+      transactions: bank.transactions.slice(-30).reverse(),
+    };
+  }
+
+  function bankTransaction(user, amount, kind, description, details = {}) {
+    requireValue(Number.isInteger(amount) && amount !== 0, 500, 'Invalid bank transaction.');
+    const bank = jobStateFor(user).bank;
+    const balanceAfter = Number(bank.balance) + amount;
+    requireValue(
+      Number.isSafeInteger(balanceAfter) && balanceAfter >= 0 && balanceAfter <= BANK_LIMIT,
+      amount < 0 ? 409 : 500,
+      amount < 0 ? 'Not enough money in your Kerala Bank account.' : 'Bank account limit reached.'
+    );
+    bank.balance = balanceAfter;
+    if (!bank.accountNumber) bank.accountNumber = bankAccountNumberFor(user);
+    const entry = {
+      id: randomUUID(),
+      type: amount > 0 ? 'credit' : 'debit',
+      amount: Math.abs(amount),
+      balanceAfter,
+      kind,
+      description,
+      createdAt: now(),
+      ...details,
+    };
+    bank.transactions.push(entry);
+    if (bank.transactions.length > 80) bank.transactions = bank.transactions.slice(-80);
+    dirty = true;
+    return entry;
+  }
+
   function registrationNumberFor(user) {
     const prefix = DISTRICT_REGISTRATION_PREFIX[user.district] || 'KL-99';
     const existing = new Set();
