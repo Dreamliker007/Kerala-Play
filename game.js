@@ -69,6 +69,7 @@ const ambientAnimals = [];
 const windVegetation = [];
 const windWires = [];
 let roadsideGrassWind = null;
+let windUpdateTimer = 0;
 const traffic = [];
 const staticColliders = [];
 const streetLampMaterials = [];
@@ -2206,7 +2207,7 @@ try {
       inChallenge: !!challengeRound,
     });
     updateWorldWeatherVisuals(weatherState);
-    updateWindWorld(villageTime);
+    updateWindWorld(villageTime, delta);
     updateVehicleRainSpray(delta);
     renderer.render(scene, camera);
     if (isMobile && !atmosphere) {
@@ -3183,6 +3184,7 @@ function addUtilityPoles(scene) {
     const geometry = new THREE.BufferGeometry().setFromPoints(sagged);
     const line = new THREE.Line(geometry, wireMaterial);
     const attribute = geometry.getAttribute('position');
+    attribute.setUsage(THREE.DynamicDrawUsage);
     windWires.push({
       attribute,
       base: Float32Array.from(attribute.array),
@@ -3474,7 +3476,10 @@ function addTownStreetDetails(scene) {
   addParkedVehicle(scene, 'auto', 0x2b773f, -57.0, -29.7, Math.PI / 2);
 }
 
-function updateWindWorld(time) {
+function updateWindWorld(time, delta) {
+  windUpdateTimer += delta;
+  if (windUpdateTimer < .08) return;
+  windUpdateTimer = 0;
   const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
   const overcast = THREE.MathUtils.clamp(Number(worldWeatherState.overcast || 0), 0, 1);
   const windStrength = .18 + overcast * .34 + rain * .62;
@@ -3547,6 +3552,10 @@ function updateWindWorld(time) {
 
 function buildWorld(scene) {
   staticColliders.length = 0;
+  windVegetation.length = 0;
+  windWires.length = 0;
+  roadsideGrassWind = null;
+  windUpdateTimer = 0;
   const groundTexture = createGroundSurfaceTexture();
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(160, 160),
