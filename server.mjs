@@ -846,6 +846,32 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/wallet' && request.method === 'GET') {
         send(response, 200, walletSummary(user)); return;
       }
+      if (path === '/api/needs' && request.method === 'GET') {
+        send(response, 200, needsSummary(user)); return;
+      }
+      if (path === '/api/needs/rest' && request.method === 'POST') {
+        limited(`needs-rest:${user.id}`, 20, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
+        requireValue(!state.active?.vehicleEntered && !personal?.entered, 409, 'Park and exit the vehicle before resting.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before resting.');
+        requireValue(Math.hypot(live.x - NEEDS_REST_POINT.x, live.z - NEEDS_REST_POINT.z) <= NEEDS_REST_POINT.radius, 409, 'Move closer to the Village Rest Bench.');
+        const current = needsSummary(user);
+        if (current.energy >= 99) {
+          send(response, 200, { rested: false, message: 'Energy is already full.', needs: current }); return;
+        }
+        const needs = state.needs;
+        const timestamp = now();
+        requireValue(timestamp >= Number(needs.lastRestAt || 0) + NEEDS_REST_COOLDOWN_MS, 409, 'Rest is still cooling down.');
+        needs.energy = Math.min(NEEDS_MAX, Number(needs.energy) + NEEDS_REST_ENERGY);
+        needs.lastRestAt = timestamp;
+        needs.updatedAt = timestamp;
+        dirty = true;
+        await persist();
+        send(response, 200, { rested: true, restored: NEEDS_REST_ENERGY, needs: needsSummary(user) }); return;
+      }
       if (path === '/api/jobs/starter-delivery/complete' && request.method === 'POST') {
         limited(`wallet-job:${user.id}`, 10, 60000);
         await jsonBody(request);
@@ -1409,8 +1435,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const item = typeof body.itemId === 'string' ? SHOP_ITEMS[body.itemId] : null;
         requireValue(item, 404, 'Shop item not found.');
         const transaction = walletTransaction(user, -item.price, 'purchase', item.name);
+        const needs = applyNeedsEffect(user, item.needs);
         await persist();
-        send(response, 200, { wallet: walletSummary(user), purchase: { itemId: body.itemId, name: item.name, price: item.price }, transaction }); return;
+        send(response, 200, {
+          wallet: walletSummary(user),
+          needs,
+          purchase: { itemId: body.itemId, name: item.name, price: item.price, needs: item.needs },
+          transaction,
+        }); return;
       }
       if (path === '/api/people' && request.method === 'GET') {
         const people = db.users.filter(peer => peer.id !== user.id && (!blocked(user.id, peer.id) || ownBlock(user.id, peer.id))).map(peer => ({ ...(blocked(user.id, peer.id) ? blockedUser(peer) : publicUser(peer)), relationship: relation(user.id, peer.id), blocked: ownBlock(user.id, peer.id), online: !blocked(user.id, peer.id) && online(peer.id), canMessage: !blocked(user.id, peer.id) && accepted(user.id, peer.id) }));
@@ -1535,8 +1567,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(requestedMode === expectedMode, 409, 'Movement mode is out of sync. Re-enter the active vehicle if needed.');
         const state = presence.get(user.id) || place(user);
         const movement = MOVEMENT_PROFILES[requestedMode];
+        const needsBeforeMove = needsSummary(user);
+        const needsFactor = requestedMode === 'walk' ? Number(needsBeforeMove.movementFactor || 1) : 1;
         const elapsed = Math.max(0, Math.min((now() - state.movedAt) / 1000, 3));
-        const credit = Math.min(movement.maxCredit, state.movementCredit + elapsed * movement.rate);
+        const credit = Math.min(movement.maxCredit * needsFactor, state.movementCredit + elapsed * movement.rate * needsFactor);
         const distance = Math.hypot(body.x - state.x, body.z - state.z);
         if (distance > credit + 0.01) throw new ApiError(409, 'Movement was too fast. Your avatar needs to resync.', { x: state.x, z: state.z });
         if (requestedMode !== 'walk' && distance > .01) {
@@ -1584,8 +1618,17 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
         state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving; state.mode = requestedMode;
         user.worldX = state.x; user.worldZ = state.z; user.worldRotation = state.rotation; user.worldUpdatedAt = now();
-        if (requestedMode === 'walk') user.walkMeters += distance;
-        else if (active && activeJob?.vehicle && distance > 0) {
+        if (requestedMode === 'walk') {
+          user.walkMeters += distance;
+          if (distance > 0) {
+            const needs = stateForMove.needs;
+            needs.energy = Math.max(0, Number(needs.energy) - distance * .02);
+            needs.thirst = Math.max(0, Number(needs.thirst) - distance * .005);
+            needs.hunger = Math.max(0, Number(needs.hunger) - distance * .002);
+            needs.updatedAt = now();
+            dirty = true;
+          }
+        } else if (active && activeJob?.vehicle && distance > 0) {
           const spec = VEHICLE_SPECS[activeJob.vehicle];
           active.vehicleFuel = Math.max(0, Number(active.vehicleFuel) - distance * spec.fuelBurnPerMeter);
           dirty = true;
@@ -1600,7 +1643,15 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
         const activeVehicle = active && activeJob?.vehicle ? jobsSummary(user).active?.vehicle || null : (personal?.entered ? garageSummary(user).activeVehicle : null);
-        send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks, vehicle: activeVehicle, trafficNotice }); return;
+        send(response, 200, {
+          ok: true,
+          user: publicUser(user),
+          walkMeters: Math.floor(user.walkMeters),
+          visitedLandmarks: user.visitedLandmarks,
+          vehicle: activeVehicle,
+          trafficNotice,
+          needs: needsSummary(user),
+        }); return;
       }
       const voiceMatch = path.match(/^\/api\/voice\/signal\/([^/]+)$/);
       if (voiceMatch && request.method === 'POST') {
