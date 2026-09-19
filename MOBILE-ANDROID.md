@@ -48,6 +48,9 @@ Kerala Play is landscape-first on phones. The hosted web client shows a rotate p
 
 The Android project is generated locally and is ignored by Git, so the npm scripts patch the generated MainActivity automatically:
 
-- `npm run mobile:add` creates Android and then sets `android:screenOrientation="landscape"`.
+- `npm run mobile:add` creates Android and then sets `android:screenOrientation="sensorLandscape"`.
 - `npm run mobile:sync` refreshes assets and reapplies the same landscape lock.
 - `npm run mobile:landscape` can reapply the lock manually.
+- After changing the orientation lock, rebuild and reinstall the APK/AAB; an already-installed old APK cannot pick up AndroidManifest changes from the hosted website alone.
+
+The web/PWA button requests fullscreen first and then asks the Screen Orientation API for landscape. If Android/browser policy rejects that request, the prompt tells the player to enable Auto-rotate and rotate manually. Native Capacitor releases should not depend on that web fallback because the Activity itself is locked to sensor landscape.

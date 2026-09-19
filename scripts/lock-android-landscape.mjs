@@ -18,11 +18,11 @@ if (!match) {
 
 let attributes = match[1];
 if (/android:screenOrientation=/.test(attributes)) {
-  attributes = attributes.replace(/android:screenOrientation=["'][^"']*["']/, 'android:screenOrientation="landscape"');
+  attributes = attributes.replace(/android:screenOrientation=["'][^"']*["']/, 'android:screenOrientation="sensorLandscape"');
 } else {
-  attributes += '\n            android:screenOrientation="landscape"';
+  attributes += '\n            android:screenOrientation="sensorLandscape"';
 }
 
 const next = xml.replace(activityPattern, `<activity${attributes}>`);
 await writeFile(manifestPath, next);
-console.log('Kerala Play Android MainActivity locked to landscape.');
+console.log('Kerala Play Android MainActivity locked to sensor landscape.');

@@ -15,7 +15,7 @@ if (config.server?.url !== 'https://keralaplay.in') errors.push(`Unexpected prod
 if (config.server?.cleartext !== false) errors.push('server.cleartext must be false for release.');
 if (config.android?.allowMixedContent !== false) errors.push('android.allowMixedContent must be false for release.');
 if (manifest.orientation !== 'landscape') errors.push(`Web app manifest orientation must be landscape, found ${manifest.orientation || '(missing)'}.`);
-if (!landscapePatcher.includes('android:screenOrientation="landscape"')) errors.push('Android landscape patcher is missing the landscape orientation lock.');
+if (!landscapePatcher.includes('android:screenOrientation="sensorLandscape"')) errors.push('Android landscape patcher is missing the sensor-landscape orientation lock.');
 
 if (errors.length) {
   console.error('Kerala Play Android release check failed:');
