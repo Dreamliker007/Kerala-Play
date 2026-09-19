@@ -34,6 +34,11 @@ const VEHICLE_SPECS = Object.freeze({
   bike: { fuelBurnPerMeter: 0.16, fuelPricePerPoint: 1, repairPricePerPoint: 1 },
   taxi: { fuelBurnPerMeter: 0.22, fuelPricePerPoint: 1, repairPricePerPoint: 2 },
 });
+const GARAGE_CATALOG = Object.freeze({
+  kerala_bike: { id: 'kerala_bike', label: 'Kerala Bike', kind: 'bike', price: 700, description: 'Light personal bike for village and town travel.' },
+  kerala_compact: { id: 'kerala_compact', label: 'Kerala Compact', kind: 'taxi', price: 2200, description: 'Compact personal car with better weather protection.' },
+});
+const PERSONAL_VEHICLE_RADIUS = 4.5;
 const VEHICLE_STATIONS = Object.freeze({
   fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 11, z: -12, radius: 7 },
   service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
@@ -44,7 +49,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {} }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -99,6 +104,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) { user.jobState = freshJobState(); migrated = true; }
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) { user.jobState.cooldowns = {}; migrated = true; }
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) { user.jobState.completed = {}; migrated = true; }
+    if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) { user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null }; migrated = true; }
+    if (!Array.isArray(user.jobState.garage.owned)) { user.jobState.garage.owned = []; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -189,7 +196,16 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       dirty = true;
     }
     const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now() };
-    presence.set(user.id, state); worldDirty = true;
+    presence.set(user.id, state);
+    const garage = jobStateFor(user).garage;
+    const personal = garage.activeVehicleId ? garage.owned.find(vehicle => vehicle.id === garage.activeVehicleId) : null;
+    if (personal?.entered) {
+      personal.entered = false;
+      personal.parkedX = x;
+      personal.parkedZ = z;
+      dirty = true;
+    }
+    worldDirty = true;
     return state;
   }
   function sessionFor(request) {
@@ -252,6 +268,21 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) user.jobState.completed = {};
+    if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null };
+    const garage = user.jobState.garage;
+    if (!Array.isArray(garage.owned)) garage.owned = [];
+    garage.owned = garage.owned.filter(vehicle => vehicle && typeof vehicle === 'object' && GARAGE_CATALOG[vehicle.modelId]);
+    for (const vehicle of garage.owned) {
+      if (!Number.isFinite(Number(vehicle.fuel))) vehicle.fuel = VEHICLE_FUEL_MAX;
+      if (!Number.isFinite(Number(vehicle.condition))) vehicle.condition = VEHICLE_CONDITION_MAX;
+      vehicle.fuel = Math.max(0, Math.min(VEHICLE_FUEL_MAX, Number(vehicle.fuel)));
+      vehicle.condition = Math.max(15, Math.min(VEHICLE_CONDITION_MAX, Number(vehicle.condition)));
+      if (typeof vehicle.entered !== 'boolean') vehicle.entered = false;
+      if (!Number.isFinite(Number(vehicle.lastImpactAt))) vehicle.lastImpactAt = 0;
+    }
+    if (garage.selectedId && !garage.owned.some(vehicle => vehicle.id === garage.selectedId)) garage.selectedId = garage.owned[0]?.id || null;
+    if (!garage.selectedId && garage.owned.length) garage.selectedId = garage.owned[0].id;
+    if (garage.activeVehicleId && !garage.owned.some(vehicle => vehicle.id === garage.activeVehicleId)) garage.activeVehicleId = null;
     const active = user.jobState.active;
     if (active && (!Array.isArray(active.checkpoints) || Number(active.expiresAt) <= now())) {
       user.jobState.active = null;
@@ -295,6 +326,66 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (jobId === 'taxi') return [point('Passenger Pickup', 'Pick up passenger', -7, 5), point('Town Junction', 'Drop off passenger', -20, -7)];
     return [point('Village Shop', 'Check in for shift', 9, -5)];
   }
+  function personalVehicleSummary(user) {
+    const state = jobStateFor(user);
+    const garage = state.garage;
+    const vehicle = garage.activeVehicleId ? garage.owned.find(item => item.id === garage.activeVehicleId) : null;
+    if (!vehicle) return null;
+    const model = GARAGE_CATALOG[vehicle.modelId];
+    const position = jobPosition(user);
+    const entered = !!vehicle.entered;
+    const x = entered ? position.x : Number(vehicle.parkedX);
+    const z = entered ? position.z : Number(vehicle.parkedZ);
+    const distance = Number.isFinite(x) && Number.isFinite(z) ? Math.hypot(x - position.x, z - position.z) : null;
+    return {
+      source: 'personal',
+      vehicleId: vehicle.id,
+      modelId: vehicle.modelId,
+      kind: model.kind,
+      label: model.label,
+      entered,
+      x,
+      z,
+      radius: PERSONAL_VEHICLE_RADIUS,
+      distance: distance === null ? null : Math.round(distance * 10) / 10,
+      withinRange: distance !== null && distance <= PERSONAL_VEHICLE_RADIUS,
+      fuel: Math.round(vehicle.fuel * 10) / 10,
+      fuelMax: VEHICLE_FUEL_MAX,
+      condition: Math.round(vehicle.condition),
+      conditionMax: VEHICLE_CONDITION_MAX,
+      stations: VEHICLE_STATIONS,
+    };
+  }
+
+  function garageSummary(user) {
+    const state = jobStateFor(user);
+    const garage = state.garage;
+    return {
+      walletBalance: user.walletBalance,
+      selectedId: garage.selectedId || null,
+      activeVehicleId: garage.activeVehicleId || null,
+      activeVehicle: personalVehicleSummary(user),
+      catalog: Object.values(GARAGE_CATALOG).map(model => ({
+        ...model,
+        owned: garage.owned.some(vehicle => vehicle.modelId === model.id),
+      })),
+      owned: garage.owned.map(vehicle => {
+        const model = GARAGE_CATALOG[vehicle.modelId];
+        return {
+          id: vehicle.id,
+          modelId: vehicle.modelId,
+          label: model.label,
+          kind: model.kind,
+          fuel: Math.round(vehicle.fuel * 10) / 10,
+          condition: Math.round(vehicle.condition),
+          selected: garage.selectedId === vehicle.id,
+          active: garage.activeVehicleId === vehicle.id,
+          entered: !!vehicle.entered,
+        };
+      }),
+    };
+  }
+
   function jobsSummary(user) {
     const state = jobStateFor(user);
     const timestamp = now();
@@ -490,6 +581,147 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         await persist();
         send(response, 200, { wallet: walletSummary(user), reward: STARTER_JOB_REWARD, transaction }); return;
       }
+      if (path === '/api/garage' && request.method === 'GET') {
+        send(response, 200, garageSummary(user)); return;
+      }
+      if (path === '/api/garage/buy' && request.method === 'POST') {
+        limited(`garage-buy:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const model = GARAGE_CATALOG[body.modelId];
+        requireValue(model, 404, 'Vehicle model not found.');
+        const state = jobStateFor(user);
+        requireValue(!state.garage.owned.some(vehicle => vehicle.modelId === model.id), 409, 'You already own this vehicle model.');
+        const transaction = walletTransaction(user, -model.price, 'vehicle_purchase', `${model.label} purchase`);
+        const position = jobPosition(user);
+        const vehicle = {
+          id: randomUUID(),
+          modelId: model.id,
+          fuel: VEHICLE_FUEL_MAX,
+          condition: VEHICLE_CONDITION_MAX,
+          parkedX: position.x,
+          parkedZ: position.z,
+          entered: false,
+          lastImpactAt: 0,
+          purchasedAt: now(),
+        };
+        state.garage.owned.push(vehicle);
+        if (!state.garage.selectedId) state.garage.selectedId = vehicle.id;
+        dirty = true;
+        await persist();
+        send(response, 201, { garage: garageSummary(user), wallet: walletSummary(user), purchase: { modelId: model.id, label: model.label, price: model.price }, transaction }); return;
+      }
+      if (path === '/api/garage/select' && request.method === 'POST') {
+        limited(`garage-select:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const state = jobStateFor(user);
+        requireValue(!state.garage.activeVehicleId, 409, 'Store the active personal vehicle before selecting another one.');
+        const vehicle = state.garage.owned.find(item => item.id === body.vehicleId);
+        requireValue(vehicle, 404, 'Owned vehicle not found.');
+        state.garage.selectedId = vehicle.id;
+        dirty = true;
+        await persist();
+        send(response, 200, { garage: garageSummary(user) }); return;
+      }
+      if (path === '/api/garage/vehicle' && request.method === 'POST') {
+        limited(`garage-vehicle:${user.id}`, 50, 60000);
+        const body = await jsonBody(request);
+        const state = jobStateFor(user);
+        const garage = state.garage;
+        requireValue(['retrieve', 'store', 'enter', 'exit'].includes(body.action), 400, 'Choose retrieve, store, enter or exit.');
+        const live = presence.get(user.id) || place(user);
+        const position = jobPosition(user);
+        if (body.action === 'retrieve') {
+          requireValue(!state.active, 409, 'Finish your active job before retrieving a personal vehicle.');
+          requireValue(!garage.activeVehicleId, 409, 'A personal vehicle is already outside the garage.');
+          const vehicle = garage.owned.find(item => item.id === (body.vehicleId || garage.selectedId));
+          requireValue(vehicle, 404, 'Select an owned vehicle first.');
+          garage.selectedId = vehicle.id;
+          garage.activeVehicleId = vehicle.id;
+          vehicle.entered = false;
+          vehicle.parkedX = missionCoordinate(position.x, 2.8);
+          vehicle.parkedZ = missionCoordinate(position.z, 1.5);
+        } else {
+          const vehicle = garage.activeVehicleId ? garage.owned.find(item => item.id === garage.activeVehicleId) : null;
+          requireValue(vehicle, 409, 'No personal vehicle is outside the garage.');
+          const model = GARAGE_CATALOG[vehicle.modelId];
+          if (body.action === 'store') {
+            requireValue(!vehicle.entered, 409, 'Park and exit the vehicle before storing it.');
+            garage.activeVehicleId = null;
+          } else if (body.action === 'enter') {
+            requireValue(!state.active, 409, 'Personal vehicles are unavailable during a job.');
+            requireValue(!vehicle.entered, 409, 'You are already in this vehicle.');
+            requireValue(Math.hypot(Number(vehicle.parkedX) - position.x, Number(vehicle.parkedZ) - position.z) <= PERSONAL_VEHICLE_RADIUS, 409, `Move closer to the ${model.label} before entering.`);
+            vehicle.entered = true;
+            live.mode = model.kind;
+            live.movementCredit = Math.max(live.movementCredit, 4);
+          } else {
+            requireValue(vehicle.entered, 409, 'You are not in this personal vehicle.');
+            vehicle.entered = false;
+            vehicle.parkedX = position.x;
+            vehicle.parkedZ = position.z;
+            live.mode = 'walk';
+            live.movementCredit = Math.min(live.movementCredit, 2);
+          }
+        }
+        dirty = true;
+        await persist();
+        send(response, 200, { garage: garageSummary(user) }); return;
+      }
+      if (path === '/api/garage/vehicle/impact' && request.method === 'POST') {
+        limited(`garage-impact:${user.id}`, 20, 60000);
+        const body = await jsonBody(request);
+        const state = jobStateFor(user);
+        const vehicle = state.garage.activeVehicleId ? state.garage.owned.find(item => item.id === state.garage.activeVehicleId) : null;
+        requireValue(vehicle && vehicle.entered, 409, 'Enter your active personal vehicle first.');
+        requireValue(body.vehicleId === vehicle.id, 409, 'Personal vehicle is out of sync.');
+        const severity = Number(body.severity);
+        requireValue(Number.isInteger(severity) && severity >= 1 && severity <= 3, 400, 'Invalid impact severity.');
+        const timestamp = now();
+        requireValue(timestamp - Number(vehicle.lastImpactAt || 0) >= 900, 409, 'Impact already registered.');
+        vehicle.lastImpactAt = timestamp;
+        const damage = [0, 2, 5, 9][severity];
+        vehicle.condition = Math.max(15, Number(vehicle.condition) - damage);
+        dirty = true;
+        await persist();
+        const summary = garageSummary(user);
+        send(response, 200, { garage: summary, vehicle: summary.activeVehicle, damage }); return;
+      }
+      if (path === '/api/garage/vehicle/service' && request.method === 'POST') {
+        limited(`garage-service:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        requireValue(body.action === 'refuel' || body.action === 'repair', 400, 'Choose refuel or repair.');
+        const state = jobStateFor(user);
+        const vehicle = state.garage.activeVehicleId ? state.garage.owned.find(item => item.id === state.garage.activeVehicleId) : null;
+        requireValue(vehicle && vehicle.entered, 409, 'Enter your active personal vehicle first.');
+        requireValue(body.vehicleId === vehicle.id, 409, 'Personal vehicle is out of sync.');
+        const live = presence.get(user.id) || place(user);
+        requireValue(!live.moving, 409, 'Stop the vehicle before using this service.');
+        const station = body.action === 'refuel' ? VEHICLE_STATIONS.fuel : VEHICLE_STATIONS.service;
+        requireValue(Math.hypot(live.x - station.x, live.z - station.z) <= station.radius, 409, `Move closer to ${station.label}.`);
+        const model = GARAGE_CATALOG[vehicle.modelId];
+        const spec = VEHICLE_SPECS[model.kind];
+        let amount, cost, description;
+        if (body.action === 'refuel') {
+          const missing = Math.max(0, VEHICLE_FUEL_MAX - Number(vehicle.fuel));
+          requireValue(missing >= .5, 409, 'Fuel tank is already full.');
+          amount = Math.ceil(missing * 10) / 10;
+          cost = Math.max(1, Math.ceil(amount * spec.fuelPricePerPoint));
+          description = `${model.label} fuel · ${amount.toFixed(1)} units`;
+          vehicle.fuel = VEHICLE_FUEL_MAX;
+        } else {
+          const missing = Math.max(0, VEHICLE_CONDITION_MAX - Number(vehicle.condition));
+          requireValue(missing >= 1, 409, 'Vehicle condition is already 100%.');
+          amount = Math.ceil(missing);
+          cost = Math.max(1, Math.ceil(amount * spec.repairPricePerPoint));
+          description = `${model.label} repair · ${amount} condition`;
+          vehicle.condition = VEHICLE_CONDITION_MAX;
+        }
+        const transaction = walletTransaction(user, -cost, body.action === 'refuel' ? 'fuel' : 'repair', description);
+        dirty = true;
+        await persist();
+        const summary = garageSummary(user);
+        send(response, 200, { garage: summary, wallet: walletSummary(user), vehicle: summary.activeVehicle, service: { action: body.action, amount, cost, station: station.label }, transaction }); return;
+      }
       if (path === '/api/jobs' && request.method === 'GET') {
         send(response, 200, jobsSummary(user)); return;
       }
@@ -502,6 +734,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(job, 404, 'Job not found.');
         const state = jobStateFor(user);
         requireValue(!state.active, 409, 'Finish your active job before starting another one.');
+        requireValue(!state.garage.activeVehicleId, 409, 'Store your personal vehicle in GARAGE before starting a job.');
         const timestamp = now();
         const cooldownUntil = Number(state.cooldowns[jobId] || 0);
         requireValue(cooldownUntil <= timestamp, 409, 'This job is cooling down. Try again shortly.');
@@ -814,10 +1047,13 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(Number.isFinite(body.x) && Number.isFinite(body.z) && Math.abs(body.x) <= 110.01 && Math.abs(body.z) <= 110.01 && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, 'Invalid avatar position.');
         const requestedMode = body.mode === undefined ? 'walk' : body.mode;
         requireValue(Object.hasOwn(MOVEMENT_PROFILES, requestedMode), 400, 'Invalid movement mode.');
-        const active = jobStateFor(user).active;
+        const stateForMove = jobStateFor(user);
+        const active = stateForMove.active;
         const activeJob = active ? JOB_DEFINITIONS[active.jobId] : null;
-        const expectedMode = active?.vehicleEntered && activeJob?.vehicle ? activeJob.vehicle : 'walk';
-        requireValue(requestedMode === expectedMode, 409, 'Movement mode is out of sync. Re-enter the job vehicle if needed.');
+        const personal = stateForMove.garage.activeVehicleId ? stateForMove.garage.owned.find(vehicle => vehicle.id === stateForMove.garage.activeVehicleId) : null;
+        const personalModel = personal ? GARAGE_CATALOG[personal.modelId] : null;
+        const expectedMode = active?.vehicleEntered && activeJob?.vehicle ? activeJob.vehicle : (personal?.entered && personalModel ? personalModel.kind : 'walk');
+        requireValue(requestedMode === expectedMode, 409, 'Movement mode is out of sync. Re-enter the active vehicle if needed.');
         const state = presence.get(user.id) || place(user);
         const movement = MOVEMENT_PROFILES[requestedMode];
         const elapsed = Math.max(0, Math.min((now() - state.movedAt) / 1000, 3));
@@ -825,7 +1061,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const distance = Math.hypot(body.x - state.x, body.z - state.z);
         if (distance > credit + 0.01) throw new ApiError(409, 'Movement was too fast. Your avatar needs to resync.', { x: state.x, z: state.z });
         if (requestedMode !== 'walk' && distance > .01) {
-          requireValue(Number(active?.vehicleFuel) > .05, 409, 'Vehicle fuel is empty. Refuel at Kerala Fuel Station.');
+          const fuel = active?.vehicleEntered ? Number(active.vehicleFuel) : Number(personal?.fuel);
+          requireValue(fuel > .05, 409, 'Vehicle fuel is empty. Refuel at Kerala Fuel Station.');
         }
         const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
@@ -836,13 +1073,17 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           const spec = VEHICLE_SPECS[activeJob.vehicle];
           active.vehicleFuel = Math.max(0, Number(active.vehicleFuel) - distance * spec.fuelBurnPerMeter);
           dirty = true;
+        } else if (personal?.entered && personalModel && distance > 0) {
+          const spec = VEHICLE_SPECS[personalModel.kind];
+          personal.fuel = Math.max(0, Number(personal.fuel) - distance * spec.fuelBurnPerMeter);
+          dirty = true;
         }
         let discovered = false;
         for (const [id, x, z] of LANDMARKS) if (Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
         const turn = Math.abs(Math.atan2(Math.sin(state.rotation - previousRotation), Math.cos(state.rotation - previousRotation)));
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
-        const activeVehicle = active && activeJob?.vehicle ? jobsSummary(user).active?.vehicle || null : null;
+        const activeVehicle = active && activeJob?.vehicle ? jobsSummary(user).active?.vehicle || null : (personal?.entered ? garageSummary(user).activeVehicle : null);
         send(response, 200, { ok: true, user: publicUser(user), walkMeters: Math.floor(user.walkMeters), visitedLandmarks: user.visitedLandmarks, vehicle: activeVehicle }); return;
       }
       const voiceMatch = path.match(/^\/api\/voice\/signal\/([^/]+)$/);
