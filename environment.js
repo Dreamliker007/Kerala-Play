@@ -128,7 +128,9 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   disposables.push(rainGeometry, rainMaterial);
 
   const moonLight = new THREE.DirectionalLight(0x8cacff, .35);
-  scene.add(moonLight, moonLight.target);
+  const lightningLight = new THREE.DirectionalLight(0xe6f3ff, 0);
+  lightningLight.castShadow = false;
+  scene.add(moonLight, moonLight.target, lightningLight, lightningLight.target);
   const originalSun = sun ? {
     intensity: sun.intensity, color: sun.color.clone(), position: sun.position.clone(), castShadow: sun.castShadow,
     targetPosition: sun.target.position.clone(), targetParent: sun.target.parent,
@@ -163,6 +165,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   const groundNight = new THREE.Color(0x3b4b55);
   const rainSky = new THREE.Color(0x647682);
   const stormCloud = new THREE.Color(0x77828a);
+  const lightningColor = new THREE.Color(0xe6f3ff);
   const lightDirection = new THREE.Vector3();
   const target = new THREE.Vector3();
 
@@ -381,15 +384,39 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     const weather = rain > .68 ? 'Heavy rain' : rain > .12 ? 'Rain' : overcast > .30 ? 'Cloudy' : 'Clear';
     const needsLights = daylight < .38 || overcast > .58;
 
-    currentWeather = { daylight, hour, rain, overcast, weather, needsLights };
+    // Two deterministic strike windows per real minute while the shared
+    // weather cycle is in heavy-rain territory. Each strike uses a quick
+    // double flash instead of a constant strobe.
+    const stormTime = worldMinute + 13;
+    const stormBlock = Math.floor(stormTime / 60);
+    const stormClock = ((stormTime % 60) + 60) % 60;
+    const strikeTimes = [7.4, 34.8];
+    let lightning = 0;
+    let lightningStrikeId = null;
+    if (rain > .68 && overcast > .70) {
+      for (let strikeIndex = 0; strikeIndex < strikeTimes.length; strikeIndex++) {
+        const elapsed = stormClock - strikeTimes[strikeIndex];
+        if (elapsed < 0 || elapsed > .38) continue;
+        const firstFlash = elapsed < .11 ? 1 - elapsed / .11 : 0;
+        const secondElapsed = elapsed - .18;
+        const secondFlash = secondElapsed >= 0 && secondElapsed < .14
+          ? .62 * (1 - secondElapsed / .14)
+          : 0;
+        lightning = Math.max(lightning, firstFlash, secondFlash);
+        lightningStrikeId = stormBlock * strikeTimes.length + strikeIndex;
+      }
+    }
+
+    currentWeather = { daylight, hour, rain, overcast, weather, needsLights, lightning };
 
     // High-quality exposure follows the world state instead of using one fixed
     // value. Nights stay readable while monsoon scenes retain contrast.
     const nightLift = (1 - daylight) * .10;
     const stormPull = overcast * .055;
-    renderer.toneMappingExposure = THREE.MathUtils.clamp(1.18 + nightLift - stormPull, 1.10, 1.28);
+    renderer.toneMappingExposure = THREE.MathUtils.clamp(1.18 + nightLift - stormPull + lightning * .10, 1.10, 1.36);
 
     scene.background.copy(nightSky).lerp(daySky, daylight).lerp(duskSky, twilight).lerp(rainSky, overcast * .58);
+    if (lightning > 0) scene.background.lerp(lightningColor, lightning * .34);
     scene.fog.color.copy(scene.background);
     scene.fog.near = 48 + daylight * 14 - overcast * 10;
     scene.fog.far = 138 + daylight * 34 - overcast * 48;
@@ -404,6 +431,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     clouds.rotation.y = worldMinute / 1440 * Math.PI * 2 + time * .002 * (1 + overcast * 1.8);
     cloudMaterial.opacity = .45 + overcast * .43;
     cloudMaterial.color.copy(nightLightColor).lerp(whiteColor, daylight).lerp(warmColor, twilight).lerp(stormCloud, overcast * .76).multiplyScalar(.35 + daylight * .65);
+    if (lightning > 0) cloudMaterial.color.lerp(lightningColor, lightning * .72);
 
     const rainLimit = 620;
     rainField.visible = rain > .035;
@@ -432,6 +460,9 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     }
 
     target.set(camera.position.x, 0, camera.position.z);
+    lightningLight.intensity = lightning * (2.4 + overcast * 2.0);
+    lightningLight.position.set(target.x + 34, 48, target.z - 26);
+    lightningLight.target.position.copy(target);
     if (sun) {
       sun.color.copy(whiteColor).lerp(warmColor, twilight);
       sun.intensity = (Math.max(0, elevation) * 1.7 + daylight * .28) * (1 - overcast * .62);
@@ -441,8 +472,9 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       sun.target.position.copy(target);
     }
     if (hemi) {
-      hemi.intensity = (.78 + daylight * 1.38) * (1 - overcast * .26);
+      hemi.intensity = (.78 + daylight * 1.38) * (1 - overcast * .26) + lightning * .78;
       hemi.color.copy(nightLightColor).lerp(daylightColor, daylight).lerp(rainSky, overcast * .40);
+      if (lightning > 0) hemi.color.lerp(lightningColor, lightning * .62);
       hemi.groundColor.copy(groundNight).lerp(groundDay, daylight);
     }
     moonLight.intensity = (1 - daylight) * .66 * (1 - overcast * .38) + overcast * (1 - daylight) * .08;
@@ -482,6 +514,8 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
         inChallenge,
         roadProximity,
         townProximity,
+        lightning,
+        lightningStrikeId,
       });
     }
     return currentWeather;
@@ -500,7 +534,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       quickActions.append(fullscreenButton);
     }
     settingsToggle.remove(); settings.remove(); clockOutput.remove(); style.remove();
-    scene.remove(sky, rainField, moonLight, moonLight.target);
+    scene.remove(sky, rainField, moonLight, moonLight.target, lightningLight, lightningLight.target);
     for (const item of disposables) item.dispose();
     for (const { object, cast, receive } of shadowObjects) { object.castShadow = cast; object.receiveShadow = receive; }
     for (const [material, color] of unlitMaterials) material.color.copy(color);
@@ -573,6 +607,7 @@ function createSoundscape() {
   const trafficHum = filteredNoise('lowpass', 145, .7);
   const streetMurmur = filteredNoise('bandpass', 520, .85);
   const nightBed = filteredNoise('bandpass', 3300, 1.4);
+  const thunder = filteredNoise('lowpass', 190, .55);
   noise.start();
 
   const active = new Set();
@@ -581,6 +616,7 @@ function createSoundscape() {
   let nextStreetBeat = 0;
   let nextTrafficCue = 0;
   let nextChallengeNote = 0;
+  let lastThunderStrikeId = null;
   let sequence = 0;
   let closed = false;
 
@@ -635,6 +671,25 @@ function createSoundscape() {
     }
   }
 
+  function thunderClap(strikeId, strength) {
+    if (closed || context.state !== 'running') return;
+    const distanceSeed = Math.abs(Math.sin((Number(strikeId) + 1) * 12.9898) * 43758.5453) % 1;
+    const delay = .85 + distanceSeed * 1.65;
+    const start = context.currentTime + delay;
+    const peak = .085 + strength * .075;
+
+    thunder.filter.frequency.setValueAtTime(210, start);
+    thunder.filter.frequency.exponentialRampToValueAtTime(95, start + 2.7);
+    thunder.gain.gain.cancelScheduledValues(start);
+    thunder.gain.gain.setValueAtTime(.0001, start);
+    thunder.gain.gain.exponentialRampToValueAtTime(Math.max(.001, peak), start + .08);
+    thunder.gain.gain.exponentialRampToValueAtTime(Math.max(.001, peak * .34), start + .72);
+    thunder.gain.gain.exponentialRampToValueAtTime(.0001, start + 2.8);
+
+    note(58, 1.8, .026 + strength * .022, delay + .02, 34, 'sine');
+    note(82, .48, .016 + strength * .012, delay, 48, 'triangle');
+  }
+
   function update({
     daylight,
     hour = 12,
@@ -646,6 +701,8 @@ function createSoundscape() {
     inChallenge,
     roadProximity = 0,
     townProximity = 0,
+    lightning = 0,
+    lightningStrikeId = null,
   }) {
     if (closed || context.state !== 'running') return;
     const now = context.currentTime;
@@ -672,6 +729,11 @@ function createSoundscape() {
 
     const cricketLevel = Math.max(0, 1 - daylight) * dryFactor;
     nightBed.gain.setTargetAtTime(.015 * cricketLevel, now, 1.4);
+
+    if (lightningStrikeId !== null && lightning > .30 && lightningStrikeId !== lastThunderStrikeId) {
+      lastThunderStrikeId = lightningStrikeId;
+      thunderClap(lightningStrikeId, Math.max(0, Math.min(1, .55 + rain * .45)));
+    }
 
     if (daylight > .42 && rain < .42 && now >= nextBird) {
       birdCall(daylight, rain);

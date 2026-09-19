@@ -430,3 +430,14 @@ Road puddles now generate animated expanding ripple rings while rain is active. 
 Vehicle tyre spray is denser and travels farther at higher speed and heavier rain, giving wet-road driving a more convincing wake without changing traction, braking or server-authoritative vehicle behavior.
 
 All water motion is cosmetic and locally rendered. The puddle/drain/runoff update pass is throttled to reduce mobile cost, and no fluid simulation, gameplay collision, backend, database, economy or Supabase changes are introduced.
+
+
+## Monsoon Storm + Lightning Realism (V93)
+
+V93 adds storm-scale lightning and thunder to the existing deterministic monsoon cycle.
+
+During heavy-rain/high-overcast windows, the shared weather system now produces spaced deterministic lightning events rather than random continuous flashes. Each strike uses a short double-flash profile that briefly brightens the sky, cloud layer, fog, ambient hemisphere light and a shadow-free directional storm light. Clear, cloudy and ordinary light-rain periods do not trigger lightning.
+
+When World Sound is enabled, each visible strike schedules a delayed procedural thunder roll. The delay varies deterministically per strike to suggest distance, while a low-pass noise rumble and short low-frequency tones create the thunder without downloaded audio files. Sound-off users still get the visual storm effect.
+
+Lightning does not cast extra shadows and introduces no physics, damage, gameplay, backend, database, economy or Supabase changes.
