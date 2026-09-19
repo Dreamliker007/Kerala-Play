@@ -1056,7 +1056,9 @@ test('phone notifications persist events dedupe live reminders and support read 
   assert.equal(received.read, false);
 
   app.advance(31 * 24 * 60 * 60 * 1000);
-  alerts = (await alice('/api/notifications')).data;
+  const reminderResponse = await alice('/api/notifications');
+  assert.equal(reminderResponse.status, 200, JSON.stringify(reminderResponse.data));
+  alerts = reminderResponse.data;
   const insurance = alerts.items.find(item => item.id === `reminder:insurance:${vehicle.id}:${vehicle.insuranceUntil}`);
   assert.ok(insurance);
   assert.equal(insurance.live, true);
