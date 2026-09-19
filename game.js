@@ -926,6 +926,104 @@ function syncJobWorldVisual() {
   }
 }
 
+function nearestTalkableVillager(maxDistance = 3.2) {
+  if (!playerRef || vehicleMode !== 'walk') return null;
+  let nearest = null;
+  let nearestDistance = maxDistance;
+  for (const villager of villagers) {
+    if (!villager?.visible || !villager.userData?.npc) continue;
+    const data = villager.userData;
+    if (data.behavior === 'crossing') continue;
+    const distance = Math.hypot(
+      villager.position.x - playerRef.position.x,
+      villager.position.z - playerRef.position.z,
+    );
+    if (distance < nearestDistance) {
+      nearest = villager;
+      nearestDistance = distance;
+    }
+  }
+  return nearest ? { villager: nearest, distance: nearestDistance } : null;
+}
+
+function npcConversationReply(villager) {
+  const data = villager?.userData || {};
+  const role = String(data.role || 'Local');
+  const hour = Number(worldWeatherState.hour ?? 12);
+  const rain = Number(worldWeatherState.rain || 0);
+  const weather = String(worldWeatherState.weather || 'Clear');
+  const morning = hour >= 5 && hour < 11.5;
+  const evening = hour >= 16.5 && hour < 20;
+  const night = hour >= 20 || hour < 5;
+  const timeGreeting = morning ? 'Good morning' : evening ? 'Good evening' : night ? 'Good night' : 'Hello';
+
+  const roleReplies = {
+    Shopkeeper: [
+      'Welcome! The shop is open. Take a look around.',
+      'Busy little day here. Good to see you.',
+      'Need anything? The village shop is right here.',
+    ],
+    Customer: [
+      'Just stopped by the shop for a few things.',
+      'This road gets lively around shopping time.',
+      'I am finishing a quick village errand.',
+    ],
+    Waiting: [
+      'I am waiting for the next bus.',
+      'The bus should come along this road.',
+      'Just waiting here for a ride.',
+    ],
+    Shopper: [
+      'I am picking up a few things from the shop.',
+      'Nice to see the village busy today.',
+      'Quick shopping trip, then I am heading back.',
+    ],
+    Phone: [
+      'One minute—I was just checking my phone.',
+      'Finished my call. How are you?',
+      'Signal is good around this side of the road.',
+    ],
+    Talking: [
+      'We were just chatting about the day.',
+      'Come say hello. It is a quiet moment.',
+      'Nothing urgent—just a village conversation.',
+    ],
+    Local: [
+      'Nice to meet you. Enjoy the village.',
+      'Have a good walk around Kerala Play.',
+      'The roads are peaceful today. Take care.',
+    ],
+  };
+  const pool = roleReplies[role] || roleReplies.Local;
+  const index = Math.abs(Number(data.npcIndex || 0) + Number(data.talkCount || 0)) % pool.length;
+
+  if (rain > .58) return `${timeGreeting}! Heavy rain today—stay under cover when you can.`;
+  if (rain > .12) return `${timeGreeting}! It is raining, so watch the wet road.`;
+  if (weather === 'Cloudy') return `${timeGreeting}! Cloudy weather today, but the village is active.`;
+  if (night) return `${timeGreeting}! The streets are quieter now—travel safely.`;
+  return `${timeGreeting}! ${pool[index]}`;
+}
+
+function interactWithNpc(index) {
+  const villager = villagers[Number(index)];
+  if (!villager?.visible || !playerRef || vehicleMode !== 'walk') return;
+  const distance = Math.hypot(
+    villager.position.x - playerRef.position.x,
+    villager.position.z - playerRef.position.z,
+  );
+  if (distance > 3.45) {
+    showToast('Move closer to talk');
+    return;
+  }
+  const data = villager.userData;
+  data.talkCount = Number(data.talkCount || 0) + 1;
+  data.interactionUntil = performance.now() + 3200;
+  data.interactionPlayerX = playerRef.position.x;
+  data.interactionPlayerZ = playerRef.position.z;
+  const reply = npcConversationReply(villager);
+  showToast(`${data.name}: ${reply}`, 3400);
+}
+
 function updateWorldInteract() {
   if (!worldInteract) return;
   worldInteract.hidden = true;
@@ -933,6 +1031,7 @@ function updateWorldInteract() {
   worldInteract.dataset.mode = '';
   worldInteract.dataset.service = '';
   worldInteract.dataset.source = '';
+  worldInteract.dataset.npc = '';
   if (!profile || !playerRef) return;
   const active = activeJobMission;
   const checkpoint = trafficSnapshot?.checkpoint;
@@ -981,6 +1080,22 @@ function updateWorldInteract() {
       worldInteract.hidden = false;
       worldInteract.dataset.mode = 'needs-rest';
       worldInteract.textContent = `REST · ENERGY ${Math.round(Number(needsSnapshot.energy ?? 100))}%`;
+      return;
+    }
+  }
+
+  if (!active && vehicleMode === 'walk') {
+    const nearbyNpc = nearestTalkableVillager();
+    if (nearbyNpc) {
+      const data = nearbyNpc.villager.userData;
+      const talking = Number(data.interactionUntil || 0) > performance.now();
+      worldInteract.hidden = false;
+      worldInteract.dataset.mode = 'npc-talk';
+      worldInteract.dataset.npc = String(data.npcIndex);
+      worldInteract.disabled = talking;
+      worldInteract.textContent = talking
+        ? `TALKING · ${String(data.name).toUpperCase()}`
+        : `TALK · ${String(data.name).toUpperCase()}`;
       return;
     }
   }
@@ -1038,6 +1153,8 @@ worldInteract?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('kerala-needs-rest'));
   } else if (worldInteract.dataset.mode === 'home-sleep') {
     window.dispatchEvent(new CustomEvent('kerala-home-sleep'));
+  } else if (worldInteract.dataset.mode === 'npc-talk') {
+    interactWithNpc(worldInteract.dataset.npc);
   } else {
     window.dispatchEvent(new CustomEvent('kerala-job-interact'));
   }
@@ -1169,11 +1286,11 @@ function updateProgressHud() {
 
 
 
-function showToast(message) {
+function showToast(message, duration = 2600) {
   toast.textContent = message;
   toast.style.display = 'block';
   clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => { toast.style.display = 'none'; }, 2600);
+  showToast.timer = setTimeout(() => { toast.style.display = 'none'; }, duration);
 }
 
 function taskProgress(task) {
@@ -2479,6 +2596,22 @@ function updateVillagers(time) {
     };
 
     data.crossingActive = false;
+
+    if (Number(data.interactionUntil || 0) > performance.now()) {
+      const dx = Number(data.interactionPlayerX) - villager.position.x;
+      const dz = Number(data.interactionPlayerZ) - villager.position.z;
+      if (Math.hypot(dx, dz) > .05) villager.rotation.y = Math.atan2(dx, dz);
+      animateHuman(human, time * .62 + data.offset, 0);
+      const greetBeat = (Math.sin(time * 4.1 + data.offset) + 1) * .5;
+      if (parts.rightArm) parts.rightArm.rotation.x = -.28 - greetBeat * .38;
+      if (parts.rightElbow) parts.rightElbow.rotation.x = .30 + greetBeat * .46;
+      if (parts.head) {
+        parts.head.rotation.y = Math.sin(time * 1.3 + data.offset) * .06;
+        parts.head.rotation.z = Math.sin(time * .8 + data.offset) * .018;
+      }
+      applyRainPosture();
+      return;
+    }
 
     if (data.behavior === 'social') {
       villager.position.set(data.startX, 0, data.startZ);
@@ -4507,6 +4640,11 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
     nightHide: !!options.nightHide,
     nightActive: !!options.nightActive,
     routinePhase: Number(options.routinePhase ?? offset),
+    npcIndex: index,
+    interactionUntil: 0,
+    interactionPlayerX: x,
+    interactionPlayerZ: z,
+    talkCount: 0,
   };
   updateNameLabel(villager, npcName + ' · ' + villager.userData.role, 'npc-' + index);
   villagers.push(villager);
