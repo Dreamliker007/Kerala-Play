@@ -1902,6 +1902,7 @@ try {
   let smoothedDriveSteering = 0;
   let driveSpeedRatio = 0;
   let walkPhase = 0;
+  let cameraDriveImpulse = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
   let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0;
   const moveForward = new THREE.Vector3();
@@ -2247,21 +2248,55 @@ try {
     }
 
     const drivingCamera = vehicleMode !== 'walk';
-    const lookAhead = drivingCamera ? .75 + driveSpeedRatio * 2.2 : 0;
+    const walkingMotion = !drivingCamera && movingNow ? (runHeld ? 1 : .62) : 0;
+    const walkBob = Math.sin(walkPhase * 2) * (runHeld ? .040 : .026) * walkingMotion;
+    const walkSway = Math.sin(walkPhase) * (runHeld ? .024 : .016) * walkingMotion;
+
+    const driveImpulseTarget = drivingCamera
+      ? (acceleratorHeld ? .12 : 0) - (runHeld ? .16 : 0)
+      : 0;
+    cameraDriveImpulse += (driveImpulseTarget - cameraDriveImpulse) * (1 - Math.exp(-delta * 5.5));
+
+    const lookAhead = drivingCamera
+      ? .75 + driveSpeedRatio * 2.2 + cameraDriveImpulse * 1.35
+      : 0;
+    const baseTargetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45;
     cameraTarget.set(
       player.position.x + Math.sin(player.rotation.y) * lookAhead,
-      player.position.y + (vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45),
+      player.position.y + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
       player.position.z + Math.cos(player.rotation.y) * lookAhead
     );
+
     const baseDistance = vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
-    const distance = baseDistance + (drivingCamera ? driveSpeedRatio * 1.35 : 0);
+    const distance = baseDistance
+      + (drivingCamera ? driveSpeedRatio * 1.35 + cameraDriveImpulse * .72 : 0);
     const horizontal = Math.cos(cameraPitch) * distance;
+    const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+    const stormShake = THREE.MathUtils.smoothstep(rain, .48, 1)
+      * (drivingCamera ? .010 + driveSpeedRatio * .010 : .005);
+    const rainShakeX = Math.sin(villageTime * 17.3) * stormShake;
+    const rainShakeY = Math.sin(villageTime * 21.7 + .8) * stormShake * .72;
+    const cameraRightX = Math.cos(cameraYaw);
+    const cameraRightZ = -Math.sin(cameraYaw);
+    const drivingSway = drivingCamera ? -smoothedDriveSteering * driveSpeedRatio * .075 : 0;
+    const lateralMotion = walkSway + drivingSway;
+
     cameraPosition.set(
-      player.position.x + Math.sin(cameraYaw) * horizontal,
-      player.position.y + (drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance,
-      player.position.z + Math.cos(cameraYaw) * horizontal
+      player.position.x + Math.sin(cameraYaw) * horizontal + cameraRightX * lateralMotion + rainShakeX,
+      player.position.y + (drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
+      player.position.z + Math.cos(cameraYaw) * horizontal + cameraRightZ * lateralMotion
     );
-    const cameraResponse = drivingCamera ? 6.8 + driveSpeedRatio * 1.4 : 9;
+
+    const targetFov = 60
+      + (drivingCamera ? driveSpeedRatio * 4.8 : runHeld && movingNow ? .65 : 0)
+      + (drivingCamera && acceleratorHeld ? .35 : 0);
+    const nextFov = camera.fov + (targetFov - camera.fov) * (1 - Math.exp(-delta * 4.6));
+    if (Math.abs(nextFov - camera.fov) > .002) {
+      camera.fov = nextFov;
+      camera.updateProjectionMatrix();
+    }
+
+    const cameraResponse = drivingCamera ? 6.5 + driveSpeedRatio * 1.6 : 8.6;
     camera.position.lerp(cameraPosition, 1 - Math.exp(-delta * cameraResponse));
     camera.lookAt(cameraTarget);
     updateRemotePlayers(delta, camera);
