@@ -171,9 +171,9 @@ function updateNeedsHud() {
     element.classList.toggle('critical', rounded <= 10);
   }
   if (runButton) {
-    const runBlocked = vehicleMode === 'walk' && needsSnapshot.canRun === false;
-    runButton.setAttribute('aria-disabled', String(runBlocked));
-    runButton.title = runBlocked ? 'Restore hunger, thirst or energy to run' : '';
+    const lowNeeds = vehicleMode === 'walk' && needsSnapshot.canRun === false;
+    runButton.setAttribute('aria-disabled', 'false');
+    runButton.title = lowNeeds ? 'Low needs reduce running speed, but RUN remains available' : '';
   }
 }
 
@@ -1755,8 +1755,7 @@ try {
   cameraZone.addEventListener('lostpointercapture', clearLook);
 
   function setRun(value) {
-    if (value && vehicleMode === 'walk' && needsSnapshot?.canRun === false) value = false;
-    runHeld = value;
+    runHeld = !!value;
     if (!value) runCruiseArmed = false;
     runButton.classList.toggle('active', value);
   }
@@ -1958,7 +1957,7 @@ try {
       driveSpeed = 0;
       driveSpeedRatio = 0;
       smoothedDriveSteering += (0 - smoothedDriveSteering) * (1 - Math.exp(-delta * 10));
-      const runningNow = runHeld && needsSnapshot?.canRun !== false;
+      const runningNow = runHeld;
       if (runningNow && controlLength > .08) runCruiseArmed = true;
       const autoRun = runningNow && runCruiseArmed && controlLength <= .08;
       const walkingInput = controlLength > .08 || autoRun;
@@ -2039,7 +2038,7 @@ try {
     sendMovement(player, movingNow);
     const weatherState = atmosphere.update(delta, villageTime, {
       moving: movingNow,
-      running: vehicleMode === 'walk' && runHeld && needsSnapshot?.canRun !== false,
+      running: vehicleMode === 'walk' && runHeld,
       nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13,
       inChallenge: !!challengeRound,
     });
@@ -2377,11 +2376,13 @@ function animateHuman(human, phase, moving) {
 }
 
 function npcPingPongState(time, speed, offset) {
-  const cycle = ((time * Math.max(.18, speed) * 1.55 + offset) % 8 + 8) % 8;
-  if (cycle < 1.15) return { progress: 0, direction: 1, moving: 0 };
-  if (cycle < 3.15) return { progress: (cycle - 1.15) / 2, direction: 1, moving: 1 };
-  if (cycle < 4.30) return { progress: 1, direction: -1, moving: 0 };
-  if (cycle < 6.30) return { progress: 1 - (cycle - 4.30) / 2, direction: -1, moving: 1 };
+  // V79: route timing is deliberately close to human walking pace instead of
+  // moving the NPC across a long route in only a couple of seconds.
+  const cycle = ((time * Math.max(.18, speed) * .22 + offset) % 8 + 8) % 8;
+  if (cycle < 1.35) return { progress: 0, direction: 1, moving: 0 };
+  if (cycle < 3.25) return { progress: (cycle - 1.35) / 1.90, direction: 1, moving: 1 };
+  if (cycle < 4.75) return { progress: 1, direction: -1, moving: 0 };
+  if (cycle < 6.65) return { progress: 1 - (cycle - 4.75) / 1.90, direction: -1, moving: 1 };
   return { progress: 0, direction: 1, moving: 0 };
 }
 
@@ -2390,31 +2391,83 @@ function updateVillagers(time) {
     const data = villager.userData;
     const human = data.human;
     if (!human) return;
+    const parts = human.userData.parts || {};
     const rainReaction = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
+
+    // Restore the relaxed arm posture before applying activity/weather poses.
+    if (parts.leftArm) parts.leftArm.rotation.z = -.055;
+    if (parts.rightArm) parts.rightArm.rotation.z = .055;
+    if (parts.torso) parts.torso.rotation.x = 0;
+    if (parts.head) parts.head.rotation.x = 0;
+
     const applyRainPosture = () => {
-      const parts = human.userData.parts;
-      if (!parts || rainReaction <= .08) return;
-      if (parts.head) parts.head.rotation.x = rainReaction * .10;
-      if (parts.torso) parts.torso.rotation.x = rainReaction * .035;
-      if (parts.leftArm) parts.leftArm.rotation.z = -.055 + rainReaction * .045;
-      if (parts.rightArm) parts.rightArm.rotation.z = .055 - rainReaction * .045;
+      if (rainReaction <= .08) return;
+      if (parts.head) parts.head.rotation.x = rainReaction * .09;
+      if (parts.torso) parts.torso.rotation.x = rainReaction * .03;
+      if (parts.leftArm) parts.leftArm.rotation.z += rainReaction * .035;
+      if (parts.rightArm) parts.rightArm.rotation.z -= rainReaction * .035;
     };
 
-    if (data.behavior === 'idle') {
+    data.crossingActive = false;
+
+    if (data.behavior === 'social') {
       villager.position.set(data.startX, 0, data.startZ);
-      villager.rotation.y = Number(data.facing || 0);
-      animateHuman(human, time * .8 + data.offset, 0);
-      const head = human.userData.parts?.head;
-      if (head) head.rotation.y = Math.sin(time * .55 + data.offset) * .13;
-      const torso = human.userData.parts?.torso;
-      if (torso) torso.rotation.y = Math.sin(time * .32 + data.offset) * .025;
-      data.crossingActive = false;
+      const dx = Number(data.targetX) - villager.position.x;
+      const dz = Number(data.targetZ) - villager.position.z;
+      villager.rotation.y = Math.atan2(dx, dz);
+      animateHuman(human, time * .55 + data.offset, 0);
+
+      const talkBeat = Math.sin(time * .72 + data.offset);
+      if (parts.head) {
+        parts.head.rotation.y = talkBeat * .10;
+        parts.head.rotation.z = Math.sin(time * .38 + data.offset) * .025;
+      }
+      if (parts.rightArm) parts.rightArm.rotation.x = -.20 - Math.max(0, talkBeat) * .34;
+      if (parts.rightElbow) parts.rightElbow.rotation.x = .34 + Math.max(0, talkBeat) * .38;
+      if (parts.leftArm && talkBeat < -.35) parts.leftArm.rotation.x = -.14;
       applyRainPosture();
       return;
     }
 
-    const weatherSpeed = data.speed * (1 - rainReaction * .24);
+    if (data.behavior === 'task') {
+      villager.position.set(data.startX, 0, data.startZ);
+      villager.rotation.y = Number(data.facing || 0);
+      animateHuman(human, time * .55 + data.offset, 0);
+      const workBeat = (Math.sin(time * .95 + data.offset) + 1) * .5;
+      if (parts.rightArm) parts.rightArm.rotation.x = -.22 - workBeat * .46;
+      if (parts.rightElbow) parts.rightElbow.rotation.x = .38 + workBeat * .48;
+      if (parts.head) parts.head.rotation.y = Math.sin(time * .34 + data.offset) * .12;
+      applyRainPosture();
+      return;
+    }
+
+    if (data.behavior === 'phone') {
+      villager.position.set(data.startX, 0, data.startZ);
+      villager.rotation.y = Number(data.facing || 0);
+      animateHuman(human, time * .45 + data.offset, 0);
+      if (parts.rightArm) parts.rightArm.rotation.x = -1.0;
+      if (parts.rightElbow) parts.rightElbow.rotation.x = 1.18;
+      if (parts.head) {
+        parts.head.rotation.x = .10;
+        parts.head.rotation.y = Math.sin(time * .25 + data.offset) * .08;
+      }
+      applyRainPosture();
+      return;
+    }
+
+    if (data.behavior === 'idle') {
+      villager.position.set(data.startX, 0, data.startZ);
+      villager.rotation.y = Number(data.facing || 0);
+      animateHuman(human, time * .55 + data.offset, 0);
+      if (parts.head) parts.head.rotation.y = Math.sin(time * .42 + data.offset) * .11;
+      if (parts.torso) parts.torso.rotation.y = Math.sin(time * .28 + data.offset) * .018;
+      applyRainPosture();
+      return;
+    }
+
+    const weatherSpeed = data.speed * (1 - rainReaction * .20);
     const motion = npcPingPongState(time, weatherSpeed, data.offset);
+
     if (data.behavior === 'crossing') {
       const fromX = Number(data.crossFromX);
       const toX = Number(data.crossToX);
@@ -2422,7 +2475,7 @@ function updateVillagers(time) {
       villager.position.z = data.startZ;
       villager.rotation.y = motion.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
       data.crossingActive = motion.moving > 0 && Math.abs(villager.position.x) < 8.45;
-      animateHuman(human, time * weatherSpeed * 7.5, motion.moving ? .86 * (1 - rainReaction * .20) : 0);
+      animateHuman(human, time * weatherSpeed * 4.8, motion.moving ? .38 * (1 - rainReaction * .12) : 0);
       applyRainPosture();
       return;
     }
@@ -2431,13 +2484,11 @@ function updateVillagers(time) {
     villager.position.x = data.startX;
     villager.position.z = data.startZ + routeOffset;
     villager.rotation.y = motion.direction > 0 ? 0 : Math.PI;
-    data.crossingActive = false;
-    animateHuman(human, time * weatherSpeed * 7, motion.moving ? .72 * (1 - rainReaction * .18) : 0);
+    animateHuman(human, time * weatherSpeed * 4.5, motion.moving ? .34 * (1 - rainReaction * .10) : 0);
     applyRainPosture();
 
-    if (!motion.moving) {
-      const head = human.userData.parts?.head;
-      if (head) head.rotation.y = Math.sin(time * .45 + data.offset) * .10;
+    if (!motion.moving && parts.head) {
+      parts.head.rotation.y = Math.sin(time * .38 + data.offset) * .08;
     }
   });
 }
@@ -3033,15 +3084,24 @@ function buildWorld(scene) {
   addTrafficCheckpoint(scene, 5.4, 18);
   addPhotoVillager(scene, -6, -50, 11, .55, 0, .78);
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
-  addPhotoVillager(scene, -9, 19, 8, .5, 4, .75);
+  addPhotoVillager(scene, -9, 19, 8, .50, 4, .75);
   addPhotoVillager(scene, 10, 50, 7, .42, 1, .68);
   addPhotoVillager(scene, -8.9, 8, 4.8, .38, 3, .72);
   addPhotoVillager(scene, 8.9, 31, 5.4, .35, 1.3, .70);
   addPhotoVillager(scene, -9.2, -43, 3.8, .40, 5.4, .69);
 
-  addPhotoVillager(scene, -10.4, pedestrianCrossingZ, 0, .56, .7, .72, {
+  // Several independently-timed pedestrians use the zebra crossing instead of
+  // one person shuttling back and forth continuously.
+  addPhotoVillager(scene, -10.4, pedestrianCrossingZ - .48, 0, .54, .25, .72, {
     behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian',
   });
+  addPhotoVillager(scene, 10.4, pedestrianCrossingZ, 0, .48, 3.05, .70, {
+    behavior: 'crossing', fromX: 10.4, toX: -10.4, role: 'Pedestrian',
+  });
+  addPhotoVillager(scene, -10.4, pedestrianCrossingZ + .48, 0, .44, 5.85, .69, {
+    behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian',
+  });
+
   addPhotoVillager(scene, 10.1, 27.2, 0, .28, 2.4, .70, {
     behavior: 'idle', facing: Math.PI, role: 'Waiting',
   });
@@ -3049,7 +3109,18 @@ function buildWorld(scene) {
     behavior: 'idle', facing: 0, role: 'Waiting',
   });
   addPhotoVillager(scene, -10.2, 7.5, 0, .25, 1.6, .68, {
-    behavior: 'idle', facing: Math.PI / 2, role: 'Shopper',
+    behavior: 'task', facing: Math.PI / 2, role: 'Shopper',
+  });
+
+  // Small social groups make the street feel inhabited rather than scripted.
+  addPhotoVillager(scene, -11.0, 14.1, 0, .25, .3, .70, {
+    behavior: 'social', targetX: -12.35, targetZ: 14.35, role: 'Talking',
+  });
+  addPhotoVillager(scene, -12.35, 14.35, 0, .25, 2.1, .72, {
+    behavior: 'social', targetX: -11.0, targetZ: 14.1, role: 'Talking',
+  });
+  addPhotoVillager(scene, 10.4, 44.5, 0, .25, 4.2, .69, {
+    behavior: 'phone', facing: Math.PI, role: 'Phone',
   });
 }
 
@@ -3724,6 +3795,8 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
     offset,
     behavior,
     facing: Number(options.facing || 0),
+    targetX: Number(options.targetX ?? x),
+    targetZ: Number(options.targetZ ?? z),
     crossFromX: Number(options.fromX ?? x),
     crossToX: Number(options.toX ?? x),
     crossingActive: false,
