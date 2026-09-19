@@ -4,7 +4,20 @@ import { fileURLToPath } from 'node:url';
 import { createGameServer } from './server.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const server = await createGameServer();
+
+function worldAlertsFromEnv() {
+  const raw = process.env.KP_WORLD_ALERTS_JSON;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('expected a JSON array');
+    return parsed;
+  } catch (error) {
+    console.error('[Kerala Play] KP_WORLD_ALERTS_JSON ignored:', error.message);
+    return [];
+  }
+}
+const server = await createGameServer({ worldAlerts: worldAlertsFromEnv() });
 
 // Preserve the existing game/API server while exposing stable public policy
 // pages for the website and Google Play listing.
