@@ -3144,6 +3144,72 @@ function addKeralaStreetRealism(scene) {
   ].forEach(([x,z,scale,yaw]) => addBananaPlant(scene, x, z, scale, yaw));
 }
 
+function addStreetLifeProps(scene) {
+  const wood = new THREE.MeshStandardMaterial({ color: 0x77533a, roughness: .94 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x666f70, roughness: .70, metalness: .28 });
+  const basketMat = new THREE.MeshStandardMaterial({ color: 0xa57542, roughness: .98 });
+  const sackMat = new THREE.MeshStandardMaterial({ color: 0xc2aa7b, roughness: 1 });
+  const produceMats = [
+    new THREE.MeshStandardMaterial({ color: 0x4f843c, roughness: .92 }),
+    new THREE.MeshStandardMaterial({ color: 0xc76a32, roughness: .92 }),
+    new THREE.MeshStandardMaterial({ color: 0xe0b43a, roughness: .90 }),
+  ];
+
+  // Small stools and a tea-shop style standing table.
+  [
+    [-11.6, 10.55, 0], [-12.6, 10.45, .2],
+    [11.8, 41.35, -.1], [12.9, 41.25, .15],
+  ].forEach(([x,z,rotation], index) => {
+    const stool = new THREE.Group();
+    const seat = new THREE.Mesh(new THREE.CylinderGeometry(.28, .30, .09, 10), wood);
+    seat.position.y = .52;
+    for (let leg = 0; leg < 3; leg++) {
+      const angle = leg / 3 * Math.PI * 2;
+      const support = new THREE.Mesh(new THREE.CylinderGeometry(.035, .045, .50, 6), steel);
+      support.position.set(Math.cos(angle) * .18, .27, Math.sin(angle) * .18);
+      support.rotation.z = Math.cos(angle) * .06;
+      stool.add(support);
+    }
+    stool.add(seat);
+    stool.position.set(x, 0, z);
+    stool.rotation.y = rotation + index * .07;
+    scene.add(stool);
+  });
+
+  const standingTable = new THREE.Group();
+  const tabletop = new THREE.Mesh(new THREE.CylinderGeometry(.43, .46, .08, 12), steel);
+  tabletop.position.y = .88;
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(.065, .085, .84, 8), steel);
+  stand.position.y = .43;
+  standingTable.add(tabletop, stand);
+  standingTable.position.set(-13.6, 10.55, 0);
+  scene.add(standingTable);
+
+  // Produce baskets/sacks make the shops feel used instead of decorative.
+  [
+    [-10.9, 9.85], [-11.6, 9.78], [11.3, 40.75], [12.0, 40.68],
+  ].forEach(([x,z], index) => {
+    const basket = new THREE.Mesh(new THREE.CylinderGeometry(.31, .37, .25, 10), basketMat);
+    basket.position.set(x, .13, z);
+    scene.add(basket);
+    for (let item = 0; item < 5; item++) {
+      const produce = new THREE.Mesh(new THREE.SphereGeometry(.09, 7, 6), produceMats[(index + item) % produceMats.length]);
+      const angle = item / 5 * Math.PI * 2;
+      produce.position.set(x + Math.cos(angle) * .18, .29 + (item % 2) * .04, z + Math.sin(angle) * .18);
+      scene.add(produce);
+    }
+  });
+
+  [
+    [-15.9, 10.2, -.08], [-16.45, 10.0, .08], [15.7, 41.0, .06],
+  ].forEach(([x,z,rotation]) => {
+    const sack = new THREE.Mesh(new THREE.CapsuleGeometry(.25, .48, 5, 8), sackMat);
+    sack.position.set(x, .38, z);
+    sack.rotation.z = rotation;
+    scene.add(sack);
+  });
+}
+
 function addTownStreetDetails(scene) {
   addShop(scene, -14.4, 7.5);
   addShop(scene, 14.8, 38.5);
@@ -3157,6 +3223,7 @@ function addTownStreetDetails(scene) {
   addUtilityPoles(scene);
   addJunctionMarkings(scene);
   addRoadsideClutter(scene);
+  addStreetLifeProps(scene);
   addJunctionSignal(scene);
   addParkedVehicle(scene, 'car', 0x7d8b91, 10.8, 56.5, Math.PI);
   addParkedVehicle(scene, 'car', 0x8c4e45, -47.5, -29.7, Math.PI / 2);
@@ -3279,6 +3346,20 @@ function buildWorld(scene) {
   });
   addPhotoVillager(scene, 10.4, 44.5, 0, .25, 4.2, .69, {
     behavior: 'phone', facing: Math.PI, role: 'Phone',
+  });
+
+  // Shop-front locals give the two stores visible daily activity.
+  addPhotoVillager(scene, -12.9, 10.9, 0, .22, 1.1, .70, {
+    behavior: 'task', facing: Math.PI, role: 'Shopkeeper',
+  });
+  addPhotoVillager(scene, -11.5, 10.7, 0, .22, 3.3, .69, {
+    behavior: 'social', targetX: -12.9, targetZ: 10.9, role: 'Customer',
+  });
+  addPhotoVillager(scene, 13.8, 41.6, 0, .22, 2.6, .71, {
+    behavior: 'task', facing: Math.PI, role: 'Shopkeeper',
+  });
+  addPhotoVillager(scene, 12.4, 41.4, 0, .22, 5.1, .68, {
+    behavior: 'social', targetX: 13.8, targetZ: 41.6, role: 'Customer',
   });
 }
 
