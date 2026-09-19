@@ -25,4 +25,4 @@ if (/android:screenOrientation=/.test(attributes)) {
 
 const next = xml.replace(activityPattern, `<activity${attributes}>`);
 await writeFile(manifestPath, next);
-console.log('Kerala Play Android MainActivity locked to landscape.');
+console.log('Kerala Play Android MainActivity locked to sensor landscape.');
