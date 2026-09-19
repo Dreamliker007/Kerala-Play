@@ -201,3 +201,10 @@ Kerala Play now uses a cleaner glass-style gameplay HUD designed to keep the 3D 
 World Sound, Graphics quality and Fullscreen are no longer permanent bottom-screen controls. They live inside a dedicated Settings panel opened from the HUD, freeing the lower centre of the screen for gameplay and vehicle status.
 
 Vehicles now have a dedicated on-screen ACCEL pedal while driving. The existing RUN control becomes BRAKE in a vehicle. Holding ACCEL supplies full forward throttle and uses a faster acceleration response, while steering remains available on the left joystick. The accelerator improves pickup but does not raise the road/condition/fuel-derived maximum speed, so existing server movement validation and Kerala Play traffic rules remain authoritative.
+
+
+## Minimal HUD + Hold-to-Run Forward (V72)
+
+The always-on HUD is reduced further so the world stays visually dominant. The Current Mission card and separate Level/Points chip are hidden from gameplay; level and points remain available in the player profile. Hunger, Thirst and Energy are shown as a very small top status strip, while the brand, profile, online and world-time chips and the icon dock use smaller footprints.
+
+On foot, holding RUN now acts as forward auto-run after movement has begun: if the player releases the left movement joystick while still holding RUN, the avatar continues straight ahead at full running speed. Releasing RUN stops the auto-run behavior. Normal joystick steering still takes priority while the movement control is being used, and the existing needs-based run restriction remains enforced.
