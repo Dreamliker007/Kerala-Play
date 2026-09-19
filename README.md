@@ -384,3 +384,14 @@ When the player is on foot and within roughly 3.2 metres of a visible non-crossi
 Talking makes the NPC pause, face the player and use a short natural greeting/hand gesture. Replies vary by NPC role, including shopkeepers, customers, bus-stop waiters, shoppers, phone users, social locals and general villagers. Dialogue also reacts to time of day and current weather, with rain, heavy-rain, cloudy and night-specific responses.
 
 The interaction is local and cosmetic: it does not add server AI, pathfinding, economy rewards, database writes or Supabase changes. NPC day/night and umbrella/shelter routines from V87 continue immediately after the short conversation ends.
+
+
+## Kerala Animal + Ambient Life (V89)
+
+V89 adds lightweight animal life to the High-quality Kerala village so the world feels inhabited beyond people and traffic.
+
+The village now includes roadside dogs, chickens, goats and a cow placed away from the main carriageway. Ground animals use small deterministic roaming areas and react when a walking player or moving vehicle approaches by turning and stepping away. Dogs keep a subtle tail motion, chickens peck/flap, and four-legged animals use simple gait animation while moving.
+
+The existing tree birds now remain available on mobile and use low-cost circling/flapping animation in daylight. Birds hide during heavy rain and at night, while chickens, goats and cattle settle out of view late at night. This keeps the world visually active during the day without adding persistent server AI.
+
+Animals are cosmetic ambient actors only: they do not become colliders, do not affect traffic authority, jobs, economy or player movement, and require no backend/database/Supabase migration.
