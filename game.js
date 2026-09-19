@@ -83,7 +83,10 @@ const puddleMaterials = [];
 const puddleRipples = [];
 const drainWaterSurfaces = [];
 const roofRunoffJets = [];
+const farVisualDetails = [];
 let monsoonWaterTimer = 0;
+let farVisualTimer = 0;
+let lastContactShadowUpdateAt = 0;
 const fruitGeometry = new THREE.SphereGeometry(.14, 6, 5);
 const fruitMaterial = new THREE.MeshStandardMaterial({ color: 0xe4a737, roughness: .72 });
 const birdBodyGeometry = new THREE.SphereGeometry(.10, 6, 5);
@@ -534,6 +537,9 @@ function attachContactShadow(root, radiusX = .48, radiusZ = .32, opacity = .18) 
 }
 
 function updateDynamicContactShadows(state) {
+  const now = performance.now();
+  if (now - lastContactShadowUpdateAt < 180) return;
+  lastContactShadowUpdateAt = now;
   const daylight = THREE.MathUtils.clamp(Number(state?.daylight ?? 1), 0, 1);
   const overcast = THREE.MathUtils.clamp(Number(state?.overcast || 0), 0, 1);
   const rain = THREE.MathUtils.clamp(Number(state?.rain || 0), 0, 1);
@@ -1904,7 +1910,7 @@ try {
   let walkPhase = 0;
   let cameraDriveImpulse = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
-  let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0;
+  let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0, interactionAccumulator = 0;
   const moveForward = new THREE.Vector3();
   const moveRight = new THREE.Vector3();
   const keys = new Set();
@@ -2096,7 +2102,8 @@ try {
     requestAnimationFrame(gameLoop);
     const delta = Math.min(clock.getDelta(), .05);
     villageTime += delta;
-    npcAccumulator += delta; trafficAccumulator += delta; mapAccumulator += delta;
+    updateFarVisualDetails(delta);
+    npcAccumulator += delta; trafficAccumulator += delta; mapAccumulator += delta; interactionAccumulator += delta;
     if (npcAccumulator >= (isMobile ? .10 : .05)) {
       updateVillagers(villageTime);
       updateAmbientAnimals(villageTime, npcAccumulator);
@@ -2104,7 +2111,10 @@ try {
     }
     if (trafficAccumulator >= (isMobile ? .05 : .025)) { updateTraffic(trafficAccumulator); trafficAccumulator = 0; }
     animateJobMissionVisual(villageTime);
-    updateWorldInteract();
+    if (interactionAccumulator >= .08) {
+      updateWorldInteract();
+      interactionAccumulator = 0;
+    }
     const keyboardX = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
     const keyboardY = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
     const controlX = Math.abs(keyboardX) > 0 ? keyboardX : inputX;
@@ -3203,6 +3213,25 @@ function addRoadsideLife(scene) {
 }
 
 
+function registerFarVisual(object, x, z, maxDistance = 52) {
+  if (!object) return object;
+  farVisualDetails.push({ object, x: Number(x), z: Number(z), maxDistance: Number(maxDistance) });
+  return object;
+}
+
+function updateFarVisualDetails(delta) {
+  farVisualTimer += delta;
+  if (farVisualTimer < .32 || !playerRef) return;
+  farVisualTimer = 0;
+  for (const detail of farVisualDetails) {
+    const distance = Math.hypot(
+      playerRef.position.x - detail.x,
+      playerRef.position.z - detail.z,
+    );
+    detail.object.visible = distance <= detail.maxDistance;
+  }
+}
+
 function createWorldSignTexture({
   title,
   subtitle = '',
@@ -3282,6 +3311,7 @@ function addRoadsideIdentitySigns(scene) {
     root.position.set(x, 0, z);
     root.rotation.y = rotation;
     applyDynamicHighQuality(root);
+    registerFarVisual(root, x, z, 60);
     scene.add(root);
   };
 
@@ -3327,6 +3357,7 @@ function addRoadsideIdentitySigns(scene) {
   milestone.position.set(10.1, 58.5, 0);
   milestone.rotation.y = Math.PI;
   applyDynamicHighQuality(milestone);
+  registerFarVisual(milestone, 10.1, 58.5, 58);
   scene.add(milestone);
 }
 
@@ -3376,6 +3407,8 @@ function addBusStop(scene, x, z, rotation = 0, stopName = 'KERALA PLAY') {
     height: 220,
   }, .44, .55);
   poleBoard.position.set(2.65, 2.36, .165);
+  registerFarVisual(stopBoard, x, z, 52);
+  registerFarVisual(poleBoard, x, z, 48);
 
   group.add(floor, roof, back, bench, benchBack, signPost, sign, stopBoard, poleBoard);
   group.position.set(x, 0, z);
@@ -3539,6 +3572,7 @@ function addRoadsideClutter(scene) {
     root.add(crate, crate2, bin);
     root.position.set(x, 0, z);
     root.rotation.y = index * .6;
+    registerFarVisual(root, x, z, 44);
     scene.add(root);
   });
 
@@ -3553,6 +3587,7 @@ function addRoadsideClutter(scene) {
     brace.position.y = .38;
     root.add(post, board, brace);
     root.position.set(x, 0, z);
+    registerFarVisual(root, x, z, 48);
     scene.add(root);
   });
 }
@@ -3593,6 +3628,8 @@ function addBananaPlant(scene, x, z, scale = 1, yaw = 0) {
   windVegetation.push({
     kind: 'banana',
     leaves,
+    x,
+    z,
     phase: windVegetation.length * 1.17 + x * .07 + z * .04,
   });
   scene.add(group);
@@ -3824,7 +3861,8 @@ function addTownStreetDetails(scene) {
 
 function updateWindWorld(time, delta) {
   windUpdateTimer += delta;
-  if (windUpdateTimer < .08) return;
+  const windInterval = isMobile ? .12 : .08;
+  if (windUpdateTimer < windInterval) return;
   windUpdateTimer = 0;
   const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
   const overcast = THREE.MathUtils.clamp(Number(worldWeatherState.overcast || 0), 0, 1);
@@ -3833,6 +3871,10 @@ function updateWindWorld(time, delta) {
   const wind = windStrength * Math.max(.24, gust);
 
   for (const item of windVegetation) {
+    if (playerRef && Number.isFinite(item.x) && Number.isFinite(item.z)) {
+      const distance = Math.hypot(playerRef.position.x - item.x, playerRef.position.z - item.z);
+      if (distance > 62) continue;
+    }
     const phase = Number(item.phase || 0);
     if (item.kind === 'palm') {
       const swayX = Math.sin(time * .86 + phase) * .011 * wind;
@@ -3898,13 +3940,21 @@ function updateWindWorld(time, delta) {
 
 function updateMonsoonWaterVisuals(time, delta) {
   monsoonWaterTimer += delta;
-  if (monsoonWaterTimer < .055) return;
+  const waterInterval = isMobile ? .09 : .055;
+  if (monsoonWaterTimer < waterInterval) return;
   monsoonWaterTimer = 0;
 
   const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
   const activeRain = THREE.MathUtils.smoothstep(rain, .08, .72);
 
   for (const ripple of puddleRipples) {
+    const rippleDistance = playerRef
+      ? Math.hypot(playerRef.position.x - ripple.mesh.position.x, playerRef.position.z - ripple.mesh.position.z)
+      : 0;
+    if (rippleDistance > 44) {
+      ripple.mesh.visible = false;
+      continue;
+    }
     const cycle = (time * (.48 + rain * .52) + ripple.phase) % 1;
     const scale = .42 + cycle * 2.15;
     ripple.mesh.scale.set(
@@ -3917,6 +3967,13 @@ function updateMonsoonWaterVisuals(time, delta) {
   }
 
   for (const flow of drainWaterSurfaces) {
+    const flowDistance = playerRef
+      ? Math.hypot(playerRef.position.x - flow.mesh.position.x, playerRef.position.z - flow.mesh.position.z)
+      : 0;
+    if (flowDistance > 58) {
+      flow.mesh.visible = false;
+      continue;
+    }
     const pulse = .86 + Math.sin(time * 2.1 + flow.phase) * .10;
     flow.material.opacity = activeRain * (.26 + rain * .42) * pulse;
     flow.material.roughness = Math.max(.055, .20 - rain * .11);
@@ -3944,7 +4001,9 @@ function buildWorld(scene) {
   puddleRipples.length = 0;
   drainWaterSurfaces.length = 0;
   roofRunoffJets.length = 0;
+  farVisualDetails.length = 0;
   monsoonWaterTimer = 0;
+  farVisualTimer = 0;
   const groundTexture = createGroundSurfaceTexture();
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(160, 160),
@@ -4621,6 +4680,17 @@ function updateTrafficWetEffects(vehicle, delta, rain, speedRatio, braking) {
     ? .055 + Number(worldWeatherState.overcast || 0) * .035 + rain * .065
     : rain > .55 ? .018 : 0;
 
+  const wetDistance = playerRef
+    ? Math.hypot(vehicle.position.x - playerRef.position.x, vehicle.position.z - playerRef.position.z)
+    : 0;
+  if (wetDistance > 46) {
+    wet.spray.visible = false;
+    for (const material of vehicle.userData.tailLightMaterials || []) {
+      material.emissiveIntensity = braking ? .86 : (worldWeatherState.needsLights ? .23 : .14);
+    }
+    return;
+  }
+
   if (wet.spray.visible) {
     wet.particles.forEach((particle, index) => {
       particle.life -= delta * (1.45 + speedRatio * 2.1 + rain * .6);
@@ -5016,6 +5086,9 @@ function updateAmbientAnimals(time, delta) {
   for (const animal of ambientAnimals) {
     const data = animal.userData.ambientAnimal;
     if (!data) continue;
+    const playerDistance = playerRef
+      ? Math.hypot(animal.position.x - playerRef.position.x, animal.position.z - playerRef.position.z)
+      : 0;
 
     if (data.kind === 'bird') {
       animal.visible = !night && rain < .62;
@@ -5037,6 +5110,7 @@ function updateAmbientAnimals(time, delta) {
     const hideAtNight = data.kind === 'chicken' || data.kind === 'goat' || data.kind === 'cow';
     animal.visible = !(hideAtNight && night);
     if (!animal.visible) continue;
+    if (playerDistance > 55) continue;
 
     const parts = data.parts || {};
     const phase = time * data.speed + data.phase;
@@ -5246,6 +5320,7 @@ function addHouse(scene, x, z, wallColor, roofColor) {
     height: 150,
   }, 1.38, .48);
   namePlate.position.set(-1.15, 3.24, 3.895);
+  registerFarVisual(namePlate, x, z, 46);
   const porchLampMaterial = new THREE.MeshStandardMaterial({
     color: 0xffedc2,
     emissive: 0xffc66c,
@@ -5367,6 +5442,7 @@ function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ
     accent: '#f0c45c',
   }, 5.28, .78);
   signText.position.set(0, 4.25, 2.985);
+  registerFarVisual(signText, x, z, 54);
   const shutterMat = new THREE.MeshStandardMaterial({ color: 0x6e5845, roughness: .96, metalness: .08 });
   const shutter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.05, .12), shutterMat);
   shutter.position.set(0, 1.82, 2.96);
@@ -5498,6 +5574,8 @@ function addTree(scene, x, z, scale, withFruit = false) {
   windVegetation.push({
     kind: 'tree',
     nodes: foliageNodes,
+    x,
+    z,
     phase: windVegetation.length * .93 + x * .045 - z * .03,
   });
   scene.add(group);
@@ -5610,6 +5688,8 @@ function addPalm(scene, x, z, scale) {
     kind: 'palm',
     fronds,
     stems,
+    x,
+    z,
     phase: windVegetation.length * .81 + x * .035 + z * .025,
   });
   scene.add(palm);
