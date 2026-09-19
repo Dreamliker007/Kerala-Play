@@ -419,3 +419,14 @@ Utility wires now use small dynamic vertex offsets between pole anchors, so they
 The vegetation/wire animation pass is throttled to roughly 12.5 updates per second rather than running full geometry/matrix updates every render frame, keeping the effect practical on mobile while preserving the always-High graphics policy.
 
 No backend, database, traffic, economy, ownership, collision or Supabase changes are required.
+
+
+## Monsoon Water Physics Visuals (V92)
+
+V92 deepens the monsoon presentation with lightweight water movement tied to the existing shared rain state.
+
+Road puddles now generate animated expanding ripple rings while rain is active. The roadside drainage channels gain visible water surfaces that fade in and become smoother/more reflective as rainfall increases. Kerala house downpipes also gain small runoff jets at their outlet shoes so the V84 gutter detail visibly carries rainwater.
+
+Vehicle tyre spray is denser and travels farther at higher speed and heavier rain, giving wet-road driving a more convincing wake without changing traction, braking or server-authoritative vehicle behavior.
+
+All water motion is cosmetic and locally rendered. The puddle/drain/runoff update pass is throttled to reduce mobile cost, and no fluid simulation, gameplay collision, backend, database, economy or Supabase changes are introduced.
