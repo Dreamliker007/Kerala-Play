@@ -517,7 +517,7 @@ function updateFootstepParticlePool(pool, delta, gravity, drag) {
   if (active > 0) pool.attribute.needsUpdate = true;
 }
 
-function updateFootstepEffects(delta, player, moving, running) {
+function updateFootstepEffects(delta, player, moving, running, phase = 0) {
   const effects = ensureFootstepEffects(sceneRef);
   if (!effects || !player) return;
 
@@ -528,7 +528,7 @@ function updateFootstepEffects(delta, player, moving, running) {
   const shadow = player.userData?.shadow;
   if (shadow) {
     const pulse = vehicleMode === 'walk' && moving
-      ? Math.abs(Math.sin(walkPhase)) * (running ? .045 : .025)
+      ? Math.abs(Math.sin(phase)) * (running ? .045 : .025)
       : 0;
     const targetX = 1 + pulse;
     const targetY = 1 - pulse * .42;
@@ -541,7 +541,7 @@ function updateFootstepEffects(delta, player, moving, running) {
     return;
   }
 
-  const beat = Math.floor(walkPhase / Math.PI);
+  const beat = Math.floor(phase / Math.PI);
   if (beat === lastFootstepBeat) return;
   lastFootstepBeat = beat;
   footstepSide *= -1;
@@ -2356,8 +2356,9 @@ try {
           // movement joystick is released. Releasing RUN stops auto-run.
           desiredMove.set(Math.sin(player.rotation.y), 0, Math.cos(player.rotation.y));
         } else {
-          moveForward.set(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
-          moveRight.set(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
+          const screenForwardYaw = cameraYaw + Math.PI;
+          moveForward.set(Math.sin(screenForwardYaw), 0, Math.cos(screenForwardYaw));
+          moveRight.set(Math.cos(screenForwardYaw), 0, -Math.sin(screenForwardYaw));
           desiredMove.copy(moveForward).multiplyScalar(-controlY).addScaledVector(moveRight, controlX);
           if (desiredMove.lengthSq() > .0001) desiredMove.normalize();
         }
@@ -2402,7 +2403,11 @@ try {
       }
     }
 
-    updateFootstepEffects(delta, player, movingNow, runHeld);
+    try {
+      updateFootstepEffects(delta, player, movingNow, runHeld, walkPhase);
+    } catch (error) {
+      console.error('Footstep visual error:', error);
+    }
 
     const drivingCamera = vehicleMode !== 'walk';
     const walkingMotion = !drivingCamera && movingNow ? (runHeld ? 1 : .62) : 0;
