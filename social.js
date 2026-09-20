@@ -122,6 +122,19 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const starterDelivery = $('starter-delivery');
   const walletRefresh = $('wallet-refresh');
   const walletShop = $('wallet-shop');
+  const worldShopPanel = $('world-shop-panel');
+  const worldShopClose = $('world-shop-close');
+  const worldShopName = $('world-shop-name');
+  const worldShopNote = $('world-shop-note');
+  const worldShopItems = $('world-shop-items');
+  const worldShopError = $('world-shop-error');
+  let worldShopContext = null;
+  const worldShopCatalog = Object.freeze({
+    water: Object.freeze({ icon: '💧', name: 'Water', price: 15, effect: 'Thirst +35 · Energy +1' }),
+    tea: Object.freeze({ icon: '☕', name: 'Tea', price: 20, effect: 'Thirst +16 · Energy +10' }),
+    snack: Object.freeze({ icon: '🥨', name: 'Snack', price: 35, effect: 'Hunger +22 · Energy +5' }),
+    meal: Object.freeze({ icon: '🍛', name: 'Kerala Meal', price: 80, effect: 'Hunger +48 · Thirst +6 · Energy +8' }),
+  });
   const bankBalance = $('bank-balance');
   const bankAccount = $('bank-account');
   const bankUpiId = $('bank-upi-id');
@@ -203,7 +216,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function closePanels() {
     cancelRecording(); stopTalking();
-    for (const panel of [peoplePanel, dmPanel, chatPanel, phonePanel, walletPanel, homePanel, garagePanel, jobsPanel]) panel?.classList.remove('open');
+    for (const panel of [peoplePanel, dmPanel, chatPanel, phonePanel, walletPanel, homePanel, garagePanel, jobsPanel, worldShopPanel]) panel?.classList.remove('open');
     peopleToggle?.setAttribute('aria-expanded', 'false');
     chatToggle?.setAttribute('aria-expanded', 'false');
     phoneToggle?.setAttribute('aria-expanded', 'false');
@@ -691,6 +704,47 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     showPanel(walletPanel);
     run(refreshFinance, walletError);
   }
+
+  function lifeLoopSuggestion() {
+    const hunger = Number(needsSnapshot?.hunger ?? 100);
+    const thirst = Number(needsSnapshot?.thirst ?? 100);
+    const energy = Number(needsSnapshot?.energy ?? 100);
+    if (thirst <= 25) return 'Next: get water from a village shop';
+    if (hunger <= 25) return 'Next: get food from a village shop';
+    if (energy <= 25) return 'Next: rest at the bench or sleep at home';
+    if (homeSnapshot?.accessBlocked || homeSnapshot?.rentOverdue || homeSnapshot?.utilityOverdue) return 'Next: check HOME bills';
+    return 'Next: save, shop, explore or start another job';
+  }
+
+  function openWorldShop(detail) {
+    if (!requireUser() || !worldShopPanel || !worldShopItems) return;
+    const shopId = String(detail?.shopId || '');
+    const label = String(detail?.label || 'Village Shop');
+    const items = Array.isArray(detail?.items) ? detail.items.filter(id => worldShopCatalog[id]) : [];
+    if (!shopId || !items.length) return;
+    worldShopContext = {
+      shopId,
+      label,
+      items,
+      suggestedItemId: String(detail?.suggestedItemId || ''),
+    };
+    if (worldShopName) worldShopName.textContent = label;
+    if (worldShopNote) worldShopNote.textContent = 'Choose an item. The server confirms that you are still standing near this shop.';
+    if (worldShopError) worldShopError.textContent = '';
+    worldShopItems.replaceChildren();
+    for (const itemId of items) {
+      const item = worldShopCatalog[itemId];
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.worldShopItem = itemId;
+      const suggested = itemId === worldShopContext.suggestedItemId;
+      button.innerHTML = `${item.icon} ${item.name} · ${formatCash(item.price)}<small>${item.effect}${suggested ? ' · Suggested for you' : ''}</small>`;
+      if (suggested) button.setAttribute('aria-label', `${item.name}, suggested, ${formatCash(item.price)}`);
+      worldShopItems.append(button);
+    }
+    showPanel(worldShopPanel);
+  }
+
   function homeDueText(timestamp, overdue) {
     const date = new Date(Number(timestamp));
     const label = Number.isNaN(date.getTime()) ? 'Due date unavailable' : date.toLocaleString();
@@ -1053,7 +1107,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/complete`, { taskId: active.taskId });
       renderJobs(result.jobs);
       renderWallet(result.wallet);
-      toast(`${result.completed.title} salary credited · ${formatCash(result.reward)}`);
+      await Promise.all([refreshNeeds().catch(() => null), refreshHome().catch(() => null)]);
+      toast(`${result.completed.title} salary credited · ${formatCash(result.reward)} · ${lifeLoopSuggestion()}`);
     }
   }
   window.addEventListener('kerala-job-interact', () => run(performWorldJobInteraction));
@@ -1744,7 +1799,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         renderJobs(result.jobs); toast(`${result.checkpoint.action} complete · next mission step ready`);
       } else {
         const result = await api(`/api/jobs/${encodeURIComponent(action.dataset.jobId)}/complete`, { taskId: action.dataset.taskId, reward: 999999 });
-        renderJobs(result.jobs); renderWallet(result.wallet); toast(`${result.completed.title} salary credited · ${formatCash(result.reward)}`);
+        renderJobs(result.jobs);
+        renderWallet(result.wallet);
+        await Promise.all([refreshNeeds().catch(() => null), refreshHome().catch(() => null)]);
+        toast(`${result.completed.title} salary credited · ${formatCash(result.reward)} · ${lifeLoopSuggestion()}`);
       }
     }, jobsError).finally(() => { if (jobsPanel?.classList.contains('open')) run(refreshJobs, jobsError); });
   });
@@ -1890,21 +1948,39 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     toast(result.rested ? `Rest complete · Energy +${result.restored}` : (result.message || 'Energy is already full'));
   }, walletError));
 
-  window.addEventListener('kerala-world-shop', event => run(async () => {
-    const shopId = String(event.detail?.shopId || '');
-    const itemId = String(event.detail?.itemId || '');
-    if (!shopId || !itemId) return;
-    const result = await api('/api/world/shop/purchase', { shopId, itemId });
-    if (result.wallet) renderWallet(result.wallet);
-    if (result.needs) renderNeeds(result.needs);
-    const effects = result.purchase?.needs || {};
-    const restored = [
-      effects.hunger ? `Hunger +${effects.hunger}` : '',
-      effects.thirst ? `Thirst +${effects.thirst}` : '',
-      effects.energy ? `Energy +${effects.energy}` : '',
-    ].filter(Boolean).join(' · ');
-    toast(`${result.shop?.label || 'Shop'} · ${result.purchase?.name || 'Purchase'} · ${formatCash(result.purchase?.price || 0)}${restored ? ` · ${restored}` : ''}`);
-  }, walletError));
+  window.addEventListener('kerala-open-home', openHome);
+  window.addEventListener('kerala-world-shop-open', event => openWorldShop(event.detail));
+
+  worldShopClose?.addEventListener('click', () => {
+    worldShopPanel?.classList.remove('open');
+    worldShopContext = null;
+  });
+
+  worldShopItems?.addEventListener('click', event => {
+    const button = event.target.closest('button[data-world-shop-item]');
+    if (!button || button.disabled || !worldShopContext) return;
+    run(async () => {
+      button.disabled = true;
+      if (worldShopError) worldShopError.textContent = '';
+      const itemId = String(button.dataset.worldShopItem || '');
+      const result = await api('/api/world/shop/purchase', {
+        shopId: worldShopContext.shopId,
+        itemId,
+      });
+      if (result.wallet) renderWallet(result.wallet);
+      if (result.needs) renderNeeds(result.needs);
+      const effects = result.purchase?.needs || {};
+      const restored = [
+        effects.hunger ? `Hunger +${effects.hunger}` : '',
+        effects.thirst ? `Thirst +${effects.thirst}` : '',
+        effects.energy ? `Energy +${effects.energy}` : '',
+      ].filter(Boolean).join(' · ');
+      toast(`${result.shop?.label || worldShopContext.label} · ${result.purchase?.name || 'Purchase'} · ${formatCash(result.purchase?.price || 0)}${restored ? ` · ${restored}` : ''}`);
+      if (worldShopNote) worldShopNote.textContent = `Purchase complete · ${lifeLoopSuggestion()}`;
+    }, worldShopError).finally(() => {
+      if (button.isConnected) button.disabled = false;
+    });
+  });
 
 
   garageMarket?.addEventListener('click', event => {
