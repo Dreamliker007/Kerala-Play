@@ -1,215 +1,26 @@
-const VERSION = 'V102.1';
-window.KERALA_PLAY_VERSION = VERSION;
+const VERSION='V102.2';
+window.KERALA_PLAY_VERSION=VERSION;
 
-const style = document.createElement('style');
-style.textContent = `
-  #ride-assist { position:absolute; z-index:10; left:50%; top:calc(env(safe-area-inset-top) + 56px); transform:translateX(-50%); display:none; border:1px solid rgba(255,221,119,.5); border-radius:11px; padding:6px 10px; color:#fff8d8; background:rgba(55,45,10,.82); box-shadow:0 4px 16px rgba(0,0,0,.22); font:900 9px/1.2 system-ui,sans-serif; letter-spacing:.3px; cursor:pointer; pointer-events:auto; touch-action:manipulation; backdrop-filter:blur(5px); }
-  #ride-assist.active { display:block; }
-  #ride-panel { position:fixed; z-index:80; inset:0; display:grid; place-items:center; padding:20px; background:rgba(1,12,16,.56); backdrop-filter:blur(4px); }
-  #ride-panel[hidden] { display:none; }
-  .ride-card { width:min(390px,92vw); max-height:min(82dvh,470px); overflow:auto; padding:14px; border:1px solid rgba(255,226,132,.44); border-radius:18px; color:#f5fff9; background:rgba(7,31,35,.98); box-shadow:0 18px 54px rgba(0,0,0,.48); font-family:system-ui,sans-serif; }
-  .ride-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .ride-head strong { font-size:15px; }
-  #ride-close { border:0; border-radius:8px; padding:4px 8px; color:#fff; background:rgba(255,255,255,.12); font-size:18px; cursor:pointer; }
-  #ride-destination { margin:8px 0 3px; color:#fff4bf; font-size:12px; font-weight:900; }
-  #ride-summary { margin:0 0 10px; color:#bad8cd; font-size:9px; font-weight:700; }
-  #ride-options { display:grid; gap:8px; }
-  .ride-option { width:100%; min-height:66px; display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:9px 11px; color:#fff; background:rgba(255,255,255,.06); text-align:left; cursor:pointer; touch-action:manipulation; }
-  .ride-option.recommended { border-color:rgba(118,235,161,.64); background:rgba(48,132,84,.20); }
-  .ride-option:disabled { opacity:.46; cursor:not-allowed; }
-  .ride-option strong,.ride-option small { display:block; }
-  .ride-option strong { font-size:12px; }
-  .ride-option small { margin-top:3px; color:#b9d8cd; font-size:8px; font-weight:700; }
-  .ride-fare { color:#ffe895; font-size:12px; font-weight:900; white-space:nowrap; }
-  #ride-status { min-height:18px; margin-top:9px; color:#d8f4e4; font-size:9px; font-weight:800; }
-  #ride-progress { height:4px; margin-top:7px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.09); }
-  #ride-progress i { display:block; width:0%; height:100%; background:linear-gradient(90deg,#72d99d,#ffe185); transition:width .45s ease; }
-  @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) {
-    #ride-assist { top:calc(env(safe-area-inset-top) + 42px); font-size:8px; padding:5px 8px; }
-    .ride-card { width:min(420px,58vw); max-height:88dvh; padding:10px; border-radius:13px; }
-    .ride-option { min-height:52px; padding:7px 9px; }
-  }
+const style=document.createElement('style');
+style.textContent=`
+#ride-assist{position:absolute;z-index:10;left:50%;top:calc(env(safe-area-inset-top) + 56px);transform:translateX(-50%);display:none;border:1px solid rgba(255,221,119,.5);border-radius:11px;padding:6px 10px;color:#fff8d8;background:rgba(55,45,10,.82);box-shadow:0 4px 16px rgba(0,0,0,.22);font:900 9px/1.2 system-ui,sans-serif;letter-spacing:.3px;cursor:pointer;pointer-events:auto;touch-action:manipulation;backdrop-filter:blur(5px)}
+#ride-assist.active{display:block}#ride-panel{position:fixed;z-index:80;inset:0;display:grid;place-items:center;padding:20px;background:rgba(1,12,16,.56);backdrop-filter:blur(4px)}#ride-panel[hidden]{display:none}.ride-card{width:min(390px,92vw);max-height:min(82dvh,470px);overflow:auto;padding:14px;border:1px solid rgba(255,226,132,.44);border-radius:18px;color:#f5fff9;background:rgba(7,31,35,.98);box-shadow:0 18px 54px rgba(0,0,0,.48);font-family:system-ui,sans-serif}.ride-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.ride-head strong{font-size:15px}#ride-close{border:0;border-radius:8px;padding:4px 8px;color:#fff;background:rgba(255,255,255,.12);font-size:18px;cursor:pointer}#ride-destination{margin:8px 0 3px;color:#fff4bf;font-size:12px;font-weight:900}#ride-summary{margin:0 0 10px;color:#bad8cd;font-size:9px;font-weight:700}#ride-options{display:grid;gap:8px}.ride-option{width:100%;min-height:66px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:9px 11px;color:#fff;background:rgba(255,255,255,.06);text-align:left;cursor:pointer;touch-action:manipulation}.ride-option.recommended{border-color:rgba(118,235,161,.64);background:rgba(48,132,84,.20)}.ride-option:disabled{opacity:.46;cursor:not-allowed}.ride-option strong,.ride-option small{display:block}.ride-option strong{font-size:12px}.ride-option small{margin-top:3px;color:#b9d8cd;font-size:8px;font-weight:700}.ride-fare{color:#ffe895;font-size:12px;font-weight:900;white-space:nowrap}#ride-status{min-height:18px;margin-top:9px;color:#d8f4e4;font-size:9px;font-weight:800}#ride-progress{height:4px;margin-top:7px;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.09)}#ride-progress i{display:block;width:0%;height:100%;background:linear-gradient(90deg,#72d99d,#ffe185);transition:width .45s ease}@media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse){#ride-assist{top:calc(env(safe-area-inset-top) + 42px);font-size:8px;padding:5px 8px}.ride-card{width:min(420px,58vw);max-height:88dvh;padding:10px;border-radius:13px}.ride-option{min-height:52px;padding:7px 9px}}
 `;
 document.head.append(style);
-
-const rideButton = document.createElement('button');
-rideButton.id = 'ride-assist';
-rideButton.type = 'button';
-rideButton.textContent = '🛺 CALL RIDE';
-rideButton.setAttribute('aria-label', 'Call auto-rickshaw or taxi to current destination');
-(document.querySelector('#hud') || document.body).append(rideButton);
-
-const panel = document.createElement('section');
-panel.id = 'ride-panel';
-panel.hidden = true;
-panel.setAttribute('role', 'dialog');
-panel.setAttribute('aria-modal', 'true');
-panel.setAttribute('aria-label', 'Book a ride');
-panel.innerHTML = `
-  <div class="ride-card">
-    <div class="ride-head"><strong>🛺 Local Ride</strong><button id="ride-close" type="button" aria-label="Close ride panel">×</button></div>
-    <div id="ride-destination">Choose a destination on the map</div>
-    <p id="ride-summary">Auto-rickshaw for local trips · taxi for longer travel.</p>
-    <div id="ride-options"></div>
-    <div id="ride-status" role="status"></div>
-    <div id="ride-progress" aria-hidden="true"><i></i></div>
-  </div>
-`;
-document.body.append(panel);
-
-const closeButton = panel.querySelector('#ride-close');
-const destinationText = panel.querySelector('#ride-destination');
-const summary = panel.querySelector('#ride-summary');
-const options = panel.querySelector('#ride-options');
-const status = panel.querySelector('#ride-status');
-const progress = panel.querySelector('#ride-progress i');
-
-let destination = null;
-let quote = null;
-let busy = false;
-
-function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-async function request(path, body) {
-  const response = await fetch(path, {
-    method: body === undefined ? 'GET' : 'POST',
-    credentials: 'same-origin',
-    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  let result = null;
-  try { result = await response.json(); } catch { /* handled below */ }
-  if (!response.ok) {
-    const error = new Error(result?.error || result?.message || `Ride request failed (${response.status}).`);
-    error.status = response.status;
-    throw error;
-  }
-  return result;
-}
-
-function closePanel({ cancel = false } = {}) {
-  if (busy) return;
-  panel.hidden = true;
-  if (cancel) window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));
-}
-
-function recommendedService(data) {
-  const auto = data?.options?.find(option => option.id === 'auto' && option.available);
-  return auto && Number(data.distance) <= 58 ? 'auto' : 'taxi';
-}
-
-function renderQuote(data) {
-  quote = data;
-  options.replaceChildren();
-  destinationText.textContent = data.destination?.label || destination?.name || 'Destination';
-  summary.textContent = `${Math.ceil(Number(data.distance || 0))} m away · Wallet ₹${Number(data.walletBalance || 0)} · choose your ride`;
-  const recommended = recommendedService(data);
-  for (const option of data.options || []) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `ride-option${option.id === recommended && option.available ? ' recommended' : ''}`;
-    button.dataset.serviceId = option.id;
-    button.disabled = !option.available || Number(data.walletBalance || 0) < Number(option.fare || 0);
-    const copy = document.createElement('span');
-    const title = document.createElement('strong');
-    title.textContent = option.id === 'auto' ? '🛺 Auto-rickshaw' : '🚕 Kerala Taxi';
-    const meta = document.createElement('small');
-    meta.textContent = option.available
-      ? `Pickup ~${option.pickupSeconds}s · travel ~${option.travelSeconds}s${option.id === recommended ? ' · Suggested' : ''}`
-      : 'Not available for this distance';
-    copy.append(title, meta);
-    const fare = document.createElement('span');
-    fare.className = 'ride-fare';
-    fare.textContent = `₹${option.fare}`;
-    button.append(copy, fare);
-    options.append(button);
-  }
-}
-
-async function openRidePanel() {
-  if (!destination || busy) return;
-  panel.hidden = false;
-  options.replaceChildren();
-  destinationText.textContent = destination.name || 'Destination';
-  summary.textContent = 'Checking current distance and fares…';
-  status.textContent = '';
-  progress.style.width = '0%';
-  try {
-    const data = await request(`/api/travel/ride/quote?destinationId=${encodeURIComponent(destination.id)}`);
-    renderQuote(data);
-  } catch (error) {
-    quote = null;
-    summary.textContent = error.message;
-  }
-}
-
-async function bookRide(serviceId) {
-  if (busy || !destination || !quote) return;
-  const selected = quote.options?.find(option => option.id === serviceId);
-  if (!selected?.available) return;
-  busy = true;
-  for (const button of options.querySelectorAll('button')) button.disabled = true;
-  closeButton.disabled = true;
-  status.textContent = `${selected.label} requested · driver coming to you…`;
-  progress.style.width = '18%';
-  window.dispatchEvent(new CustomEvent('kerala-ride-booking-start', {
-    detail: { serviceId, serviceLabel: selected.label, destinationId: destination.id },
-  }));
-  try {
-    const result = await request('/api/travel/ride/book', {
-      destinationId: destination.id,
-      serviceId,
-    });
-    progress.style.width = '42%';
-    await wait(800);
-    status.textContent = `${result.ride.serviceLabel} arrived · boarding…`;
-    await wait(650);
-    window.dispatchEvent(new CustomEvent('kerala-ride-travel-start', { detail: result.ride }));
-    progress.style.width = '68%';
-    status.textContent = `Travelling to ${result.ride.to.label}…`;
-    await wait(Math.min(2400, 900 + Number(result.ride.travelSeconds || 3) * 80));
-    progress.style.width = '100%';
-    window.dispatchEvent(new CustomEvent('kerala-public-travel-arrival', { detail: result.ride }));
-    window.dispatchEvent(new CustomEvent('kerala-public-ride-complete', { detail: result }));
-    destination = null;
-    quote = null;
-    rideButton.classList.remove('active');
-    status.textContent = `Arrived at ${result.ride.to.label} · fare ₹${result.ride.fare}`;
-    await wait(650);
-    panel.hidden = true;
-  } catch (error) {
-    status.textContent = error.message;
-    progress.style.width = '0%';
-    window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));
-  } finally {
-    busy = false;
-    closeButton.disabled = false;
-    for (const button of options.querySelectorAll('button')) button.disabled = false;
-  }
-}
-
-window.addEventListener('kerala-destination-selected', event => {
-  const next = event.detail || null;
-  destination = next?.id ? next : null;
-  quote = null;
-  rideButton.classList.toggle('active', !!destination);
-  if (destination) rideButton.setAttribute('aria-label', `Call a ride to ${destination.name}`);
-});
-
-window.addEventListener('kerala-destination-cleared', () => {
-  destination = null;
-  quote = null;
-  rideButton.classList.remove('active');
-  if (!busy) panel.hidden = true;
-});
-
-rideButton.addEventListener('click', openRidePanel);
-closeButton.addEventListener('click', () => closePanel({ cancel: true }));
-panel.addEventListener('click', event => {
-  if (event.target === panel) closePanel({ cancel: true });
-});
-options.addEventListener('click', event => {
-  const button = event.target.closest('button[data-service-id]');
-  if (!button || button.disabled) return;
-  bookRide(String(button.dataset.serviceId || ''));
-});
+const rideButton=document.createElement('button');rideButton.id='ride-assist';rideButton.type='button';rideButton.textContent='🛺 CALL RIDE';rideButton.setAttribute('aria-label','Call auto-rickshaw or taxi to current destination');(document.querySelector('#hud')||document.body).append(rideButton);
+const panel=document.createElement('section');panel.id='ride-panel';panel.hidden=true;panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','Book a ride');panel.innerHTML=`<div class="ride-card"><div class="ride-head"><strong>🛺 Local Ride</strong><button id="ride-close" type="button" aria-label="Close ride panel">×</button></div><div id="ride-destination">Choose a destination on the map</div><p id="ride-summary">Auto-rickshaw for local trips · taxi for longer travel.</p><div id="ride-options"></div><div id="ride-status" role="status"></div><div id="ride-progress" aria-hidden="true"><i></i></div></div>`;document.body.append(panel);
+const closeButton=panel.querySelector('#ride-close'),destinationText=panel.querySelector('#ride-destination'),summary=panel.querySelector('#ride-summary'),options=panel.querySelector('#ride-options'),status=panel.querySelector('#ride-status'),progress=panel.querySelector('#ride-progress i');
+let destination=null,quote=null,busy=false;
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+async function request(path,body){const method=body===undefined?'GET':'POST',attempts=method==='GET'?2:1;for(let attempt=0;attempt<attempts;attempt++){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);let response;try{response=await fetch(path,{method,credentials:'same-origin',signal:controller.signal,headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});}catch(error){clearTimeout(timer);if(attempt+1<attempts){await wait(700);continue;}throw new Error(error?.name==='AbortError'?'Ride service took too long. Please try again.':'Cannot reach the ride service. Please try again.');}clearTimeout(timer);let result=null;try{result=await response.json();}catch{}if(!response.ok){if(attempt+1<attempts&&[429,502,503,504].includes(response.status)){await wait(700);continue;}const error=new Error(result?.error||result?.message||`Ride request failed (${response.status}).`);error.status=response.status;throw error;}return result;}throw new Error('Ride service is temporarily unavailable. Please try again.');}
+function closePanel({cancel=false}={}){if(busy)return;panel.hidden=true;if(cancel)window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));}
+function recommendedService(data){const auto=data?.options?.find(o=>o.id==='auto'&&o.available);return auto&&Number(data.distance)<=58?'auto':'taxi';}
+function optionAllowed(option,data=quote){return !!option?.available&&Number(data?.walletBalance||0)>=Number(option?.fare||0);}
+function restoreOptionStates(){for(const button of options.querySelectorAll('button[data-service-id]')){const selected=quote?.options?.find(o=>o.id===button.dataset.serviceId);button.disabled=!optionAllowed(selected);}}
+function renderQuote(data){quote=data;options.replaceChildren();destinationText.textContent=data.destination?.label||destination?.name||'Destination';summary.textContent=`${Math.ceil(Number(data.distance||0))} m away · Wallet ₹${Number(data.walletBalance||0)} · choose your ride`;const recommended=recommendedService(data);for(const option of data.options||[]){const button=document.createElement('button');button.type='button';button.className=`ride-option${option.id===recommended&&option.available?' recommended':''}`;button.dataset.serviceId=option.id;button.disabled=!optionAllowed(option,data);const copy=document.createElement('span'),title=document.createElement('strong'),meta=document.createElement('small'),fare=document.createElement('span');title.textContent=option.id==='auto'?'🛺 Auto-rickshaw':'🚕 Kerala Taxi';meta.textContent=option.available?`Pickup ~${option.pickupSeconds}s · travel ~${option.travelSeconds}s${option.id===recommended?' · Suggested':''}`:'Not available for this distance';copy.append(title,meta);fare.className='ride-fare';fare.textContent=`₹${option.fare}`;button.append(copy,fare);options.append(button);}}
+async function openRidePanel(){if(!destination||busy)return;panel.hidden=false;options.replaceChildren();destinationText.textContent=destination.name||'Destination';summary.textContent='Checking current distance and fares…';status.textContent='';progress.style.width='0%';try{renderQuote(await request(`/api/travel/ride/quote?destinationId=${encodeURIComponent(destination.id)}`));}catch(error){quote=null;summary.textContent=error.message;status.textContent='Tap CALL RIDE to retry.';}}
+async function refreshQuote(){if(!destination)return;try{renderQuote(await request(`/api/travel/ride/quote?destinationId=${encodeURIComponent(destination.id)}`));}catch{restoreOptionStates();}}
+async function bookRide(serviceId){if(busy||!destination||!quote)return;const selected=quote.options?.find(o=>o.id===serviceId);if(!optionAllowed(selected))return;busy=true;for(const button of options.querySelectorAll('button'))button.disabled=true;closeButton.disabled=true;status.textContent=`${selected.label} requested · driver coming to you…`;progress.style.width='18%';window.dispatchEvent(new CustomEvent('kerala-ride-booking-start',{detail:{serviceId,serviceLabel:selected.label,destinationId:destination.id}}));try{const result=await request('/api/travel/ride/book',{destinationId:destination.id,serviceId});progress.style.width='42%';await wait(800);status.textContent=`${result.ride.serviceLabel} arrived · boarding…`;await wait(650);window.dispatchEvent(new CustomEvent('kerala-ride-travel-start',{detail:result.ride}));progress.style.width='68%';status.textContent=`Travelling to ${result.ride.to.label}…`;await wait(Math.min(2400,900+Number(result.ride.travelSeconds||3)*80));progress.style.width='100%';window.dispatchEvent(new CustomEvent('kerala-public-travel-arrival',{detail:result.ride}));window.dispatchEvent(new CustomEvent('kerala-public-ride-complete',{detail:result}));destination=null;quote=null;rideButton.classList.remove('active');status.textContent=`Arrived at ${result.ride.to.label} · fare ₹${result.ride.fare}`;await wait(650);panel.hidden=true;}catch(error){status.textContent=error.message;progress.style.width='0%';window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));}finally{busy=false;closeButton.disabled=false;if(destination)await refreshQuote();else restoreOptionStates();}}
+window.addEventListener('kerala-destination-selected',event=>{const next=event.detail||null;destination=next?.id?next:null;quote=null;rideButton.classList.toggle('active',!!destination);if(destination)rideButton.setAttribute('aria-label',`Call a ride to ${destination.name}`);});
+window.addEventListener('kerala-destination-cleared',()=>{destination=null;quote=null;rideButton.classList.remove('active');if(!busy)panel.hidden=true;});
+rideButton.addEventListener('click',openRidePanel);closeButton.addEventListener('click',()=>closePanel({cancel:true}));panel.addEventListener('click',event=>{if(event.target===panel)closePanel({cancel:true});});options.addEventListener('click',event=>{const button=event.target.closest('button[data-service-id]');if(!button||button.disabled)return;bookRide(String(button.dataset.serviceId||''));});
