@@ -35,6 +35,20 @@ await mkdir(DATA_DIR, { recursive: true });
 // Supabase is authoritative at process start. The JSON file is only a runtime
 // cache for the existing API server while the migration remains incremental.
 const remoteDatabase = await store.load();
+const recoveryProbeUser = remoteDatabase.users.find(user => String(user.username || '').toLowerCase() === 'anson');
+console.log('[Kerala Play] recovery probe Anson:', recoveryProbeUser ? JSON.stringify({
+  exists: true,
+  username: recoveryProbeUser.username,
+  firstName: recoveryProbeUser.firstName || '',
+  district: recoveryProbeUser.district,
+  gender: recoveryProbeUser.gender,
+  points: Number(recoveryProbeUser.points || 0),
+  walletBalance: Number(recoveryProbeUser.walletBalance || 0),
+  completedTasks: Array.isArray(recoveryProbeUser.completedTasks) ? recoveryProbeUser.completedTasks : [],
+  visitedLandmarks: Array.isArray(recoveryProbeUser.visitedLandmarks) ? recoveryProbeUser.visitedLandmarks : [],
+  walkMeters: Number(recoveryProbeUser.walkMeters || 0),
+  createdAt: Number(recoveryProbeUser.createdAt || 0)
+}) : JSON.stringify({ exists: false }));
 const initialSnapshot = JSON.stringify(remoteDatabase);
 await atomicWrite(DATABASE_PATH, initialSnapshot);
 
