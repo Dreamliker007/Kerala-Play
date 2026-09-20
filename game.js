@@ -139,6 +139,7 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
 ]);
 let lastWorldActivityAt = 0;
 let lifeLoopAction = 'jobs';
+let busTravelStatus = null;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
@@ -1334,12 +1335,9 @@ function performWorldActivity(activityId) {
   lastWorldActivityAt = performance.now();
 
   if (spot.kind === 'bus') {
-    const phase = spot.id === 'town-bus' ? 1.4 : 3.2;
-    const minutes = 2 + Math.floor(((villageTime * .18 + phase) % 5 + 5) % 5);
-    const destination = spot.id === 'town-bus' ? 'South Stop' : 'Town Junction';
-    showToast(`Village Line · ${spot.label} → ${destination} · next bus about ${minutes} min`, 3800);
+    showToast(`${spot.label} · checking Village Line timetable…`, 2200);
     window.dispatchEvent(new CustomEvent('kerala-bus-stop-view', {
-      detail: { routeId: 'village-line', stopId: spot.id, destination, minutes },
+      detail: { routeId: 'village-line', stopId: spot.id },
     }));
     return;
   }
@@ -1484,11 +1482,41 @@ function updateWorldInteract() {
         worldInteract.title = closeEnough
           ? `${spot.label} · suggested: ${item.name}`
           : worldInteract.title;
+      } else if (spot.kind === 'bus') {
+        const status = busTravelStatus?.stop?.id === spot.id ? busTravelStatus : null;
+        const serverOffset = Number(status?.serverNow || 0) - Number(status?.receivedAt || 0);
+        const travelNow = Date.now() + (Number.isFinite(serverOffset) ? serverOffset : 0);
+        const arrivalAt = Number(status?.arrivalAt || 0);
+        const boardingUntil = Number(status?.boardingUntil || 0);
+        const boarding = !!status && travelNow >= arrivalAt && travelNow <= boardingUntil;
+        const waiting = !!status && travelNow < arrivalAt;
+        if (status && travelNow > boardingUntil) busTravelStatus = null;
+
+        worldInteract.dataset.activity = closeEnough ? spot.id : '';
+        if (!closeEnough) {
+          worldInteract.dataset.mode = '';
+          worldInteract.textContent = `NEARBY · ${spot.label.toUpperCase()}`;
+        } else if (boarding) {
+          worldInteract.dataset.mode = 'bus-board';
+          worldInteract.dataset.activity = spot.id;
+          worldInteract.textContent = `BOARD BUS · ₹${Number(status.fare || 0)}`;
+          worldInteract.title = `${status.routeLabel || 'Village Line'} → ${status.destination?.label || 'next stop'} · boarding now`;
+        } else if (waiting) {
+          const seconds = Math.max(1, Math.ceil((arrivalAt - travelNow) / 1000));
+          worldInteract.dataset.mode = 'bus-check';
+          worldInteract.dataset.activity = spot.id;
+          worldInteract.textContent = `WAIT BUS · ${seconds}s`;
+          worldInteract.title = `${status.routeLabel || 'Village Line'} → ${status.destination?.label || 'next stop'} · fare ₹${Number(status.fare || 0)}`;
+        } else {
+          worldInteract.dataset.mode = 'world-activity';
+          worldInteract.dataset.activity = spot.id;
+          worldInteract.textContent = 'CHECK BUS TIMES';
+        }
       } else {
         worldInteract.dataset.mode = closeEnough ? 'world-activity' : '';
         worldInteract.dataset.activity = closeEnough ? spot.id : '';
         worldInteract.textContent = closeEnough
-          ? (spot.kind === 'bus' ? 'CHECK BUS TIMES' : 'ENJOY POND VIEW')
+          ? 'ENJOY POND VIEW'
           : `NEARBY · ${spot.label.toUpperCase()}`;
       }
       return;
@@ -1582,6 +1610,14 @@ worldInteract?.addEventListener('click', () => {
         },
       }));
     }
+  } else if (worldInteract.dataset.mode === 'bus-check') {
+    window.dispatchEvent(new CustomEvent('kerala-bus-stop-view', {
+      detail: { routeId: 'village-line', stopId: worldInteract.dataset.activity },
+    }));
+  } else if (worldInteract.dataset.mode === 'bus-board') {
+    window.dispatchEvent(new CustomEvent('kerala-bus-board', {
+      detail: { routeId: 'village-line', stopId: worldInteract.dataset.activity },
+    }));
   } else if (worldInteract.dataset.mode === 'world-activity') {
     performWorldActivity(worldInteract.dataset.activity);
   } else if (worldInteract.dataset.mode === 'npc-talk') {
@@ -1651,6 +1687,11 @@ window.addEventListener('kerala-home-state', event => {
   homeSnapshot = event.detail || null;
   updateWorldInteract();
   updateLifeLoopMission();
+});
+window.addEventListener('kerala-bus-status', event => {
+  const detail = event.detail || null;
+  busTravelStatus = detail ? { ...detail, receivedAt: Date.now() } : null;
+  updateWorldInteract();
 });
 
 window.addEventListener('error', event => {
@@ -2504,6 +2545,27 @@ try {
   let walkSafeRotation = player.rotation.y;
   let walkSafeReady = !positionBlocked(player.position.x, player.position.z, .48);
   let walkSafeAccumulator = 0;
+
+  window.addEventListener('kerala-public-travel-arrival', event => {
+    const detail = event.detail || {};
+    if (!Number.isFinite(Number(detail.x)) || !Number.isFinite(Number(detail.z))) return;
+    vehicleMode = 'walk';
+    driveSpeed = 0;
+    player.position.set(Number(detail.x), 0, Number(detail.z));
+    player.rotation.y = Number.isFinite(Number(detail.rotation)) ? Number(detail.rotation) : player.rotation.y;
+    if (positionBlocked(player.position.x, player.position.z, .43)) recoverBlockedPlayerSpawn(player, true);
+    walkVelocity.set(0, 0, 0);
+    targetWalkVelocity.set(0, 0, 0);
+    walkSafePosition.copy(player.position);
+    walkSafeRotation = player.rotation.y;
+    walkSafeReady = true;
+    walkingStuckSeconds = 0;
+    busTravelStatus = null;
+    selectedLandmark = null;
+    updateMapPlayer(player);
+    updateWorldInteract();
+    updateLifeLoopMission();
+  });
   let cameraDriveImpulse = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
   let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0, interactionAccumulator = 0, walkingStuckSeconds = 0;
