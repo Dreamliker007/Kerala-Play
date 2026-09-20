@@ -72,6 +72,27 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
     }),
   }),
 });
+const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
+  bekal: Object.freeze({ id:'bekal', label:'Bekal Fort', x:-7, z:60, arrivalX:-7, arrivalZ:56.5 }),
+  munnar: Object.freeze({ id:'munnar', label:'Munnar Tea Hills', x:42, z:26, arrivalX:38.8, arrivalZ:26 }),
+  kochi: Object.freeze({ id:'kochi', label:'Mattancherry Palace', x:-26, z:6, arrivalX:-22.8, arrivalZ:6 }),
+  alappuzha: Object.freeze({ id:'alappuzha', label:'Alappuzha Backwaters', x:-34, z:-13, arrivalX:-30.7, arrivalZ:-13 }),
+  kuttanad: Object.freeze({ id:'kuttanad', label:'Kuttanad Fields', x:7, z:-23, arrivalX:10.2, arrivalZ:-23 }),
+  temple: Object.freeze({ id:'temple', label:'Padmanabhaswamy Temple', x:13, z:-57, arrivalX:16.2, arrivalZ:-57 }),
+  anugraha: Object.freeze({ id:'anugraha', label:'Anugraha Stores', x:-14.4, z:10.7, arrivalX:-14.4, arrivalZ:10.7 }),
+  malabar: Object.freeze({ id:'malabar', label:'Malabar Bakery', x:14.8, z:41.2, arrivalX:14.8, arrivalZ:41.2 }),
+  'town-bus': Object.freeze({ id:'town-bus', label:'Town Junction Bus Stop', x:11.7, z:27.5, arrivalX:8.7, arrivalZ:27.5 }),
+  'south-bus': Object.freeze({ id:'south-bus', label:'South Bus Stop', x:-11.7, z:-50.5, arrivalX:-8.7, arrivalZ:-50.5 }),
+  'village-rental': Object.freeze({ id:'village-rental', label:'Village Rental Home', x:-24, z:-30.8, arrivalX:-24, arrivalZ:-30.8 }),
+  'village-bench': Object.freeze({ id:'village-bench', label:'Village Rest Bench', x:-10, z:-10, arrivalX:-10, arrivalZ:-10 }),
+  fuel: Object.freeze({ id:'fuel', label:'Kerala Fuel Station', x:11, z:-12, arrivalX:13.8, arrivalZ:-12 }),
+  service: Object.freeze({ id:'service', label:'Village Service Garage', x:-36, z:-15, arrivalX:-32.8, arrivalZ:-15 }),
+  'village-pond': Object.freeze({ id:'village-pond', label:'Village Pond', x:39, z:-4, arrivalX:35.5, arrivalZ:-4 }),
+});
+const PUBLIC_RIDE_SERVICES = Object.freeze({
+  auto: Object.freeze({ id:'auto', label:'Auto-rickshaw', baseFare:18, perMeter:.48, maxDistance:72, pickupSeconds:2, speed:10 }),
+  taxi: Object.freeze({ id:'taxi', label:'Kerala Taxi', baseFare:32, perMeter:.68, maxDistance:240, pickupSeconds:3, speed:14 }),
+});
 const JOB_DEFINITIONS = Object.freeze({
   delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Take the delivery bike, collect a parcel, then ride to the customer.', missionType: 'route', vehicle: 'bike', vehicleLabel: 'Delivery Bike' },
   taxi: { title: 'Taxi Driver', reward: 220, durationMs: 0, cooldownMs: 35_000, description: 'Enter the taxi, reach the passenger pickup point, then drive to the destination.', missionType: 'route', vehicle: 'taxi', vehicleLabel: 'Kerala Taxi' },
@@ -943,6 +964,42 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return null;
   }
 
+  function publicRideQuote(user, destinationId) {
+    const destination = PUBLIC_RIDE_DESTINATIONS[destinationId];
+    requireValue(destination, 404, 'Ride destination not found.');
+    const state = jobStateFor(user);
+    requireValue(!state.active, 409, 'Finish your active job before booking a public ride.');
+    const personal = state.garage.activeVehicleId
+      ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
+      : null;
+    requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before booking a ride.');
+    const live = presence.get(user.id) || place(user);
+    requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before booking a ride.');
+    const distance = Math.hypot(Number(destination.x) - live.x, Number(destination.z) - live.z);
+    requireValue(distance >= 5.5, 409, 'You are already close enough to walk to this destination.');
+    const options = Object.values(PUBLIC_RIDE_SERVICES).map(service => {
+      const available = distance <= Number(service.maxDistance);
+      const fare = Math.max(
+        Number(service.baseFare),
+        Number(service.baseFare) + Math.ceil(distance * Number(service.perMeter))
+      );
+      return {
+        id: service.id,
+        label: service.label,
+        available,
+        fare,
+        pickupSeconds: service.pickupSeconds,
+        travelSeconds: Math.max(3, Math.ceil(distance / Number(service.speed))),
+      };
+    });
+    return {
+      destination: { id: destination.id, label: destination.label, x: destination.x, z: destination.z },
+      distance: Math.round(distance * 10) / 10,
+      walletBalance: user.walletBalance,
+      options,
+    };
+  }
+
   function publicTravelStatus(stopId, timestamp = now()) {
     const found = publicTravelStop(stopId);
     if (!found) return null;
@@ -1351,6 +1408,61 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           receivedTransactionId: received.id,
         }); return;
       }
+      if (path === '/api/travel/ride/quote' && request.method === 'GET') {
+        limited(`ride-quote:${user.id}`, 40, 60000);
+        const destinationId = String(url.searchParams.get('destinationId') || '');
+        send(response, 200, publicRideQuote(user, destinationId)); return;
+      }
+      if (path === '/api/travel/ride/book' && request.method === 'POST') {
+        limited(`ride-book:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const destinationId = typeof body.destinationId === 'string' ? body.destinationId : '';
+        const serviceId = typeof body.serviceId === 'string' ? body.serviceId : '';
+        const service = PUBLIC_RIDE_SERVICES[serviceId];
+        requireValue(service, 400, 'Choose auto-rickshaw or taxi.');
+        const quote = publicRideQuote(user, destinationId);
+        const option = quote.options.find(item => item.id === serviceId);
+        requireValue(option?.available, 409, serviceId === 'auto' ? 'Auto-rickshaw is for shorter local trips. Choose taxi for this destination.' : 'This ride is not available.');
+        requireValue(user.walletBalance >= option.fare, 409, 'Not enough Kerala Cash for this ride.');
+        const destination = PUBLIC_RIDE_DESTINATIONS[destinationId];
+        const live = presence.get(user.id) || place(user);
+        const transaction = walletTransaction(user, -option.fare, 'public_ride', `${service.label} · ${destination.label}`);
+        const timestamp = now();
+        live.x = Number(destination.arrivalX);
+        live.z = Number(destination.arrivalZ);
+        live.rotation = 0;
+        live.moving = false;
+        live.mode = 'walk';
+        live.lastSeen = timestamp;
+        live.movedAt = timestamp;
+        live.movementCredit = 2;
+        user.worldX = live.x;
+        user.worldZ = live.z;
+        user.worldRotation = live.rotation;
+        user.worldUpdatedAt = timestamp;
+        dirty = true;
+        worldDirty = true;
+        profileChanged(user);
+        await persist();
+        send(response, 200, {
+          wallet: walletSummary(user),
+          user: publicUser(user),
+          transaction,
+          ride: {
+            serviceId,
+            serviceLabel: service.label,
+            fare: option.fare,
+            pickupSeconds: option.pickupSeconds,
+            travelSeconds: option.travelSeconds,
+            fromDistance: quote.distance,
+            to: { id: destination.id, label: destination.label },
+            x: live.x,
+            z: live.z,
+            rotation: live.rotation,
+          },
+        }); return;
+      }
+
       if (path === '/api/travel/bus/status' && request.method === 'GET') {
         const stopId = String(url.searchParams.get('stopId') || '');
         const status = publicTravelStatus(stopId);
