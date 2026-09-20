@@ -143,6 +143,8 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
 let lastWorldActivityAt = 0;
 let lifeLoopAction = 'jobs';
 let busTravelStatus = null;
+let publicRideInProgress = false;
+let ridePickupVisual = null;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
@@ -2104,7 +2106,7 @@ function updateRemotePlayers(delta, camera) {
 async function sendMovement(player, moving) {
   const now = performance.now();
   const stateChanged = moving !== lastMovementMoving;
-  if (!profile || !connectionReady || document.hidden || movementPending || (!stateChanged && now - lastMovementSend < (moving ? 250 : 1500))) return;
+  if (!profile || !connectionReady || document.hidden || publicRideInProgress || movementPending || (!stateChanged && now - lastMovementSend < (moving ? 250 : 1500))) return;
   movementPending = true; lastMovementSend = now;
   const userId = profile.id;
   try {
@@ -2147,7 +2149,7 @@ async function sendMovement(player, moving) {
 }
 
 function flushMovement() {
-  if (!profile || !playerRef) return;
+  if (!profile || !playerRef || publicRideInProgress) return;
   fetch('/api/world/move', {
     method: 'POST',
     credentials: 'same-origin',
@@ -2314,6 +2316,9 @@ function setWaypoint(place) {
   missionText.textContent = `Destination: ${place.name}`;
   const distance = placeDistance(place);
   landmarkStatus.textContent = `${destinationDirection(place)} · ${Math.ceil(distance)} m${destinationBusSuggestion(place)}`;
+  window.dispatchEvent(new CustomEvent('kerala-destination-selected', {
+    detail: { id: place.id, name: place.name, kind: place.kind, x: Number(place.x), z: Number(place.z), distance },
+  }));
   renderMapLandmarks();
   if (playerRef) updateMapPlayer(playerRef);
 }
@@ -2365,6 +2370,7 @@ function updateMapPlayer(player) {
       if (destination.kind === 'landmark') markLandmarkVisited(destination);
       selectedDestination = null;
       selectedLandmark = null;
+      window.dispatchEvent(new CustomEvent('kerala-destination-cleared', { detail: { id: destination.id, reason: 'arrived' } }));
       missionText.textContent = `Arrived: ${destination.name}`;
       landmarkStatus.textContent = destination.kind === 'landmark'
         ? 'Landmark reached · reward progress updated'
@@ -2644,11 +2650,75 @@ try {
   let walkSafeReady = !positionBlocked(player.position.x, player.position.z, .48);
   let walkSafeAccumulator = 0;
 
+  function clearRidePickupVisual() {
+    if (!ridePickupVisual) return;
+    scene.remove(ridePickupVisual);
+    disposeMissionObject(ridePickupVisual);
+    ridePickupVisual = null;
+  }
+
+  function showRidePickupVisual(serviceId = 'auto') {
+    clearRidePickupVisual();
+    const kind = serviceId === 'taxi' ? 'car' : 'auto';
+    const visual = createTrafficVehicleVisual(kind, serviceId === 'taxi' ? 0xd7d7d7 : 0x2b773f);
+    const driver = createHuman({
+      gender: 'male',
+      shirt: serviceId === 'taxi' ? 0xe8e8e3 : 0xc9d8b0,
+      trousers: 0x26303a,
+      skin: 0xa96d4c,
+      hair: 0x171311,
+      shoes: 0x20201f,
+      accent: 0xffffff,
+      styleSeed: 21,
+    });
+    driver.scale.setScalar(serviceId === 'taxi' ? .52 : .48);
+    driver.position.set(0, serviceId === 'taxi' ? .52 : .50, serviceId === 'taxi' ? .12 : .20);
+    driver.rotation.y = Math.PI;
+    visual.add(driver);
+    const rightX = Math.cos(player.rotation.y) * 3.0;
+    const rightZ = -Math.sin(player.rotation.y) * 3.0;
+    let px = player.position.x + rightX;
+    let pz = player.position.z + rightZ;
+    if (positionBlocked(px, pz, serviceId === 'taxi' ? .9 : .75)) {
+      px = player.position.x - rightX;
+      pz = player.position.z - rightZ;
+    }
+    visual.position.set(px, 0, pz);
+    visual.rotation.y = player.rotation.y;
+    visual.userData.ridePickup = true;
+    applyDynamicHighQuality(visual);
+    scene.add(visual);
+    ridePickupVisual = visual;
+  }
+
+  window.addEventListener('kerala-ride-booking-start', event => {
+    publicRideInProgress = true;
+    clearGameInput();
+    showRidePickupVisual(String(event.detail?.serviceId || 'auto'));
+    showToast(`${event.detail?.serviceLabel || 'Driver'} is arriving…`, 2200);
+  });
+
+  window.addEventListener('kerala-ride-travel-start', () => {
+    publicRideInProgress = true;
+    clearGameInput();
+    player.visible = false;
+    clearRidePickupVisual();
+  });
+
+  window.addEventListener('kerala-ride-cancel', () => {
+    publicRideInProgress = false;
+    player.visible = !!profile;
+    clearRidePickupVisual();
+  });
+
   window.addEventListener('kerala-public-travel-arrival', event => {
     const detail = event.detail || {};
     if (!Number.isFinite(Number(detail.x)) || !Number.isFinite(Number(detail.z))) return;
+    publicRideInProgress = false;
+    clearRidePickupVisual();
     vehicleMode = 'walk';
     driveSpeed = 0;
+    player.visible = !!profile;
     player.position.set(Number(detail.x), 0, Number(detail.z));
     player.rotation.y = Number.isFinite(Number(detail.rotation)) ? Number(detail.rotation) : player.rotation.y;
     if (positionBlocked(player.position.x, player.position.z, .43)) recoverBlockedPlayerSpawn(player, true);
@@ -2661,6 +2731,7 @@ try {
     busTravelStatus = null;
     selectedLandmark = null;
     selectedDestination = null;
+    window.dispatchEvent(new CustomEvent('kerala-destination-cleared', { detail: { reason: 'travel-arrival' } }));
     renderMapLandmarks();
     updateMapPlayer(player);
     updateWorldInteract();
@@ -2883,7 +2954,7 @@ try {
     const keyboardY = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
     const controlX = Math.abs(keyboardX) > 0 ? keyboardX : inputX;
     const controlY = Math.abs(keyboardY) > 0 ? keyboardY : inputY;
-    const paused = !profile || !connectionReady || !!document.querySelector('[aria-modal="true"]:not([hidden])');
+    const paused = !profile || !connectionReady || publicRideInProgress || !!document.querySelector('[aria-modal="true"]:not([hidden])');
     if (paused) clearGameInput();
     const controlLength = paused ? 0 : Math.min(1, Math.hypot(controlX, controlY));
     let movingNow = false;
