@@ -3692,14 +3692,16 @@ function updateVillagers(time) {
       return;
     }
 
-    const usingUmbrella = rainReaction > .18 && !data.hasRainShelter;
+    const nearRainShelter = data.hasRainShelter
+      && Math.hypot(villager.position.x - data.rainShelterX, villager.position.z - data.rainShelterZ) <= 5.5;
+    const usingUmbrella = rainReaction > .18 && !nearRainShelter;
     if (data.umbrella) {
       data.umbrella.visible = usingUmbrella;
       data.umbrella.rotation.y = Math.sin(time * .22 + data.routinePhase) * .035;
     }
 
     const applyRainShelter = () => {
-      if (!data.hasRainShelter || rainReaction < .42) return false;
+      if (!data.hasRainShelter || !nearRainShelter || rainReaction < .42) return false;
       const shelterBlend = THREE.MathUtils.smoothstep(rainReaction, .42, .84);
       villager.position.x = THREE.MathUtils.lerp(villager.position.x, data.rainShelterX, shelterBlend);
       villager.position.z = THREE.MathUtils.lerp(villager.position.z, data.rainShelterZ, shelterBlend);
