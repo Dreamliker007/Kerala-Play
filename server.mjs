@@ -26,13 +26,16 @@ const SHOP_ITEMS = Object.freeze({
 const WORLD_SHOPS = Object.freeze({
   anugraha: Object.freeze({
     id: 'anugraha', label: 'Anugraha Stores', x: -14.4, z: 10.7, radius: 4.8,
+    openHour: 6, closeHour: 21,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
   malabar: Object.freeze({
     id: 'malabar', label: 'Malabar Bakery', x: 14.8, z: 41.2, radius: 4.8,
+    openHour: 5.5, closeHour: 20.5,
     items: Object.freeze(['water', 'tea', 'snack']),
   }),
 });
+const WORLD_DAY_LENGTH_MS = 24 * 60 * 1000;
 const NEEDS_MAX = 100;
 const NEEDS_DECAY_PER_MINUTE = Object.freeze({ hunger: 0.28, thirst: 0.4, energy: 0.22 });
 const NEEDS_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
@@ -962,6 +965,27 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (stop) return { route, stop };
     }
     return null;
+  }
+
+  function worldHour(timestamp = now()) {
+    const phase = ((Number(timestamp) % WORLD_DAY_LENGTH_MS) + WORLD_DAY_LENGTH_MS) % WORLD_DAY_LENGTH_MS;
+    return phase / 60_000;
+  }
+
+  function worldShopOpen(shop, timestamp = now()) {
+    if (!shop) return false;
+    const hour = worldHour(timestamp);
+    const open = Number(shop.openHour ?? 0);
+    const close = Number(shop.closeHour ?? 24);
+    return open <= close ? hour >= open && hour < close : hour >= open || hour < close;
+  }
+
+  function worldHourLabel(value) {
+    const numeric = Number(value) || 0;
+    const hour = Math.floor(numeric) % 24;
+    const minute = Math.round((((numeric % 1) + 1) % 1) * 60);
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${suffix}`;
   }
 
   function publicRideQuote(user, destinationId) {
@@ -2205,6 +2229,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const item = typeof body.itemId === 'string' ? SHOP_ITEMS[body.itemId] : null;
         requireValue(shop, 404, 'World shop not found.');
         requireValue(item && shop.items.includes(body.itemId), 404, 'That item is not sold here.');
+        requireValue(
+          worldShopOpen(shop),
+          409,
+          `${shop.label} is closed. Opening hours: ${worldHourLabel(shop.openHour)}–${worldHourLabel(shop.closeHour)}.`
+        );
         const state = jobStateFor(user);
         const personal = state.garage.activeVehicleId
           ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
@@ -2223,7 +2252,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         send(response, 200, {
           wallet: walletSummary(user),
           needs,
-          shop: { id: shop.id, label: shop.label },
+          shop: { id: shop.id, label: shop.label, openHour: shop.openHour, closeHour: shop.closeHour },
           purchase: { itemId: body.itemId, name: item.name, price: item.price, needs: item.needs },
           transaction,
         }); return;
