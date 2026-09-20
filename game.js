@@ -156,6 +156,7 @@ const claimPending = new Set();
 let lastMovementSend = 0;
 let lastMovementMoving = false;
 let movementPending = false;
+let remoteLabelAccumulator = 0;
 let lastProgressRefresh = 0;
 let lastMoveError = 0;
 const labelPosition = new THREE.Vector3();
@@ -1831,6 +1832,9 @@ function synchronizePlayers(players) {
 
 function updateRemotePlayers(delta, camera) {
   const networkNow = performance.now();
+  remoteLabelAccumulator += delta;
+  const refreshLabels = remoteLabelAccumulator >= (runtimeIsMobile ? .10 : .05);
+
   for (const remote of remotePlayers.values()) {
     const predictionAge = remote.userData.moving ? Math.min(.28, Math.max(0, (networkNow - remote.userData.targetAt) / 1000)) : 0;
     remote.userData.predicted.copy(remote.userData.target).addScaledVector(remote.userData.velocity, predictionAge);
@@ -1838,12 +1842,22 @@ function updateRemotePlayers(delta, camera) {
     remote.userData.predicted.z = THREE.MathUtils.clamp(remote.userData.predicted.z, -110, 110);
     remote.position.lerp(remote.userData.predicted, 1 - Math.exp(-delta * 10));
     remote.rotation.y = rotateTowards(remote.rotation.y, remote.userData.yaw, delta * 12);
-    const remoteWalkSpeed = remote.userData.velocity.length();
-    const remoteOnFoot = remote.userData.moving && remote.userData.mode === 'walk';
-    const remoteRunning = remoteOnFoot && remoteWalkSpeed > 3.9;
-    remote.userData.phase += delta * (remoteRunning ? 10.5 : 5.2);
-    animatePlayer(remote, remote.userData.phase, remoteOnFoot ? (remoteRunning ? .78 : .36) : 0);
+
+    const playerDistance = playerRef
+      ? Math.hypot(remote.position.x - playerRef.position.x, remote.position.z - playerRef.position.z)
+      : 0;
+    const animateRemote = !runtimeIsMobile || playerDistance < 58;
+    if (animateRemote) {
+      const remoteWalkSpeed = remote.userData.velocity.length();
+      const remoteOnFoot = remote.userData.moving && remote.userData.mode === 'walk';
+      const remoteRunning = remoteOnFoot && remoteWalkSpeed > 3.9;
+      remote.userData.phase += delta * (remoteRunning ? 10.5 : 5.2);
+      animatePlayer(remote, remote.userData.phase, remoteOnFoot ? (remoteRunning ? .78 : .36) : 0);
+    }
   }
+
+  if (!refreshLabels) return;
+  remoteLabelAccumulator = 0;
   camera.updateMatrixWorld();
   for (const object of [playerRef, ...villagers, ...remotePlayers.values()]) {
     if (!object?.userData.label) continue;
@@ -2197,9 +2211,13 @@ try {
     alpha: false,
     precision: 'highp',
   });
-  let renderScale = isMobile ? 0.78 : 1;
+  let renderScale = isMobile ? .90 : 1;
   function applyRenderScale() {
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? renderScale : 1.25));
+    if (atmosphere?.setPerformanceScale) {
+      atmosphere.setPerformanceScale(renderScale);
+      return;
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? Math.max(1.12, 1.78 * renderScale) : 1.25));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
   }
   applyRenderScale();
@@ -2280,6 +2298,7 @@ try {
   }
   scene.add(warmLight);
   atmosphere = createAtmosphere(THREE, { scene, renderer, camera, sun: warmLight, hemi: sun });
+  atmosphere.setPerformanceScale?.(renderScale);
 
   let joystickPointerId = null;
   let lookPointerId = null;
@@ -2488,7 +2507,7 @@ try {
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    if (atmosphere) atmosphere.applyQuality(); else applyRenderScale();
+    applyRenderScale();
     renderer.setSize(window.innerWidth, window.innerHeight, false);
   });
   renderer.domElement.addEventListener('webglcontextlost', event => {
@@ -2500,17 +2519,18 @@ try {
   function gameLoop() {
     requestAnimationFrame(gameLoop);
     const delta = Math.min(clock.getDelta(), .05);
+    if (document.hidden) return;
     villageTime += delta;
     updateFarVisualDetails(delta);
     npcAccumulator += delta; trafficAccumulator += delta; mapAccumulator += delta; interactionAccumulator += delta;
-    if (npcAccumulator >= (isMobile ? .10 : .05)) {
+    if (npcAccumulator >= (isMobile ? .12 : .05)) {
       updateVillagers(villageTime);
       updateAmbientAnimals(villageTime, npcAccumulator);
       npcAccumulator = 0;
     }
-    if (trafficAccumulator >= (isMobile ? .05 : .025)) { updateTraffic(trafficAccumulator); trafficAccumulator = 0; }
+    if (trafficAccumulator >= (isMobile ? .066 : .025)) { updateTraffic(trafficAccumulator); trafficAccumulator = 0; }
     animateJobMissionVisual(villageTime);
-    if (interactionAccumulator >= .08) {
+    if (interactionAccumulator >= (isMobile ? .10 : .08)) {
       updateWorldInteract();
       interactionAccumulator = 0;
     }
@@ -2784,13 +2804,24 @@ try {
     updateMonsoonWaterVisuals(villageTime, delta);
     updateVehicleRainSpray(delta);
     renderer.render(scene, camera);
-    if (isMobile && !atmosphere) {
-      perfFrames++; const now = performance.now();
-      if (now - perfTime >= 2000) {
-        const fps = perfFrames * 1000 / (now - perfTime); perfFrames = 0; perfTime = now;
-        if (perfCooldown > 0) perfCooldown--;
-        else if (fps < 22 && renderScale > .48) { renderScale = Math.max(.48, renderScale - .08); applyRenderScale(); perfCooldown = 2; }
-        else if (fps > 42 && renderScale < .82) { renderScale = Math.min(.82, renderScale + .04); applyRenderScale(); perfCooldown = 3; }
+    if (isMobile) {
+      perfFrames++;
+      const now = performance.now();
+      if (now - perfTime >= 2200) {
+        const fps = perfFrames * 1000 / (now - perfTime);
+        perfFrames = 0;
+        perfTime = now;
+        if (perfCooldown > 0) {
+          perfCooldown--;
+        } else if (fps < 24 && renderScale > .66) {
+          renderScale = Math.max(.66, renderScale - .07);
+          applyRenderScale();
+          perfCooldown = 2;
+        } else if (fps > 47 && renderScale < 1) {
+          renderScale = Math.min(1, renderScale + .035);
+          applyRenderScale();
+          perfCooldown = 3;
+        }
       }
     }
   }
@@ -3140,6 +3171,14 @@ function updateVillagers(time) {
     const hiddenByRoutine = data.nightHide && night && !data.nightActive;
     villager.visible = !hiddenByRoutine;
     if (!villager.visible) {
+      data.crossingActive = false;
+      return;
+    }
+
+    const playerDistance = playerRef
+      ? Math.hypot(villager.position.x - playerRef.position.x, villager.position.z - playerRef.position.z)
+      : 0;
+    if (runtimeIsMobile && playerDistance > 64 && data.behavior !== 'crossing') {
       data.crossingActive = false;
       return;
     }
@@ -5800,7 +5839,9 @@ function updateAmbientAnimals(time, delta) {
 
     if (data.kind === 'bird' || data.kind === 'butterfly') {
       const butterfly = data.kind === 'butterfly';
-      animal.visible = !night && rain < (butterfly ? .42 : .62);
+      animal.visible = !night
+        && rain < (butterfly ? .42 : .62)
+        && (!runtimeIsMobile || playerDistance < 52);
       if (!animal.visible) continue;
       const angle = time * data.speed + data.phase;
       const radius = data.radius;
