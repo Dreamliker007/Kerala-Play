@@ -1630,6 +1630,25 @@ function updateWorldInteract() {
     }
   }
 
+  if (!active && !activeNpcFavor && vehicleMode === 'walk') {
+    const communityEvent = activeCommunityEvent();
+    const target = communityEvent?.target;
+    if (target) {
+      const distance = Math.hypot(playerRef.position.x - Number(target.x), playerRef.position.z - Number(target.z));
+      if (distance <= Number(target.radius || 6) + .45) {
+        worldInteract.hidden = false;
+        worldInteract.disabled = communityEventPending;
+        worldInteract.dataset.mode = 'community-event';
+        worldInteract.dataset.activity = communityEvent.id;
+        worldInteract.textContent = communityEventPending
+          ? 'JOINING EVENT…'
+          : `JOIN EVENT · ₹${Number(communityEvent.cashReward || 0)} + ${Number(communityEvent.pointsReward || 0)}P`;
+        worldInteract.title = `${communityEvent.title} · ${target.label}`;
+        return;
+      }
+    }
+  }
+
   if (!active && vehicleMode === 'walk' && homeSnapshot?.home) {
     const home = homeSnapshot.home;
     const distance = Math.hypot(playerRef.position.x - Number(home.x), playerRef.position.z - Number(home.z));
@@ -1868,6 +1887,14 @@ worldInteract?.addEventListener('click', () => {
     performWorldActivity(worldInteract.dataset.activity);
   } else if (worldInteract.dataset.mode === 'npc-talk') {
     interactWithNpc(worldInteract.dataset.npc);
+  } else if (worldInteract.dataset.mode === 'community-event') {
+    const communityEvent = activeCommunityEvent();
+    if (communityEvent && !communityEventPending) {
+      communityEventPending = true;
+      window.dispatchEvent(new CustomEvent('kerala-community-event-participate', {
+        detail: { eventId: communityEvent.id },
+      }));
+    }
   } else if (worldInteract.dataset.mode === 'npc-favor-start') {
     const villager = villagers[Number(worldInteract.dataset.npc)];
     if (villager?.userData?.favorOffer) {
