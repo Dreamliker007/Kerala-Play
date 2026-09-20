@@ -1475,8 +1475,14 @@ function newProgress() {
   return { xp: 0, level: 1, walkMeters: 0, visitedLandmarkIds: [], completedTaskIds: [], followingIds: [] };
 }
 
+function onboardingStorageKey() {
+  // The guide belongs to the signed-in account, not the whole phone/browser.
+  // A second account on the same device must receive its own first-time guide.
+  return `${ONBOARDING_STORAGE_KEY}:${profile?.id || profile?.username || 'guest'}`;
+}
+
 function onboardingCompleteStored() {
-  try { return localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'complete'; }
+  try { return localStorage.getItem(onboardingStorageKey()) === 'complete'; }
   catch { return false; }
 }
 
@@ -1502,7 +1508,7 @@ function finishOnboarding(skipped = false) {
   onboardingQueued = false;
   onboarding.hidden = true;
   document.body.classList.remove('onboarding-actions');
-  try { localStorage.setItem(ONBOARDING_STORAGE_KEY, 'complete'); } catch { /* Private browsing can still use the guide once. */ }
+  try { localStorage.setItem(onboardingStorageKey(), 'complete'); } catch { /* Private browsing can still use the guide once. */ }
   if (!skipped) showToast('Starter guide complete · Kerala is yours to explore!');
 }
 
@@ -4326,14 +4332,19 @@ function buildWorld(scene) {
   addPhotoHouse(scene, 28, 24, 8.8, 5.9);
   addPhotoHouse(scene, -36, 33, 9.4, 6.25);
   addPhotoHouse(scene, 18, -32, 8.6, 5.75);
-  const treePositions = [[-15,-62],[14,-55],[-20,-47],[20,-42],[-18,-20],[17,-10],[-18,5],[18,9],[-16,34],[16,43],[-14,61],[17,66],[-50,-20],[-45,14],[-42,48],[46,-42],[42,4],[47,52]];
+  // Keep tall palms clear of both carriageways. Their fronds no longer hang
+  // over the driving lanes; the near-road detail is handled by low gardens.
+  const treePositions = [[-21,-62],[22,-55],[-22,-47],[23,-42],[-23,-11],[23,-8],[-23,7],[23,12],[-23,34],[23,43],[-22,61],[23,66],[-50,-20],[-45,14],[-42,48],[46,-42],[42,4],[47,52]];
   treePositions.forEach(([x, z], i) => addPalm(scene, x, z, .72 + (i % 3) * .09));
   [[-43,-35,1.08],[41,-29,1.15],[-48,41,.96],[45,39,1.04],[-27,-13,.88],[30,6,.8],[-28,57,.85]].forEach(([x, z, scale]) => addPalm(scene, x, z, scale));
   [[-43,-49,.88],[39,-25,.94],[-42,27,.90],[43,43,.92]].forEach(([x, z, scale]) => addTree(scene, x, z, scale, true));
+  addRoadsideGardens(scene);
   addBird(scene, -43.4, 5.15, -48.7, .6);
   addBird(scene, 39.4, 5.6, -24.8, -.8);
   addBird(scene, -42.4, 5.2, 26.5, 1.1);
   addBird(scene, 42.4, 5.4, 42.6, -.45);
+  addBird(scene, -24.2, 5.3, 7.2, .3);
+  addBird(scene, 24.1, 5.7, 42.5, -.9);
 
   // Lightweight village animals stay off the carriageway and react locally to
   // nearby players/vehicles without becoming gameplay colliders.
@@ -5190,6 +5201,79 @@ function addBird(scene, x, y, z, yaw = 0) {
   return bird;
 }
 
+function addButterfly(scene, x, z, color = 0xf6b64c, phase = 0) {
+  const butterfly = new THREE.Group();
+  const wingMaterial = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: .92 });
+  const bodyMaterial = new THREE.MeshBasicMaterial({ color: 0x253229 });
+  const wingGeometry = new THREE.CircleGeometry(.16, 7);
+  const leftWing = new THREE.Mesh(wingGeometry, wingMaterial);
+  const rightWing = new THREE.Mesh(wingGeometry, wingMaterial.clone());
+  leftWing.scale.set(.82, 1.14, 1);
+  rightWing.scale.set(.82, 1.14, 1);
+  leftWing.position.x = -.115;
+  rightWing.position.x = .115;
+  leftWing.rotation.y = .32;
+  rightWing.rotation.y = -.32;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.045, 6, 5), bodyMaterial);
+  body.scale.set(.7, .7, 1.8);
+  butterfly.add(leftWing, rightWing, body);
+  butterfly.position.set(x, .72, z);
+  butterfly.userData.ambientAnimal = {
+    kind: 'butterfly', startX: x, startY: .72, startZ: z,
+    phase: phase || ambientAnimals.length * 1.19,
+    speed: .72 + (ambientAnimals.length % 3) * .08,
+    radius: .7 + (ambientAnimals.length % 2) * .32,
+    leftWing, rightWing,
+  };
+  ambientAnimals.push(butterfly);
+  scene.add(butterfly);
+  return butterfly;
+}
+
+function addRoadsideGardens(scene) {
+  const shrubMaterials = [0x275f33, 0x347641, 0x4b8d46, 0x5b9b4f].map(color => new THREE.MeshStandardMaterial({ color, roughness: .92 }));
+  const flowerMaterials = [0xff6d7a, 0xffc957, 0xcf80ff, 0xfff0a8].map(color => new THREE.MeshBasicMaterial({ color, toneMapped: false }));
+  const stemMaterial = new THREE.MeshStandardMaterial({ color: 0x356c36, roughness: .94 });
+  const shrubGeometry = new THREE.DodecahedronGeometry(.48, 1);
+  const flowerHeadGeometry = new THREE.SphereGeometry(.075, 7, 6);
+  const stemGeometry = new THREE.CylinderGeometry(.012, .018, .28, 5);
+  const gardenSpots = [
+    [-12.2, -62], [12.2, -55], [-12.6, -47], [12.5, -42],
+    [-12.4, -8], [12.7, -3], [-12.6, 8], [12.4, 15],
+    [-12.2, 34], [12.7, 43], [-12.4, 61], [12.5, 66],
+    [-31, -10], [31, 9], [-33, 47], [34, 52]
+  ];
+  gardenSpots.forEach(([x, z], index) => {
+    const random = visualRandom(Math.abs(Math.floor(x * 73 + z * 131)) + 11031);
+    for (let shrubIndex = 0; shrubIndex < 3; shrubIndex++) {
+      const shrub = new THREE.Mesh(shrubGeometry, shrubMaterials[(index + shrubIndex) % shrubMaterials.length]);
+      shrub.position.set(x + (random() - .5) * 1.35, .32 + random() * .13, z + (random() - .5) * 1.15);
+      const size = .58 + random() * .42;
+      shrub.scale.set(size * (1.06 + random() * .26), size * (.76 + random() * .28), size);
+      shrub.rotation.set(random() * .3, random() * Math.PI, random() * .22);
+      shrub.castShadow = true;
+      shrub.receiveShadow = true;
+      scene.add(shrub);
+    }
+    for (let flowerIndex = 0; flowerIndex < 7; flowerIndex++) {
+      const flower = new THREE.Group();
+      const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+      stem.position.y = .14;
+      const head = new THREE.Mesh(flowerHeadGeometry, flowerMaterials[(index + flowerIndex) % flowerMaterials.length]);
+      head.position.y = .31;
+      head.scale.set(1, .55, 1);
+      flower.add(stem, head);
+      flower.position.set(x + (random() - .5) * 1.9, .015, z + (random() - .5) * 1.65);
+      flower.rotation.y = random() * Math.PI;
+      scene.add(flower);
+    }
+  });
+
+  [[-13.4, -47], [13.4, -3], [-13.5, 34], [13.3, 43], [-31, 47], [31, 9]].forEach(([x, z], index) => {
+    addButterfly(scene, x, z, [0xffd157, 0xf37a91, 0x9b7aff, 0x7ee5d2][index % 4], index * .92);
+  });
+}
+
 function createVillageAnimal(kind, color) {
   const root = new THREE.Group();
   const coat = new THREE.MeshStandardMaterial({ color, roughness: .94 });
@@ -5352,20 +5436,26 @@ function updateAmbientAnimals(time, delta) {
       ? Math.hypot(animal.position.x - playerRef.position.x, animal.position.z - playerRef.position.z)
       : 0;
 
-    if (data.kind === 'bird') {
-      animal.visible = !night && rain < .62;
+    if (data.kind === 'bird' || data.kind === 'butterfly') {
+      const butterfly = data.kind === 'butterfly';
+      animal.visible = !night && rain < (butterfly ? .42 : .62);
       if (!animal.visible) continue;
       const angle = time * data.speed + data.phase;
       const radius = data.radius;
       animal.position.set(
         data.startX + Math.cos(angle) * radius,
-        data.startY + .45 + Math.sin(time * .72 + data.phase) * .42,
+        data.startY + (butterfly ? .12 : .45) + Math.sin(time * (butterfly ? 1.9 : .72) + data.phase) * (butterfly ? .16 : .42),
         data.startZ + Math.sin(angle) * radius,
       );
       animal.rotation.y = -angle + Math.PI / 2;
-      const flap = Math.sin(time * 9.5 + data.phase) * .62;
-      data.leftWing.rotation.z = .28 + flap;
-      data.rightWing.rotation.z = -.28 - flap;
+      const flap = Math.sin(time * (butterfly ? 14 : 9.5) + data.phase) * (butterfly ? .72 : .62);
+      if (butterfly) {
+        data.leftWing.rotation.y = .32 + flap;
+        data.rightWing.rotation.y = -.32 - flap;
+      } else {
+        data.leftWing.rotation.z = .28 + flap;
+        data.rightWing.rotation.z = -.28 - flap;
+      }
       continue;
     }
 
