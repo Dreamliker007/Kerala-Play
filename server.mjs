@@ -39,7 +39,17 @@ const WORLD_DAY_LENGTH_MS = 24 * 60 * 1000;
 const NPC_RELATIONSHIP_MAX = 100;
 const NPC_RELATIONSHIP_COUNT = 25;
 const NPC_RELATIONSHIP_COOLDOWN_MS = 20_000;
+const NPC_FAVOR_COOLDOWN_MS = 2 * 60_000;
+const NPC_FAVOR_EXPIRY_MS = 10 * 60_000;
+const NPC_FAVOR_MIN_SCORE = 5;
 const NPC_NAMES = Object.freeze(['Anu','Vivek','Meera','Arun','Nisha','Riyas','Asha','Manu','Liya','Nabeel','Sreeja','Jose']);
+const NPC_FAVOR_TARGETS = Object.freeze([
+  Object.freeze({ id:'anugraha', title:'Drop off a small parcel', action:'Deliver parcel', reward:40 }),
+  Object.freeze({ id:'malabar', title:'Take a tea order to the bakery', action:'Deliver tea order', reward:45 }),
+  Object.freeze({ id:'town-bus', title:'Pass a note to the bus stop', action:'Deliver note', reward:35 }),
+  Object.freeze({ id:'village-pond', title:'Check the village pond notice point', action:'Check pond', reward:50 }),
+  Object.freeze({ id:'village-bench', title:'Return a forgotten bag to the rest bench', action:'Return bag', reward:40 }),
+]);
 const NEEDS_MAX = 100;
 const NEEDS_DECAY_PER_MINUTE = Object.freeze({ hunger: 0.28, thirst: 0.4, energy: 0.22 });
 const NEEDS_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
@@ -139,7 +149,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, npcRelations: {} }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -880,6 +890,16 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] };
     if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) user.jobState.notifications = { items: [], read: {} };
     if (!user.jobState.npcRelations || typeof user.jobState.npcRelations !== 'object' || Array.isArray(user.jobState.npcRelations)) user.jobState.npcRelations = {};
+    if (!user.jobState.npcFavors || typeof user.jobState.npcFavors !== 'object' || Array.isArray(user.jobState.npcFavors)) user.jobState.npcFavors = { active: null, cooldowns: {}, completed: 0 };
+    if (!user.jobState.npcFavors.cooldowns || typeof user.jobState.npcFavors.cooldowns !== 'object' || Array.isArray(user.jobState.npcFavors.cooldowns)) user.jobState.npcFavors.cooldowns = {};
+    if (!Number.isInteger(Number(user.jobState.npcFavors.completed)) || Number(user.jobState.npcFavors.completed) < 0) user.jobState.npcFavors.completed = 0;
+    const normalizedFavorCooldowns = {};
+    for (const [npcId, value] of Object.entries(user.jobState.npcFavors.cooldowns)) {
+      if (!npcRelationshipIdentitySafe(npcId)) continue;
+      const timestamp = Number(value);
+      if (Number.isFinite(timestamp) && timestamp > 0) normalizedFavorCooldowns[npcId] = timestamp;
+    }
+    user.jobState.npcFavors.cooldowns = normalizedFavorCooldowns;
     const normalizedNpcRelations = {};
     for (const [npcId, relation] of Object.entries(user.jobState.npcRelations)) {
       const match = /^npc-(\d+)$/.exec(npcId);
@@ -945,6 +965,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (garage.selectedId && !garage.owned.some(vehicle => vehicle.id === garage.selectedId && !(Number(vehicle.salePrice) > 0))) garage.selectedId = garage.owned.find(vehicle => !(Number(vehicle.salePrice) > 0))?.id || null;
     if (!garage.selectedId && garage.owned.length) garage.selectedId = garage.owned.find(vehicle => !(Number(vehicle.salePrice) > 0))?.id || null;
     if (garage.activeVehicleId && !garage.owned.some(vehicle => vehicle.id === garage.activeVehicleId)) garage.activeVehicleId = null;
+    const activeFavor = user.jobState.npcFavors.active;
+    if (activeFavor && (!npcRelationshipIdentitySafe(activeFavor.npcId) || !PUBLIC_RIDE_DESTINATIONS[activeFavor.targetId] || !Number.isFinite(Number(activeFavor.expiresAt)) || Number(activeFavor.expiresAt) <= now())) {
+      user.jobState.npcFavors.active = null;
+      dirty = true;
+    }
     const active = user.jobState.active;
     if (active && (!Array.isArray(active.checkpoints) || Number(active.expiresAt) <= now())) {
       user.jobState.active = null;
