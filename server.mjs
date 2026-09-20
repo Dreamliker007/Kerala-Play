@@ -985,6 +985,66 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return null;
   }
 
+  function npcRelationshipIdentity(value) {
+    const match = /^npc-(\d+)$/.exec(String(value || ''));
+    const index = match ? Number(match[1]) : -1;
+    if (!match || !Number.isInteger(index) || index < 0 || index >= NPC_RELATIONSHIP_COUNT) return null;
+    return { id: `npc-${index}`, index, name: NPC_NAMES[index % NPC_NAMES.length] };
+  }
+
+  function npcRelationshipTier(score) {
+    const value = Number(score) || 0;
+    if (value >= 60) return 'Trusted';
+    if (value >= 30) return 'Friendly';
+    if (value >= 15) return 'Familiar';
+    if (value >= 5) return 'Acquaintance';
+    return 'Stranger';
+  }
+
+  function localReputationTier(value) {
+    if (value >= 70) return 'Community Regular';
+    if (value >= 45) return 'Trusted Local';
+    if (value >= 20) return 'Known Local';
+    if (value >= 5) return 'Recognized';
+    return 'Newcomer';
+  }
+
+  function npcRelationshipSummary(user) {
+    const state = jobStateFor(user);
+    const relationships = [];
+    let breadthScore = 0;
+    for (const [npcId, relation] of Object.entries(state.npcRelations)) {
+      const identity = npcRelationshipIdentity(npcId);
+      if (!identity) continue;
+      const score = Math.max(0, Math.min(NPC_RELATIONSHIP_MAX, Number(relation.score) || 0));
+      breadthScore += Math.min(score, 20);
+      relationships.push({
+        npcId,
+        npcIndex: identity.index,
+        name: identity.name,
+        score,
+        tier: npcRelationshipTier(score),
+        conversations: Math.max(0, Number(relation.conversations) || 0),
+        firstMetAt: Number(relation.firstMetAt || 0),
+        lastInteractionAt: Number(relation.lastInteractionAt || 0),
+      });
+    }
+    relationships.sort((a, b) => b.score - a.score || a.npcIndex - b.npcIndex);
+    const value = Math.max(0, Math.min(100, Math.round((breadthScore / (NPC_RELATIONSHIP_COUNT * 20)) * 100)));
+    return {
+      reputation: { value, tier: localReputationTier(value), met: relationships.length, totalNpcs: NPC_RELATIONSHIP_COUNT },
+      relationships,
+    };
+  }
+
+  function npcRecognitionMessage(tier, name) {
+    if (tier === 'Trusted') return `${name} knows you well and greets you warmly.`;
+    if (tier === 'Friendly') return `${name} is happy to see a familiar face.`;
+    if (tier === 'Familiar') return `${name} remembers you from earlier visits.`;
+    if (tier === 'Acquaintance') return `${name} recognizes you now.`;
+    return `You have met ${name}.`;
+  }
+
   function worldHour(timestamp = now()) {
     const phase = ((Number(timestamp) % WORLD_DAY_LENGTH_MS) + WORLD_DAY_LENGTH_MS) % WORLD_DAY_LENGTH_MS;
     return phase / 60_000;
