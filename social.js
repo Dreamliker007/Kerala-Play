@@ -61,7 +61,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   let peopleSignature = '';
   let activePeer = null;
   let profileId = null;
-  let peopleFilter = 'all';
+  let peopleFilter = 'followers';
   let peopleSearch = '';
   let messageVersion = 0;
   let profileVersion = 0;
@@ -339,7 +339,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     await run(async () => {
       const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, ...(authMode === 'signup' ? { email: signupEmail.value, mobile: signupMobile.value, district: signupDistrict.value, gender: signupGender.value } : {}) });
       password.value = '';
-      await beginSession(result.user);
+      await beginSession(result.user, authMode === 'signup');
     }, authError);
     authSubmit.disabled = false;
   });
@@ -348,7 +348,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const onlineLabel = node('p', 'panel-note', 'Not connected');
   onlineLabel.id = 'people-online-label';
   const peopleTabs = node('div', 'social-tabs people-tabs');
-  for (const [value, label] of [['all', 'Everyone'], ['followers', 'Followers'], ['following', 'Following'], ['requests', 'Requests'], ['blocked', 'Blocked']]) {
+  // People is intentionally a private social space: only relationship lists
+  // are shown here. New players can still be met naturally in the world.
+  for (const [value, label] of [['followers', 'Followers'], ['following', 'Following'], ['requests', 'Requests']]) {
     const tab = button(label, () => { peopleFilter = value; renderPeople(); });
     tab.dataset.filter = value;
     peopleTabs.append(tab);
@@ -485,7 +487,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       if (peopleFilter === 'requests') return ['outgoing', 'incoming'].includes(person.relationship);
       return true;
     }).sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
-    if (!visible.length) peopleList.append(node('p', 'social-empty', peopleFilter === 'all' ? 'No people here yet. Invite a friend to open this world and create an account.' : 'No people in this list yet.'));
+    if (!visible.length) peopleList.append(node('p', 'social-empty', 'No people in this list yet.'));
     for (const person of visible) peopleList.append(personCard(person));
     conversations.replaceChildren();
     const contacts = people.filter(person => person.id !== user?.id && canMessage(person));
@@ -1112,6 +1114,12 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     run(refreshPeople, peopleError);
     search.focus();
   }
+  window.addEventListener('kerala-open-blocked', () => {
+    if (!requireUser()) return;
+    peopleFilter = 'blocked';
+    closeProfile(); showPanel(peoplePanel);
+    run(refreshPeople, peopleError);
+  });
   function openChat() {
     if (!requireUser()) return;
     closeProfile(); showPanel(chatPanel);
@@ -1614,7 +1622,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     listen('signal', handleSignal);
     listen('proximity-signal', handleProximitySignal);
   }
-  async function beginSession(next) {
+  async function beginSession(next, isNewAccount = false) {
     if (!next) { renderAuth(); return; }
     sessionVersion++;
     cleanupVoice(); clearMessageURLs();
@@ -1625,6 +1633,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     dmInput.value = ''; dmLog.replaceChildren();
     setUser(next);
     authModal.hidden = true;
+    // Signup is the one moment a new explorer must always see the guide.
+    if (isNewAccount) window.dispatchEvent(new CustomEvent('kerala-onboarding-start'));
     profileChip?.focus();
     setConnection(false);
     startEvents();
