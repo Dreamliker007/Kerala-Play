@@ -1639,6 +1639,21 @@ function updateWorldInteract() {
   }
 
   if (!active && vehicleMode === 'walk') {
+    const nearbyFavorNpc = nearestTalkableVillager();
+    if (nearbyFavorNpc?.distance <= 3.65) {
+      const favorData = nearbyFavorNpc.villager.userData;
+      const favorTalking = Number(favorData.interactionUntil || 0) > performance.now();
+      if (favorData.favorOffer && !activeNpcFavor && !favorTalking) {
+        worldInteract.hidden = false;
+        worldInteract.disabled = false;
+        worldInteract.dataset.mode = 'npc-favor-start';
+        worldInteract.dataset.npc = String(favorData.npcIndex);
+        worldInteract.textContent = `HELP · ${String(favorData.name).toUpperCase()}`;
+        worldInteract.title = `${favorData.favorOffer.title} · reward ₹${Number(favorData.favorOffer.reward || 0)}`;
+        return;
+      }
+    }
+
     const nearbyActivity = nearestWorldActivity();
     if (nearbyActivity) {
       const { spot, distance } = nearbyActivity;
