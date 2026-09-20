@@ -18,9 +18,10 @@
     "mobile:sync": "npm run mobile:prepare && npx cap sync android && npm run mobile:configure",
     "mobile:open": "npm run mobile:sync && npx cap open android",
     "mobile:release:check": "node scripts/check-mobile-release.mjs",
-    "mobile:configure": "npm run mobile:landscape && npm run mobile:version",
+    "mobile:configure": "npm run mobile:landscape && npm run mobile:version && npm run mobile:branding",
     "mobile:landscape": "node scripts/lock-android-landscape.mjs",
-    "mobile:version": "node scripts/set-android-version.mjs"
+    "mobile:version": "node scripts/set-android-version.mjs",
+    "mobile:branding": "node scripts/set-android-branding.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
