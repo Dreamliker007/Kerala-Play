@@ -134,8 +134,8 @@ const WORLD_SHOP_ITEMS = Object.freeze({
   meal: Object.freeze({ name: 'Kerala Meal', price: 80 }),
 });
 const WORLD_ACTIVITY_SPOTS = Object.freeze([
-  Object.freeze({ id: 'anugraha', kind: 'shop', label: 'Anugraha Stores', x: -14.4, z: 10.7, radius: 3.8, discoverRadius: 7.0, items: ['water', 'tea', 'snack', 'meal'] }),
-  Object.freeze({ id: 'malabar', kind: 'shop', label: 'Malabar Bakery', x: 14.8, z: 41.2, radius: 3.8, discoverRadius: 7.0, items: ['water', 'tea', 'snack'] }),
+  Object.freeze({ id: 'anugraha', kind: 'shop', label: 'Anugraha Stores', x: -14.4, z: 10.7, radius: 3.8, discoverRadius: 7.0, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
+  Object.freeze({ id: 'malabar', kind: 'shop', label: 'Malabar Bakery', x: 14.8, z: 41.2, radius: 3.8, discoverRadius: 7.0, openHour: 5.5, closeHour: 20.5, items: ['water', 'tea', 'snack'] }),
   Object.freeze({ id: 'town-bus', kind: 'bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 3.6, discoverRadius: 6.6 }),
   Object.freeze({ id: 'south-bus', kind: 'bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 3.6, discoverRadius: 6.6 }),
   Object.freeze({ id: 'village-pond', kind: 'view', label: 'Village Pond', x: 39, z: -4, radius: 4.2, discoverRadius: 7.2 }),
@@ -1274,6 +1274,26 @@ function npcConversationReply(villager) {
       'Come say hello. It is a quiet moment.',
       'Nothing urgent—just a village conversation.',
     ],
+    Worker: [
+      'I am on my way to work now.',
+      'Another workday in the village.',
+      'I will be heading home after the shift.',
+    ],
+    Commuter: [
+      'I am heading toward the bus stop.',
+      'I usually take the Village Line from here.',
+      'Just finishing my trip through town.',
+    ],
+    'Tea Break': [
+      'Tea break time. The bakery is busy now.',
+      'A quick tea, then back to work.',
+      'Nothing like a short tea break in the village.',
+    ],
+    'Going Home': [
+      'Work is done. I am heading home.',
+      'Evening time—I am going back home now.',
+      'See you tomorrow. I am on my way home.',
+    ],
     Local: [
       'Nice to meet you. Enjoy the village.',
       'Have a good walk around Kerala Play.',
@@ -1317,6 +1337,21 @@ function interactWithNpc(index) {
   data.interactionPlayerZ = playerRef.position.z;
   const reply = npcConversationReply(villager);
   showToast(`${data.name}: ${reply}`, 3400);
+}
+
+function worldShopIsOpen(spot, hour = Number(worldWeatherState.hour ?? 12)) {
+  if (!spot || spot.kind !== 'shop') return true;
+  const open = Number(spot.openHour ?? 0);
+  const close = Number(spot.closeHour ?? 24);
+  return open <= close ? hour >= open && hour < close : hour >= open || hour < close;
+}
+
+function worldHourLabel(value) {
+  const hour = Math.floor(Number(value) || 0) % 24;
+  const minute = Math.round((((Number(value) || 0) % 1) + 1) % 1 * 60);
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const display = hour % 12 || 12;
+  return `${display}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
 function recommendedWorldShopItem(spot) {
@@ -1490,15 +1525,21 @@ function updateWorldInteract() {
       if (spot.kind === 'shop') {
         const itemId = recommendedWorldShopItem(spot);
         const item = WORLD_SHOP_ITEMS[itemId] || WORLD_SHOP_ITEMS.tea;
-        worldInteract.dataset.mode = closeEnough ? 'world-shop-open' : '';
-        worldInteract.dataset.shop = closeEnough ? spot.id : '';
-        worldInteract.dataset.itemId = closeEnough ? itemId : '';
-        worldInteract.textContent = closeEnough
-          ? `OPEN SHOP · ${spot.label.toUpperCase()}`
-          : `COME CLOSER · ${spot.label.toUpperCase()}`;
-        worldInteract.title = closeEnough
-          ? `${spot.label} · suggested: ${item.name}`
-          : worldInteract.title;
+        const shopOpen = worldShopIsOpen(spot);
+        worldInteract.dataset.mode = closeEnough && shopOpen ? 'world-shop-open' : '';
+        worldInteract.dataset.shop = closeEnough && shopOpen ? spot.id : '';
+        worldInteract.dataset.itemId = closeEnough && shopOpen ? itemId : '';
+        worldInteract.disabled = !closeEnough || !shopOpen;
+        worldInteract.textContent = !shopOpen
+          ? `CLOSED · OPENS ${worldHourLabel(spot.openHour)}`
+          : closeEnough
+            ? `OPEN SHOP · ${spot.label.toUpperCase()}`
+            : `COME CLOSER · ${spot.label.toUpperCase()}`;
+        worldInteract.title = !shopOpen
+          ? `${spot.label} · closed · ${worldHourLabel(spot.openHour)}–${worldHourLabel(spot.closeHour)}`
+          : closeEnough
+            ? `${spot.label} · suggested: ${item.name}`
+            : worldInteract.title;
       } else if (spot.kind === 'bus') {
         const status = busTravelStatus?.stop?.id === spot.id ? busTravelStatus : null;
         const serverOffset = Number(status?.serverNow || 0) - Number(status?.receivedAt || 0);
@@ -3563,6 +3604,55 @@ function animateHuman(human, phase, moving) {
   }
 }
 
+function npcDailyRoutine(data, hour) {
+  const schedule = Array.isArray(data?.dailySchedule) ? data.dailySchedule : null;
+  if (!schedule?.length) return null;
+  const normalizedHour = ((Number(hour) % 24) + 24) % 24;
+  const sorted = schedule;
+  let stageIndex = sorted.length - 1;
+  for (let index = 0; index < sorted.length; index++) {
+    if (normalizedHour >= Number(sorted[index].start || 0)) stageIndex = index;
+    else break;
+  }
+  const stage = sorted[stageIndex];
+  const previous = sorted[(stageIndex - 1 + sorted.length) % sorted.length];
+  const elapsed = ((normalizedHour - Number(stage.start || 0)) + 24) % 24;
+  const transitionHours = Math.max(.12, Number(stage.transitionHours ?? .55));
+  const transitioning = elapsed < transitionHours && !stage.hidden && !previous?.hidden;
+  const progress = transitioning ? THREE.MathUtils.smoothstep(elapsed / transitionHours, 0, 1) : 1;
+  const fromX = Number(previous?.x ?? data.startX);
+  const fromZ = Number(previous?.z ?? data.startZ);
+  const toX = Number(stage.x ?? data.startX);
+  const toZ = Number(stage.z ?? data.startZ);
+  return {
+    stageIndex,
+    stage,
+    behavior: stage.behavior || data.behavior,
+    role: stage.role || data.baseRole || data.role || 'Local',
+    hidden: !!stage.hidden,
+    transitioning,
+    progress,
+    x: THREE.MathUtils.lerp(fromX, toX, progress),
+    z: THREE.MathUtils.lerp(fromZ, toZ, progress),
+    fromX,
+    fromZ,
+    toX,
+    toZ,
+    targetX: Number(stage.targetX ?? data.targetX ?? toX),
+    targetZ: Number(stage.targetZ ?? data.targetZ ?? toZ),
+    facing: Number(stage.facing ?? data.facing ?? 0),
+  };
+}
+
+function applyNpcRoutineRole(villager, role, stageIndex) {
+  const data = villager?.userData;
+  if (!data) return;
+  if (data.role === role && data.lastRoutineStage === stageIndex) return;
+  data.role = role;
+  data.lastRoutineStage = stageIndex;
+  updateNameLabel(villager, `${data.name} · ${role}`, `npc-${data.npcIndex}`);
+}
+
 function npcPingPongState(time, speed, offset) {
   // V79: route timing is deliberately close to human walking pace instead of
   // moving the NPC across a long route in only a couple of seconds.
@@ -3584,7 +3674,10 @@ function updateVillagers(time) {
     const hour = Number(worldWeatherState.hour ?? 12);
     const night = hour >= 20 || hour < 5.25;
     const lateEvening = hour >= 18.5 || hour < 6.0;
-    const hiddenByRoutine = data.nightHide && night && !data.nightActive;
+    const dailyRoutine = npcDailyRoutine(data, hour);
+    const behavior = dailyRoutine?.behavior || data.behavior;
+    if (dailyRoutine) applyNpcRoutineRole(villager, dailyRoutine.role, dailyRoutine.stageIndex);
+    const hiddenByRoutine = dailyRoutine?.hidden || (data.nightHide && night && !data.nightActive);
     villager.visible = !hiddenByRoutine;
     if (!villager.visible) {
       data.crossingActive = false;
@@ -3638,6 +3731,16 @@ function updateVillagers(time) {
 
     data.crossingActive = false;
 
+    if (dailyRoutine?.transitioning) {
+      villager.position.set(dailyRoutine.x, 0, dailyRoutine.z);
+      const dx = dailyRoutine.toX - dailyRoutine.fromX;
+      const dz = dailyRoutine.toZ - dailyRoutine.fromZ;
+      if (Math.hypot(dx, dz) > .05) villager.rotation.y = Math.atan2(dx, dz);
+      animateHuman(human, time * Math.max(.8, data.speed * 5.2) + data.offset, .34 * (1 - rainReaction * .12));
+      applyRainPosture();
+      return;
+    }
+
     if (Number(data.interactionUntil || 0) > performance.now()) {
       const dx = Number(data.interactionPlayerX) - villager.position.x;
       const dz = Number(data.interactionPlayerZ) - villager.position.z;
@@ -3654,11 +3757,11 @@ function updateVillagers(time) {
       return;
     }
 
-    if (data.behavior === 'social') {
-      villager.position.set(data.startX, 0, data.startZ);
+    if (behavior === 'social') {
+      villager.position.set(dailyRoutine?.toX ?? data.startX, 0, dailyRoutine?.toZ ?? data.startZ);
       const sheltered = applyRainShelter();
-      const dx = Number(data.targetX) - villager.position.x;
-      const dz = Number(data.targetZ) - villager.position.z;
+      const dx = Number(dailyRoutine?.targetX ?? data.targetX) - villager.position.x;
+      const dz = Number(dailyRoutine?.targetZ ?? data.targetZ) - villager.position.z;
       villager.rotation.y = Math.atan2(dx, dz);
       animateHuman(human, time * .55 + data.offset, 0);
 
@@ -3674,10 +3777,10 @@ function updateVillagers(time) {
       return;
     }
 
-    if (data.behavior === 'task') {
-      villager.position.set(data.startX, 0, data.startZ);
+    if (behavior === 'task') {
+      villager.position.set(dailyRoutine?.toX ?? data.startX, 0, dailyRoutine?.toZ ?? data.startZ);
       const sheltered = applyRainShelter();
-      villager.rotation.y = Number(data.facing || 0);
+      villager.rotation.y = Number(dailyRoutine?.facing ?? data.facing || 0);
       animateHuman(human, time * .55 + data.offset, 0);
       const workBeat = (Math.sin(time * (lateEvening ? .58 : .95) + data.offset) + 1) * .5 * (sheltered ? .68 : 1);
       if (parts.rightArm) parts.rightArm.rotation.x = -.22 - workBeat * .46;
@@ -3687,10 +3790,10 @@ function updateVillagers(time) {
       return;
     }
 
-    if (data.behavior === 'phone') {
-      villager.position.set(data.startX, 0, data.startZ);
+    if (behavior === 'phone') {
+      villager.position.set(dailyRoutine?.toX ?? data.startX, 0, dailyRoutine?.toZ ?? data.startZ);
       applyRainShelter();
-      villager.rotation.y = Number(data.facing || 0);
+      villager.rotation.y = Number(dailyRoutine?.facing ?? data.facing || 0);
       animateHuman(human, time * .45 + data.offset, 0);
       if (parts.rightArm) parts.rightArm.rotation.x = -1.0;
       if (parts.rightElbow) parts.rightElbow.rotation.x = 1.18;
@@ -3702,10 +3805,10 @@ function updateVillagers(time) {
       return;
     }
 
-    if (data.behavior === 'idle') {
-      villager.position.set(data.startX, 0, data.startZ);
+    if (behavior === 'idle') {
+      villager.position.set(dailyRoutine?.toX ?? data.startX, 0, dailyRoutine?.toZ ?? data.startZ);
       applyRainShelter();
-      villager.rotation.y = Number(data.facing || 0);
+      villager.rotation.y = Number(dailyRoutine?.facing ?? data.facing || 0);
       animateHuman(human, time * .55 + data.offset, 0);
       if (parts.head) parts.head.rotation.y = Math.sin(time * .42 + data.offset) * .11;
       if (parts.torso) parts.torso.rotation.y = Math.sin(time * .28 + data.offset) * .018;
@@ -3717,7 +3820,7 @@ function updateVillagers(time) {
     const weatherSpeed = data.speed * routineSpeed * (1 - rainReaction * .22);
     const motion = npcPingPongState(time, weatherSpeed, data.offset);
 
-    if (data.behavior === 'crossing') {
+    if (behavior === 'crossing') {
       const fromX = Number(data.crossFromX);
       const toX = Number(data.crossToX);
       villager.position.x = THREE.MathUtils.lerp(fromX, toX, motion.progress);
@@ -3736,8 +3839,8 @@ function updateVillagers(time) {
     }
 
     const routeOffset = (motion.progress * 2 - 1) * data.distance;
-    villager.position.x = data.startX;
-    villager.position.z = data.startZ + routeOffset;
+    villager.position.x = dailyRoutine?.toX ?? data.startX;
+    villager.position.z = (dailyRoutine?.toZ ?? data.startZ) + routeOffset;
     villager.rotation.y = motion.direction > 0 ? 0 : Math.PI;
     animateHuman(human, time * weatherSpeed * 4.5, motion.moving ? .34 * (1 - rainReaction * .10) : 0);
     applyRainPosture();
@@ -6930,6 +7033,11 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
     npc: true,
     name: npcName,
     role: options.role || 'Local',
+    baseRole: options.role || 'Local',
+    dailySchedule: Array.isArray(options.dailySchedule)
+      ? [...options.dailySchedule].sort((a, b) => Number(a.start || 0) - Number(b.start || 0))
+      : null,
+    lastRoutineStage: -1,
     gender,
     umbrella,
     rainShelterX: Number(options.shelterX ?? x),
