@@ -41,6 +41,7 @@ function finishKeralaSplash() {
 // Navigation assist is deliberately isolated from the world module so a HUD
 // feedback failure can never prevent the 3D world from starting.
 import('./navigation-assist.js').catch(error => console.warn('Navigation assist unavailable:', error));
+import('./ride-assist.js').catch(error => console.warn('Ride assist unavailable:', error));
 
 // Display a useful recovery screen even if a module fails before game.js runs.
 import('./game.js').then(() => {
