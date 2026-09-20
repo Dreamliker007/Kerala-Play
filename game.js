@@ -1881,8 +1881,8 @@ function placePlayerAtDistrict(district) {
   updateMapPlayer(playerRef);
 }
 
-function recoverBlockedPlayerSpawn(player) {
-  if (!player || !positionBlocked(player.position.x, player.position.z, .43)) return false;
+function recoverBlockedPlayerSpawn(player, force = false) {
+  if (!player || (!force && !positionBlocked(player.position.x, player.position.z, .43))) return false;
   const originX = player.position.x;
   const originZ = player.position.z;
   // A persisted position can become enclosed after a new house or landmark is
@@ -2215,7 +2215,7 @@ try {
   let walkPhase = 0;
   let cameraDriveImpulse = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
-  let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0, interactionAccumulator = 0;
+  let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0, interactionAccumulator = 0, walkingStuckSeconds = 0;
   const moveForward = new THREE.Vector3();
   const moveRight = new THREE.Vector3();
   const keys = new Set();
@@ -2545,6 +2545,12 @@ try {
         const beforeZ = player.position.z;
         moveWithCollision(player, dx, dz, .43);
         const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
+        walkingStuckSeconds = movedDistance < .0005 ? walkingStuckSeconds + delta : 0;
+        if (walkingStuckSeconds > .65 && recoverBlockedPlayerSpawn(player, true)) {
+          walkingStuckSeconds = 0;
+          walkVelocity.set(0, 0, 0);
+          showToast('Moved you to a clear path.');
+        }
         addWalkProgress(movedDistance);
         if (movedDistance > .0005) {
           if (movedDistance > .015) recordOnboardingAction('move');
@@ -2574,6 +2580,7 @@ try {
           animatePlayer(player, walkPhase, 0);
         }
       } else {
+        walkingStuckSeconds = 0;
         animatePlayer(player, walkPhase, 0);
       }
     }
@@ -5178,7 +5185,7 @@ function updateTraffic(delta) {
             break;
           }
         }
-      }
+    }
     }
 
     const previousSpeed = Number(config.currentSpeed);
