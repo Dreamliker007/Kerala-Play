@@ -124,6 +124,20 @@ let homeSnapshot = null;
 let trafficCheckpointVisual = null;
 let junctionSignalVisual = null;
 const pedestrianCrossingZ = -14.3;
+const WORLD_SHOP_ITEMS = Object.freeze({
+  water: Object.freeze({ name: 'Water', price: 15 }),
+  tea: Object.freeze({ name: 'Tea', price: 20 }),
+  snack: Object.freeze({ name: 'Snack', price: 35 }),
+  meal: Object.freeze({ name: 'Kerala Meal', price: 80 }),
+});
+const WORLD_ACTIVITY_SPOTS = Object.freeze([
+  Object.freeze({ id: 'anugraha', kind: 'shop', label: 'Anugraha Stores', x: -14.4, z: 10.7, radius: 3.8, discoverRadius: 7.0, items: ['water', 'tea', 'snack', 'meal'] }),
+  Object.freeze({ id: 'malabar', kind: 'shop', label: 'Malabar Bakery', x: 14.8, z: 41.2, radius: 3.8, discoverRadius: 7.0, items: ['water', 'tea', 'snack'] }),
+  Object.freeze({ id: 'town-bus', kind: 'bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 3.6, discoverRadius: 6.6 }),
+  Object.freeze({ id: 'south-bus', kind: 'bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 3.6, discoverRadius: 6.6 }),
+  Object.freeze({ id: 'village-pond', kind: 'view', label: 'Village Pond', x: 39, z: -4, radius: 4.2, discoverRadius: 7.2 }),
+]);
+let lastWorldActivityAt = 0;
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
@@ -1277,6 +1291,56 @@ function interactWithNpc(index) {
   showToast(`${data.name}: ${reply}`, 3400);
 }
 
+function recommendedWorldShopItem(spot) {
+  const available = Array.isArray(spot?.items) ? spot.items : [];
+  const hunger = Number(needsSnapshot?.hunger ?? 100);
+  const thirst = Number(needsSnapshot?.thirst ?? 100);
+  const energy = Number(needsSnapshot?.energy ?? 100);
+  if (hunger < 48 && available.includes('meal')) return 'meal';
+  if (thirst < 58 && available.includes('water')) return 'water';
+  if (hunger < 78 && available.includes('snack')) return 'snack';
+  if (energy < 78 && available.includes('tea')) return 'tea';
+  return available.includes('tea') ? 'tea' : available[0] || 'water';
+}
+
+function nearestWorldActivity(maxDistance = 7.2) {
+  if (!playerRef || vehicleMode !== 'walk') return null;
+  let nearest = null;
+  let nearestDistance = maxDistance;
+  for (const spot of WORLD_ACTIVITY_SPOTS) {
+    const distance = Math.hypot(playerRef.position.x - spot.x, playerRef.position.z - spot.z);
+    const discoverRadius = Number(spot.discoverRadius || maxDistance);
+    if (distance <= discoverRadius && distance < nearestDistance) {
+      nearest = spot;
+      nearestDistance = distance;
+    }
+  }
+  return nearest ? { spot: nearest, distance: nearestDistance } : null;
+}
+
+function performWorldActivity(activityId) {
+  const spot = WORLD_ACTIVITY_SPOTS.find(item => item.id === activityId);
+  if (!spot || performance.now() - lastWorldActivityAt < 700) return;
+  lastWorldActivityAt = performance.now();
+
+  if (spot.kind === 'bus') {
+    const phase = spot.id === 'town-bus' ? 1.4 : 3.2;
+    const minutes = 2 + Math.floor(((villageTime * .18 + phase) % 5 + 5) % 5);
+    showToast(`${spot.label} · next bus about ${minutes} min · wait near the shelter`, 3600);
+    return;
+  }
+
+  if (spot.kind === 'view') {
+    const rain = Number(worldWeatherState.rain || 0);
+    showToast(
+      rain > .18
+        ? 'Village Pond · monsoon water is rising softly around the banks'
+        : 'Village Pond · a quiet place to stop and look around',
+      3600
+    );
+  }
+}
+
 function updateWorldInteract() {
   if (!worldInteract) return;
   worldInteract.hidden = true;
@@ -1285,6 +1349,9 @@ function updateWorldInteract() {
   worldInteract.dataset.service = '';
   worldInteract.dataset.source = '';
   worldInteract.dataset.npc = '';
+  worldInteract.dataset.shop = '';
+  worldInteract.dataset.itemId = '';
+  worldInteract.dataset.activity = '';
   worldInteract.title = '';
   if (!profile || !playerRef) return;
   const active = activeJobMission;
@@ -1331,14 +1398,56 @@ function updateWorldInteract() {
     const rest = needsSnapshot.restPoint;
     const distance = Math.hypot(playerRef.position.x - Number(rest.x), playerRef.position.z - Number(rest.z));
     if (distance <= Number(rest.radius || 5.2) + .3) {
+      const waitMs = Math.max(0, Number(needsSnapshot.restReadyAt || 0) - Date.now());
+      const full = Number(needsSnapshot.energy ?? 100) >= 99;
       worldInteract.hidden = false;
       worldInteract.dataset.mode = 'needs-rest';
-      worldInteract.textContent = `REST · ENERGY ${Math.round(Number(needsSnapshot.energy ?? 100))}%`;
+      worldInteract.disabled = full || waitMs > 0;
+      worldInteract.title = full
+        ? 'Energy is already full'
+        : waitMs > 0
+          ? 'Bench rest is cooling down'
+          : 'Sit and recover energy';
+      worldInteract.textContent = full
+        ? 'REST · ENERGY FULL'
+        : waitMs > 0
+          ? `REST READY · ${Math.ceil(waitMs / 1000)}s`
+          : `REST · ENERGY ${Math.round(Number(needsSnapshot.energy ?? 100))}%`;
       return;
     }
   }
 
   if (!active && vehicleMode === 'walk') {
+    const nearbyActivity = nearestWorldActivity();
+    if (nearbyActivity) {
+      const { spot, distance } = nearbyActivity;
+      const closeEnough = distance <= Number(spot.radius || 3.8);
+      worldInteract.hidden = false;
+      worldInteract.disabled = !closeEnough;
+      worldInteract.title = closeEnough
+        ? spot.label
+        : `${spot.label} · ${distance.toFixed(1)} m away`;
+
+      if (spot.kind === 'shop') {
+        const itemId = recommendedWorldShopItem(spot);
+        const item = WORLD_SHOP_ITEMS[itemId] || WORLD_SHOP_ITEMS.tea;
+        worldInteract.dataset.mode = closeEnough ? 'world-shop' : '';
+        worldInteract.dataset.shop = closeEnough ? spot.id : '';
+        worldInteract.dataset.itemId = closeEnough ? itemId : '';
+        worldInteract.textContent = closeEnough
+          ? `BUY ${item.name.toUpperCase()} · ₹${item.price}`
+          : `COME CLOSER · ${spot.label.toUpperCase()}`;
+      } else {
+        worldInteract.dataset.mode = closeEnough ? 'world-activity' : '';
+        worldInteract.dataset.activity = closeEnough ? spot.id : '';
+        worldInteract.textContent = closeEnough
+          ? (spot.kind === 'bus' ? 'CHECK BUS TIMES' : 'ENJOY POND VIEW')
+          : `NEARBY · ${spot.label.toUpperCase()}`;
+      }
+      return;
+    }
+
+    const nearbyNpc = nearestTalkableVillager();
     const nearbyNpc = nearestTalkableVillager();
     if (nearbyNpc) {
       const data = nearbyNpc.villager.userData;
@@ -1413,6 +1522,15 @@ worldInteract?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('kerala-needs-rest'));
   } else if (worldInteract.dataset.mode === 'home-sleep') {
     window.dispatchEvent(new CustomEvent('kerala-home-sleep'));
+  } else if (worldInteract.dataset.mode === 'world-shop') {
+    window.dispatchEvent(new CustomEvent('kerala-world-shop', {
+      detail: {
+        shopId: worldInteract.dataset.shop,
+        itemId: worldInteract.dataset.itemId,
+      },
+    }));
+  } else if (worldInteract.dataset.mode === 'world-activity') {
+    performWorldActivity(worldInteract.dataset.activity);
   } else if (worldInteract.dataset.mode === 'npc-talk') {
     interactWithNpc(worldInteract.dataset.npc);
   } else {
