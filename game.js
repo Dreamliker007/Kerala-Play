@@ -138,6 +138,7 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'village-pond', kind: 'view', label: 'Village Pond', x: 39, z: -4, radius: 4.2, discoverRadius: 7.2 }),
 ]);
 let lastWorldActivityAt = 0;
+let lifeLoopAction = 'jobs';
 let jobWorldVisual = null;
 let jobCarryVisual = null;
 let jobVisualSignature = '';
@@ -1263,6 +1264,15 @@ function npcConversationReply(villager) {
   };
   const pool = roleReplies[role] || roleReplies.Local;
   const index = Math.abs(Number(data.npcIndex || 0) + Number(data.talkCount || 0)) % pool.length;
+  const hunger = Number(needsSnapshot?.hunger ?? 100);
+  const thirst = Number(needsSnapshot?.thirst ?? 100);
+  const energy = Number(needsSnapshot?.energy ?? 100);
+
+  if (activeJobMission) return `${timeGreeting}! Looks like you are on the ${activeJobMission.title} shift—good luck with the next stop.`;
+  if (thirst <= 22) return `${timeGreeting}! You look thirsty. Get some water from a nearby village shop.`;
+  if (hunger <= 22) return `${timeGreeting}! You should eat soon. The village shops have snacks and meals.`;
+  if (energy <= 22) return `${timeGreeting}! You look tired. Try the rest bench or head home for sleep.`;
+  if (homeSnapshot?.rentOverdue || homeSnapshot?.utilityOverdue) return `${timeGreeting}! Remember to check your HOME panel—one of your bills is due.`;
 
   if (rain > .58) return `${timeGreeting}! Heavy rain today—stay under cover when you can.`;
   if (rain > .12) return `${timeGreeting}! It is raining, so watch the wet road.`;
@@ -1341,6 +1351,36 @@ function performWorldActivity(activityId) {
   }
 }
 
+function updateLifeLoopMission() {
+  if (!missionText || !landmarkStatus || activeJobMission || selectedLandmark) return;
+  const hunger = Number(needsSnapshot?.hunger ?? 100);
+  const thirst = Number(needsSnapshot?.thirst ?? 100);
+  const energy = Number(needsSnapshot?.energy ?? 100);
+
+  if (thirst <= 25) {
+    lifeLoopAction = 'map';
+    missionText.textContent = 'Daily need: get water';
+    landmarkStatus.textContent = 'Visit a nearby village shop';
+  } else if (hunger <= 25) {
+    lifeLoopAction = 'map';
+    missionText.textContent = 'Daily need: get food';
+    landmarkStatus.textContent = 'Visit a nearby village shop';
+  } else if (energy <= 25) {
+    lifeLoopAction = 'map';
+    missionText.textContent = 'Daily need: recover energy';
+    landmarkStatus.textContent = 'Rest bench or Village Rental Home';
+  } else if (homeSnapshot?.accessBlocked || homeSnapshot?.rentOverdue || homeSnapshot?.utilityOverdue) {
+    lifeLoopAction = 'home';
+    missionText.textContent = 'Home payment needs attention';
+    landmarkStatus.textContent = 'Open HOME to review rent and utilities';
+  } else {
+    lifeLoopAction = 'jobs';
+    missionText.textContent = 'Daily life: choose a job';
+    landmarkStatus.textContent = 'Work → salary → home, food and vehicles';
+  }
+  missionCard.dataset.lifeAction = lifeLoopAction;
+}
+
 function updateWorldInteract() {
   if (!worldInteract) return;
   worldInteract.hidden = true;
@@ -1385,11 +1425,11 @@ function updateWorldInteract() {
     const distance = Math.hypot(playerRef.position.x - Number(home.x), playerRef.position.z - Number(home.z));
     if (distance <= Number(home.radius || 5.2) + .3) {
       worldInteract.hidden = false;
-      worldInteract.dataset.mode = 'home-sleep';
+      worldInteract.dataset.mode = homeSnapshot.accessBlocked ? 'home-open' : 'home-sleep';
       worldInteract.textContent = homeSnapshot.accessBlocked
-        ? 'HOME · PAYMENT DUE'
+        ? 'OPEN HOME · PAYMENT DUE'
         : `SLEEP · ENERGY ${Math.round(Number(needsSnapshot?.energy ?? 100))}%`;
-      worldInteract.disabled = !!homeSnapshot.accessBlocked;
+      worldInteract.disabled = false;
       return;
     }
   }
@@ -1431,12 +1471,15 @@ function updateWorldInteract() {
       if (spot.kind === 'shop') {
         const itemId = recommendedWorldShopItem(spot);
         const item = WORLD_SHOP_ITEMS[itemId] || WORLD_SHOP_ITEMS.tea;
-        worldInteract.dataset.mode = closeEnough ? 'world-shop' : '';
+        worldInteract.dataset.mode = closeEnough ? 'world-shop-open' : '';
         worldInteract.dataset.shop = closeEnough ? spot.id : '';
         worldInteract.dataset.itemId = closeEnough ? itemId : '';
         worldInteract.textContent = closeEnough
-          ? `BUY ${item.name.toUpperCase()} · ₹${item.price}`
+          ? `OPEN SHOP · ${spot.label.toUpperCase()}`
           : `COME CLOSER · ${spot.label.toUpperCase()}`;
+        worldInteract.title = closeEnough
+          ? `${spot.label} · suggested: ${item.name}`
+          : worldInteract.title;
       } else {
         worldInteract.dataset.mode = closeEnough ? 'world-activity' : '';
         worldInteract.dataset.activity = closeEnough ? spot.id : '';
@@ -1521,13 +1564,20 @@ worldInteract?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('kerala-needs-rest'));
   } else if (worldInteract.dataset.mode === 'home-sleep') {
     window.dispatchEvent(new CustomEvent('kerala-home-sleep'));
-  } else if (worldInteract.dataset.mode === 'world-shop') {
-    window.dispatchEvent(new CustomEvent('kerala-world-shop', {
-      detail: {
-        shopId: worldInteract.dataset.shop,
-        itemId: worldInteract.dataset.itemId,
-      },
-    }));
+  } else if (worldInteract.dataset.mode === 'home-open') {
+    window.dispatchEvent(new CustomEvent('kerala-open-home'));
+  } else if (worldInteract.dataset.mode === 'world-shop-open') {
+    const spot = WORLD_ACTIVITY_SPOTS.find(item => item.id === worldInteract.dataset.shop && item.kind === 'shop');
+    if (spot) {
+      window.dispatchEvent(new CustomEvent('kerala-world-shop-open', {
+        detail: {
+          shopId: spot.id,
+          label: spot.label,
+          items: [...spot.items],
+          suggestedItemId: recommendedWorldShopItem(spot),
+        },
+      }));
+    }
   } else if (worldInteract.dataset.mode === 'world-activity') {
     performWorldActivity(worldInteract.dataset.activity);
   } else if (worldInteract.dataset.mode === 'npc-talk') {
@@ -1558,10 +1608,7 @@ function applyJobMission(active) {
   updateVehicleAction();
   if (playerRef) updateMapPlayer(playerRef);
   if (!activeJobMission) {
-    if (!selectedLandmark) {
-      missionText.textContent = 'Explore Kerala landmarks';
-      landmarkStatus.textContent = 'Tap TASKS for rewards';
-    }
+    updateLifeLoopMission();
     return;
   }
   if (activeJobMission.phase === 'travel' && activeJobMission.target) {
@@ -1592,10 +1639,14 @@ window.addEventListener('kerala-traffic-state', event => {
   updateWorldInteract();
   updateDriveHud();
 });
-window.addEventListener('kerala-needs-state', event => applyNeedsState(event.detail, { warn: false }));
+window.addEventListener('kerala-needs-state', event => {
+  applyNeedsState(event.detail, { warn: false });
+  updateLifeLoopMission();
+});
 window.addEventListener('kerala-home-state', event => {
   homeSnapshot = event.detail || null;
   updateWorldInteract();
+  updateLifeLoopMission();
 });
 
 window.addEventListener('error', event => {
@@ -2308,7 +2359,18 @@ function wireInterface() {
     } catch { showToast('Fullscreen is unavailable in this browser'); }
   });
   taskClose.addEventListener('click', () => setOpenPanel());
-  missionCard.addEventListener('click', () => { if (activeJobMission) document.querySelector('#jobs-toggle')?.click(); else setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'); });
+  missionCard.addEventListener('click', () => {
+    if (activeJobMission) {
+      document.querySelector('#jobs-toggle')?.click();
+      return;
+    }
+    const action = missionCard.dataset.lifeAction || lifeLoopAction;
+    if (action === 'jobs') document.querySelector('#jobs-toggle')?.click();
+    else if (action === 'home') document.querySelector('#home-toggle')?.click();
+    else if (action === 'wallet') document.querySelector('#wallet-toggle')?.click();
+    else if (action === 'map') document.querySelector('#map-open')?.click();
+    else setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks');
+  });
   challengePlay.addEventListener('click', playCoconutChallenge);
   document.querySelector('#npc-profile .panel-close').addEventListener('click', () => { document.querySelector('#npc-profile').hidden = true; });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { setOpenPanel(); document.querySelector('#npc-profile').hidden = true; } });
