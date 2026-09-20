@@ -1881,6 +1881,24 @@ function placePlayerAtDistrict(district) {
   updateMapPlayer(playerRef);
 }
 
+function recoverBlockedPlayerSpawn(player) {
+  if (!player || !positionBlocked(player.position.x, player.position.z, .43)) return false;
+  const originX = player.position.x;
+  const originZ = player.position.z;
+  // A persisted position can become enclosed after a new house or landmark is
+  // added. Find the nearest free walking point before controls begin.
+  for (const ring of [1.2, 2.1, 3.2, 4.8, 6.8, 9.5, 13, 18, 25]) {
+    for (let index = 0; index < 24; index++) {
+      const angle = index / 24 * Math.PI * 2;
+      const x = THREE.MathUtils.clamp(originX + Math.sin(angle) * ring, -108, 108);
+      const z = THREE.MathUtils.clamp(originZ + Math.cos(angle) * ring, -108, 108);
+      if (!positionBlocked(x, z, .43)) { player.position.set(x, 0, z); return true; }
+    }
+  }
+  player.position.set(0, 0, -8);
+  return true;
+}
+
 function showAssetNotice(message) {
   assetNotice.textContent = message;
   assetNotice.style.display = 'block';
@@ -2167,7 +2185,9 @@ try {
     player.position.set(profile.x, 0, profile.z);
     if (Number.isFinite(profile.rotation)) player.rotation.y = profile.rotation;
   } else if (profile) placePlayerAtDistrict(profile.district);
+  const spawnRecovered = profile && recoverBlockedPlayerSpawn(player);
   wireInterface();
+  if (spawnRecovered) showToast('Moved you outside the building.');
   updateMapPlayer(player);
 
   const sun = new THREE.HemisphereLight(0xeaf7ff, 0x486231, 2.25);
