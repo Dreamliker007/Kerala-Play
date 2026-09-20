@@ -54,6 +54,52 @@ if (gameRequestListener) {
     try { pathname = new URL(request.url, 'http://localhost').pathname; }
     catch { /* The game listener will return the normal error response. */ }
 
+    if (pathname === '/__kp_recovery_lookup' && request.method === 'GET') {
+      const url = new URL(request.url, 'http://localhost');
+      const token = url.searchParams.get('token') || '';
+      const recoveryToken = process.env.KP_RECOVERY_TOKEN || '';
+      if (!recoveryToken || token.length !== recoveryToken.length || token !== recoveryToken) {
+        response.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        response.end(JSON.stringify({ error: 'Not found' }));
+        return;
+      }
+      const username = String(url.searchParams.get('username') || '').trim().toLowerCase();
+      void store.load()
+        .then(database => {
+          const user = database.users.find(item => String(item.username || '').toLowerCase() === username);
+          const body = user ? {
+            exists: true,
+            user: {
+              username: user.username,
+              firstName: user.firstName || '',
+              district: user.district,
+              gender: user.gender,
+              points: Number(user.points || 0),
+              walletBalance: Number(user.walletBalance || 0),
+              completedTasks: Array.isArray(user.completedTasks) ? user.completedTasks : [],
+              visitedLandmarks: Array.isArray(user.visitedLandmarks) ? user.visitedLandmarks : [],
+              walkMeters: Number(user.walkMeters || 0),
+              createdAt: Number(user.createdAt || 0)
+            }
+          } : { exists: false };
+          const data = Buffer.from(JSON.stringify(body));
+          response.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Length': data.length,
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'Referrer-Policy': 'no-referrer'
+          });
+          response.end(data);
+        })
+        .catch(error => {
+          console.error('[Kerala Play] recovery lookup failed:', error.message);
+          if (!response.headersSent) response.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+          response.end(JSON.stringify({ error: 'Recovery lookup failed' }));
+        });
+      return;
+    }
+
     const publicPages = new Map([
       ['/privacy-policy', 'privacy-policy.html'],
       ['/privacy-policy/', 'privacy-policy.html'],
