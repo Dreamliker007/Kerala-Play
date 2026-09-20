@@ -244,3 +244,24 @@
   .auth-card h1 { margin:4px 0 5px; font-size:19px; }
   .auth-card > .social-muted:first-of-type { margin:0; font-size:10px; }
 }
+
+
+/* V102.1 community events */
+#events-panel { max-height:min(76dvh,620px); overflow:auto; }
+.events-summary { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:10px 0 12px; padding:12px; border:1px solid #6ca78a55; border-radius:13px; background:#11372f; }
+.events-summary strong,.events-summary small { display:block; }
+.events-summary small { margin-top:3px; color:#b9d8cd; font-size:10px; }
+#events-list { display:grid; gap:9px; }
+.community-event-card { padding:12px; border:1px solid #ffffff1f; border-radius:13px; background:#ffffff08; }
+.community-event-card.active { border-color:#7bdfa277; background:#1c6b4630; }
+.community-event-card.completed { border-color:#e4ce7466; }
+.community-event-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.community-event-head strong { font-size:13px; }
+.community-event-status { flex:0 0 auto; padding:3px 6px; border-radius:999px; color:#dff8e7; background:#2c6f4f; font-size:8px; font-weight:900; letter-spacing:.7px; }
+.community-event-card p { margin:8px 0 6px; color:#d4e9df; font-size:11px; line-height:1.45; }
+.community-event-card small { display:block; color:#a8cbc0; font-size:9px; line-height:1.45; }
+.community-event-time { margin-top:4px; color:#f5df91 !important; font-weight:800; }
+.community-event-actions { display:flex; gap:7px; margin-top:10px; }
+.community-event-actions button { flex:1; }
+#events-panel :focus-visible { outline:3px solid #ffe298; outline-offset:3px; }
+@media (max-width:560px) { #events-panel { width:min(340px,calc(100vw - 86px)); max-height:calc(100dvh - 40px - env(safe-area-inset-top)); } }
