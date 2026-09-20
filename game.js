@@ -4221,6 +4221,146 @@ function addKeralaStreetRealism(scene) {
   ].forEach(([x,z,scale,yaw]) => addBananaPlant(scene, x, z, scale, yaw));
 }
 
+
+function addWorldRealismPass(scene) {
+  // V101.0: a mobile-first realism layer. Most repeated detail is instanced or
+  // culled at distance so the village feels denser without turning every plant
+  // and yard prop into a separate heavy object.
+  const random = visualRandom(10100);
+
+  const soilMaterial = new THREE.MeshStandardMaterial({
+    color: 0x7a5b39,
+    roughness: 1,
+    transparent: true,
+    opacity: .52,
+    depthWrite: false,
+  });
+  const mossMaterial = new THREE.MeshStandardMaterial({
+    color: 0x4f713d,
+    roughness: 1,
+    transparent: true,
+    opacity: .34,
+    depthWrite: false,
+  });
+  const patchGeometry = new THREE.CircleGeometry(1, 14);
+  const groundPatches = [
+    [-14.0,-64,1.9,.62,.10], [14.4,-54,1.6,.54,-.08],
+    [-14.2,-40,1.5,.50,.16], [14.0,-7,1.7,.58,-.14],
+    [-14.3,25,1.8,.60,.06], [14.2,52,1.6,.53,-.12],
+    [-55,-31.0,1.9,.58,.08], [-38,-12.8,1.5,.52,-.06],
+    [-18,-31.6,1.4,.48,.12], [34,-29.8,1.6,.55,-.10],
+  ];
+  groundPatches.forEach(([x,z,sx,sz,rotation], index) => {
+    const patch = new THREE.Mesh(patchGeometry, index % 3 === 0 ? mossMaterial : soilMaterial);
+    patch.rotation.x = -Math.PI / 2;
+    patch.rotation.z = rotation;
+    patch.scale.set(sx, sz, 1);
+    patch.position.set(x, .022, z);
+    patch.receiveShadow = true;
+    scene.add(patch);
+  });
+
+  // Dense low undergrowth uses one draw call instead of dozens of separate meshes.
+  const undergrowthGeometry = new THREE.ConeGeometry(.16, .52, 5);
+  undergrowthGeometry.translate(0, .26, 0);
+  const undergrowthMaterial = new THREE.MeshStandardMaterial({ color: 0x3f7338, roughness: 1 });
+  const clusters = [
+    [-53,-55],[-49,-38],[-51,-4],[-48,22],[-52,55],
+    [49,-56],[52,-35],[49,-2],[51,25],[50,58],
+    [-31,17],[33,55],
+  ];
+  const perCluster = runtimeIsMobile ? 4 : 6;
+  const undergrowth = new THREE.InstancedMesh(undergrowthGeometry, undergrowthMaterial, clusters.length * perCluster);
+  const dummy = new THREE.Object3D();
+  let undergrowthIndex = 0;
+  clusters.forEach(([cx,cz], clusterIndex) => {
+    for (let i = 0; i < perCluster; i++) {
+      const angle = random() * Math.PI * 2;
+      const radius = .25 + random() * 2.4;
+      dummy.position.set(cx + Math.cos(angle) * radius, .01, cz + Math.sin(angle) * radius);
+      dummy.rotation.set((random() - .5) * .06, random() * Math.PI, (random() - .5) * .08);
+      const scale = .58 + random() * .72;
+      dummy.scale.set(scale * (.82 + random() * .38), scale, scale * (.82 + random() * .30));
+      dummy.updateMatrix();
+      undergrowth.setMatrixAt(undergrowthIndex++, dummy.matrix);
+    }
+  });
+  undergrowth.instanceMatrix.needsUpdate = true;
+  undergrowth.castShadow = false;
+  undergrowth.receiveShadow = true;
+  scene.add(undergrowth);
+
+  // Irregular stepping paths make house fronts feel inhabited rather than dropped
+  // onto a flat field. These are visual only and intentionally do not add colliders.
+  const slabMaterial = new THREE.MeshStandardMaterial({ color: 0x9c917e, roughness: 1 });
+  const yardPaths = [
+    [28,29.0,0],[-36,38.0,0],[18,-27.0,0],[-24,-31.0,0],
+  ];
+  yardPaths.forEach(([x,z,rotation], pathIndex) => {
+    const root = new THREE.Group();
+    for (let step = 0; step < 5; step++) {
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(1.0 + (step % 2) * .18, .07, .62), slabMaterial);
+      slab.position.set((step % 2 ? .12 : -.10), .035, step * .76);
+      slab.rotation.y = (step % 2 ? 1 : -1) * .035;
+      slab.receiveShadow = true;
+      root.add(slab);
+    }
+    root.position.set(x, 0, z);
+    root.rotation.y = rotation;
+    registerFarVisual(root, x, z, 42);
+    scene.add(root);
+  });
+
+  // A few clothes lines add everyday Kerala life with only simple planes/lines.
+  const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x68645b, roughness: .88, metalness: .08 });
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x4e4d48, transparent: true, opacity: .72 });
+  const clothColors = [0xd66e62,0x5d87b4,0xe4bf54,0x7b9e68,0xc27c9b];
+  const laundrySpots = [
+    [32.0,20.0,.08],[-40.5,29.0,-.10],[22.5,-36.4,.04],
+  ];
+  laundrySpots.forEach(([x,z,rotation], spotIndex) => {
+    const root = new THREE.Group();
+    const left = new THREE.Mesh(new THREE.CylinderGeometry(.035,.05,2.0,6), poleMaterial);
+    const right = left.clone();
+    left.position.set(-1.55,1.0,0);
+    right.position.set(1.55,1.0,0);
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.55,1.76,0),
+      new THREE.Vector3(1.55,1.72,0),
+    ]);
+    const line = new THREE.Line(lineGeometry, lineMaterial);
+    root.add(left,right,line);
+    for (let item=0; item<4; item++) {
+      const cloth = new THREE.Mesh(
+        new THREE.PlaneGeometry(.50 + (item % 2) * .12,.62),
+        new THREE.MeshStandardMaterial({
+          color: clothColors[(spotIndex + item) % clothColors.length],
+          roughness:.92,
+          side:THREE.DoubleSide,
+        })
+      );
+      cloth.position.set(-1.05 + item * .70,1.42 - (item % 2) * .04,.02);
+      cloth.rotation.z = (item % 2 ? 1 : -1) * .035;
+      root.add(cloth);
+    }
+    root.position.set(x,0,z);
+    root.rotation.y = rotation;
+    registerFarVisual(root,x,z,38);
+    scene.add(root);
+  });
+
+  // Broader species mix around compounds; tall vegetation stays well away from
+  // the carriageway to preserve visibility and touch-device performance.
+  [
+    [-54,-47,.78,true],[52,-45,.82,false],[-52,12,.74,true],
+    [51,16,.80,false],[-46,58,.76,false],[47,62,.82,true],
+  ].forEach(([x,z,scale,fruit]) => addTree(scene,x,z,scale,fruit));
+  [
+    [-29,18,.68,.2],[-31,21,.62,1.0],[35,24,.70,2.0],
+    [38,27,.64,2.7],[-42,-42,.66,.8],[43,-48,.69,1.8],
+  ].forEach(([x,z,scale,yaw]) => addBananaPlant(scene,x,z,scale,yaw));
+}
+
 function addStreetLifeProps(scene) {
   const wood = new THREE.MeshStandardMaterial({ color: 0x77533a, roughness: .94 });
   const steel = new THREE.MeshStandardMaterial({ color: 0x666f70, roughness: .70, metalness: .28 });
@@ -4509,6 +4649,8 @@ function buildWorld(scene) {
   addRoadVehicle(scene, { kind: 'auto', axis: 'z', fixed: 3.15, min: -76, max: 76, progress: 20, direction: -1, speed: 5.8, color: 0x2b773f, flowPhase: 3.8 });
   addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5, flowPhase: .8 });
   addRoadVehicle(scene, { kind: 'bike', axis: 'x', fixed: -24.4, min: -69, max: 10, progress: -31, direction: 1, speed: 7.2, color: 0x8b3e35, flowPhase: 4.4 });
+  // Opposing side-road traffic keeps the junction from feeling one-directional.
+  addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: -19.5, min: -69, max: 10, progress: -4, direction: -1, speed: 5.5, color: 0x31734a, flowPhase: 2.9 });
 
   addPhotoHouse(scene, -24, -36, 10.2, 6.8);
   const rentalHomeMarker = new THREE.Group();
@@ -4518,6 +4660,7 @@ function buildWorld(scene) {
   addPhotoHouse(scene, 28, 24, 8.8, 5.9);
   addPhotoHouse(scene, -36, 33, 9.4, 6.25);
   addPhotoHouse(scene, 18, -32, 8.6, 5.75);
+  addWorldRealismPass(scene);
   // Keep tall palms clear of both carriageways. Their fronds no longer hang
   // over the driving lanes; the near-road detail is handled by low gardens.
   const treePositions = [[-21,-62],[22,-55],[-22,-47],[23,-42],[-23,-11],[23,-8],[-23,7],[23,12],[-23,34],[23,43],[-22,61],[23,66],[-50,-20],[-45,14],[-42,48],[46,-42],[42,4],[47,52]];
@@ -4608,6 +4751,23 @@ function buildWorld(scene) {
   addPhotoVillager(scene, 12.4, 41.4, 0, .22, 5.1, .68, {
     behavior: 'social', targetX: 13.8, targetZ: 41.6, role: 'Customer', nightHide: true,
     shelterX: 12.7, shelterZ: 41.05,
+  });
+
+  // V101.0: a few additional everyday routines spread activity beyond the
+  // junction so the village feels occupied without crowding the mobile scene.
+  addPhotoVillager(scene, 27.2, 19.4, 0, .22, .8, .69, {
+    behavior: 'idle', facing: -Math.PI / 2, role: 'Local', nightHide: true,
+    shelterX: 27.8, shelterZ: 20.0,
+  });
+  addPhotoVillager(scene, -34.2, -11.7, 0, .24, 2.7, .71, {
+    behavior: 'task', facing: Math.PI, role: 'Local', nightHide: true,
+    shelterX: -35.0, shelterZ: -12.4,
+  });
+  addPhotoVillager(scene, -18.5, 52.0, 7.5, .34, 4.0, .70, {
+    role: 'Local', nightHide: true,
+  });
+  addPhotoVillager(scene, 18.0, -50.0, 6.2, .31, 1.5, .68, {
+    role: 'Local', nightHide: true,
   });
 }
 
