@@ -2204,7 +2204,10 @@ try {
   }
   applyRenderScale();
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.shadowMap.enabled = false;
+  // Mobile keeps the lightweight contact-shadow system. Desktop can afford a
+  // restrained soft sun shadow pass for trees, buildings, people and vehicles.
+  renderer.shadowMap.enabled = !isMobile;
+  if (!isMobile) renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.prepend(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -2263,6 +2266,18 @@ try {
   scene.add(sun);
   const warmLight = new THREE.DirectionalLight(0xfff1d0, 1.5);
   warmLight.position.set(35, 55, 25);
+  warmLight.castShadow = !isMobile;
+  if (!isMobile) {
+    warmLight.shadow.mapSize.set(1024, 1024);
+    warmLight.shadow.camera.left = -58;
+    warmLight.shadow.camera.right = 58;
+    warmLight.shadow.camera.top = 58;
+    warmLight.shadow.camera.bottom = -58;
+    warmLight.shadow.camera.near = 8;
+    warmLight.shadow.camera.far = 135;
+    warmLight.shadow.bias = -.00035;
+    warmLight.shadow.normalBias = .025;
+  }
   scene.add(warmLight);
   atmosphere = createAtmosphere(THREE, { scene, renderer, camera, sun: warmLight, hemi: sun });
 
