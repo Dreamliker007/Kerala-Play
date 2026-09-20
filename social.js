@@ -245,6 +245,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   authModal.setAttribute('aria-labelledby', 'auth-title');
   authModal.hidden = true;
   const authCard = node('div', 'social-card auth-card');
+  const authLogo = document.createElement('img');
+  authLogo.className = 'auth-brand-logo';
+  authLogo.src = './assets/kerala-play-logo.svg';
+  authLogo.alt = 'Kerala Play';
   const authTitle = node('h1', '', 'Welcome to Kerala Play');
   authTitle.id = 'auth-title';
   const authIntro = node('p', 'social-muted', 'Your avatar. Your people. One living Kerala.');
@@ -276,7 +280,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const authNote = node('p', 'social-muted', 'New accounts start at 0 points. Earn rewards by completing tasks and winning games.');
   const forgot = button('Forgot password?', () => renderReset()); forgot.className = 'social-link';
   authForm.append(field('First name', firstName), field('Username', username), usernameNote, field('Password', password), signupContact, signupFields, authSubmit, forgot, authError);
-  authCard.append(node('div', 'social-eyebrow', 'KERALA PLAY'), authTitle, authIntro, authTabs, authForm, authNote);
+  authCard.append(authLogo, authTitle, authIntro, authTabs, authForm, authNote);
   authModal.append(authCard);
   document.body.append(authModal);
 
