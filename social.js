@@ -1,22 +1,48 @@
 const districts = ['Alappuzha', 'Ernakulam', 'Idukki', 'Kannur', 'Kasaragod', 'Kollam', 'Kottayam', 'Kozhikode', 'Malappuram', 'Palakkad', 'Pathanamthitta', 'Thiruvananthapuram', 'Thrissur', 'Wayanad'];
 const accepted = relation => ['following', 'follower', 'mutual'].includes(relation);
-const serverHelp = 'Start the Kerala Play server with npm start, then open http://localhost:3000. Accounts and live features need the server.';
+const localHostnames = new Set(['localhost', '127.0.0.1', '::1']);
+const localServerHelp = 'Start the Kerala Play server with npm start, then open http://localhost:3000. Accounts and live features need the server.';
+const productionServerHelp = 'Kerala Play account service is starting or temporarily unavailable. Please wait a few seconds and try again.';
+const serverHelp = localHostnames.has(location.hostname) ? localServerHelp : productionServerHelp;
+const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 export async function api(path, body, method) {
   if (!/^https?:$/.test(location.protocol)) throw new Error(serverHelp);
-  let response;
-  try {
-    response = await fetch(path, { method: method || (body === undefined ? 'GET' : 'POST'), credentials: 'same-origin', headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch { throw new Error(`Cannot reach the Kerala Play server. ${serverHelp}`); }
-  let result;
-  try { result = await response.json(); }
-  catch { throw new Error(`This page is not connected to the Kerala Play server. ${serverHelp}`); }
-  if (!response.ok) {
-    const error = new Error(result.error || result.message || `Request failed (${response.status}).`);
-    error.status = response.status;
-    throw error;
+  const requestMethod = method || (body === undefined ? 'GET' : 'POST');
+  const options = {
+    method: requestMethod,
+    credentials: 'same-origin',
+    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  };
+  const attempts = requestMethod === 'GET' ? 2 : 1;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(path, options);
+    } catch {
+      if (attempt + 1 < attempts) { await wait(900); continue; }
+      throw new Error(`Cannot reach the Kerala Play server. ${serverHelp}`);
+    }
+
+    const text = await response.text();
+    let result;
+    try { result = text ? JSON.parse(text) : {}; }
+    catch {
+      if (attempt + 1 < attempts) { await wait(900); continue; }
+      throw new Error(serverHelp);
+    }
+
+    if (!response.ok) {
+      if (attempt + 1 < attempts && [502, 503, 504].includes(response.status)) { await wait(900); continue; }
+      const error = new Error(result.error || result.message || `Request failed (${response.status}).`);
+      error.status = response.status;
+      throw error;
+    }
+    return result;
   }
-  return result;
+  throw new Error(serverHelp);
 }
 
 function node(tag, className, text) {
