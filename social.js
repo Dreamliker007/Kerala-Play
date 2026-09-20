@@ -1828,6 +1828,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     await run(refreshBank, walletError);
     await run(refreshNotifications, phoneError);
     await run(refreshNpcRelationships, peopleError);
+    await run(refreshCommunityEvents, eventsError);
     if (notificationsTimer) clearInterval(notificationsTimer);
     notificationsTimer = setInterval(() => { if (user) run(refreshNotifications, phoneError); }, 60000);
   }
@@ -1843,8 +1844,13 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (walletBalance) walletBalance.textContent = '₹0';
     notificationsSnapshot = null;
     npcRelationshipsSnapshot = null;
+    eventsSnapshot = null;
+    if (eventsTimer) { clearInterval(eventsTimer); eventsTimer = null; }
     window.dispatchEvent(new CustomEvent('kerala-npc-relationships-sync', { detail: null }));
+    window.dispatchEvent(new CustomEvent('kerala-community-events-sync', { detail: null }));
     phoneNotifications?.replaceChildren();
+    eventsList?.replaceChildren();
+    if (eventsSummaryText) eventsSummaryText.textContent = 'No active session';
     if (phoneBadge) { phoneBadge.hidden = true; phoneBadge.textContent = '0'; }
     if (phoneSummaryText) phoneSummaryText.textContent = 'No unread alerts';
     walletTransactions?.replaceChildren();
@@ -1861,6 +1867,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   phoneClose?.addEventListener('click', () => { closePanels(); phoneToggle?.focus(); });
   phoneRefresh?.addEventListener('click', () => run(refreshNotifications, phoneError));
   phoneMarkAll?.addEventListener('click', () => run(() => markNotificationRead('', true), phoneError));
+  eventsToggle?.addEventListener('click', () => eventsPanel?.classList.contains('open') ? closePanels() : openEvents());
+  eventsClose?.addEventListener('click', () => { closePanels(); eventsToggle?.focus(); });
+  eventsRefresh?.addEventListener('click', () => run(refreshCommunityEvents, eventsError));
   walletToggle?.addEventListener('click', () => walletPanel?.classList.contains('open') ? closePanels() : openWallet());
   walletClose?.addEventListener('click', () => { closePanels(); walletToggle?.focus(); });
   walletRefresh?.addEventListener('click', () => run(refreshWallet, walletError));
@@ -2105,6 +2114,16 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (result?.ride) {
       toast(`${result.ride.serviceLabel || 'Ride'} · arrived at ${result.ride.to?.label || 'destination'} · fare ${formatCash(result.ride.fare || 0)}`, 4200);
     }
+  });
+
+  window.addEventListener('kerala-community-event-participate', event => {
+    const eventId = String(event.detail?.eventId || eventsSnapshot?.current?.id || '');
+    if (!eventId) return;
+    run(() => participateCommunityEvent(eventId), eventsPanel?.classList.contains('open') ? eventsError : null);
+  });
+
+  window.addEventListener('kerala-community-events-refresh', () => {
+    if (user) run(refreshCommunityEvents, eventsPanel?.classList.contains('open') ? eventsError : null);
   });
 
   window.addEventListener('kerala-npc-interact', event => run(async () => {
