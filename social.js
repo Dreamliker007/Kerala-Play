@@ -1951,6 +1951,28 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   window.addEventListener('kerala-open-home', openHome);
   window.addEventListener('kerala-world-shop-open', event => openWorldShop(event.detail));
 
+  window.addEventListener('kerala-bus-stop-view', event => run(async () => {
+    const stopId = String(event.detail?.stopId || '');
+    if (!stopId) return;
+    const status = await api(`/api/travel/bus/status?stopId=${encodeURIComponent(stopId)}`);
+    window.dispatchEvent(new CustomEvent('kerala-bus-status', { detail: status }));
+    const timing = status.boarding
+      ? `BOARDING NOW · ${status.boardingSecondsRemaining}s left`
+      : `next bus in ${status.secondsToArrival}s`;
+    toast(`${status.routeLabel} · ${status.stop.label} → ${status.destination.label} · ${timing} · fare ${formatCash(status.fare)}`, 4200);
+  }, walletError));
+
+  window.addEventListener('kerala-bus-board', event => run(async () => {
+    const stopId = String(event.detail?.stopId || '');
+    if (!stopId) return;
+    const result = await api('/api/travel/bus/board', { stopId });
+    if (result.wallet) renderWallet(result.wallet);
+    if (result.user) setUser(result.user);
+    window.dispatchEvent(new CustomEvent('kerala-bus-status', { detail: null }));
+    window.dispatchEvent(new CustomEvent('kerala-public-travel-arrival', { detail: result.travel || null }));
+    toast(`${result.travel?.routeLabel || 'Village Line'} · arrived at ${result.travel?.to?.label || 'destination'} · ticket ${formatCash(result.travel?.fare || 0)}`, 4200);
+  }, walletError));
+
   worldShopClose?.addEventListener('click', () => {
     worldShopPanel?.classList.remove('open');
     worldShopContext = null;
