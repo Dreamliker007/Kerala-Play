@@ -1,13 +1,20 @@
 {
   "name": "Kerala Play",
   "short_name": "Kerala Play",
+  "description": "A living Kerala open-world social life simulation.",
   "start_url": "/",
   "scope": "/",
   "display": "fullscreen",
   "orientation": "landscape",
-  "background_color": "#16323f",
+  "background_color": "#061f29",
   "theme_color": "#075f65",
+  "categories": ["games", "social", "entertainment"],
   "icons": [
-    { "src": "assets/kerala-play-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "assets/kerala-play-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }
