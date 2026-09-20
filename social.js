@@ -707,12 +707,109 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     run(refreshNotifications, phoneError);
   }
 
+  function communityEventById(id) {
+    const events = [
+      eventsSnapshot?.current,
+      eventsSnapshot?.upcoming,
+      ...(Array.isArray(eventsSnapshot?.recent) ? eventsSnapshot.recent : []),
+    ].filter(Boolean);
+    return events.find(event => event.id === id) || null;
+  }
+
+  function renderCommunityEvents(summary) {
+    eventsSnapshot = summary || null;
+    window.dispatchEvent(new CustomEvent('kerala-community-events-sync', { detail: eventsSnapshot }));
+    if (!eventsList) return;
+    eventsList.replaceChildren();
+    const current = summary?.current || null;
+    const upcoming = summary?.upcoming || null;
+    const recent = Array.isArray(summary?.recent) ? summary.recent : [];
+    const contribution = Number(summary?.contributions || 0);
+    const reputation = summary?.reputation;
+    if (eventsSummaryText) {
+      eventsSummaryText.textContent = `${contribution} contribution${contribution === 1 ? '' : 's'} · local rep ${Number(reputation?.value || 0)}/100`;
+    }
+
+    const appendCard = (event, label) => {
+      if (!event) return;
+      const card = node('article', `community-event-card ${event.status || ''}`);
+      const head = node('div', 'community-event-head');
+      const title = node('strong', '', `${event.icon || '📌'} ${event.title || 'Community Event'}`);
+      const badge = node('span', 'community-event-status', label);
+      head.append(title, badge);
+      const description = node('p', '', event.description || '');
+      const target = node('small', '', `${event.target?.label || 'Village'} · ₹${Number(event.cashReward || 0)} + ${Number(event.pointsReward || 0)} points`);
+      const timing = node('small', 'community-event-time');
+      if (event.status === 'active') timing.textContent = `${Math.max(1, Math.ceil(Number(event.secondsRemaining || 0) / 60))} min left`;
+      else if (event.status === 'upcoming') timing.textContent = `Starts in ${Math.max(1, Math.ceil(Number(event.secondsUntilStart || 0) / 60))} min`;
+      else timing.textContent = event.completed ? 'You participated' : 'Event ended';
+      card.append(head, description, target, timing);
+      if (event.status === 'active' && !event.completed) {
+        const actions = node('div', 'community-event-actions');
+        const navigate = button('Navigate', () => {
+          window.dispatchEvent(new CustomEvent('kerala-community-event-navigate', { detail: event }));
+          closePanels();
+        }, 'social-button secondary');
+        const participate = button('Join here', () => {
+          run(() => participateCommunityEvent(event.id), eventsError);
+        }, 'social-button');
+        actions.append(navigate, participate);
+        card.append(actions);
+      }
+      eventsList.append(card);
+    };
+
+    if (current) appendCard(current, current.status === 'active' ? (current.completed ? 'COMPLETED' : 'NOW') : 'ENDED');
+    if (upcoming) appendCard(upcoming, 'UPCOMING');
+    for (const event of recent) appendCard(event, event.completed ? 'COMPLETED' : 'RECENT');
+    if (!current && !upcoming && !recent.length) eventsList.append(node('p', 'social-empty', 'No community events are scheduled right now.'));
+  }
+
+  async function refreshCommunityEvents() {
+    if (!user) return null;
+    const summary = await api('/api/community/events');
+    renderCommunityEvents(summary);
+    return summary;
+  }
+
+  async function participateCommunityEvent(eventId) {
+    if (!user || !eventId) return null;
+    const result = await api('/api/community/events/participate', { eventId });
+    if (result.wallet) renderWallet(result.wallet);
+    if (result.user) setUser(result.user);
+    if (result.reputation) {
+      syncNpcRelationships({
+        ...(npcRelationshipsSnapshot || {}),
+        reputation: result.reputation,
+      });
+    }
+    if (result.events) renderCommunityEvents(result.events);
+    window.dispatchEvent(new CustomEvent('kerala-community-event-completed', { detail: result }));
+    toast(`${result.completed?.title || 'Community event'} complete · +${formatCash(result.completed?.cashReward || 0)} · +${Number(result.completed?.pointsReward || 0)} points`, 4400);
+    return result;
+  }
+
+  function startEventsTimer() {
+    if (eventsTimer) clearInterval(eventsTimer);
+    eventsTimer = setInterval(() => {
+      if (!eventsPanel?.classList.contains('open')) { clearInterval(eventsTimer); eventsTimer = null; return; }
+      run(refreshCommunityEvents, eventsError);
+    }, 10000);
+  }
+
+  function openEvents() {
+    if (!requireUser()) return;
+    showPanel(eventsPanel);
+    run(refreshCommunityEvents, eventsError).then(() => startEventsTimer());
+  }
+
   function openNotificationTarget(target) {
     if (target === 'wallet') openWallet();
     else if (target === 'home') openHome();
     else if (target === 'garage') openGarage();
     else if (target === 'jobs') openJobs();
     else if (target === 'people') openPeople();
+    else if (target === 'events') openEvents();
   }
 
   function renderNeeds(summary) {
