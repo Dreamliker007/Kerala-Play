@@ -105,7 +105,7 @@
     .guide-avatar { position:absolute; left:12px; bottom:12px; display:grid; place-items:center; width:53px; height:53px; border:2px solid #8df0b5; border-radius:50%; background:radial-gradient(circle at 50% 28%, #f0b485 0 15%, transparent 16%), linear-gradient(160deg, transparent 0 30%, #202a36 31% 52%, #55a96f 53%); box-shadow:0 0 0 4px rgba(88,224,142,.13); font-size:0; }
     .guide-avatar::after { content:'Maya'; position:absolute; top:57px; color:#bde9ce; font:800 9px system-ui,sans-serif; }
     #onboarding-pointer { position:fixed; z-index:31; width:52px; height:52px; border:2px solid #81f1a9; border-radius:14px; box-shadow:0 0 0 5px rgba(73,222,128,.18), 0 0 24px rgba(83,232,143,.72); pointer-events:none; transform:translate(-50%,-50%); }
-    #onboarding-pointer::after { content:'Tap here'; position:absolute; top:-27px; left:50%; transform:translateX(-50%); padding:4px 7px; border-radius:7px; color:#082019; background:#8df0b5; white-space:nowrap; font:900 10px system-ui,sans-serif; }
+    #onboarding-pointer::after { content:attr(data-label); position:absolute; top:-27px; left:50%; transform:translateX(-50%); padding:4px 7px; border-radius:7px; color:#082019; background:#8df0b5; white-space:nowrap; font:900 10px system-ui,sans-serif; }
     #onboarding-pointer[hidden] { display:none; }
     .onboarding-kicker { color:#8df0b5; font:800 10px/1 system-ui,sans-serif; letter-spacing:1.1px; }
     #onboarding-title { margin:7px 0 6px; font:900 21px/1.1 system-ui,sans-serif; }
@@ -824,13 +824,163 @@
       }
       #kerala-map { height:min(56dvh,218px); }
     }
+
+    /* V100.6 Maya guide polish */
+    .onboarding-card {
+      overflow:visible;
+      animation:guide-arrive .28s ease-out both;
+    }
+    .onboarding-card::before {
+      content:'';
+      position:absolute;
+      left:58px;
+      bottom:33px;
+      width:18px;
+      height:18px;
+      background:rgba(11,42,46,.96);
+      border-left:1px solid rgba(167,255,204,.28);
+      border-bottom:1px solid rgba(167,255,204,.28);
+      transform:rotate(45deg);
+    }
+    .guide-avatar {
+      overflow:visible;
+      background:linear-gradient(180deg,#173a45 0 56%,#4caf75 57% 100%);
+      animation:guide-breathe 2.4s ease-in-out infinite;
+    }
+    .guide-hair {
+      position:absolute;
+      top:7px;
+      left:13px;
+      width:27px;
+      height:22px;
+      border-radius:50% 50% 42% 42%;
+      background:#20242c;
+      transform:rotate(-4deg);
+      z-index:1;
+    }
+    .guide-face {
+      position:absolute;
+      top:12px;
+      left:15px;
+      width:23px;
+      height:24px;
+      border-radius:48% 48% 45% 45%;
+      background:#e7ad83;
+      box-shadow:inset 0 -2px 0 rgba(147,82,56,.12);
+      z-index:2;
+    }
+    .guide-face i {
+      position:absolute;
+      top:9px;
+      width:3px;
+      height:3px;
+      border-radius:50%;
+      background:#263238;
+      animation:guide-blink 4.2s infinite;
+    }
+    .guide-face i:first-child { left:5px; }
+    .guide-face i:nth-child(2) { right:5px; }
+    .guide-face b {
+      position:absolute;
+      left:8px;
+      bottom:5px;
+      width:8px;
+      height:4px;
+      border-bottom:2px solid #9d5347;
+      border-radius:0 0 8px 8px;
+    }
+    .guide-body {
+      position:absolute;
+      left:10px;
+      bottom:1px;
+      width:33px;
+      height:19px;
+      border-radius:14px 14px 7px 7px;
+      background:linear-gradient(145deg,#66c486,#3a8c64);
+    }
+    #onboarding-copy {
+      min-height:2.9em;
+    }
+    #onboarding-copy.speaking::after {
+      content:'';
+      display:inline-block;
+      width:2px;
+      height:1em;
+      margin-left:3px;
+      vertical-align:-2px;
+      background:#8df0b5;
+      animation:guide-caret .62s steps(1) infinite;
+    }
+    #onboarding-pointer {
+      animation:guide-target 1.05s ease-in-out infinite;
+    }
+    #onboarding-pointer.swipe-target {
+      width:86px;
+      height:62px;
+      border-radius:22px;
+    }
+    #onboarding-pointer.swipe-target::before {
+      content:'↔';
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      color:#dffff0;
+      font:900 27px/1 system-ui,sans-serif;
+      text-shadow:0 2px 8px rgba(0,0,0,.32);
+    }
+    #onboarding-pointer::after {
+      top:-30px;
+      box-shadow:0 5px 16px rgba(0,0,0,.24);
+    }
+    body.onboarding-actions #onboarding { pointer-events:none; }
+    body.onboarding-actions .onboarding-card { pointer-events:auto; }
+    @keyframes guide-arrive {
+      from { opacity:0; transform:translateY(10px) scale(.98); }
+      to { opacity:1; transform:none; }
+    }
+    @keyframes guide-breathe {
+      0%,100% { transform:translateY(0); }
+      50% { transform:translateY(-2px); }
+    }
+    @keyframes guide-blink {
+      0%,45%,48%,100% { transform:scaleY(1); }
+      46%,47% { transform:scaleY(.12); }
+    }
+    @keyframes guide-caret {
+      0%,49% { opacity:1; }
+      50%,100% { opacity:0; }
+    }
+    @keyframes guide-target {
+      0%,100% { transform:translate(-50%,-50%) scale(1); }
+      50% { transform:translate(-50%,-50%) scale(1.08); }
+    }
+    @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) {
+      .onboarding-card {
+        left:calc(env(safe-area-inset-left) + 116px);
+        bottom:calc(env(safe-area-inset-bottom) + 8px);
+        width:min(350px,calc(100vw - env(safe-area-inset-left) - 136px));
+        min-height:82px;
+        padding:10px 12px 9px 66px;
+      }
+      .guide-avatar { width:47px; height:47px; left:10px; bottom:12px; }
+      .guide-hair { top:6px; left:11px; width:24px; height:20px; }
+      .guide-face { top:10px; left:13px; width:21px; height:23px; }
+      .guide-body { left:9px; width:29px; height:17px; }
+      .guide-avatar::after { top:50px; }
+      #onboarding-title { margin:5px 0 4px; font-size:15px; }
+      #onboarding-copy { min-height:2.7em; font-size:9.5px; line-height:1.35; }
+      #onboarding-progress { margin:6px 0 5px; }
+      #onboarding-skip { padding:4px 1px; font-size:9px; }
+      #onboarding-next { min-width:96px; padding:6px 8px; font-size:9px; }
+    }
   </style>
   <link rel="stylesheet" href="./social.css">
   <link rel="stylesheet" href="./game.css">
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:10px;opacity:.68">V100.5</span></div>
+    <div id="brand">Kerala Play <span style="font-size:10px;opacity:.68">V100.6</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -953,7 +1103,7 @@
   <section id="npc-profile" hidden aria-label="Village guide profile"><button type="button" class="panel-close" aria-label="Close guide profile">×</button><h2></h2><p></p></section>
   <section id="onboarding" hidden aria-label="Kerala Play starter guide">
     <div class="onboarding-card">
-      <div class="guide-avatar" aria-hidden="true"></div>
+      <div class="guide-avatar" aria-hidden="true"><span class="guide-hair"></span><span class="guide-face"><i></i><i></i><b></b></span><span class="guide-body"></span></div>
       <div class="onboarding-kicker">KERALA PLAY · STARTER GUIDE</div>
       <h2 id="onboarding-title">Welcome to Kerala Play</h2>
       <p id="onboarding-copy">Learn the essentials in less than a minute, then the whole world is yours to explore.</p>
