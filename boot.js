@@ -31,9 +31,20 @@ async function requestKeralaLandscape() {
 
 window.requestKeralaLandscape = requestKeralaLandscape;
 
+function finishKeralaSplash() {
+  document.body.classList.add('kp-ready');
+  const splash = document.querySelector('#kp-splash');
+  if (!splash) return;
+  setTimeout(() => splash.remove(), 520);
+}
+
 // Display a useful recovery screen even if a module fails before game.js runs.
-import('./game.js').catch(error => {
+import('./game.js').then(() => {
+  // Give the first rendered frame a moment to settle before revealing the world.
+  requestAnimationFrame(() => setTimeout(finishKeralaSplash, 260));
+}).catch(error => {
   console.error('Kerala Play startup failed:', error);
+  finishKeralaSplash();
   const fallback = document.querySelector('#fallback');
   fallback.style.display = 'grid';
   fallback.textContent = location.protocol === 'file:'
