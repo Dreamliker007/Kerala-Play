@@ -1665,6 +1665,122 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
             recognition: npcRecognitionMessage(tier, identity.name),
           },
           reputation: summary.reputation,
+          activeFavor: summary.activeFavor,
+          favorOffer: npcFavorOffer(user, identity, timestamp),
+        }); return;
+      }
+
+      if (path === '/api/npc/favor/start' && request.method === 'POST') {
+        limited(`npc-favor-start:${user.id}`, 12, 60000);
+        const body = await jsonBody(request);
+        const identity = npcRelationshipIdentity(body.npcId);
+        requireValue(identity, 404, 'Village NPC not found.');
+        const state = jobStateFor(user);
+        requireValue(!state.active, 409, 'Finish your active job before accepting a village favor.');
+        requireValue(!state.npcFavors.active, 409, 'Finish your current village favor first.');
+        const relation = state.npcRelations[identity.id];
+        requireValue(Number(relation?.score || 0) >= NPC_FAVOR_MIN_SCORE, 409, 'Build a little more familiarity with this villager first.');
+        const timestamp = now();
+        requireValue(timestamp - Number(relation?.lastInteractionAt || 0) <= 90_000, 409, 'Talk to this villager again before accepting the favor.');
+        const cooldownUntil = Number(state.npcFavors.cooldowns[identity.id] || 0);
+        requireValue(cooldownUntil <= timestamp, 409, 'This villager does not need another favor yet.');
+        const personal = state.garage.activeVehicleId
+          ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
+          : null;
+        requireValue(!personal?.entered, 409, 'Exit your personal vehicle before accepting a favor.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before accepting a favor.');
+
+        const definition = npcFavorDefinition(user, identity);
+        const activeFavor = {
+          id: randomUUID(),
+          npcId: identity.id,
+          targetId: definition.target.id,
+          title: definition.title,
+          action: definition.action,
+          reward: definition.reward,
+          startedAt: timestamp,
+          expiresAt: timestamp + NPC_FAVOR_EXPIRY_MS,
+        };
+        state.npcFavors.active = activeFavor;
+        dirty = true;
+        await persist();
+        send(response, 200, {
+          activeFavor: npcFavorSummary(user),
+          reputation: npcRelationshipSummary(user).reputation,
+        }); return;
+      }
+
+      if (path === '/api/npc/favor/complete' && request.method === 'POST') {
+        limited(`npc-favor-complete:${user.id}`, 12, 60000);
+        const state = jobStateFor(user);
+        const activeFavor = state.npcFavors.active;
+        requireValue(activeFavor, 409, 'No village favor is active.');
+        const timestamp = now();
+        requireValue(timestamp <= Number(activeFavor.expiresAt || 0), 409, 'This favor expired. Talk to the villager again later.');
+        const identity = npcRelationshipIdentity(activeFavor.npcId);
+        const target = PUBLIC_RIDE_DESTINATIONS[activeFavor.targetId];
+        requireValue(identity && target, 409, 'This favor is no longer available.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before completing the favor.');
+        requireValue(
+          Math.hypot(Number(target.x) - live.x, Number(target.z) - live.z) <= 5.8,
+          409,
+          `Move closer to ${target.label} before completing the favor.`
+        );
+
+        const reward = Math.max(0, Math.min(200, Number(activeFavor.reward || 0)));
+        const transaction = walletTransaction(user, reward, 'npc_favor', `${identity.name} · ${activeFavor.title}`);
+        const relation = state.npcRelations[identity.id] || {
+          score: 0, conversations: 0, lastInteractionAt: timestamp, firstMetAt: timestamp,
+        };
+        const previousTier = npcRelationshipTier(relation.score);
+        relation.score = Math.min(NPC_RELATIONSHIP_MAX, Number(relation.score || 0) + 3);
+        relation.lastInteractionAt = timestamp;
+        state.npcRelations[identity.id] = relation;
+        state.npcFavors.active = null;
+        state.npcFavors.cooldowns[identity.id] = timestamp + NPC_FAVOR_COOLDOWN_MS;
+        state.npcFavors.completed = Math.max(0, Number(state.npcFavors.completed || 0)) + 1;
+        dirty = true;
+        const tier = npcRelationshipTier(relation.score);
+        addNotification(user, {
+          sourceKey: `favor:${transaction.id}`,
+          kind: 'community',
+          title: 'Village favor completed',
+          message: `${identity.name} · ${activeFavor.title} · ₹${reward} received.`,
+          severity: 'success',
+          target: 'wallet',
+        });
+        await persist();
+        const summary = npcRelationshipSummary(user);
+        send(response, 200, {
+          completed: {
+            id: activeFavor.id,
+            npcId: identity.id,
+            npcName: identity.name,
+            title: activeFavor.title,
+            target: { id: target.id, label: target.label },
+            reward,
+          },
+          relationship: {
+            npcId: identity.id,
+            npcIndex: identity.index,
+            name: identity.name,
+            score: relation.score,
+            tier,
+            conversations: Number(relation.conversations || 0),
+            firstMetAt: Number(relation.firstMetAt || 0),
+            lastInteractionAt: Number(relation.lastInteractionAt || 0),
+            gained: 3,
+            progressed: true,
+            tierChanged: tier !== previousTier,
+            previousTier,
+            recognition: npcRecognitionMessage(tier, identity.name),
+          },
+          reputation: summary.reputation,
+          activeFavor: null,
+          wallet: walletSummary(user),
+          transaction,
         }); return;
       }
 
