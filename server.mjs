@@ -23,6 +23,16 @@ const SHOP_ITEMS = Object.freeze({
   snack: { name: 'Snack', price: 35, needs: { hunger: 22, energy: 5 } },
   meal: { name: 'Kerala Meal', price: 80, needs: { hunger: 48, thirst: 6, energy: 8 } },
 });
+const WORLD_SHOPS = Object.freeze({
+  anugraha: Object.freeze({
+    id: 'anugraha', label: 'Anugraha Stores', x: -14.4, z: 10.7, radius: 4.8,
+    items: Object.freeze(['water', 'tea', 'snack', 'meal']),
+  }),
+  malabar: Object.freeze({
+    id: 'malabar', label: 'Malabar Bakery', x: 14.8, z: 41.2, radius: 4.8,
+    items: Object.freeze(['water', 'tea', 'snack']),
+  }),
+});
 const NEEDS_MAX = 100;
 const NEEDS_DECAY_PER_MINUTE = Object.freeze({ hunger: 0.28, thirst: 0.4, energy: 0.22 });
 const NEEDS_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
@@ -1955,6 +1965,36 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         });
         await persist();
         send(response, 200, { jobs: jobsSummary(user), wallet: walletSummary(user), reward: job.reward, transaction, completed: { jobId, title: job.title, count: state.completed[jobId] } }); return;
+      }
+      if (path === '/api/world/shop/purchase' && request.method === 'POST') {
+        limited(`world-shop:${user.id}`, 45, 60000);
+        const body = await jsonBody(request);
+        const shop = typeof body.shopId === 'string' ? WORLD_SHOPS[body.shopId] : null;
+        const item = typeof body.itemId === 'string' ? SHOP_ITEMS[body.itemId] : null;
+        requireValue(shop, 404, 'World shop not found.');
+        requireValue(item && shop.items.includes(body.itemId), 404, 'That item is not sold here.');
+        const state = jobStateFor(user);
+        const personal = state.garage.activeVehicleId
+          ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
+          : null;
+        requireValue(!state.active?.vehicleEntered && !personal?.entered, 409, 'Exit the vehicle before shopping.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before shopping.');
+        requireValue(
+          Math.hypot(live.x - shop.x, live.z - shop.z) <= shop.radius,
+          409,
+          `Move closer to ${shop.label}.`
+        );
+        const transaction = walletTransaction(user, -item.price, 'world_purchase', `${shop.label} · ${item.name}`);
+        const needs = applyNeedsEffect(user, item.needs);
+        await persist();
+        send(response, 200, {
+          wallet: walletSummary(user),
+          needs,
+          shop: { id: shop.id, label: shop.label },
+          purchase: { itemId: body.itemId, name: item.name, price: item.price, needs: item.needs },
+          transaction,
+        }); return;
       }
       if (path === '/api/shop/purchase' && request.method === 'POST') {
         limited(`wallet-shop:${user.id}`, 60, 60000);
