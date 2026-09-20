@@ -160,6 +160,11 @@ class ApiError extends Error {
   constructor(status, message, details) { super(message); this.status = status; this.details = details; }
 }
 function requireValue(condition, status, message) { if (!condition) throw new ApiError(status, message); }
+function npcRelationshipIdentitySafe(value) {
+  const match = /^npc-(\d+)$/.exec(String(value || ''));
+  const index = match ? Number(match[1]) : -1;
+  return !!match && Number.isInteger(index) && index >= 0 && index < NPC_RELATIONSHIP_COUNT;
+}
 function hashToken(value) { return createHash('sha256').update(value).digest('hex'); }
 function cookieToken(request) {
   return (request.headers.cookie || '').split(';').map(value => value.trim()).find(value => value.startsWith('kp_session='))?.slice(11) || '';
