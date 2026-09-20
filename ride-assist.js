@@ -3,7 +3,7 @@ window.KERALA_PLAY_VERSION = VERSION;
 
 const style = document.createElement('style');
 style.textContent = `
-  #ride-assist { position:absolute; z-index:5; left:50%; top:calc(env(safe-area-inset-top) + 56px); transform:translateX(-50%); display:none; border:1px solid rgba(255,221,119,.5); border-radius:11px; padding:6px 10px; color:#fff8d8; background:rgba(55,45,10,.82); box-shadow:0 4px 16px rgba(0,0,0,.22); font:900 9px/1.2 system-ui,sans-serif; letter-spacing:.3px; cursor:pointer; touch-action:manipulation; backdrop-filter:blur(5px); }
+  #ride-assist { position:absolute; z-index:10; left:50%; top:calc(env(safe-area-inset-top) + 56px); transform:translateX(-50%); display:none; border:1px solid rgba(255,221,119,.5); border-radius:11px; padding:6px 10px; color:#fff8d8; background:rgba(55,45,10,.82); box-shadow:0 4px 16px rgba(0,0,0,.22); font:900 9px/1.2 system-ui,sans-serif; letter-spacing:.3px; cursor:pointer; pointer-events:auto; touch-action:manipulation; backdrop-filter:blur(5px); }
   #ride-assist.active { display:block; }
   #ride-panel { position:fixed; z-index:80; inset:0; display:grid; place-items:center; padding:20px; background:rgba(1,12,16,.56); backdrop-filter:blur(4px); }
   #ride-panel[hidden] { display:none; }
