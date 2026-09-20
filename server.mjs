@@ -42,6 +42,16 @@ const NPC_RELATIONSHIP_COOLDOWN_MS = 20_000;
 const NPC_FAVOR_COOLDOWN_MS = 2 * 60_000;
 const NPC_FAVOR_EXPIRY_MS = 10 * 60_000;
 const NPC_FAVOR_MIN_SCORE = 5;
+const COMMUNITY_EVENT_INTERVAL_MS = 6 * 60_000;
+const COMMUNITY_EVENT_ACTIVE_MS = 3 * 60_000;
+const COMMUNITY_EVENT_HISTORY_LIMIT = 30;
+const COMMUNITY_EVENT_CATALOG = Object.freeze([
+  Object.freeze({ key:'market', icon:'🛍️', title:'Village Market Hour', description:'Help the local market stay lively and organized.', targetId:'anugraha', action:'Join market activity', cash:55, points:12 }),
+  Object.freeze({ key:'football', icon:'⚽', title:'Village Football Meetup', description:'Join a short community football gathering.', targetId:'village-pond', action:'Join football meetup', cash:45, points:15 }),
+  Object.freeze({ key:'cleanup', icon:'🧹', title:'Community Clean-up', description:'Pitch in with a quick clean-up around the public area.', targetId:'village-bench', action:'Help clean up', cash:60, points:18 }),
+  Object.freeze({ key:'culture', icon:'🎭', title:'Kerala Cultural Evening', description:'Take part in a small local cultural gathering.', targetId:'town-bus', action:'Join cultural gathering', cash:50, points:16 }),
+  Object.freeze({ key:'support', icon:'🤝', title:'Neighbourhood Help Desk', description:'Support a short community assistance activity.', targetId:'malabar', action:'Help at the desk', cash:65, points:20 }),
+]);
 const NPC_NAMES = Object.freeze(['Anu','Vivek','Meera','Arun','Nisha','Riyas','Asha','Manu','Liya','Nabeel','Sreeja','Jose']);
 const NPC_FAVOR_TARGETS = Object.freeze([
   Object.freeze({ id:'anugraha', title:'Drop off a small parcel', action:'Deliver parcel', reward:40 }),
@@ -149,7 +159,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -896,6 +906,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) user.jobState.notifications = { items: [], read: {} };
     if (!user.jobState.npcRelations || typeof user.jobState.npcRelations !== 'object' || Array.isArray(user.jobState.npcRelations)) user.jobState.npcRelations = {};
     if (!user.jobState.npcFavors || typeof user.jobState.npcFavors !== 'object' || Array.isArray(user.jobState.npcFavors)) user.jobState.npcFavors = { active: null, cooldowns: {}, completed: 0 };
+    if (!user.jobState.communityEvents || typeof user.jobState.communityEvents !== 'object' || Array.isArray(user.jobState.communityEvents)) user.jobState.communityEvents = { completedIds: [], contributions: 0 };
+    if (!Array.isArray(user.jobState.communityEvents.completedIds)) user.jobState.communityEvents.completedIds = [];
+    user.jobState.communityEvents.completedIds = user.jobState.communityEvents.completedIds.filter(id => typeof id === 'string' && /^community:\d+:[a-z]+$/.test(id)).slice(-COMMUNITY_EVENT_HISTORY_LIMIT);
+    if (!Number.isInteger(Number(user.jobState.communityEvents.contributions)) || Number(user.jobState.communityEvents.contributions) < 0) user.jobState.communityEvents.contributions = 0;
     if (!user.jobState.npcFavors.cooldowns || typeof user.jobState.npcFavors.cooldowns !== 'object' || Array.isArray(user.jobState.npcFavors.cooldowns)) user.jobState.npcFavors.cooldowns = {};
     if (!Number.isInteger(Number(user.jobState.npcFavors.completed)) || Number(user.jobState.npcFavors.completed) < 0) user.jobState.npcFavors.completed = 0;
     const normalizedFavorCooldowns = {};
