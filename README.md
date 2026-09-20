@@ -555,3 +555,10 @@ V100.3 fixes the root cause behind the V100 in-game runtime error. The module-le
 The V100.2 safety isolation remains in place, and V100.2's faster facing correction continues to prevent visible backward/moonwalk motion during direction reversals.
 
 No movement speed, server authority, collision, economy, backend/database or Supabase changes.
+
+
+## V100.4 Tap-to-Reveal Mobile HUD
+
+V100.4 reduces always-on screen clutter on phones. Kerala Play now starts with the secondary HUD details hidden while keeping the main menu button available. Tapping the menu reveals the profile, online state, daily needs and quick-action controls together; closing it hides those overlays again so the world remains easier to see.
+
+The Kerala Play brand stays as a small persistent identity chip, and gameplay controls such as joystick, RUN/vehicle controls and contextual INTERACT actions remain available at all times. This is a UI-only change and does not alter movement, accounts, economy, multiplayer or server authority.
