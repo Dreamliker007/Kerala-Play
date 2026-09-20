@@ -1973,6 +1973,14 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     toast(`${result.travel?.routeLabel || 'Village Line'} · arrived at ${result.travel?.to?.label || 'destination'} · ticket ${formatCash(result.travel?.fare || 0)}`, 4200);
   }, walletError));
 
+  window.addEventListener('kerala-public-ride-complete', event => {
+    const result = event.detail || null;
+    if (result?.wallet) renderWallet(result.wallet);
+    if (result?.ride) {
+      toast(`${result.ride.serviceLabel || 'Ride'} · arrived at ${result.ride.to?.label || 'destination'} · fare ${formatCash(result.ride.fare || 0)}`, 4200);
+    }
+  });
+
   worldShopClose?.addEventListener('click', () => {
     worldShopPanel?.classList.remove('open');
     worldShopContext = null;
