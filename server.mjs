@@ -1635,7 +1635,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const progressed = elapsed >= NPC_RELATIONSHIP_COOLDOWN_MS;
         let gained = 0;
         if (progressed) {
-          gained = Number(relation.conversations || 0) === 0 ? 4 : (elapsed >= 5 * 60_000 ? 2 : 1);
+          gained = Number(relation.conversations || 0) === 0 ? 5 : (elapsed >= 5 * 60_000 ? 2 : 1);
           relation.score = Math.min(NPC_RELATIONSHIP_MAX, Number(relation.score || 0) + gained);
           relation.lastInteractionAt = timestamp;
         }
