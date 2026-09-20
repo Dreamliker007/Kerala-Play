@@ -53,6 +53,25 @@ const HOME_DEFINITION = Object.freeze({
 const HOME_SLEEP_COOLDOWN_MS = 60_000;
 const HOME_SLEEP_HUNGER_COST = 4;
 const HOME_SLEEP_THIRST_COST = 6;
+const PUBLIC_TRAVEL_ROUTES = Object.freeze({
+  'village-line': Object.freeze({
+    id: 'village-line',
+    label: 'Village Line',
+    fare: 12,
+    intervalMs: 45_000,
+    boardingWindowMs: 9_000,
+    stops: Object.freeze({
+      'town-bus': Object.freeze({
+        id: 'town-bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 6.2,
+        phaseMs: 0, destinationId: 'south-bus', arrivalX: 11.7, arrivalZ: 29.4, arrivalRotation: Math.PI,
+      }),
+      'south-bus': Object.freeze({
+        id: 'south-bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 6.2,
+        phaseMs: 22_500, destinationId: 'town-bus', arrivalX: -11.7, arrivalZ: -52.4, arrivalRotation: 0,
+      }),
+    }),
+  }),
+});
 const JOB_DEFINITIONS = Object.freeze({
   delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Take the delivery bike, collect a parcel, then ride to the customer.', missionType: 'route', vehicle: 'bike', vehicleLabel: 'Delivery Bike' },
   taxi: { title: 'Taxi Driver', reward: 220, durationMs: 0, cooldownMs: 35_000, description: 'Enter the taxi, reach the passenger pickup point, then drive to the destination.', missionType: 'route', vehicle: 'taxi', vehicleLabel: 'Kerala Taxi' },
@@ -915,6 +934,43 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const saved = savedPosition(user);
     return { x: saved.x, z: saved.z };
   }
+
+  function publicTravelStop(stopId) {
+    for (const route of Object.values(PUBLIC_TRAVEL_ROUTES)) {
+      const stop = route.stops[stopId];
+      if (stop) return { route, stop };
+    }
+    return null;
+  }
+
+  function publicTravelStatus(stopId, timestamp = now()) {
+    const found = publicTravelStop(stopId);
+    if (!found) return null;
+    const { route, stop } = found;
+    const destination = route.stops[stop.destinationId];
+    const interval = Number(route.intervalMs);
+    const windowMs = Number(route.boardingWindowMs);
+    const phase = Number(stop.phaseMs || 0);
+    const latestArrival = Math.floor((timestamp - phase) / interval) * interval + phase;
+    const boardingUntil = latestArrival + windowMs;
+    const boarding = timestamp >= latestArrival && timestamp <= boardingUntil;
+    const arrivalAt = boarding ? latestArrival : latestArrival + interval;
+    const effectiveBoardingUntil = boarding ? boardingUntil : arrivalAt + windowMs;
+    return {
+      routeId: route.id,
+      routeLabel: route.label,
+      fare: route.fare,
+      intervalMs: interval,
+      serverNow: timestamp,
+      boarding,
+      arrivalAt,
+      boardingUntil: effectiveBoardingUntil,
+      secondsToArrival: boarding ? 0 : Math.max(0, Math.ceil((arrivalAt - timestamp) / 1000)),
+      boardingSecondsRemaining: boarding ? Math.max(0, Math.ceil((effectiveBoardingUntil - timestamp) / 1000)) : 0,
+      stop: { id: stop.id, label: stop.label, x: stop.x, z: stop.z, radius: stop.radius },
+      destination: { id: destination.id, label: destination.label },
+    };
+  }
   function missionCoordinate(value, delta) {
     let next = value + delta;
     if (next > 104 || next < -104) next = value - delta;
@@ -1293,6 +1349,70 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           bank: bankSummary(user),
           transaction: sent,
           receivedTransactionId: received.id,
+        }); return;
+      }
+      if (path === '/api/travel/bus/status' && request.method === 'GET') {
+        const stopId = String(url.searchParams.get('stopId') || '');
+        const status = publicTravelStatus(stopId);
+        requireValue(status, 404, 'Bus stop not found.');
+        send(response, 200, status); return;
+      }
+      if (path === '/api/travel/bus/board' && request.method === 'POST') {
+        limited(`bus-board:${user.id}`, 12, 60000);
+        const body = await jsonBody(request);
+        const stopId = typeof body.stopId === 'string' ? body.stopId : '';
+        const found = publicTravelStop(stopId);
+        requireValue(found, 404, 'Bus stop not found.');
+        const { route, stop } = found;
+        const stateForTravel = jobStateFor(user);
+        requireValue(!stateForTravel.active, 409, 'Finish your active job before boarding public transport.');
+        const personal = stateForTravel.garage.activeVehicleId
+          ? stateForTravel.garage.owned.find(vehicle => vehicle.id === stateForTravel.garage.activeVehicleId)
+          : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before boarding.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before boarding.');
+        requireValue(
+          Math.hypot(live.x - Number(stop.x), live.z - Number(stop.z)) <= Number(stop.radius || 6.2),
+          409,
+          `Move closer to ${stop.label}.`
+        );
+        const status = publicTravelStatus(stopId);
+        requireValue(status?.boarding, 409, `Bus has not arrived yet. Wait ${status?.secondsToArrival || 1}s.`);
+        const destination = route.stops[stop.destinationId];
+        const transaction = walletTransaction(user, -Number(route.fare), 'bus_fare', `${route.label} · ${stop.label} → ${destination.label}`);
+        const timestamp = now();
+        live.x = Number(destination.arrivalX);
+        live.z = Number(destination.arrivalZ);
+        live.rotation = Number(destination.arrivalRotation || 0);
+        live.moving = false;
+        live.mode = 'walk';
+        live.lastSeen = timestamp;
+        live.movedAt = timestamp;
+        live.movementCredit = 2;
+        user.worldX = live.x;
+        user.worldZ = live.z;
+        user.worldRotation = live.rotation;
+        user.worldUpdatedAt = timestamp;
+        dirty = true;
+        worldDirty = true;
+        profileChanged(user);
+        await persist();
+        send(response, 200, {
+          wallet: walletSummary(user),
+          user: publicUser(user),
+          transaction,
+          travel: {
+            routeId: route.id,
+            routeLabel: route.label,
+            fare: route.fare,
+            from: { id: stop.id, label: stop.label },
+            to: { id: destination.id, label: destination.label },
+            x: live.x,
+            z: live.z,
+            rotation: live.rotation,
+          },
+          nextStopStatus: publicTravelStatus(destination.id),
         }); return;
       }
       if (path === '/api/needs' && request.method === 'GET') {
