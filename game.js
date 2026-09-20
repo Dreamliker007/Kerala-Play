@@ -1178,7 +1178,7 @@ function syncJobWorldVisual() {
   }
 }
 
-function nearestTalkableVillager(maxDistance = 3.2) {
+function nearestTalkableVillager(maxDistance = 4.8) {
   if (!playerRef || vehicleMode !== 'walk') return null;
   let nearest = null;
   let nearestDistance = maxDistance;
@@ -1263,8 +1263,8 @@ function interactWithNpc(index) {
     villager.position.x - playerRef.position.x,
     villager.position.z - playerRef.position.z,
   );
-  if (distance > 3.45) {
-    showToast('Move closer to talk');
+  if (distance > 3.65) {
+    showToast(`Move closer to ${villager.userData?.name || 'talk'}`);
     return;
   }
   const data = villager.userData;
@@ -1284,6 +1284,7 @@ function updateWorldInteract() {
   worldInteract.dataset.service = '';
   worldInteract.dataset.source = '';
   worldInteract.dataset.npc = '';
+  worldInteract.title = '';
   if (!profile || !playerRef) return;
   const active = activeJobMission;
   const checkpoint = trafficSnapshot?.checkpoint;
@@ -1341,13 +1342,19 @@ function updateWorldInteract() {
     if (nearbyNpc) {
       const data = nearbyNpc.villager.userData;
       const talking = Number(data.interactionUntil || 0) > performance.now();
+      const closeEnough = nearbyNpc.distance <= 3.65;
       worldInteract.hidden = false;
-      worldInteract.dataset.mode = 'npc-talk';
-      worldInteract.dataset.npc = String(data.npcIndex);
-      worldInteract.disabled = talking;
+      worldInteract.dataset.mode = closeEnough ? 'npc-talk' : '';
+      worldInteract.dataset.npc = closeEnough ? String(data.npcIndex) : '';
+      worldInteract.disabled = talking || !closeEnough;
+      worldInteract.title = closeEnough
+        ? `Talk to ${data.name}`
+        : `${data.name} · ${nearbyNpc.distance.toFixed(1)} m away`;
       worldInteract.textContent = talking
         ? `TALKING · ${String(data.name).toUpperCase()}`
-        : `TALK · ${String(data.name).toUpperCase()}`;
+        : closeEnough
+          ? `TALK · ${String(data.name).toUpperCase()}`
+          : `COME CLOSER · ${String(data.name).toUpperCase()}`;
       return;
     }
   }
@@ -2275,6 +2282,11 @@ try {
   let smoothedDriveSteering = 0;
   let driveSpeedRatio = 0;
   let walkPhase = 0;
+  let playerRunningVisual = false;
+  const walkSafePosition = new THREE.Vector3().copy(player.position);
+  let walkSafeRotation = player.rotation.y;
+  let walkSafeReady = !positionBlocked(player.position.x, player.position.z, .48);
+  let walkSafeAccumulator = 0;
   let cameraDriveImpulse = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
   let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0, interactionAccumulator = 0, walkingStuckSeconds = 0;
@@ -2571,6 +2583,7 @@ try {
     } else {
       driveSpeed = 0;
       driveSpeedRatio = 0;
+      playerRunningVisual = false;
       smoothedDriveSteering += (0 - smoothedDriveSteering) * (1 - Math.exp(-delta * 10));
       const runningNow = runHeld;
       if (runningNow && controlLength > .08) runCruiseArmed = true;
@@ -2607,12 +2620,30 @@ try {
         const beforeZ = player.position.z;
         moveWithCollision(player, dx, dz, .43);
         const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
+        const overlappingWorld = positionBlocked(player.position.x, player.position.z, .43);
         walkingStuckSeconds = movedDistance < .0005 ? walkingStuckSeconds + delta : 0;
-        if (walkingStuckSeconds > .65 && recoverBlockedPlayerSpawn(player, true)) {
+
+        // Do not teleport someone simply because they are pressing into a wall.
+        // Recovery is reserved for genuine overlap/spawn bugs; ordinary contact
+        // drops the accumulated velocity so the next input can slide away cleanly.
+        if (walkingStuckSeconds > .72 && overlappingWorld) {
+          let recovered = false;
+          if (walkSafeReady && !positionBlocked(walkSafePosition.x, walkSafePosition.z, .48)) {
+            player.position.set(walkSafePosition.x, 0, walkSafePosition.z);
+            player.rotation.y = walkSafeRotation;
+            recovered = true;
+          } else {
+            recovered = recoverBlockedPlayerSpawn(player, true);
+          }
           walkingStuckSeconds = 0;
           walkVelocity.set(0, 0, 0);
-          showToast('Moved you to a clear path.');
+          targetWalkVelocity.set(0, 0, 0);
+          if (recovered) showToast('Avatar unstuck · clear path restored');
+        } else if (walkingStuckSeconds > .42 && !overlappingWorld) {
+          walkingStuckSeconds = 0;
+          walkVelocity.multiplyScalar(.12);
         }
+
         addWalkProgress(movedDistance);
         if (movedDistance > .0005) {
           if (movedDistance > .015) recordOnboardingAction('move');
@@ -2623,18 +2654,33 @@ try {
             Math.sin(desiredYaw - player.rotation.y),
             Math.cos(desiredYaw - player.rotation.y)
           );
-          // Prevent visible moonwalking when the input direction reverses:
-          // snap large reversals, but keep smaller turns smooth.
-          if (Math.abs(yawDelta) > Math.PI * .42) {
+          // Turn the body toward actual travel quickly enough that direction
+          // changes never read as moonwalking, while keeping small turns smooth.
+          if (Math.abs(yawDelta) > Math.PI * .30) {
             player.rotation.y = desiredYaw;
           } else {
-            const turnSpeed = runningNow ? 10.5 : 12.0;
+            const actualSpeed = movedDistance / Math.max(delta, .001);
+            const runBlend = THREE.MathUtils.clamp((actualSpeed - 3.0) / 2.0, 0, 1);
+            const turnSpeed = THREE.MathUtils.lerp(13.5, 10.8, runBlend);
             player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
           }
           if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
+
+          const actualSpeed = movedDistance / Math.max(delta, .001);
+          const runBlend = THREE.MathUtils.clamp((actualSpeed - 3.0) / 2.0, 0, 1);
+          playerRunningVisual = runBlend > .34;
           const animationAmount = Math.min(1, movedDistance / Math.max(.0001, ((runningNow ? 5.4 : 3.05) * needsFactor) * delta));
-          walkPhase += delta * (runningNow ? 12 : 8) * Math.max(.22, animationAmount);
+          const gaitRate = THREE.MathUtils.lerp(7.1, 11.7, runBlend);
+          walkPhase += delta * gaitRate * Math.max(.28, animationAmount);
           animatePlayer(player, walkPhase, animationAmount);
+
+          walkSafeAccumulator += delta;
+          if (walkSafeAccumulator >= .22 && !positionBlocked(player.position.x, player.position.z, .48)) {
+            walkSafePosition.copy(player.position);
+            walkSafeRotation = player.rotation.y;
+            walkSafeReady = true;
+            walkSafeAccumulator = 0;
+          }
           movingNow = true;
           if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
         } else {
@@ -2649,7 +2695,7 @@ try {
 
     if (!footstepEffectsFailed) {
       try {
-        updateFootstepEffects(delta, player, movingNow, runHeld, walkPhase);
+        updateFootstepEffects(delta, player, movingNow, playerRunningVisual, walkPhase);
       } catch (error) {
         footstepEffectsFailed = true;
         console.warn('Footstep visuals disabled after a runtime error:', error);
@@ -2657,9 +2703,9 @@ try {
     }
 
     const drivingCamera = vehicleMode !== 'walk';
-    const walkingMotion = !drivingCamera && movingNow ? (runHeld ? 1 : .62) : 0;
-    const walkBob = Math.sin(walkPhase * 2) * (runHeld ? .040 : .026) * walkingMotion;
-    const walkSway = Math.sin(walkPhase) * (runHeld ? .024 : .016) * walkingMotion;
+    const walkingMotion = !drivingCamera && movingNow ? (playerRunningVisual ? 1 : .62) : 0;
+    const walkBob = Math.sin(walkPhase * 2) * (playerRunningVisual ? .040 : .026) * walkingMotion;
+    const walkSway = Math.sin(walkPhase) * (playerRunningVisual ? .024 : .016) * walkingMotion;
 
     const driveImpulseTarget = drivingCamera
       ? (acceleratorHeld ? .12 : 0) - (runHeld ? .16 : 0)
@@ -2697,7 +2743,7 @@ try {
     );
 
     const targetFov = 60
-      + (drivingCamera ? driveSpeedRatio * 4.8 : runHeld && movingNow ? .65 : 0)
+      + (drivingCamera ? driveSpeedRatio * 4.8 : playerRunningVisual && movingNow ? .65 : 0)
       + (drivingCamera && acceleratorHeld ? .35 : 0);
     const nextFov = camera.fov + (targetFov - camera.fov) * (1 - Math.exp(-delta * 4.6));
     if (Math.abs(nextFov - camera.fov) > .002) {
@@ -2714,7 +2760,7 @@ try {
     sendMovement(player, movingNow);
     const weatherState = atmosphere.update(delta, villageTime, {
       moving: movingNow,
-      running: vehicleMode === 'walk' && runHeld,
+      running: vehicleMode === 'walk' && playerRunningVisual,
       nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13,
       inChallenge: !!challengeRound,
     });
@@ -3207,8 +3253,14 @@ function updateVillagers(time) {
       villager.position.x = THREE.MathUtils.lerp(fromX, toX, motion.progress);
       villager.position.z = data.startZ;
       villager.rotation.y = motion.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
-      data.crossingActive = motion.moving > 0 && Math.abs(villager.position.x) < 8.45;
+      data.crossingActive = motion.moving > 0 && Math.abs(villager.position.x) < 10.15;
       animateHuman(human, time * weatherSpeed * 4.8, motion.moving ? .38 * (1 - rainReaction * .12) : 0);
+      if (!motion.moving) {
+        // Kerb-side pedestrians visibly check both directions instead of
+        // freezing like props while they wait for their next crossing window.
+        if (parts.head) parts.head.rotation.y = Math.sin(time * .95 + data.offset) * .42;
+        if (parts.torso) parts.torso.rotation.y = Math.sin(time * .48 + data.offset) * .025;
+      }
       applyRainPosture();
       return;
     }
@@ -5176,7 +5228,7 @@ function updateTraffic(delta) {
   const pedestrianOnCrossing = villagers.some(villager =>
     villager.userData?.crossingActive
     && Math.abs(villager.position.z - pedestrianCrossingZ) < 1.2
-    && Math.abs(villager.position.x) < 8.6
+    && Math.abs(villager.position.x) < 10.2
   );
 
   traffic.forEach(vehicle => {
