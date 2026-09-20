@@ -5,6 +5,7 @@ import { createGameServer } from './server.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const API_UPSTREAM = String(process.env.KP_API_UPSTREAM || '').replace(/\/$/, '');
+const API_TIMEOUT_MS = Math.max(3000, Number(process.env.KP_API_TIMEOUT_MS || 12000));
 
 function worldAlertsFromEnv() {
   const raw = process.env.KP_WORLD_ALERTS_JSON;
@@ -19,6 +20,31 @@ function worldAlertsFromEnv() {
   }
 }
 const server = await createGameServer({ worldAlerts: worldAlertsFromEnv() });
+
+function transientUpstreamStatus(status) {
+  return [429, 502, 503, 504].includes(Number(status));
+}
+
+async function fetchUpstream(target, options, requestMethod) {
+  const attempts = ['GET', 'HEAD'].includes(requestMethod) ? 2 : 1;
+  let lastResponse = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    try {
+      const upstream = await fetch(target, { ...options, signal: controller.signal });
+      lastResponse = upstream;
+      if (!transientUpstreamStatus(upstream.status) || attempt + 1 >= attempts) return upstream;
+      await upstream.body?.cancel?.().catch?.(() => {});
+    } catch (error) {
+      if (attempt + 1 >= attempts) throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+    await new Promise(resolve => setTimeout(resolve, 650));
+  }
+  return lastResponse;
+}
 
 // Preserve the existing game/API server while exposing stable public policy
 // pages for the website and Google Play listing.
@@ -45,18 +71,20 @@ if (gameRequestListener) {
           headers.set('sec-fetch-site', 'same-origin');
 
           const chunks = [];
-          if (!['GET', 'HEAD'].includes(request.method || 'GET')) {
+          const requestMethod = request.method || 'GET';
+          if (!['GET', 'HEAD'].includes(requestMethod)) {
             for await (const chunk of request) chunks.push(chunk);
           }
           const body = chunks.length ? Buffer.concat(chunks) : undefined;
 
-          const upstream = await fetch(target, {
-            method: request.method,
+          const upstream = await fetchUpstream(target, {
+            method: requestMethod,
             headers,
             body,
             redirect: 'manual',
-          });
+          }, requestMethod);
 
+          if (!upstream) throw new Error('No response from production API');
           const responseHeaders = {};
           upstream.headers.forEach((value, name) => {
             if (['connection', 'transfer-encoding', 'content-encoding', 'content-length'].includes(name.toLowerCase())) return;
@@ -66,7 +94,7 @@ if (gameRequestListener) {
           if (setCookie?.length) responseHeaders['set-cookie'] = setCookie;
 
           response.writeHead(upstream.status, responseHeaders);
-          if (!upstream.body || request.method === 'HEAD') {
+          if (!upstream.body || requestMethod === 'HEAD') {
             response.end();
             return;
           }
@@ -75,12 +103,12 @@ if (gameRequestListener) {
         } catch (error) {
           console.error('[Kerala Play] API upstream proxy failed:', error.message);
           if (!response.headersSent) {
-            response.writeHead(502, {
+            response.writeHead(error?.name === 'AbortError' ? 504 : 502, {
               'Content-Type': 'application/json; charset=utf-8',
               'Cache-Control': 'no-store',
             });
           }
-          response.end(JSON.stringify({ error: 'Kerala Play account service is temporarily unavailable.' }));
+          response.end(JSON.stringify({ error: 'Kerala Play account service is temporarily unavailable. Please try again.' }));
         }
       })();
       return;
