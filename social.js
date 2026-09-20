@@ -114,6 +114,15 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   let notificationsSnapshot = null;
   let notificationsTimer = null;
   let npcRelationshipsSnapshot = null;
+  const eventsPanel = $('events-panel');
+  const eventsToggle = $('events-toggle');
+  const eventsClose = $('events-close');
+  const eventsList = $('events-list');
+  const eventsSummaryText = $('events-summary-text');
+  const eventsRefresh = $('events-refresh');
+  const eventsError = $('events-error');
+  let eventsSnapshot = null;
+  let eventsTimer = null;
   const walletPanel = $('wallet-panel');
   const walletToggle = $('wallet-toggle');
   const walletClose = $('wallet-close');
@@ -217,15 +226,17 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function closePanels() {
     cancelRecording(); stopTalking();
-    for (const panel of [peoplePanel, dmPanel, chatPanel, phonePanel, walletPanel, homePanel, garagePanel, jobsPanel, worldShopPanel]) panel?.classList.remove('open');
+    for (const panel of [peoplePanel, dmPanel, chatPanel, phonePanel, eventsPanel, walletPanel, homePanel, garagePanel, jobsPanel, worldShopPanel]) panel?.classList.remove('open');
     peopleToggle?.setAttribute('aria-expanded', 'false');
     chatToggle?.setAttribute('aria-expanded', 'false');
     phoneToggle?.setAttribute('aria-expanded', 'false');
+    eventsToggle?.setAttribute('aria-expanded', 'false');
     walletToggle?.setAttribute('aria-expanded', 'false');
     homeToggle?.setAttribute('aria-expanded', 'false');
     garageToggle?.setAttribute('aria-expanded', 'false');
     jobsToggle?.setAttribute('aria-expanded', 'false');
     if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
+    if (eventsTimer) { clearInterval(eventsTimer); eventsTimer = null; }
   }
   function showPanel(panel) {
     closePanels();
@@ -238,6 +249,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     peopleToggle?.setAttribute('aria-expanded', String(panel === peoplePanel));
     chatToggle?.setAttribute('aria-expanded', String(panel === dmPanel || panel === chatPanel));
     phoneToggle?.setAttribute('aria-expanded', String(panel === phonePanel));
+    eventsToggle?.setAttribute('aria-expanded', String(panel === eventsPanel));
     walletToggle?.setAttribute('aria-expanded', String(panel === walletPanel));
     homeToggle?.setAttribute('aria-expanded', String(panel === homePanel));
     garageToggle?.setAttribute('aria-expanded', String(panel === garagePanel));
