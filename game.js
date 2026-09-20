@@ -1512,7 +1512,7 @@ function performWorldActivity(activityId) {
 }
 
 function updateLifeLoopMission() {
-  if (!missionText || !landmarkStatus || activeJobMission || selectedLandmark) return;
+  if (!missionText || !landmarkStatus || activeJobMission || activeNpcFavor || selectedDestination) return;
   const hunger = Number(needsSnapshot?.hunger ?? 100);
   const thirst = Number(needsSnapshot?.thirst ?? 100);
   const energy = Number(needsSnapshot?.energy ?? 100);
@@ -1617,6 +1617,20 @@ function updateWorldInteract() {
     }
   }
 
+  if (!active && activeNpcFavor?.target && vehicleMode === 'walk') {
+    const target = activeNpcFavor.target;
+    const distance = Math.hypot(playerRef.position.x - Number(target.x), playerRef.position.z - Number(target.z));
+    const radius = Number(target.radius || 5.5);
+    if (distance <= radius + .35) {
+      worldInteract.hidden = false;
+      worldInteract.disabled = npcFavorCompletionPending;
+      worldInteract.dataset.mode = 'npc-favor-complete';
+      worldInteract.textContent = npcFavorCompletionPending ? 'COMPLETING FAVOR…' : `COMPLETE FAVOR · ₹${Number(activeNpcFavor.reward || 0)}`;
+      worldInteract.title = `${activeNpcFavor.npcName} · ${activeNpcFavor.title}`;
+      return;
+    }
+  }
+
   if (!active && vehicleMode === 'walk') {
     const nearbyActivity = nearestWorldActivity();
     if (nearbyActivity) {
@@ -1691,17 +1705,20 @@ function updateWorldInteract() {
       const data = nearbyNpc.villager.userData;
       const talking = Number(data.interactionUntil || 0) > performance.now();
       const closeEnough = nearbyNpc.distance <= 3.65;
+      const favorReady = !!data.favorOffer && !activeNpcFavor && !talking;
       worldInteract.hidden = false;
-      worldInteract.dataset.mode = closeEnough ? 'npc-talk' : '';
+      worldInteract.dataset.mode = closeEnough ? (favorReady ? 'npc-favor-start' : 'npc-talk') : '';
       worldInteract.dataset.npc = closeEnough ? String(data.npcIndex) : '';
       worldInteract.disabled = talking || !closeEnough;
       worldInteract.title = closeEnough
-        ? `Talk to ${data.name}`
+        ? (favorReady ? `${data.favorOffer.title} · reward ₹${Number(data.favorOffer.reward || 0)}` : `Talk to ${data.name}`)
         : `${data.name} · ${nearbyNpc.distance.toFixed(1)} m away`;
       worldInteract.textContent = talking
         ? `TALKING · ${String(data.name).toUpperCase()}`
         : closeEnough
-          ? `TALK · ${String(data.name).toUpperCase()}`
+          ? favorReady
+            ? `HELP · ${String(data.name).toUpperCase()}`
+            : `TALK · ${String(data.name).toUpperCase()}`
           : `COME CLOSER · ${String(data.name).toUpperCase()}`;
       return;
     }
@@ -1786,6 +1803,18 @@ worldInteract?.addEventListener('click', () => {
     performWorldActivity(worldInteract.dataset.activity);
   } else if (worldInteract.dataset.mode === 'npc-talk') {
     interactWithNpc(worldInteract.dataset.npc);
+  } else if (worldInteract.dataset.mode === 'npc-favor-start') {
+    const villager = villagers[Number(worldInteract.dataset.npc)];
+    if (villager?.userData?.favorOffer) {
+      window.dispatchEvent(new CustomEvent('kerala-npc-favor-start', {
+        detail: { npcId: villager.userData.relationshipId, offer: villager.userData.favorOffer },
+      }));
+    }
+  } else if (worldInteract.dataset.mode === 'npc-favor-complete') {
+    if (activeNpcFavor && !npcFavorCompletionPending) {
+      npcFavorCompletionPending = true;
+      window.dispatchEvent(new CustomEvent('kerala-npc-favor-complete', { detail: { favorId: activeNpcFavor.id } }));
+    }
   } else {
     window.dispatchEvent(new CustomEvent('kerala-job-interact'));
   }
