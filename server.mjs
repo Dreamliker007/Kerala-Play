@@ -1510,6 +1510,67 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           receivedTransactionId: received.id,
         }); return;
       }
+      if (path === '/api/npc/relationships' && request.method === 'GET') {
+        send(response, 200, npcRelationshipSummary(user)); return;
+      }
+      if (path === '/api/npc/interact' && request.method === 'POST') {
+        limited(`npc-interact:${user.id}`, 35, 60000);
+        const body = await jsonBody(request);
+        const identity = npcRelationshipIdentity(body.npcId);
+        requireValue(identity, 404, 'Village NPC not found.');
+        const state = jobStateFor(user);
+        const personal = state.garage.activeVehicleId
+          ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
+          : null;
+        requireValue(!state.active?.vehicleEntered && !personal?.entered, 409, 'Exit the vehicle before talking to someone.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before talking to someone.');
+
+        const timestamp = now();
+        const relation = state.npcRelations[identity.id] || {
+          score: 0,
+          conversations: 0,
+          lastInteractionAt: 0,
+          firstMetAt: timestamp,
+        };
+        const previousTier = npcRelationshipTier(relation.score);
+        const elapsed = timestamp - Number(relation.lastInteractionAt || 0);
+        const progressed = elapsed >= NPC_RELATIONSHIP_COOLDOWN_MS;
+        let gained = 0;
+        if (progressed) {
+          gained = Number(relation.conversations || 0) === 0 ? 4 : (elapsed >= 5 * 60_000 ? 2 : 1);
+          relation.score = Math.min(NPC_RELATIONSHIP_MAX, Number(relation.score || 0) + gained);
+          relation.lastInteractionAt = timestamp;
+        }
+        relation.conversations = Math.min(100000, Number(relation.conversations || 0) + 1);
+        if (!Number(relation.firstMetAt)) relation.firstMetAt = timestamp;
+        state.npcRelations[identity.id] = relation;
+        dirty = true;
+        await persist();
+
+        const tier = npcRelationshipTier(relation.score);
+        const summary = npcRelationshipSummary(user);
+        send(response, 200, {
+          relationship: {
+            npcId: identity.id,
+            npcIndex: identity.index,
+            name: identity.name,
+            score: relation.score,
+            tier,
+            conversations: relation.conversations,
+            firstMetAt: relation.firstMetAt,
+            lastInteractionAt: relation.lastInteractionAt,
+            gained,
+            progressed,
+            tierChanged: tier !== previousTier,
+            previousTier,
+            cooldownRemainingMs: progressed ? NPC_RELATIONSHIP_COOLDOWN_MS : Math.max(0, NPC_RELATIONSHIP_COOLDOWN_MS - elapsed),
+            recognition: npcRecognitionMessage(tier, identity.name),
+          },
+          reputation: summary.reputation,
+        }); return;
+      }
+
       if (path === '/api/travel/ride/quote' && request.method === 'GET') {
         limited(`ride-quote:${user.id}`, 40, 60000);
         const destinationId = String(url.searchParams.get('destinationId') || '');
