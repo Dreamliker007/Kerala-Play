@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createGameServer } from './server.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
+const API_UPSTREAM = String(process.env.KP_API_UPSTREAM || '').replace(/\/$/, '');
 
 function worldAlertsFromEnv() {
   const raw = process.env.KP_WORLD_ALERTS_JSON;
@@ -28,6 +29,62 @@ if (gameRequestListener) {
     let pathname = '';
     try { pathname = new URL(request.url, 'http://localhost').pathname; }
     catch { /* The game listener will handle malformed requests. */ }
+
+    if (API_UPSTREAM && pathname.startsWith('/api/')) {
+      void (async () => {
+        try {
+          const target = new URL(request.url, API_UPSTREAM);
+          const headers = new Headers();
+          for (const [name, value] of Object.entries(request.headers)) {
+            if (value === undefined) continue;
+            if (['host', 'content-length', 'connection'].includes(name.toLowerCase())) continue;
+            headers.set(name, Array.isArray(value) ? value.join(', ') : String(value));
+          }
+          headers.set('origin', API_UPSTREAM);
+          headers.set('referer', `${API_UPSTREAM}/`);
+          headers.set('sec-fetch-site', 'same-origin');
+
+          const chunks = [];
+          if (!['GET', 'HEAD'].includes(request.method || 'GET')) {
+            for await (const chunk of request) chunks.push(chunk);
+          }
+          const body = chunks.length ? Buffer.concat(chunks) : undefined;
+
+          const upstream = await fetch(target, {
+            method: request.method,
+            headers,
+            body,
+            redirect: 'manual',
+          });
+
+          const responseHeaders = {};
+          upstream.headers.forEach((value, name) => {
+            if (['connection', 'transfer-encoding', 'content-encoding', 'content-length'].includes(name.toLowerCase())) return;
+            responseHeaders[name] = value;
+          });
+          const setCookie = upstream.headers.getSetCookie?.();
+          if (setCookie?.length) responseHeaders['set-cookie'] = setCookie;
+
+          response.writeHead(upstream.status, responseHeaders);
+          if (!upstream.body || request.method === 'HEAD') {
+            response.end();
+            return;
+          }
+          for await (const chunk of upstream.body) response.write(Buffer.from(chunk));
+          response.end();
+        } catch (error) {
+          console.error('[Kerala Play] API upstream proxy failed:', error.message);
+          if (!response.headersSent) {
+            response.writeHead(502, {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Cache-Control': 'no-store',
+            });
+          }
+          response.end(JSON.stringify({ error: 'Kerala Play account service is temporarily unavailable.' }));
+        }
+      })();
+      return;
+    }
 
     const publicPages = new Map([
       ['/privacy-policy', 'privacy-policy.html'],
