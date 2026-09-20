@@ -1428,6 +1428,47 @@ window.addEventListener('kerala-npc-favor-completion-reset', () => {
   updateWorldInteract();
 });
 
+function activeCommunityEvent() {
+  const event = communityEventsSnapshot?.current || null;
+  return event?.status === 'active' && !event.completed ? event : null;
+}
+
+window.addEventListener('kerala-community-events-sync', event => {
+  communityEventsSnapshot = event.detail || null;
+  communityEventPending = false;
+  updateWorldInteract();
+});
+
+window.addEventListener('kerala-community-event-navigate', event => {
+  const communityEvent = event.detail || null;
+  const target = communityEvent?.target;
+  if (!target || !Number.isFinite(Number(target.x)) || !Number.isFinite(Number(target.z))) return;
+  setWaypoint({
+    id: String(target.id || communityEvent.id),
+    name: `${communityEvent.icon || '📌'} ${communityEvent.title} · ${target.label || 'Village'}`,
+    icon: communityEvent.icon || '📌',
+    x: Number(target.x),
+    z: Number(target.z),
+    kind: 'event',
+    district: 'Village',
+  });
+});
+
+window.addEventListener('kerala-community-event-completed', event => {
+  const result = event.detail || null;
+  communityEventsSnapshot = result.events || communityEventsSnapshot;
+  communityEventPending = false;
+  const targetId = result.completed?.target?.id;
+  if (targetId && selectedDestination?.id === targetId) {
+    selectedDestination = null;
+    selectedLandmark = null;
+    window.dispatchEvent(new CustomEvent('kerala-destination-cleared', { detail: { id: targetId, reason: 'community-event-complete' } }));
+    renderMapLandmarks();
+  }
+  updateWorldInteract();
+  updateLifeLoopMission();
+});
+
 window.addEventListener('kerala-npc-relationship-result', event => {
   const result = event.detail || null;
   if (!result?.relationship?.npcId) return;
