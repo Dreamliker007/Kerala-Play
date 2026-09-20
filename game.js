@@ -1448,7 +1448,6 @@ function updateWorldInteract() {
     }
 
     const nearbyNpc = nearestTalkableVillager();
-    const nearbyNpc = nearestTalkableVillager();
     if (nearbyNpc) {
       const data = nearbyNpc.villager.userData;
       const talking = Number(data.interactionUntil || 0) > performance.now();
