@@ -36,6 +36,10 @@ const WORLD_SHOPS = Object.freeze({
   }),
 });
 const WORLD_DAY_LENGTH_MS = 24 * 60 * 1000;
+const NPC_RELATIONSHIP_MAX = 100;
+const NPC_RELATIONSHIP_COUNT = 25;
+const NPC_RELATIONSHIP_COOLDOWN_MS = 20_000;
+const NPC_NAMES = Object.freeze(['Anu','Vivek','Meera','Arun','Nisha','Riyas','Asha','Manu','Liya','Nabeel','Sreeja','Jose']);
 const NEEDS_MAX = 100;
 const NEEDS_DECAY_PER_MINUTE = Object.freeze({ hunger: 0.28, thirst: 0.4, energy: 0.22 });
 const NEEDS_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
@@ -135,7 +139,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, npcRelations: {} }; }
 const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -875,6 +879,20 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 };
     if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] };
     if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) user.jobState.notifications = { items: [], read: {} };
+    if (!user.jobState.npcRelations || typeof user.jobState.npcRelations !== 'object' || Array.isArray(user.jobState.npcRelations)) user.jobState.npcRelations = {};
+    const normalizedNpcRelations = {};
+    for (const [npcId, relation] of Object.entries(user.jobState.npcRelations)) {
+      const match = /^npc-(\d+)$/.exec(npcId);
+      const npcIndex = match ? Number(match[1]) : -1;
+      if (!match || npcIndex < 0 || npcIndex >= NPC_RELATIONSHIP_COUNT || !relation || typeof relation !== 'object' || Array.isArray(relation)) continue;
+      normalizedNpcRelations[npcId] = {
+        score: Math.max(0, Math.min(NPC_RELATIONSHIP_MAX, Number(relation.score) || 0)),
+        conversations: Math.max(0, Math.min(100000, Math.floor(Number(relation.conversations) || 0))),
+        lastInteractionAt: Math.max(0, Number(relation.lastInteractionAt) || 0),
+        firstMetAt: Math.max(0, Number(relation.firstMetAt) || 0),
+      };
+    }
+    user.jobState.npcRelations = normalizedNpcRelations;
     if (!Array.isArray(user.jobState.notifications.items)) user.jobState.notifications.items = [];
     if (!user.jobState.notifications.read || typeof user.jobState.notifications.read !== 'object' || Array.isArray(user.jobState.notifications.read)) user.jobState.notifications.read = {};
     if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
