@@ -673,6 +673,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   function syncNpcRelationships(summary) {
     npcRelationshipsSnapshot = summary || null;
     window.dispatchEvent(new CustomEvent('kerala-npc-relationships-sync', { detail: npcRelationshipsSnapshot }));
+    window.dispatchEvent(new CustomEvent('kerala-npc-favor-state', { detail: npcRelationshipsSnapshot?.activeFavor || null }));
   }
 
   async function refreshNpcRelationships() {
@@ -2012,8 +2013,51 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         relationships: [...others, result.relationship],
       });
       window.dispatchEvent(new CustomEvent('kerala-npc-relationship-result', { detail: result }));
+      window.dispatchEvent(new CustomEvent('kerala-npc-favor-offer', {
+        detail: {
+          npcId: result.relationship.npcId,
+          offer: result.favorOffer || null,
+        },
+      }));
     }
   }, peopleError));
+
+  window.addEventListener('kerala-npc-favor-start', event => run(async () => {
+    if (!user) return;
+    const npcId = String(event.detail?.npcId || '');
+    if (!npcId) return;
+    const result = await api('/api/npc/favor/start', { npcId });
+    syncNpcRelationships({
+      ...(npcRelationshipsSnapshot || {}),
+      reputation: result.reputation || npcRelationshipsSnapshot?.reputation || null,
+      activeFavor: result.activeFavor || null,
+    });
+    if (result.activeFavor) {
+      toast(`${result.activeFavor.npcName} · ${result.activeFavor.title} → ${result.activeFavor.target?.label || 'destination'} · reward ${formatCash(result.activeFavor.reward || 0)}`, 4600);
+    }
+  }, peopleError));
+
+  window.addEventListener('kerala-npc-favor-complete', () => {
+    run(async () => {
+      if (!user) return;
+      const result = await api('/api/npc/favor/complete', {});
+      if (result.wallet) renderWallet(result.wallet);
+      const relationships = Array.isArray(npcRelationshipsSnapshot?.relationships)
+        ? npcRelationshipsSnapshot.relationships.filter(item => item.npcId !== result.relationship?.npcId)
+        : [];
+      if (result.relationship) relationships.push(result.relationship);
+      syncNpcRelationships({
+        ...(npcRelationshipsSnapshot || {}),
+        reputation: result.reputation || npcRelationshipsSnapshot?.reputation || null,
+        relationships,
+        activeFavor: null,
+      });
+      if (result.relationship) window.dispatchEvent(new CustomEvent('kerala-npc-relationship-result', { detail: result }));
+      toast(`${result.completed?.npcName || 'Villager'} favor complete · +${formatCash(result.completed?.reward || 0)} · local reputation ${result.reputation?.value ?? 0}/100`, 4600);
+    }, peopleError).finally(() => {
+      window.dispatchEvent(new CustomEvent('kerala-npc-favor-completion-reset'));
+    });
+  });
 
   worldShopClose?.addEventListener('click', () => {
     worldShopPanel?.classList.remove('open');
