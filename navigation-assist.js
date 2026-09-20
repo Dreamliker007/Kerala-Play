@@ -1,4 +1,4 @@
-const VERSION = 'V102.1';
+const VERSION = 'V102.3';
 window.KERALA_PLAY_VERSION = VERSION;
 
 const style = document.createElement('style');
@@ -40,19 +40,35 @@ function distanceFromStatus(text) {
   return match ? Number(match[1]) : Infinity;
 }
 
+function activeRouteFromMission(mission, status) {
+  const destination = mission.match(/^Destination:\s*(.+)$/i);
+  if (destination) return { name: destination[1].trim(), kind: 'destination' };
+
+  // Job travel and NPC favors already drive the same map route in game.js, but
+  // their mission text is not prefixed with "Destination". Keep the compact
+  // navigation chip available whenever those missions expose a live distance.
+  if (!Number.isFinite(distanceFromStatus(status))) return null;
+  const favor = mission.match(/^Favor for\s+(.+?):\s*(.+)$/i);
+  if (favor) return { name: `${favor[1].trim()} favor`, kind: 'favor' };
+  const job = mission.match(/^(.+?):\s*(.+)$/i);
+  if (job && !/^Arrived$/i.test(job[1].trim())) return { name: job[1].trim(), kind: 'job' };
+  return null;
+}
+
 function refreshNavigationAssist() {
   const mission = missionText?.textContent?.trim() || '';
   const status = landmarkStatus?.textContent?.trim() || '';
-  const destination = mission.match(/^Destination:\s*(.+)$/i);
+  const route = activeRouteFromMission(mission, status);
   const arrived = mission.match(/^Arrived:\s*(.+)$/i);
 
-  if (destination) {
+  if (route) {
     clearTimeout(arrivalTimer);
-    const name = destination[1].trim();
+    const name = route.name;
     const isNew = name !== activeName;
     activeName = name;
     chip.classList.remove('arrived');
     chip.classList.add('active');
+    chip.dataset.routeKind = route.kind;
     title.textContent = name;
     detail.textContent = status || 'Route active · tap to open map';
     const distance = distanceFromStatus(status);
@@ -73,6 +89,7 @@ function refreshNavigationAssist() {
     if (activeName || !chip.classList.contains('arrived')) vibrate([45, 55, 80]);
     activeName = '';
     lastDistanceBand = Infinity;
+    delete chip.dataset.routeKind;
     chip.classList.remove('active');
     chip.classList.add('arrived');
     title.textContent = `Arrived · ${name}`;
@@ -84,6 +101,7 @@ function refreshNavigationAssist() {
 
   activeName = '';
   lastDistanceBand = Infinity;
+  delete chip.dataset.routeKind;
   chip.classList.remove('active');
 }
 
