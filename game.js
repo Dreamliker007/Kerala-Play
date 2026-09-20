@@ -124,6 +124,7 @@ let garageSnapshot = null;
 let trafficSnapshot = null;
 let needsSnapshot = null;
 let homeSnapshot = null;
+let npcRelationshipSnapshot = null;
 let trafficCheckpointVisual = null;
 let junctionSignalVisual = null;
 const pedestrianCrossingZ = -14.3;
@@ -1232,6 +1233,19 @@ function nearestTalkableVillager(maxDistance = 4.8) {
   return nearest ? { villager: nearest, distance: nearestDistance } : null;
 }
 
+function npcRelationshipForId(npcId) {
+  return npcRelationshipSnapshot?.relationships?.find?.(relation => relation.npcId === npcId) || null;
+}
+
+function updateNpcLabel(villager) {
+  const data = villager?.userData;
+  if (!data) return;
+  const relationship = data.relationship || npcRelationshipForId(data.relationshipId);
+  if (relationship) data.relationship = relationship;
+  const tier = relationship?.tier && relationship.tier !== 'Stranger' ? ` · ${relationship.tier}` : '';
+  updateNameLabel(villager, `${data.name} · ${data.role || 'Local'}${tier}`, data.relationshipId || `npc-${data.npcIndex}`);
+}
+
 function npcConversationReply(villager) {
   const data = villager?.userData || {};
   const role = String(data.role || 'Local');
@@ -1312,11 +1326,22 @@ function npcConversationReply(villager) {
   if (energy <= 22) return `${timeGreeting}! You look tired. Try the rest bench or head home for sleep.`;
   if (homeSnapshot?.rentOverdue || homeSnapshot?.utilityOverdue) return `${timeGreeting}! Remember to check your HOME panel—one of your bills is due.`;
 
-  if (rain > .58) return `${timeGreeting}! Heavy rain today—stay under cover when you can.`;
-  if (rain > .12) return `${timeGreeting}! It is raining, so watch the wet road.`;
-  if (weather === 'Cloudy') return `${timeGreeting}! Cloudy weather today, but the village is active.`;
-  if (night) return `${timeGreeting}! The streets are quieter now—travel safely.`;
-  return `${timeGreeting}! ${pool[index]}`;
+  const relationTier = String(data.relationship?.tier || '');
+  const recognition = relationTier === 'Trusted'
+    ? 'Good to see you again—you are part of the regular crowd here.'
+    : relationTier === 'Friendly'
+      ? 'Nice to see you again. I remember you well.'
+      : relationTier === 'Familiar'
+        ? 'I remember you from your earlier visits.'
+        : relationTier === 'Acquaintance'
+          ? 'I recognize you now.'
+          : '';
+
+  if (rain > .58) return `${timeGreeting}! ${recognition ? recognition + ' ' : ''}Heavy rain today—stay under cover when you can.`;
+  if (rain > .12) return `${timeGreeting}! ${recognition ? recognition + ' ' : ''}It is raining, so watch the wet road.`;
+  if (weather === 'Cloudy') return `${timeGreeting}! ${recognition ? recognition + ' ' : ''}Cloudy weather today, but the village is active.`;
+  if (night) return `${timeGreeting}! ${recognition ? recognition + ' ' : ''}The streets are quieter now—travel safely.`;
+  return `${timeGreeting}! ${recognition ? recognition + ' ' : ''}${pool[index]}`;
 }
 
 function interactWithNpc(index) {
@@ -1337,7 +1362,51 @@ function interactWithNpc(index) {
   data.interactionPlayerZ = playerRef.position.z;
   const reply = npcConversationReply(villager);
   showToast(`${data.name}: ${reply}`, 3400);
+  window.dispatchEvent(new CustomEvent('kerala-npc-interact', {
+    detail: {
+      npcId: data.relationshipId || `npc-${data.npcIndex}`,
+      npcIndex: data.npcIndex,
+      name: data.name,
+      role: data.role,
+    },
+  }));
 }
+
+window.addEventListener('kerala-npc-relationships-sync', event => {
+  npcRelationshipSnapshot = event.detail || null;
+  for (const villager of villagers) {
+    const data = villager?.userData;
+    if (!data?.npc) continue;
+    data.relationship = npcRelationshipForId(data.relationshipId);
+    updateNpcLabel(villager);
+  }
+});
+
+window.addEventListener('kerala-npc-relationship-result', event => {
+  const result = event.detail || null;
+  if (!result?.relationship?.npcId) return;
+  const relationship = result.relationship;
+  const existing = Array.isArray(npcRelationshipSnapshot?.relationships)
+    ? npcRelationshipSnapshot.relationships.filter(item => item.npcId !== relationship.npcId)
+    : [];
+  npcRelationshipSnapshot = {
+    ...(npcRelationshipSnapshot || {}),
+    reputation: result.reputation || npcRelationshipSnapshot?.reputation || null,
+    relationships: [...existing, relationship],
+  };
+  const villager = villagers.find(item => item?.userData?.relationshipId === relationship.npcId);
+  if (villager) {
+    villager.userData.relationship = relationship;
+    updateNpcLabel(villager);
+  }
+  if (relationship.tierChanged && relationship.tier !== 'Stranger') {
+    const reputation = result.reputation;
+    showToast(
+      `${relationship.name} · ${relationship.tier} relationship${reputation ? ` · Local rep ${reputation.value}/100` : ''}`,
+      3800
+    );
+  }
+});
 
 function worldShopIsOpen(spot, hour = Number(worldWeatherState.hour ?? 12)) {
   if (!spot || spot.kind !== 'shop') return true;
@@ -2045,7 +2114,13 @@ function inspectAvatar(object) {
     const panel = document.querySelector('#npc-profile');
     panel.querySelector('h2').textContent = object.userData.name;
     const activity = object.userData.role || 'Local';
-    panel.querySelector('p').textContent = activity + ' · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ' local. NPCs follow day/night routines, use umbrellas or shelter in rain, walk, wait, shop, cross roads and talk around the village.';
+    const relationship = object.userData.relationship || npcRelationshipForId(object.userData.relationshipId);
+    const relationshipText = relationship
+      ? `${relationship.tier} · ${relationship.score}/100 familiarity · ${relationship.conversations} conversation${relationship.conversations === 1 ? '' : 's'}`
+      : 'Stranger · talk to build familiarity';
+    const reputation = npcRelationshipSnapshot?.reputation;
+    const reputationText = reputation ? ` Local reputation: ${reputation.value}/100 · ${reputation.tier}.` : '';
+    panel.querySelector('p').textContent = activity + ' · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ` local. Relationship: ${relationshipText}.${reputationText} NPCs remember repeat conversations across sessions.`;
     panel.hidden = false;
     panel.querySelector('button').focus();
   } else if (object.userData.playerId) social.openProfile(object.userData.playerId);
@@ -3650,7 +3725,7 @@ function applyNpcRoutineRole(villager, role, stageIndex) {
   if (data.role === role && data.lastRoutineStage === stageIndex) return;
   data.role = role;
   data.lastRoutineStage = stageIndex;
-  updateNameLabel(villager, `${data.name} · ${role}`, `npc-${data.npcIndex}`);
+  updateNpcLabel(villager);
 }
 
 function npcPingPongState(time, speed, offset) {
@@ -7114,8 +7189,10 @@ function addPhotoVillager(scene, x, z, distance, speed, offset, scale, options =
     interactionPlayerX: x,
     interactionPlayerZ: z,
     talkCount: 0,
+    relationshipId: `npc-${index}`,
+    relationship: npcRelationshipForId(`npc-${index}`),
   };
-  updateNameLabel(villager, npcName + ' · ' + villager.userData.role, 'npc-' + index);
+  updateNpcLabel(villager);
   villagers.push(villager);
   scene.add(villager);
 }
