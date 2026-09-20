@@ -5286,10 +5286,32 @@ function buildWorld(scene) {
   addPhotoVillager(scene, 10.1, 27.2, 0, .28, 2.4, .70, {
     behavior: 'idle', facing: Math.PI, role: 'Waiting',
     shelterX: 10.1, shelterZ: 26.95,
+    dailySchedule: [
+      { start: 0, hidden: true, x: 22.0, z: 18.0, role: 'Local' },
+      { start: 5.8, x: 22.0, z: 18.0, behavior: 'idle', role: 'Local' },
+      { start: 6.5, x: 10.1, z: 27.2, behavior: 'idle', role: 'Commuter', facing: Math.PI, transitionHours: .65 },
+      { start: 7.2, x: 10.1, z: 27.2, behavior: 'idle', role: 'Waiting', facing: Math.PI },
+      { start: 8.4, x: 25.0, z: 39.0, behavior: 'task', role: 'Worker', facing: -Math.PI / 2, transitionHours: .7 },
+      { start: 13.0, x: 13.8, z: 41.6, behavior: 'social', role: 'Tea Break', targetX: 12.4, targetZ: 41.4, transitionHours: .45 },
+      { start: 13.6, x: 25.0, z: 39.0, behavior: 'task', role: 'Worker', facing: -Math.PI / 2, transitionHours: .4 },
+      { start: 18.1, x: 10.1, z: 27.2, behavior: 'idle', role: 'Waiting', facing: Math.PI, transitionHours: .7 },
+      { start: 19.0, x: 22.0, z: 18.0, behavior: 'idle', role: 'Going Home', transitionHours: .65 },
+      { start: 20.2, hidden: true, x: 22.0, z: 18.0, role: 'Local' },
+    ],
   });
   addPhotoVillager(scene, -10.0, -50.2, 0, .28, 4.8, .69, {
     behavior: 'idle', facing: 0, role: 'Waiting',
     shelterX: -10.1, shelterZ: -50.45,
+    dailySchedule: [
+      { start: 0, hidden: true, x: -23.0, z: -39.0, role: 'Local' },
+      { start: 6.2, x: -23.0, z: -39.0, behavior: 'idle', role: 'Local' },
+      { start: 7.0, x: -10.0, z: -50.2, behavior: 'idle', role: 'Commuter', facing: 0, transitionHours: .65 },
+      { start: 7.7, x: -10.0, z: -50.2, behavior: 'idle', role: 'Waiting', facing: 0 },
+      { start: 9.0, x: -34.2, z: -11.7, behavior: 'task', role: 'Worker', facing: Math.PI, transitionHours: .9 },
+      { start: 17.6, x: -10.0, z: -50.2, behavior: 'idle', role: 'Waiting', facing: 0, transitionHours: .9 },
+      { start: 18.8, x: -23.0, z: -39.0, behavior: 'idle', role: 'Going Home', transitionHours: .7 },
+      { start: 20.4, hidden: true, x: -23.0, z: -39.0, role: 'Local' },
+    ],
   });
   addPhotoVillager(scene, -10.2, 7.5, 0, .25, 1.6, .68, {
     behavior: 'task', facing: Math.PI / 2, role: 'Shopper', nightHide: true,
@@ -5312,18 +5334,57 @@ function buildWorld(scene) {
   addPhotoVillager(scene, -12.9, 10.9, 0, .22, 1.1, .70, {
     behavior: 'task', facing: Math.PI, role: 'Shopkeeper',
     shelterX: -12.9, shelterZ: 10.45,
+    dailySchedule: [
+      { start: 0, hidden: true, x: -25.0, z: 10.9, role: 'Local' },
+      { start: 5.35, x: -25.0, z: 10.9, behavior: 'idle', role: 'Local', facing: Math.PI / 2 },
+      { start: 5.8, x: -12.9, z: 10.9, behavior: 'task', role: 'Worker', facing: Math.PI, transitionHours: .48 },
+      { start: 6.25, x: -12.9, z: 10.9, behavior: 'task', role: 'Shopkeeper', facing: Math.PI },
+      { start: 10.4, x: -11.3, z: 10.9, behavior: 'social', role: 'Tea Break', targetX: -10.2, targetZ: 7.5, transitionHours: .25 },
+      { start: 10.9, x: -12.9, z: 10.9, behavior: 'task', role: 'Shopkeeper', facing: Math.PI, transitionHours: .2 },
+      { start: 20.5, x: -25.0, z: 10.9, behavior: 'idle', role: 'Going Home', facing: -Math.PI / 2, transitionHours: .6 },
+      { start: 21.2, hidden: true, x: -25.0, z: 10.9, role: 'Local' },
+    ],
   });
   addPhotoVillager(scene, -11.5, 10.7, 0, .22, 3.3, .69, {
     behavior: 'social', targetX: -12.9, targetZ: 10.9, role: 'Customer', nightHide: true,
     shelterX: -11.9, shelterZ: 10.35,
+    dailySchedule: [
+      { start: 0, hidden: true, x: -28.0, z: 4.0, role: 'Local' },
+      { start: 7.4, x: -28.0, z: 4.0, behavior: 'idle', role: 'Local' },
+      { start: 8.1, x: -11.5, z: 10.7, behavior: 'social', role: 'Customer', targetX: -12.9, targetZ: 10.9, transitionHours: .65 },
+      { start: 9.0, x: -9.0, z: 19.0, behavior: 'patrol', role: 'Local', transitionHours: .45 },
+      { start: 16.6, x: -11.5, z: 10.7, behavior: 'social', role: 'Customer', targetX: -12.9, targetZ: 10.9, transitionHours: .5 },
+      { start: 17.4, x: -28.0, z: 4.0, behavior: 'idle', role: 'Going Home', transitionHours: .7 },
+      { start: 19.2, hidden: true, x: -28.0, z: 4.0, role: 'Local' },
+    ],
   });
   addPhotoVillager(scene, 13.8, 41.6, 0, .22, 2.6, .71, {
-    behavior: 'task', facing: Math.PI, role: 'Shopkeeper', nightHide: true,
+    behavior: 'task', facing: Math.PI, role: 'Shopkeeper',
     shelterX: 13.8, shelterZ: 41.1,
+    dailySchedule: [
+      { start: 0, hidden: true, x: 26.0, z: 47.0, role: 'Local' },
+      { start: 4.9, x: 26.0, z: 47.0, behavior: 'idle', role: 'Local' },
+      { start: 5.35, x: 13.8, z: 41.6, behavior: 'task', role: 'Worker', facing: Math.PI, transitionHours: .45 },
+      { start: 5.7, x: 13.8, z: 41.6, behavior: 'task', role: 'Shopkeeper', facing: Math.PI },
+      { start: 12.2, x: 12.8, z: 41.3, behavior: 'social', role: 'Tea Break', targetX: 12.4, targetZ: 41.4, transitionHours: .25 },
+      { start: 12.7, x: 13.8, z: 41.6, behavior: 'task', role: 'Shopkeeper', facing: Math.PI, transitionHours: .2 },
+      { start: 20.05, x: 26.0, z: 47.0, behavior: 'idle', role: 'Going Home', transitionHours: .6 },
+      { start: 20.7, hidden: true, x: 26.0, z: 47.0, role: 'Local' },
+    ],
   });
   addPhotoVillager(scene, 12.4, 41.4, 0, .22, 5.1, .68, {
     behavior: 'social', targetX: 13.8, targetZ: 41.6, role: 'Customer', nightHide: true,
     shelterX: 12.7, shelterZ: 41.05,
+    dailySchedule: [
+      { start: 0, hidden: true, x: 27.0, z: 34.0, role: 'Local' },
+      { start: 6.8, x: 27.0, z: 34.0, behavior: 'idle', role: 'Local' },
+      { start: 7.6, x: 12.4, z: 41.4, behavior: 'social', role: 'Customer', targetX: 13.8, targetZ: 41.6, transitionHours: .6 },
+      { start: 8.5, x: 10.1, z: 27.2, behavior: 'idle', role: 'Commuter', facing: Math.PI, transitionHours: .6 },
+      { start: 9.2, x: 10.1, z: 27.2, behavior: 'idle', role: 'Waiting', facing: Math.PI },
+      { start: 17.0, x: 12.4, z: 41.4, behavior: 'social', role: 'Customer', targetX: 13.8, targetZ: 41.6, transitionHours: .65 },
+      { start: 18.0, x: 27.0, z: 34.0, behavior: 'idle', role: 'Going Home', transitionHours: .7 },
+      { start: 20.0, hidden: true, x: 27.0, z: 34.0, role: 'Local' },
+    ],
   });
 
   // V101.0: a few additional everyday routines spread activity beyond the
