@@ -33,6 +33,11 @@ const minimap = document.querySelector('#minimap');
 const mapOpen = document.querySelector('#map-open');
 const mapClose = document.querySelector('#map-close');
 const mapLabelToggle = document.querySelector('#map-label-toggle');
+const keralaMap = document.querySelector('#kerala-map');
+const districtLabels = document.querySelector('#district-labels');
+const mapZoomIn = document.querySelector('#map-zoom-in');
+const mapZoomOut = document.querySelector('#map-zoom-out');
+const mapZoomReset = document.querySelector('#map-zoom-reset');
 const missionText = document.querySelector('#mission-text');
 const landmarkStatus = document.querySelector('#landmark-status');
 const missionCard = document.querySelector('#mission-card');
@@ -109,6 +114,7 @@ let villageTime = 0;
 let playerRef = null;
 let selectedLandmark = null;
 let mapLabelsVisible = false;
+let mapZoom = 1;
 let activeDmContact = null;
 let activeJobMission = null;
 let garageSnapshot = null;
@@ -1940,18 +1946,35 @@ function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 function worldToKeralaMap(worldX, worldZ) {
-  const bands = [[0,52,7],[.12,56,13],[.28,60,19],[.44,62,20],[.60,65,20],[.76,62,18],[.90,58,14],[1,54,7]];
-  const t = clamp((70 - worldZ) / 140, 0, 1);
+  // Follow the real Kerala silhouette from north-west Kasaragod to the
+  // south-east Thiruvananthapuram while keeping the game world's local X/Z
+  // coordinates readable inside the district-accurate map.
+  const bands = [[.02,18.8,2.16],[.12,30.98,6.77],[.28,52.4,11.04],[.44,67.99,16.2],[.60,79.11,17.28],[.76,84.12,16.51],[.90,88.03,7.95],[.98,92.87,2.26]];
+  const t = clamp((70 - worldZ) / 140, .02, .98);
   let index = 0;
   while (index < bands.length - 2 && t > bands[index + 1][0]) index++;
   const [t0, center0, half0] = bands[index];
   const [t1, center1, half1] = bands[index + 1];
-  const localT = (t - t0) / (t1 - t0);
-  return { x: lerp(center0, center1, localT) + clamp(worldX / 70, -1, 1) * (lerp(half0, half1, localT) - 4), y: 16 + t * 268 };
+  const localT = clamp((t - t0) / (t1 - t0), 0, 1);
+  const center = lerp(center0, center1, localT);
+  const usableHalf = Math.max(1.4, lerp(half0, half1, localT) - 1.15);
+  return { x: center + clamp(worldX / 70, -1, 1) * usableHalf, y: 8 + t * 284 };
+}
+
+function applyMapZoom(nextZoom = mapZoom) {
+  mapZoom = clamp(nextZoom, 1, 1.8);
+  const width = 120 / mapZoom;
+  const height = 300 / mapZoom;
+  const center = playerRef ? worldToKeralaMap(playerRef.position.x, playerRef.position.z) : { x: 60, y: 150 };
+  const x = clamp(center.x - width / 2, 0, 120 - width);
+  const y = clamp(center.y - height / 2, 0, 300 - height);
+  keralaMap?.setAttribute('viewBox', `${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)}`);
+  if (mapZoomReset) mapZoomReset.textContent = mapZoom === 1 ? '1×' : `${mapZoom.toFixed(1)}×`;
 }
 
 function renderMapLandmarks() {
   const svgNamespace = 'http://www.w3.org/2000/svg';
+  if (districtLabels) districtLabels.style.display = mapLabelsVisible ? 'block' : 'none';
   mapLayer.replaceChildren();
   landmarks.forEach(landmark => {
     const point = worldToKeralaMap(landmark.x, landmark.z);
@@ -2120,12 +2143,21 @@ function wireInterface() {
     hudMenuToggle.textContent = expanded ? '×' : '☰';
     recordOnboardingAction('menu');
   });
-  mapOpen.addEventListener('click', () => { setOpenPanel(minimap.classList.contains('open') ? null : 'map'); recordOnboardingAction('map'); });
+  mapOpen.addEventListener('click', () => {
+    const opening = !minimap.classList.contains('open');
+    setOpenPanel(opening ? 'map' : null);
+    if (opening) requestAnimationFrame(() => applyMapZoom(mapZoom));
+    recordOnboardingAction('map');
+  });
   mapClose.addEventListener('click', () => setOpenPanel());
   mapLabelToggle.addEventListener('click', () => {
     mapLabelsVisible = !mapLabelsVisible;
-    mapLabelToggle.textContent = mapLabelsVisible ? 'Labels on' : 'Labels'; renderMapLandmarks();
+    mapLabelToggle.textContent = mapLabelsVisible ? 'Labels on' : 'Labels';
+    renderMapLandmarks();
   });
+  mapZoomIn?.addEventListener('click', () => applyMapZoom(mapZoom + .25));
+  mapZoomOut?.addEventListener('click', () => applyMapZoom(mapZoom - .25));
+  mapZoomReset?.addEventListener('click', () => applyMapZoom(1));
   taskToggle.addEventListener('click', () => { setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'); recordOnboardingAction('tasks'); });
   fullscreenToggle?.addEventListener('click', async () => {
     try {
