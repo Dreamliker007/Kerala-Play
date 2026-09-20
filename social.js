@@ -1413,7 +1413,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       await Promise.allSettled(nearby.map(player => sendProximitySignal(player.id, { type: 'ready' })));
       updateProximityWorld([...worldPlayers.values()]);
     } catch (error) {
-      toast(error.name === 'NotAllowedError' ? 'Microphone permission was denied.' : 'Could not start nearby voice.');
+      // Android/browser permission UI is sufficient; do not cover gameplay
+      // with a second denial popup.
+      if (error.name !== 'NotAllowedError') console.warn('Could not start nearby voice:', error);
     } finally { proximityStarting = false; updateProximityButton(); }
   }
   function stopProximityVoice(notifyPeers = true) {

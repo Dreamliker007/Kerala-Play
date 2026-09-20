@@ -97,6 +97,21 @@
     #dm-input { min-width:0; flex:1; border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:8px; color:#fff; background:#163139; font:inherit; }
     #toast { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:50%; transform:translateX(-50%); max-width:260px; padding:8px 11px; border-radius:10px; color:#fff; background:rgba(21,105,69,.93); box-shadow:0 4px 17px rgba(0,0,0,.24); text-align:center; font-size:11px; font-weight:800; pointer-events:none; }
     #asset-notice { display:none; position:absolute; left:50%; top:calc(env(safe-area-inset-top) + 14px); transform:translateX(-50%); max-width:310px; padding:8px 10px; border-radius:9px; color:#fff7d7; background:rgba(93,60,10,.85); font-size:11px; text-align:center; }
+    #onboarding { position:fixed; inset:0; z-index:30; display:flex; justify-content:center; align-items:center; pointer-events:none; }
+    #onboarding[hidden] { display:none; }
+    .onboarding-card { width:min(380px, calc(100vw - 36px)); padding:17px 19px 15px; border:1px solid rgba(167,255,204,.42); border-radius:18px; color:#f7fff9; background:linear-gradient(145deg, rgba(12,51,53,.95), rgba(8,26,34,.96)); box-shadow:0 14px 42px rgba(0,0,0,.42); text-align:center; pointer-events:auto; }
+    .onboarding-kicker { color:#8df0b5; font:800 10px/1 system-ui,sans-serif; letter-spacing:1.1px; }
+    #onboarding-title { margin:7px 0 6px; font:900 21px/1.1 system-ui,sans-serif; }
+    #onboarding-copy { margin:0; color:#d2e9df; font:600 12px/1.45 system-ui,sans-serif; }
+    #onboarding-progress { display:flex; justify-content:center; gap:5px; margin:13px 0 12px; }
+    #onboarding-progress i { width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.25); }
+    #onboarding-progress i.active { background:#6ae79c; box-shadow:0 0 9px rgba(106,231,156,.7); }
+    .onboarding-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    #onboarding-skip { border:0; padding:7px 2px; color:#b8d6c9; background:transparent; font:700 11px system-ui,sans-serif; cursor:pointer; }
+    #onboarding-next { min-width:122px; border:1px solid rgba(220,255,232,.42); border-radius:10px; padding:9px 12px; color:#06231a; background:#5be08e; font:900 12px system-ui,sans-serif; cursor:pointer; }
+    #onboarding-next[hidden] { display:none; }
+    body.onboarding-actions #quick-actions { z-index:31; }
+    @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) { .onboarding-card { width:min(350px, 46vw); padding:13px 15px 12px; border-radius:14px; } #onboarding-title { font-size:17px; } #onboarding-copy { font-size:10px; } #onboarding-progress { margin:9px 0; } #onboarding-next { padding:7px 10px; font-size:10px; } }
     #profile-modal { display:none; position:fixed; inset:0; z-index:20; align-items:center; justify-content:center; padding:20px; background:rgba(3,15,18,.72); color:#fff; }
     #profile-modal.open { display:flex; }
     .profile-card { width:min(360px, 100%); padding:22px; border:1px solid rgba(255,255,255,.25); border-radius:18px; background:linear-gradient(145deg, #143e43, #0c2229); box-shadow:0 12px 36px rgba(0,0,0,.38); }
@@ -114,16 +129,13 @@
     #needs-hud span.critical { color:#ff9c86; }
     #needs-hud b { font-size:9px; }
     @media (max-width:560px) { #needs-hud { bottom:calc(env(safe-area-inset-bottom) + 52px); gap:4px; padding:4px 6px; font-size:8px; opacity:.9; } #needs-hud span { min-width:36px; } }
-    #rotate-device { display:none; position:fixed; inset:0; z-index:50; place-items:center; padding:24px; background:radial-gradient(circle at 50% 35%,rgba(22,70,82,.98),rgba(6,24,30,.995)); color:#fff; text-align:center; pointer-events:auto; }
+    #rotate-device { display:none !important; }
     #rotate-device .rotate-card { width:min(320px,86vw); padding:22px 18px; border:1px solid rgba(255,255,255,.18); border-radius:18px; background:rgba(255,255,255,.055); box-shadow:0 14px 40px rgba(0,0,0,.35); }
     #rotate-device .rotate-icon { display:block; margin-bottom:10px; font-size:44px; }
     #rotate-device strong { display:block; font-size:18px; }
     #rotate-device p { margin:8px 0 14px; color:#c7e5dc; font-size:12px; line-height:1.45; }
     #rotate-landscape { border:1px solid rgba(255,255,255,.22); border-radius:11px; padding:10px 14px; color:#fff; background:#2b7d5b; font:900 12px system-ui,sans-serif; cursor:pointer; }
     #rotate-landscape:disabled { opacity:.72; cursor:wait; }
-    @media (orientation:portrait) and (max-width:900px) and (hover:none) and (pointer:coarse) {
-      #rotate-device { display:grid; }
-    }
     @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) {
       #hint, #camera-note { display:none; }
       #brand { top:calc(env(safe-area-inset-top) + 6px); left:calc(env(safe-area-inset-left) + 8px); padding:6px 8px; border-radius:9px; font-size:11px; opacity:.9; }
@@ -621,14 +633,6 @@
   <link rel="stylesheet" href="./game.css">
 </head>
 <body>
-  <div id="rotate-device" role="dialog" aria-label="Rotate device to landscape">
-    <div class="rotate-card">
-      <span class="rotate-icon" aria-hidden="true">📱↻</span>
-      <strong>Landscape mode</strong>
-      <p>Kerala Play is designed for a wider game view. Rotate your phone sideways for the best controls.</p>
-      <button id="rotate-landscape" type="button">ENTER LANDSCAPE</button>
-    </div>
-  </div>
   <div id="hud" aria-label="Game controls">
     <div id="brand">Kerala Play <span style="font-size:10px;opacity:.68">V100.3</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
@@ -750,8 +754,16 @@
   <div id="fallback">Kerala Play could not start. Reload the page once. If it still does not open, update the app/browser and try again.</div>
   <div id="avatar-labels" aria-label="Avatars in the world"></div>
   <section id="npc-profile" hidden aria-label="Village guide profile"><button type="button" class="panel-close" aria-label="Close guide profile">×</button><h2></h2><p></p></section>
+  <section id="onboarding" hidden aria-label="Kerala Play starter guide">
+    <div class="onboarding-card">
+      <div class="onboarding-kicker">KERALA PLAY · STARTER GUIDE</div>
+      <h2 id="onboarding-title">Welcome to Kerala Play</h2>
+      <p id="onboarding-copy">Learn the essentials in less than a minute, then the whole world is yours to explore.</p>
+      <div id="onboarding-progress" aria-hidden="true"></div>
+      <div class="onboarding-actions"><button id="onboarding-skip" type="button">Skip guide</button><button id="onboarding-next" type="button">Start guide</button></div>
+    </div>
+  </section>
 
   <script type="module" src="./boot.js"></script>
 </body>
 </html>
-
