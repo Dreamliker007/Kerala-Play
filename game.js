@@ -29,6 +29,7 @@ const mapPlayer = document.querySelector('#map-player');
 const mapRoute = document.querySelector('#map-route');
 const jobMapMarker = document.querySelector('#job-map-marker');
 const mapStatus = document.querySelector('#map-status');
+const nearbyPlaces = document.querySelector('#nearby-places');
 const minimap = document.querySelector('#minimap');
 const mapOpen = document.querySelector('#map-open');
 const mapClose = document.querySelector('#map-close');
@@ -113,6 +114,8 @@ const birdMaterial = new THREE.MeshBasicMaterial({ color: 0x202724, side: THREE.
 let villageTime = 0;
 let playerRef = null;
 let selectedLandmark = null;
+let selectedDestination = null;
+let lastNearbyPlacesRenderAt = 0;
 let mapLabelsVisible = false;
 let mapZoom = 1;
 let activeDmContact = null;
@@ -200,13 +203,25 @@ const districtStarts = {
   Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
 };
 const landmarks = [
-  { id: 'bekal', name: 'Bekal Fort', icon: 'F', x: -7, z: 60, district: 'Kasaragod' },
-  { id: 'munnar', name: 'Munnar Tea Hills', icon: 'M', x: 42, z: 26, district: 'Idukki' },
-  { id: 'kochi', name: 'Mattancherry Palace', icon: 'P', x: -26, z: 6, district: 'Ernakulam' },
-  { id: 'alappuzha', name: 'Alappuzha Backwaters', icon: 'B', x: -34, z: -13, district: 'Alappuzha' },
-  { id: 'kuttanad', name: 'Kuttanad Fields', icon: 'K', x: 7, z: -23, district: 'Kottayam' },
-  { id: 'temple', name: 'Padmanabhaswamy Temple', icon: 'T', x: 13, z: -57, district: 'Thiruvananthapuram' }
+  { id: 'bekal', name: 'Bekal Fort', icon: 'F', x: -7, z: 60, district: 'Kasaragod', kind: 'landmark' },
+  { id: 'munnar', name: 'Munnar Tea Hills', icon: 'M', x: 42, z: 26, district: 'Idukki', kind: 'landmark' },
+  { id: 'kochi', name: 'Mattancherry Palace', icon: 'P', x: -26, z: 6, district: 'Ernakulam', kind: 'landmark' },
+  { id: 'alappuzha', name: 'Alappuzha Backwaters', icon: 'B', x: -34, z: -13, district: 'Alappuzha', kind: 'landmark' },
+  { id: 'kuttanad', name: 'Kuttanad Fields', icon: 'K', x: 7, z: -23, district: 'Kottayam', kind: 'landmark' },
+  { id: 'temple', name: 'Padmanabhaswamy Temple', icon: 'T', x: 13, z: -57, district: 'Thiruvananthapuram', kind: 'landmark' }
 ];
+const navigationPlaces = Object.freeze([
+  ...landmarks,
+  Object.freeze({ id: 'anugraha', name: 'Anugraha Stores', icon: 'S', x: -14.4, z: 10.7, kind: 'shop', district: 'Village' }),
+  Object.freeze({ id: 'malabar', name: 'Malabar Bakery', icon: 'B', x: 14.8, z: 41.2, kind: 'shop', district: 'Village' }),
+  Object.freeze({ id: 'town-bus', name: 'Town Junction Bus Stop', icon: '🚌', x: 11.7, z: 27.5, kind: 'bus', district: 'Village' }),
+  Object.freeze({ id: 'south-bus', name: 'South Bus Stop', icon: '🚌', x: -11.7, z: -50.5, kind: 'bus', district: 'Village' }),
+  Object.freeze({ id: 'village-rental', name: 'Village Rental Home', icon: 'H', x: -24, z: -30.8, kind: 'home', district: 'Village' }),
+  Object.freeze({ id: 'village-bench', name: 'Village Rest Bench', icon: 'R', x: -10, z: -10, kind: 'rest', district: 'Village' }),
+  Object.freeze({ id: 'fuel', name: 'Kerala Fuel Station', icon: 'F', x: 11, z: -12, kind: 'service', district: 'Village' }),
+  Object.freeze({ id: 'service', name: 'Village Service Garage', icon: 'G', x: -36, z: -15, kind: 'service', district: 'Village' }),
+  Object.freeze({ id: 'village-pond', name: 'Village Pond', icon: 'P', x: 39, z: -4, kind: 'view', district: 'Village' }),
+]);
 const taskCatalog = [
   { id: 'open-map', title: 'Open the Kerala map', target: 1, reward: 10 },
   { id: 'walk-50', title: 'Walk 50 metres', target: 50, reward: 25 },
@@ -2206,34 +2221,100 @@ function applyMapZoom(nextZoom = mapZoom) {
   if (mapZoomReset) mapZoomReset.textContent = mapZoom === 1 ? '1×' : `${mapZoom.toFixed(1)}×`;
 }
 
+function placeDistance(place, player = playerRef) {
+  if (!place || !player) return Infinity;
+  return Math.hypot(Number(place.x) - player.position.x, Number(place.z) - player.position.z);
+}
+
+function destinationDirection(place, player = playerRef) {
+  if (!place || !player) return '';
+  const dx = Number(place.x) - player.position.x;
+  const dz = Number(place.z) - player.position.z;
+  const degrees = (Math.atan2(dx, dz) * 180 / Math.PI + 360) % 360;
+  const labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  return labels[Math.round(degrees / 45) % 8];
+}
+
+function destinationBusSuggestion(place, player = playerRef) {
+  if (!place || !player || place.kind === 'bus') return '';
+  const town = navigationPlaces.find(item => item.id === 'town-bus');
+  const south = navigationPlaces.find(item => item.id === 'south-bus');
+  const playerTown = placeDistance(town, player);
+  const playerSouth = placeDistance(south, player);
+  const destinationTown = Math.hypot(place.x - town.x, place.z - town.z);
+  const destinationSouth = Math.hypot(place.x - south.x, place.z - south.z);
+  if (playerTown <= 20 && destinationSouth + 18 < destinationTown) return ' · Village Line can help';
+  if (playerSouth <= 20 && destinationTown + 18 < destinationSouth) return ' · Village Line can help';
+  return '';
+}
+
+function renderNearbyPlaces() {
+  if (!nearbyPlaces || !playerRef) return;
+  nearbyPlaces.replaceChildren();
+  const entries = navigationPlaces
+    .map(place => ({ place, distance: placeDistance(place) }))
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 6);
+  for (const { place, distance } of entries) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `nearby-place${selectedDestination?.id === place.id ? ' selected' : ''}`;
+    button.dataset.placeId = place.id;
+    const left = document.createElement('span');
+    const title = document.createElement('b');
+    title.textContent = place.name;
+    const detail = document.createElement('small');
+    detail.textContent = `${place.kind === 'landmark' ? place.district : place.kind.toUpperCase()} · ${destinationDirection(place)}`;
+    left.append(title, detail);
+    const distanceLabel = document.createElement('span');
+    distanceLabel.textContent = selectedDestination?.id === place.id ? `${Math.ceil(distance)} m · SET` : `${Math.ceil(distance)} m`;
+    button.append(left, distanceLabel);
+    button.addEventListener('click', () => setWaypoint(place));
+    nearbyPlaces.append(button);
+  }
+}
+
 function renderMapLandmarks() {
   const svgNamespace = 'http://www.w3.org/2000/svg';
   if (districtLabels) districtLabels.style.display = mapLabelsVisible ? 'block' : 'none';
   mapLayer.replaceChildren();
-  landmarks.forEach(landmark => {
-    const point = worldToKeralaMap(landmark.x, landmark.z);
+  navigationPlaces.forEach(place => {
+    const point = worldToKeralaMap(place.x, place.z);
     const marker = document.createElementNS(svgNamespace, 'g');
-    marker.setAttribute('class', 'landmark-marker');
+    const classes = ['landmark-marker'];
+    if (place.kind !== 'landmark') classes.push('poi-marker', place.kind);
+    if (selectedDestination?.id === place.id) classes.push('selected');
+    marker.setAttribute('class', classes.join(' '));
     marker.setAttribute('transform', `translate(${point.x} ${point.y})`);
-    marker.setAttribute('aria-label', landmark.name);
+    marker.setAttribute('aria-label', `Set destination: ${place.name}`);
     const pin = document.createElementNS(svgNamespace, 'circle');
-    pin.setAttribute('class', 'pin'); pin.setAttribute('r', '5.8');
+    pin.setAttribute('class', 'pin'); pin.setAttribute('r', place.kind === 'landmark' ? '5.8' : '4.6');
     const label = document.createElementNS(svgNamespace, 'text');
-    label.textContent = landmark.icon;
+    label.textContent = place.icon;
     const caption = document.createElementNS(svgNamespace, 'text');
-    caption.textContent = landmark.name.replace('Padmanabhaswamy ', '').replace('Mattancherry ', '');
-    caption.setAttribute('y', '11'); caption.setAttribute('font-size', '5.2'); caption.setAttribute('fill', '#fff'); caption.setAttribute('text-anchor', 'middle');
-    caption.style.display = mapLabelsVisible ? 'block' : 'none';
+    caption.textContent = place.name.replace('Padmanabhaswamy ', '').replace('Mattancherry ', '').replace('Village ', '');
+    caption.setAttribute('y', place.kind === 'landmark' ? '11' : '9.5');
+    caption.setAttribute('font-size', place.kind === 'landmark' ? '5.2' : '4.2');
+    caption.setAttribute('fill', '#fff');
+    caption.setAttribute('text-anchor', 'middle');
+    caption.style.display = mapLabelsVisible || selectedDestination?.id === place.id ? 'block' : 'none';
     marker.append(pin, label, caption);
-    marker.addEventListener('click', event => { event.stopPropagation(); setWaypoint(landmark); });
+    marker.addEventListener('click', event => { event.stopPropagation(); setWaypoint(place); });
     mapLayer.append(marker);
   });
+  renderNearbyPlaces();
 }
 
-function setWaypoint(landmark) {
-  selectedLandmark = landmark;
-  missionText.textContent = `Travel to ${landmark.name}`;
-  landmarkStatus.textContent = `${landmark.district} landmark selected`;
+function setWaypoint(place) {
+  if (!place || !Number.isFinite(Number(place.x)) || !Number.isFinite(Number(place.z))) return;
+  selectedDestination = place;
+  selectedLandmark = place.kind === 'landmark' ? place : null;
+  lifeLoopAction = 'map';
+  missionCard.dataset.lifeAction = 'map';
+  missionText.textContent = `Destination: ${place.name}`;
+  const distance = placeDistance(place);
+  landmarkStatus.textContent = `${destinationDirection(place)} · ${Math.ceil(distance)} m${destinationBusSuggestion(place)}`;
+  renderMapLandmarks();
   if (playerRef) updateMapPlayer(playerRef);
 }
 
@@ -2271,26 +2352,43 @@ function updateMapPlayer(player) {
     }
     return;
   }
-  if (selectedLandmark) {
-    const activeLandmark = selectedLandmark;
-    const target = worldToKeralaMap(activeLandmark.x, activeLandmark.z);
+  if (selectedDestination) {
+    const destination = selectedDestination;
+    const target = worldToKeralaMap(destination.x, destination.z);
     mapRoute.setAttribute('x1', point.x); mapRoute.setAttribute('y1', point.y);
     mapRoute.setAttribute('x2', target.x); mapRoute.setAttribute('y2', target.y);
     mapRoute.hidden = false;
-    const distance = Math.hypot(activeLandmark.x - player.position.x, activeLandmark.z - player.position.z);
-    if (distance < 5.2) {
-      markLandmarkVisited(activeLandmark);
+    const distance = placeDistance(destination, player);
+    const direction = destinationDirection(destination, player);
+    const arrivalRadius = destination.kind === 'landmark' ? 5.2 : 4.6;
+    if (distance < arrivalRadius) {
+      if (destination.kind === 'landmark') markLandmarkVisited(destination);
+      selectedDestination = null;
       selectedLandmark = null;
-      missionText.textContent = `Visited ${activeLandmark.name}`;
-      landmarkStatus.textContent = 'Landmark reward collected · choose another place';
+      missionText.textContent = `Arrived: ${destination.name}`;
+      landmarkStatus.textContent = destination.kind === 'landmark'
+        ? 'Landmark reached · reward progress updated'
+        : 'Destination reached · nearby interaction ready';
       mapRoute.hidden = true;
-      mapStatus.textContent = `${activeLandmark.name} · visited`;
+      mapStatus.textContent = `${destination.name} · arrived`;
+      renderMapLandmarks();
+      showToast(`Arrived at ${destination.name}`);
     } else {
-      mapStatus.textContent = `${activeLandmark.name} · ${Math.ceil(distance)} m`;
+      missionText.textContent = `Destination: ${destination.name}`;
+      landmarkStatus.textContent = `${direction} · ${Math.ceil(distance)} m${destinationBusSuggestion(destination, player)}`;
+      mapStatus.textContent = `${destination.name} · ${direction} · ${Math.ceil(distance)} m`;
+      if (minimap?.classList.contains('open') && performance.now() - lastNearbyPlacesRenderAt > 500) {
+        lastNearbyPlacesRenderAt = performance.now();
+        renderNearbyPlaces();
+      }
     }
   } else {
     mapRoute.hidden = true;
     mapStatus.textContent = `${profile?.district || 'Kerala'} · You`;
+    if (minimap?.classList.contains('open') && performance.now() - lastNearbyPlacesRenderAt > 500) {
+      lastNearbyPlacesRenderAt = performance.now();
+      renderNearbyPlaces();
+    }
   }
 }
 
@@ -2380,7 +2478,7 @@ function wireInterface() {
   mapOpen.addEventListener('click', () => {
     const opening = !minimap.classList.contains('open');
     setOpenPanel(opening ? 'map' : null);
-    if (opening) requestAnimationFrame(() => applyMapZoom(mapZoom));
+    if (opening) requestAnimationFrame(() => { renderMapLandmarks(); applyMapZoom(mapZoom); });
     recordOnboardingAction('map');
   });
   mapClose.addEventListener('click', () => setOpenPanel());
@@ -2562,6 +2660,8 @@ try {
     walkingStuckSeconds = 0;
     busTravelStatus = null;
     selectedLandmark = null;
+    selectedDestination = null;
+    renderMapLandmarks();
     updateMapPlayer(player);
     updateWorldInteract();
     updateLifeLoopMission();
