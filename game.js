@@ -1313,6 +1313,11 @@ function npcConversationReply(villager) {
       'Evening time—I am going back home now.',
       'See you tomorrow. I am on my way home.',
     ],
+    'Event Guest': [
+      'The community event is active—come join us.',
+      'A few of us came over for the village event.',
+      'It is nice seeing the village gather together.',
+    ],
     Local: [
       'Nice to meet you. Enjoy the village.',
       'Have a good walk around Kerala Play.',
@@ -3934,8 +3939,32 @@ function updateVillagers(time) {
     const hour = Number(worldWeatherState.hour ?? 12);
     const night = hour >= 20 || hour < 5.25;
     const lateEvening = hour >= 18.5 || hour < 6.0;
-    const dailyRoutine = npcDailyRoutine(data, hour);
-    const behavior = dailyRoutine?.behavior || data.behavior;
+    let dailyRoutine = npcDailyRoutine(data, hour);
+    let behavior = dailyRoutine?.behavior || data.behavior;
+    const communityEvent = activeCommunityEvent();
+    if (communityEvent?.target && dailyRoutine && !dailyRoutine.hidden) {
+      const baseX = Number(dailyRoutine.toX ?? data.startX);
+      const baseZ = Number(dailyRoutine.toZ ?? data.startZ);
+      const eventDistance = Math.hypot(baseX - Number(communityEvent.target.x), baseZ - Number(communityEvent.target.z));
+      const joinsEvent = eventDistance <= 18 && ((Number(data.npcIndex || 0) + Number(communityEvent.slot || 0)) % 3 === 0);
+      if (joinsEvent) {
+        const elapsed = Math.max(0, Date.now() - Number(communityEvent.startsAt || Date.now()));
+        const blend = THREE.MathUtils.smoothstep(Math.min(1, elapsed / 30000), 0, 1);
+        const offset = ((Number(data.npcIndex || 0) % 3) - 1) * 1.15;
+        dailyRoutine = {
+          ...dailyRoutine,
+          transitioning: false,
+          toX: THREE.MathUtils.lerp(baseX, Number(communityEvent.target.x) + offset, blend),
+          toZ: THREE.MathUtils.lerp(baseZ, Number(communityEvent.target.z) + 2.2, blend),
+          targetX: Number(communityEvent.target.x),
+          targetZ: Number(communityEvent.target.z),
+          behavior: 'social',
+          role: 'Event Guest',
+          stageIndex: `event-${communityEvent.id}`,
+        };
+        behavior = 'social';
+      }
+    }
     if (dailyRoutine) applyNpcRoutineRole(villager, dailyRoutine.role, dailyRoutine.stageIndex);
     const hiddenByRoutine = dailyRoutine?.hidden || (data.nightHide && night && !data.nightActive);
     villager.visible = !hiddenByRoutine;
