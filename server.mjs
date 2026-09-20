@@ -1064,6 +1064,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return {
       reputation: { value, tier: localReputationTier(value), met: relationships.length, totalNpcs: NPC_RELATIONSHIP_COUNT },
       relationships,
+      activeFavor: npcFavorSummary(user),
     };
   }
 
@@ -1073,6 +1074,72 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (tier === 'Familiar') return `${name} remembers you from earlier visits.`;
     if (tier === 'Acquaintance') return `${name} recognizes you now.`;
     return `You have met ${name}.`;
+  }
+
+  function npcFavorDefinition(user, identity) {
+    const state = jobStateFor(user);
+    const offset = Math.max(0, Number(state.npcFavors.completed || 0));
+    const spec = NPC_FAVOR_TARGETS[(identity.index + offset) % NPC_FAVOR_TARGETS.length];
+    const target = PUBLIC_RIDE_DESTINATIONS[spec.id];
+    return {
+      id: `${identity.id}:${spec.id}`,
+      npcId: identity.id,
+      npcIndex: identity.index,
+      npcName: identity.name,
+      title: spec.title,
+      action: spec.action,
+      reward: spec.reward,
+      target: {
+        id: target.id,
+        label: target.label,
+        x: Number(target.x),
+        z: Number(target.z),
+        radius: 5.5,
+      },
+    };
+  }
+
+  function npcFavorOffer(user, identity, timestamp = now()) {
+    const state = jobStateFor(user);
+    const relation = state.npcRelations[identity.id];
+    const score = Number(relation?.score || 0);
+    if (score < NPC_FAVOR_MIN_SCORE || state.npcFavors.active || state.active) return null;
+    const cooldownUntil = Number(state.npcFavors.cooldowns[identity.id] || 0);
+    if (cooldownUntil > timestamp) return null;
+    const definition = npcFavorDefinition(user, identity);
+    return {
+      ...definition,
+      available: true,
+      relationshipRequired: NPC_FAVOR_MIN_SCORE,
+      expiresInMs: NPC_FAVOR_EXPIRY_MS,
+    };
+  }
+
+  function npcFavorSummary(user) {
+    const state = jobStateFor(user);
+    const active = state.npcFavors.active;
+    if (!active) return null;
+    const identity = npcRelationshipIdentity(active.npcId);
+    const target = PUBLIC_RIDE_DESTINATIONS[active.targetId];
+    if (!identity || !target) return null;
+    return {
+      id: active.id,
+      npcId: identity.id,
+      npcIndex: identity.index,
+      npcName: identity.name,
+      title: active.title,
+      action: active.action,
+      reward: Number(active.reward || 0),
+      startedAt: Number(active.startedAt || 0),
+      expiresAt: Number(active.expiresAt || 0),
+      target: {
+        id: target.id,
+        label: target.label,
+        x: Number(target.x),
+        z: Number(target.z),
+        radius: 5.5,
+      },
+    };
   }
 
   function worldHour(timestamp = now()) {
