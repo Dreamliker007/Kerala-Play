@@ -1454,6 +1454,11 @@ window.addEventListener('kerala-community-event-navigate', event => {
   });
 });
 
+window.addEventListener('kerala-community-event-pending-reset', () => {
+  communityEventPending = false;
+  updateWorldInteract();
+});
+
 window.addEventListener('kerala-community-event-completed', event => {
   const result = event.detail || null;
   communityEventsSnapshot = result.events || communityEventsSnapshot;
