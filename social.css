@@ -1,4 +1,15 @@
 .social-modal[hidden], .social-modal [hidden], #hud [hidden] { display:none !important; }
+#auth-modal { background:
+  radial-gradient(circle at 17% 20%, rgba(92,219,143,.16), transparent 27%),
+  radial-gradient(circle at 82% 78%, rgba(89,177,217,.14), transparent 30%),
+  rgba(3,17,20,.88);
+}
+.auth-card { position:relative; overflow:auto; border-color:rgba(126,211,166,.42); background:linear-gradient(145deg,rgba(16,62,59,.97),rgba(7,31,40,.98)); }
+.auth-card::before { content:''; position:absolute; inset:0 0 auto; height:3px; background:linear-gradient(90deg,#63dc93,#f0cd66,#69cce0); }
+.auth-brand-logo { display:block; width:min(270px,78%); height:auto; margin:0 auto 10px; filter:drop-shadow(0 12px 22px rgba(0,0,0,.22)); }
+.auth-card h1 { text-align:center; }
+.auth-card > .social-muted:first-of-type { margin-top:0; text-align:center; }
+
 .social-modal { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; padding:max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); background:rgba(3,17,20,.82); backdrop-filter:blur(9px); color:#edf9f0; touch-action:pan-y; overflow-y:auto; }
 .social-card { width:min(430px, 100%); max-height:calc(100dvh - 40px); overflow-y:auto; padding:26px; border:1px solid #52776a; border-radius:22px; background:linear-gradient(145deg,#163d3b,#0a212a); box-shadow:0 24px 70px #0008; touch-action:pan-y; }
 .social-card h1 { margin:8px 0 10px; font-size:26px; letter-spacing:-.7px; line-height:1.15; }
@@ -226,3 +237,10 @@
 .phone-alert-actions { display:flex; gap:6px; margin-top:6px; }
 .phone-alert-actions button { flex:1; border:0; border-radius:7px; padding:6px 7px; color:#fff; background:#2e6650; font:inherit; font-size:8px; font-weight:900; cursor:pointer; }
 .phone-alert-actions button.secondary { background:#344b54; }
+
+/* V100.8 login branding */
+@media (orientation:landscape) and (max-height:580px) {
+  .auth-brand-logo { width:min(210px,52vw); margin-bottom:4px; }
+  .auth-card h1 { margin:4px 0 5px; font-size:19px; }
+  .auth-card > .social-muted:first-of-type { margin:0; font-size:10px; }
+}
