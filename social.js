@@ -2123,7 +2123,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   window.addEventListener('kerala-community-event-participate', event => {
     const eventId = String(event.detail?.eventId || eventsSnapshot?.current?.id || '');
     if (!eventId) return;
-    run(() => participateCommunityEvent(eventId), eventsPanel?.classList.contains('open') ? eventsError : null);
+    run(() => participateCommunityEvent(eventId), eventsPanel?.classList.contains('open') ? eventsError : null)
+      .finally(() => window.dispatchEvent(new CustomEvent('kerala-community-event-pending-reset')));
   });
 
   window.addEventListener('kerala-community-events-refresh', () => {
