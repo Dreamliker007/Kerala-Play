@@ -11,6 +11,8 @@ function readPreferences() {
 export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) {
   const preferences = readPreferences();
   const quality = 'high';
+  const mobileLike = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
+  let performanceScale = mobileLike ? .90 : 1;
   let disposed = false;
   let lastHudMinute = -1;
   let lastHudWeather = '';
@@ -279,16 +281,32 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   function savePreferences() {
     try { localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ quality: 'high', sound: audioEnabled })); } catch { /* Storage can be unavailable in private mode. */ }
   }
-  function applyQuality() {
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  function applyPerformanceScale() {
+    const deviceRatio = devicePixelRatio || 1;
+    const mobileCap = Math.max(1.12, 1.78 * performanceScale);
+    renderer.setPixelRatio(Math.min(deviceRatio, mobileLike ? mobileCap : 2));
     renderer.setSize(innerWidth, innerHeight, false);
-    renderer.shadowMap.enabled = true;
+  }
+
+  function setPerformanceScale(nextScale = 1) {
+    if (disposed) return;
+    performanceScale = THREE.MathUtils.clamp(Number(nextScale) || 1, mobileLike ? .64 : .85, 1);
+    applyPerformanceScale();
+  }
+
+  function applyQuality() {
+    applyPerformanceScale();
+    // "High quality" remains the only user-facing preset. On mobile we keep all
+    // lighting/weather/material detail but use contact shadows instead of a full
+    // scene shadow map, which removes one of the largest GPU stalls.
+    renderer.shadowMap.enabled = !mobileLike;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.shadowMap.needsUpdate = true;
+    renderer.shadowMap.needsUpdate = !mobileLike;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.20;
 
-    const anisotropy = Math.max(1, Math.min(renderer.capabilities.getMaxAnisotropy?.() || 1, 8));
+    const anisotropyCap = mobileLike ? 4 : 8;
+    const anisotropy = Math.max(1, Math.min(renderer.capabilities.getMaxAnisotropy?.() || 1, anisotropyCap));
     scene.traverse(object => {
       if (!object.isMesh && !object.isSprite) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -309,17 +327,17 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     });
 
     if (sun) {
-      sun.castShadow = true;
-      if (sun.shadow && (sun.shadow.mapSize.x !== 2048 || sun.shadow.mapSize.y !== 2048)) {
+      sun.castShadow = !mobileLike;
+      if (!mobileLike && sun.shadow && (sun.shadow.mapSize.x !== 2048 || sun.shadow.mapSize.y !== 2048)) {
         sun.shadow.mapSize.set(2048, 2048);
         sun.shadow.map?.dispose?.();
         sun.shadow.map = null;
       }
     }
     stars.visible = true;
-    clouds.count = 30;
+    clouds.count = mobileLike ? 24 : 30;
     clouds.visible = true;
-    rainGeometry.setDrawRange(0, 620 * 2);
+    rainGeometry.setDrawRange(0, (mobileLike ? 520 : 620) * 2);
     rainMaterial.opacity = Math.min(rainMaterial.opacity, .72);
   }
   function setQuality() {
@@ -567,7 +585,15 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     }
     if (hemi && originalHemi) { hemi.intensity = originalHemi.intensity; hemi.color.copy(originalHemi.color); hemi.groundColor.copy(originalHemi.groundColor); }
   }
-  return { update, dispose, setQuality, applyQuality, getState: () => ({ ...currentWeather }), get quality() { return quality; } };
+  return {
+    update,
+    dispose,
+    setQuality,
+    applyQuality,
+    setPerformanceScale,
+    getState: () => ({ ...currentWeather }),
+    get quality() { return quality; },
+  };
 }
 
 function createSoundscape() {
