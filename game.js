@@ -4442,7 +4442,8 @@ function buildLandmarkWorld(scene) {
   addTeaHills(scene, 42, 26);
   addPalaceLandmark(scene, -26, 6);
   addBackwaterHouseboat(scene, -34, -13);
-  addPaddyFields(scene, 7, -23);
+  // Keep the junction open and readable; the paddy-row landmark here looked
+  // like a green road barrier from the driving view.
   addTempleLandmark(scene, 13, -57);
 }
 
