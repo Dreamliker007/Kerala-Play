@@ -1890,6 +1890,22 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     toast(result.rested ? `Rest complete · Energy +${result.restored}` : (result.message || 'Energy is already full'));
   }, walletError));
 
+  window.addEventListener('kerala-world-shop', event => run(async () => {
+    const shopId = String(event.detail?.shopId || '');
+    const itemId = String(event.detail?.itemId || '');
+    if (!shopId || !itemId) return;
+    const result = await api('/api/world/shop/purchase', { shopId, itemId });
+    if (result.wallet) renderWallet(result.wallet);
+    if (result.needs) renderNeeds(result.needs);
+    const effects = result.purchase?.needs || {};
+    const restored = [
+      effects.hunger ? `Hunger +${effects.hunger}` : '',
+      effects.thirst ? `Thirst +${effects.thirst}` : '',
+      effects.energy ? `Energy +${effects.energy}` : '',
+    ].filter(Boolean).join(' · ');
+    toast(`${result.shop?.label || 'Shop'} · ${result.purchase?.name || 'Purchase'} · ${formatCash(result.purchase?.price || 0)}${restored ? ` · ${restored}` : ''}`);
+  }, walletError));
+
 
   garageMarket?.addEventListener('click', event => {
     const buy = event.target.closest('button[data-market-buy]');
