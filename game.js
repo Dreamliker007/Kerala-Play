@@ -63,6 +63,12 @@ const dmForm = document.querySelector('#dm-form');
 const dmInput = document.querySelector('#dm-input');
 const assetNotice = document.querySelector('#asset-notice');
 const toast = document.querySelector('#toast');
+const onboarding = document.querySelector('#onboarding');
+const onboardingTitle = document.querySelector('#onboarding-title');
+const onboardingCopy = document.querySelector('#onboarding-copy');
+const onboardingProgress = document.querySelector('#onboarding-progress');
+const onboardingNext = document.querySelector('#onboarding-next');
+const onboardingSkip = document.querySelector('#onboarding-skip');
 document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
 const runtimeIsMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
 const villagers = [];
@@ -149,6 +155,19 @@ const labelWorldPosition = new THREE.Vector3();
 const pointerOrigin = new Map();
 let challengeRound = null;
 let challengeGeneration = 0;
+const ONBOARDING_STORAGE_KEY = 'kerala-play-onboarding-v1';
+const onboardingSteps = [
+  { title: 'Welcome to Kerala Play', copy: 'Learn the essentials in less than a minute, then the whole world is yours to explore.', button: 'Start guide' },
+  { title: 'Move around', copy: 'Use the left joystick (or WASD keys) and walk a few steps.', target: 'move' },
+  { title: 'Look around', copy: 'Swipe or drag on the right side of the screen to move the camera.', target: 'camera' },
+  { title: 'Run faster', copy: 'Hold the RUN button to move quickly. Release it when you want to stop.', target: 'run' },
+  { title: 'Meet Kerala locals', copy: 'Tap an NPC or player name in the world to view their profile.', target: 'npc' },
+  { title: 'Find your way', copy: 'Tap MAP at the top to see Kerala landmarks and your location.', target: 'map' },
+  { title: 'Your first goals', copy: 'Tap TASKS at the top. Completing tasks earns points and levels.', target: 'tasks' },
+  { title: 'You are ready!', copy: 'Explore Kerala, meet people and complete your first task. Have fun!', button: 'Start exploring' }
+];
+let onboardingStep = -1;
+let onboardingQueued = false;
 const districtStarts = {
   Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
 };
@@ -1445,19 +1464,74 @@ window.addEventListener('kerala-home-state', event => {
 
 window.addEventListener('error', event => {
   console.error(event.error || event.message);
-  // Resource/ResizeObserver/browser-level notices should not be presented as
-  // a fatal game error. Only surface real JavaScript exceptions.
-  if (!(event.error instanceof Error)) return;
-  showAssetNotice('A game error occurred. Reload if the controls stop responding.');
+  // Keep runtime diagnostics in the console without covering gameplay with a
+  // large error banner. Isolated optional effects already fail safely.
 });
 window.addEventListener('unhandledrejection', event => {
   console.error(event.reason);
-  showAssetNotice('An action could not finish. Please try again.');
 });
 
 function newProgress() {
   return { xp: 0, level: 1, walkMeters: 0, visitedLandmarkIds: [], completedTaskIds: [], followingIds: [] };
 }
+
+function onboardingCompleteStored() {
+  try { return localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'complete'; }
+  catch { return false; }
+}
+
+function renderOnboarding() {
+  const step = onboardingSteps[onboardingStep];
+  if (!step) return;
+  onboardingTitle.textContent = step.title;
+  onboardingCopy.textContent = step.copy;
+  onboardingProgress.replaceChildren(...onboardingSteps.map((_, index) => {
+    const dot = document.createElement('i');
+    if (index <= onboardingStep) dot.className = 'active';
+    return dot;
+  }));
+  onboardingNext.hidden = !step.button;
+  onboardingNext.textContent = step.button || '';
+  onboarding.hidden = false;
+  document.body.classList.add('onboarding-actions');
+}
+
+function finishOnboarding(skipped = false) {
+  if (onboardingStep < 0) return;
+  onboardingStep = -1;
+  onboardingQueued = false;
+  onboarding.hidden = true;
+  document.body.classList.remove('onboarding-actions');
+  try { localStorage.setItem(ONBOARDING_STORAGE_KEY, 'complete'); } catch { /* Private browsing can still use the guide once. */ }
+  if (!skipped) showToast('Starter guide complete · Kerala is yours to explore!');
+}
+
+function advanceOnboarding() {
+  if (onboardingStep < 0) return;
+  if (onboardingStep >= onboardingSteps.length - 1) { finishOnboarding(); return; }
+  onboardingStep += 1;
+  renderOnboarding();
+}
+
+function recordOnboardingAction(action) {
+  if (onboardingStep < 0 || onboardingSteps[onboardingStep]?.target !== action) return;
+  advanceOnboarding();
+}
+
+function maybeStartOnboarding() {
+  onboardingQueued = false;
+  if (!profile || !playerRef || onboardingStep >= 0 || onboardingCompleteStored()) return;
+  if (document.querySelector('[aria-modal="true"]:not([hidden])')) {
+    onboardingQueued = true;
+    setTimeout(maybeStartOnboarding, 700);
+    return;
+  }
+  onboardingStep = 0;
+  renderOnboarding();
+}
+
+onboardingNext.addEventListener('click', advanceOnboarding);
+onboardingSkip.addEventListener('click', () => finishOnboarding(true));
 
 function acceptUser(user) {
   const previous = profile;
@@ -1485,7 +1559,13 @@ function acceptUser(user) {
     challengePlay.disabled = false;
     document.querySelector('#coconut-keys')?.replaceChildren();
     challengeResult.textContent = '';
-  } else if ((user.followers || 0) + (user.following || 0) > 0) finishTask('social');
+  } else {
+    if ((user.followers || 0) + (user.following || 0) > 0) finishTask('social');
+    if (!onboardingQueued) {
+      onboardingQueued = true;
+      setTimeout(maybeStartOnboarding, 450);
+    }
+  }
 }
 
 
@@ -1602,6 +1682,7 @@ function updateNameLabel(object, name, id) {
 }
 
 function inspectAvatar(object) {
+  recordOnboardingAction('npc');
   if (object.userData.npc) {
     const panel = document.querySelector('#npc-profile');
     panel.querySelector('h2').textContent = object.userData.name;
@@ -1940,13 +2021,13 @@ async function answerCoconut(value, generation) {
 
 function wireInterface() {
   updateProfileHud(); updateProgressHud(); renderTasks(); renderMapLandmarks(); setOpenPanel();
-  mapOpen.addEventListener('click', () => setOpenPanel(minimap.classList.contains('open') ? null : 'map'));
+  mapOpen.addEventListener('click', () => { setOpenPanel(minimap.classList.contains('open') ? null : 'map'); recordOnboardingAction('map'); });
   mapClose.addEventListener('click', () => setOpenPanel());
   mapLabelToggle.addEventListener('click', () => {
     mapLabelsVisible = !mapLabelsVisible;
     mapLabelToggle.textContent = mapLabelsVisible ? 'Labels on' : 'Labels'; renderMapLandmarks();
   });
-  taskToggle.addEventListener('click', () => setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'));
+  taskToggle.addEventListener('click', () => { setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'); recordOnboardingAction('tasks'); });
   fullscreenToggle?.addEventListener('click', async () => {
     try {
       if (!document.fullscreenElement) {
@@ -2022,6 +2103,10 @@ try {
 
   scene.add(player);
   playerRef = player;
+  if (profile && !onboardingQueued) {
+    onboardingQueued = true;
+    setTimeout(maybeStartOnboarding, 450);
+  }
   buildWorld(scene);
   buildLandmarkWorld(scene);
   buildPlayer(player);
@@ -2128,8 +2213,11 @@ try {
   });
   cameraZone.addEventListener('pointermove', event => {
     if (event.pointerId !== lookPointerId) return;
-    cameraYaw -= (event.clientX - lastLookX) * .009;
-    cameraPitch = THREE.MathUtils.clamp(cameraPitch + (event.clientY - lastLookY) * .006, .12, .64);
+    const lookDeltaX = event.clientX - lastLookX;
+    const lookDeltaY = event.clientY - lastLookY;
+    cameraYaw -= lookDeltaX * .009;
+    cameraPitch = THREE.MathUtils.clamp(cameraPitch + lookDeltaY * .006, .12, .64);
+    if (Math.hypot(lookDeltaX, lookDeltaY) > 4) recordOnboardingAction('camera');
     lastLookX = event.clientX;
     lastLookY = event.clientY;
   });
@@ -2140,8 +2228,10 @@ try {
 
   function setRun(value) {
     runHeld = !!value;
+    if (value && vehicleMode === 'walk') runCruiseArmed = true;
     if (!value) runCruiseArmed = false;
     runButton.classList.toggle('active', value);
+    if (value && vehicleMode === 'walk') recordOnboardingAction('run');
   }
   function clearRun(event) {
     if (!event || runPointerId === null || event.pointerId === runPointerId) {
@@ -2386,6 +2476,7 @@ try {
         const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
         addWalkProgress(movedDistance);
         if (movedDistance > .0005) {
+          if (movedDistance > .015) recordOnboardingAction('move');
           const actualX = player.position.x - beforeX;
           const actualZ = player.position.z - beforeZ;
           const desiredYaw = Math.atan2(actualX, actualZ);
