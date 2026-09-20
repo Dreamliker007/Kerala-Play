@@ -1713,9 +1713,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
 
       if (path === '/api/npc/favor/complete' && request.method === 'POST') {
         limited(`npc-favor-complete:${user.id}`, 12, 60000);
+        const body = await jsonBody(request);
         const state = jobStateFor(user);
         const activeFavor = state.npcFavors.active;
         requireValue(activeFavor, 409, 'No village favor is active.');
+        requireValue(typeof body.favorId === 'string' && body.favorId === activeFavor.id, 409, 'This village favor is no longer active.');
         const timestamp = now();
         requireValue(timestamp <= Number(activeFavor.expiresAt || 0), 409, 'This favor expired. Talk to the villager again later.');
         const identity = npcRelationshipIdentity(activeFavor.npcId);
