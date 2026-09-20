@@ -1830,7 +1830,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     await run(refreshNpcRelationships, peopleError);
     await run(refreshCommunityEvents, eventsError);
     if (notificationsTimer) clearInterval(notificationsTimer);
-    notificationsTimer = setInterval(() => { if (user) run(refreshNotifications, phoneError); }, 60000);
+    notificationsTimer = setInterval(() => {
+      if (!user) return;
+      run(refreshNotifications, phoneError);
+      run(refreshCommunityEvents, eventsPanel?.classList.contains('open') ? eventsError : null);
+    }, 30000);
   }
   function endSession(message = '') {
     sessionVersion++;
