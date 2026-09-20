@@ -2037,10 +2037,12 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     }
   }, peopleError));
 
-  window.addEventListener('kerala-npc-favor-complete', () => {
+  window.addEventListener('kerala-npc-favor-complete', event => {
     run(async () => {
       if (!user) return;
-      const result = await api('/api/npc/favor/complete', {});
+      const favorId = String(event.detail?.favorId || npcRelationshipsSnapshot?.activeFavor?.id || '');
+      if (!favorId) return;
+      const result = await api('/api/npc/favor/complete', { favorId });
       if (result.wallet) renderWallet(result.wallet);
       const relationships = Array.isArray(npcRelationshipsSnapshot?.relationships)
         ? npcRelationshipsSnapshot.relationships.filter(item => item.npcId !== result.relationship?.npcId)
