@@ -113,6 +113,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const phoneError = $('phone-error');
   let notificationsSnapshot = null;
   let notificationsTimer = null;
+  let npcRelationshipsSnapshot = null;
   const walletPanel = $('wallet-panel');
   const walletToggle = $('wallet-toggle');
   const walletClose = $('wallet-close');
@@ -666,6 +667,18 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (!user) return null;
     const summary = await api('/api/notifications');
     renderNotifications(summary);
+    return summary;
+  }
+
+  function syncNpcRelationships(summary) {
+    npcRelationshipsSnapshot = summary || null;
+    window.dispatchEvent(new CustomEvent('kerala-npc-relationships-sync', { detail: npcRelationshipsSnapshot }));
+  }
+
+  async function refreshNpcRelationships() {
+    if (!user) return null;
+    const summary = await api('/api/npc/relationships');
+    syncNpcRelationships(summary);
     return summary;
   }
 
@@ -1704,6 +1717,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     await run(refreshHome, homeError);
     await run(refreshBank, walletError);
     await run(refreshNotifications, phoneError);
+    await run(refreshNpcRelationships, peopleError);
     if (notificationsTimer) clearInterval(notificationsTimer);
     notificationsTimer = setInterval(() => { if (user) run(refreshNotifications, phoneError); }, 60000);
   }
@@ -1718,6 +1732,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     setUser(null); setConnection(false); onPlayers([]); onDisconnect();
     if (walletBalance) walletBalance.textContent = '₹0';
     notificationsSnapshot = null;
+    npcRelationshipsSnapshot = null;
+    window.dispatchEvent(new CustomEvent('kerala-npc-relationships-sync', { detail: null }));
     phoneNotifications?.replaceChildren();
     if (phoneBadge) { phoneBadge.hidden = true; phoneBadge.textContent = '0'; }
     if (phoneSummaryText) phoneSummaryText.textContent = 'No unread alerts';
@@ -1980,6 +1996,24 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       toast(`${result.ride.serviceLabel || 'Ride'} · arrived at ${result.ride.to?.label || 'destination'} · fare ${formatCash(result.ride.fare || 0)}`, 4200);
     }
   });
+
+  window.addEventListener('kerala-npc-interact', event => run(async () => {
+    if (!user) return;
+    const npcId = String(event.detail?.npcId || '');
+    if (!npcId) return;
+    const result = await api('/api/npc/interact', { npcId });
+    if (result.relationship) {
+      const others = Array.isArray(npcRelationshipsSnapshot?.relationships)
+        ? npcRelationshipsSnapshot.relationships.filter(item => item.npcId !== result.relationship.npcId)
+        : [];
+      syncNpcRelationships({
+        ...(npcRelationshipsSnapshot || {}),
+        reputation: result.reputation || npcRelationshipsSnapshot?.reputation || null,
+        relationships: [...others, result.relationship],
+      });
+      window.dispatchEvent(new CustomEvent('kerala-npc-relationship-result', { detail: result }));
+    }
+  }, peopleError));
 
   worldShopClose?.addEventListener('click', () => {
     worldShopPanel?.classList.remove('open');
