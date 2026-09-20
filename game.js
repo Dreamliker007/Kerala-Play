@@ -3780,7 +3780,7 @@ function updateVillagers(time) {
     if (behavior === 'task') {
       villager.position.set(dailyRoutine?.toX ?? data.startX, 0, dailyRoutine?.toZ ?? data.startZ);
       const sheltered = applyRainShelter();
-      villager.rotation.y = Number(dailyRoutine?.facing ?? data.facing || 0);
+      villager.rotation.y = Number(dailyRoutine?.facing ?? data.facing ?? 0);
       animateHuman(human, time * .55 + data.offset, 0);
       const workBeat = (Math.sin(time * (lateEvening ? .58 : .95) + data.offset) + 1) * .5 * (sheltered ? .68 : 1);
       if (parts.rightArm) parts.rightArm.rotation.x = -.22 - workBeat * .46;
@@ -3793,7 +3793,7 @@ function updateVillagers(time) {
     if (behavior === 'phone') {
       villager.position.set(dailyRoutine?.toX ?? data.startX, 0, dailyRoutine?.toZ ?? data.startZ);
       applyRainShelter();
-      villager.rotation.y = Number(dailyRoutine?.facing ?? data.facing || 0);
+      villager.rotation.y = Number(dailyRoutine?.facing ?? data.facing ?? 0);
       animateHuman(human, time * .45 + data.offset, 0);
       if (parts.rightArm) parts.rightArm.rotation.x = -1.0;
       if (parts.rightElbow) parts.rightElbow.rotation.x = 1.18;
@@ -3808,7 +3808,7 @@ function updateVillagers(time) {
     if (behavior === 'idle') {
       villager.position.set(dailyRoutine?.toX ?? data.startX, 0, dailyRoutine?.toZ ?? data.startZ);
       applyRainShelter();
-      villager.rotation.y = Number(dailyRoutine?.facing ?? data.facing || 0);
+      villager.rotation.y = Number(dailyRoutine?.facing ?? data.facing ?? 0);
       animateHuman(human, time * .55 + data.offset, 0);
       if (parts.head) parts.head.rotation.y = Math.sin(time * .42 + data.offset) * .11;
       if (parts.torso) parts.torso.rotation.y = Math.sin(time * .28 + data.offset) * .018;
