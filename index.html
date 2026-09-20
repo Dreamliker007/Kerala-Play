@@ -475,8 +475,27 @@
       #world-interact { right:calc(env(safe-area-inset-right) + 14px); bottom:calc(env(safe-area-inset-bottom) + 102px); }
       #vehicle-action { right:calc(env(safe-area-inset-right) + 14px); bottom:calc(env(safe-area-inset-bottom) + 138px); }
     }
-    /* V72 minimal always-on HUD */
+    /* V100.4 tap-to-reveal HUD: keep the world view clean until the menu is opened. */
     #progress-chip, #mission-card { display:none!important; }
+
+    #profile-chip, #online-chip, #needs-hud, #hint, #camera-note {
+      transition:opacity .16s ease, visibility .16s ease;
+    }
+    body.hud-menu-collapsed #profile-chip,
+    body.hud-menu-collapsed #online-chip,
+    body.hud-menu-collapsed #needs-hud,
+    body.hud-menu-collapsed #hint,
+    body.hud-menu-collapsed #camera-note {
+      opacity:0!important;
+      visibility:hidden!important;
+      pointer-events:none!important;
+    }
+    body.hud-menu-collapsed #brand {
+      opacity:.78;
+    }
+    body:not(.hud-menu-collapsed) #brand {
+      opacity:.94;
+    }
 
     #brand {
       top:calc(env(safe-area-inset-top) + 8px);
@@ -643,7 +662,7 @@
 </head>
 <body>
   <div id="hud" aria-label="Game controls">
-    <div id="brand">Kerala Play <span style="font-size:10px;opacity:.68">V100.3</span></div>
+    <div id="brand">Kerala Play <span style="font-size:10px;opacity:.68">V100.4</span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
