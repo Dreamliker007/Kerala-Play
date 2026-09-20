@@ -125,6 +125,8 @@ let trafficSnapshot = null;
 let needsSnapshot = null;
 let homeSnapshot = null;
 let npcRelationshipSnapshot = null;
+let activeNpcFavor = null;
+let npcFavorCompletionPending = false;
 let trafficCheckpointVisual = null;
 let junctionSignalVisual = null;
 const pedestrianCrossingZ = -14.3;
@@ -1243,7 +1245,8 @@ function updateNpcLabel(villager) {
   const relationship = data.relationship || npcRelationshipForId(data.relationshipId);
   if (relationship) data.relationship = relationship;
   const tier = relationship?.tier && relationship.tier !== 'Stranger' ? ` · ${relationship.tier}` : '';
-  updateNameLabel(villager, `${data.name} · ${data.role || 'Local'}${tier}`, data.relationshipId || `npc-${data.npcIndex}`);
+  const favor = data.favorOffer && !activeNpcFavor ? ' · FAVOR' : '';
+  updateNameLabel(villager, `${data.name} · ${data.role || 'Local'}${tier}${favor}`, data.relationshipId || `npc-${data.npcIndex}`);
 }
 
 function npcConversationReply(villager) {
@@ -1372,14 +1375,48 @@ function interactWithNpc(index) {
   }));
 }
 
+function applyNpcFavorState(favor) {
+  activeNpcFavor = favor || null;
+  npcFavorCompletionPending = false;
+  if (activeNpcFavor) {
+    for (const villager of villagers) {
+      if (villager?.userData?.npc) {
+        villager.userData.favorOffer = null;
+        updateNpcLabel(villager);
+      }
+    }
+    missionText.textContent = `Favor for ${activeNpcFavor.npcName}: ${activeNpcFavor.action || activeNpcFavor.title}`;
+    landmarkStatus.textContent = `${activeNpcFavor.target?.label || 'Destination'} · community favor`;
+  }
+  updateWorldInteract();
+  renderMapLandmarks();
+  if (playerRef) updateMapPlayer(playerRef);
+}
+
 window.addEventListener('kerala-npc-relationships-sync', event => {
   npcRelationshipSnapshot = event.detail || null;
+  applyNpcFavorState(npcRelationshipSnapshot?.activeFavor || null);
   for (const villager of villagers) {
     const data = villager?.userData;
     if (!data?.npc) continue;
     data.relationship = npcRelationshipForId(data.relationshipId);
     updateNpcLabel(villager);
   }
+});
+
+window.addEventListener('kerala-npc-favor-offer', event => {
+  const offer = event.detail?.offer || null;
+  const npcId = String(event.detail?.npcId || offer?.npcId || '');
+  const villager = villagers.find(item => item?.userData?.relationshipId === npcId);
+  if (!villager) return;
+  villager.userData.favorOffer = offer;
+  updateNpcLabel(villager);
+  updateWorldInteract();
+  if (offer) showToast(`${villager.userData.name} has a small favor · tap HELP when ready`, 3600);
+});
+
+window.addEventListener('kerala-npc-favor-state', event => {
+  applyNpcFavorState(event.detail || null);
 });
 
 window.addEventListener('kerala-npc-relationship-result', event => {
@@ -2120,7 +2157,12 @@ function inspectAvatar(object) {
       : 'Stranger · talk to build familiarity';
     const reputation = npcRelationshipSnapshot?.reputation;
     const reputationText = reputation ? ` Local reputation: ${reputation.value}/100 · ${reputation.tier}.` : '';
-    panel.querySelector('p').textContent = activity + ' · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ` local. Relationship: ${relationshipText}.${reputationText} NPCs remember repeat conversations across sessions.`;
+    const favorText = activeNpcFavor?.npcId === object.userData.relationshipId
+      ? ` Active favor: ${activeNpcFavor.title} → ${activeNpcFavor.target?.label || 'destination'}.`
+      : object.userData.favorOffer
+        ? ` Favor available: ${object.userData.favorOffer.title} → ${object.userData.favorOffer.target?.label || 'destination'}.`
+        : '';
+    panel.querySelector('p').textContent = activity + ' · ' + (object.userData.gender === 'female' ? 'Female' : 'Male') + ` local. Relationship: ${relationshipText}.${reputationText}${favorText} NPCs remember repeat conversations across sessions.`;
     panel.hidden = false;
     panel.querySelector('button').focus();
   } else if (object.userData.playerId) social.openProfile(object.userData.playerId);
