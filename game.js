@@ -1387,6 +1387,8 @@ function applyNpcFavorState(favor) {
     }
     missionText.textContent = `Favor for ${activeNpcFavor.npcName}: ${activeNpcFavor.action || activeNpcFavor.title}`;
     landmarkStatus.textContent = `${activeNpcFavor.target?.label || 'Destination'} · community favor`;
+  } else {
+    updateLifeLoopMission();
   }
   updateWorldInteract();
   renderMapLandmarks();
@@ -1417,6 +1419,11 @@ window.addEventListener('kerala-npc-favor-offer', event => {
 
 window.addEventListener('kerala-npc-favor-state', event => {
   applyNpcFavorState(event.detail || null);
+});
+
+window.addEventListener('kerala-npc-favor-completion-reset', () => {
+  npcFavorCompletionPending = false;
+  updateWorldInteract();
 });
 
 window.addEventListener('kerala-npc-relationship-result', event => {
@@ -2542,6 +2549,23 @@ function updateMapPlayer(player) {
       landmarkStatus.textContent = 'Open JOBS to collect salary';
       mapStatus.textContent = `${activeJobMission.title} · salary ready`;
     }
+    return;
+  }
+  if (activeNpcFavor?.target) {
+    const targetData = activeNpcFavor.target;
+    const target = worldToKeralaMap(Number(targetData.x), Number(targetData.z));
+    mapRoute.setAttribute('x1', point.x); mapRoute.setAttribute('y1', point.y);
+    mapRoute.setAttribute('x2', target.x); mapRoute.setAttribute('y2', target.y);
+    mapRoute.hidden = false;
+    if (jobMapMarker) {
+      jobMapMarker.hidden = false;
+      jobMapMarker.setAttribute('transform', `translate(${target.x} ${target.y})`);
+    }
+    const distance = Math.hypot(Number(targetData.x) - player.position.x, Number(targetData.z) - player.position.z);
+    const remaining = Math.max(0, Math.ceil((Number(activeNpcFavor.expiresAt || 0) - Date.now()) / 1000));
+    missionText.textContent = `Favor for ${activeNpcFavor.npcName}: ${activeNpcFavor.action || activeNpcFavor.title}`;
+    landmarkStatus.textContent = `${targetData.label} · ${Math.ceil(distance)} m · ${Math.ceil(remaining / 60)} min left`;
+    mapStatus.textContent = `${activeNpcFavor.title} · ${targetData.label} · ${Math.ceil(distance)} m`;
     return;
   }
   if (selectedDestination) {
