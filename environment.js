@@ -232,7 +232,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   const settings = document.createElement('div');
   settings.id = 'world-settings';
   settings.setAttribute('aria-label', 'Game settings');
-  settings.innerHTML = '<div class="world-settings-head"><strong>Settings</strong><button type="button" id="world-settings-close" aria-label="Close settings">×</button></div><label class="world-setting-row"><span>World sound</span><button type="button" id="world-sound" aria-pressed="false">Off</button></label><div class="world-setting-row"><span>Graphics</span><strong id="world-quality-fixed">HIGH QUALITY</strong></div><output id="world-audio-status" role="status"></output>';
+  settings.innerHTML = '<div class="world-settings-head"><strong>Settings</strong><button type="button" id="world-settings-close" aria-label="Close settings">×</button></div><label class="world-setting-row"><span>World sound</span><button type="button" id="world-sound" aria-pressed="false">Off</button></label><div class="world-setting-row"><span>Graphics</span><strong id="world-quality-fixed">HIGH QUALITY</strong></div><button type="button" id="blocked-accounts" class="settings-fullscreen">Blocked accounts</button><output id="world-audio-status" role="status"></output>';
 
   const quickActions = document.querySelector('#quick-actions');
   const settingsToggle = document.createElement('button');
@@ -257,6 +257,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   const soundButton = settings.querySelector('#world-sound');
   const audioStatus = settings.querySelector('#world-audio-status');
   const settingsClose = settings.querySelector('#world-settings-close');
+  const blockedAccounts = settings.querySelector('#blocked-accounts');
 
   function setSettingsOpen(open) {
     const next = !!open;
@@ -265,6 +266,10 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   }
   settingsToggle.addEventListener('click', () => setSettingsOpen(!settings.classList.contains('open')));
   settingsClose.addEventListener('click', () => setSettingsOpen(false));
+  blockedAccounts.addEventListener('click', () => {
+    setSettingsOpen(false);
+    window.dispatchEvent(new CustomEvent('kerala-open-blocked'));
+  });
   settings.addEventListener('pointerdown', event => event.stopPropagation());
   document.addEventListener('keydown', event => { if (event.key === 'Escape') setSettingsOpen(false); });
 

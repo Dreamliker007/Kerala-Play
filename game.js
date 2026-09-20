@@ -168,6 +168,7 @@ const onboardingSteps = [
 ];
 let onboardingStep = -1;
 let onboardingQueued = false;
+let onboardingForceRequested = false;
 const districtStarts = {
   Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
 };
@@ -1524,17 +1525,28 @@ function recordOnboardingAction(action) {
   advanceOnboarding();
 }
 
-function maybeStartOnboarding() {
+function maybeStartOnboarding(force = onboardingForceRequested) {
   onboardingQueued = false;
-  if (!profile || !playerRef || onboardingStep >= 0 || onboardingCompleteStored()) return;
+  if (!profile || !playerRef || onboardingStep >= 0 || (!force && onboardingCompleteStored())) return;
   if (document.querySelector('[aria-modal="true"]:not([hidden])')) {
     onboardingQueued = true;
     setTimeout(maybeStartOnboarding, 700);
     return;
   }
+  onboardingForceRequested = false;
   onboardingStep = 0;
   renderOnboarding();
 }
+
+window.addEventListener('kerala-onboarding-start', () => {
+  // A new signup should get the guide even when an older browser state exists.
+  onboardingForceRequested = true;
+  try { localStorage.removeItem(onboardingStorageKey()); } catch { /* Continue without persistent storage. */ }
+  if (!onboardingQueued && onboardingStep < 0) {
+    onboardingQueued = true;
+    setTimeout(() => maybeStartOnboarding(true), 500);
+  }
+});
 
 onboardingNext.addEventListener('click', advanceOnboarding);
 onboardingSkip.addEventListener('click', () => finishOnboarding(true));
