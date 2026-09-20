@@ -209,7 +209,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!message) return null;
     const kind = ['world', 'weather', 'emergency', 'event'].includes(alert.kind) ? alert.kind : 'world';
     const severity = ['info', 'warning', 'critical', 'success'].includes(alert.severity) ? alert.severity : 'info';
-    const target = ['wallet', 'home', 'garage', 'jobs', 'people'].includes(alert.target) ? alert.target : '';
+    const target = ['wallet', 'home', 'garage', 'jobs', 'people', 'events'].includes(alert.target) ? alert.target : '';
     const startsAt = Number.isFinite(Number(alert.startsAt)) ? Math.max(0, Number(alert.startsAt)) : 0;
     const endsAt = Number.isFinite(Number(alert.endsAt)) ? Math.max(0, Number(alert.endsAt)) : 0;
     const districts = Array.isArray(alert.districts)
@@ -417,7 +417,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       title: String(title || 'Kerala Play'),
       message: String(message || ''),
       severity: ['info', 'warning', 'critical', 'success'].includes(severity) ? severity : 'info',
-      target: ['wallet', 'home', 'garage', 'jobs', 'people'].includes(target) ? target : '',
+      target: ['wallet', 'home', 'garage', 'jobs', 'people', 'events'].includes(target) ? target : '',
       createdAt: now(),
     };
     notifications.items.push(item);
@@ -546,6 +546,20 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         severity: alert.severity,
         target: alert.target,
         createdAt: alert.startsAt || timestamp,
+      });
+    }
+
+    const eventSummary = communityEventsSummary(user, timestamp);
+    const currentEvent = eventSummary.current;
+    if (currentEvent?.status === 'active' && !currentEvent.completed) {
+      items.push({
+        id: `reminder:event:${currentEvent.id}`,
+        kind: 'event',
+        title: `${currentEvent.icon} ${currentEvent.title}`,
+        message: `${currentEvent.target.label} · ${Math.max(1, Math.ceil(currentEvent.secondsRemaining / 60))} min left · ₹${currentEvent.cashReward} + ${currentEvent.pointsReward} points.`,
+        severity: 'info',
+        target: 'events',
+        createdAt: Number(currentEvent.startsAt || timestamp),
       });
     }
 
