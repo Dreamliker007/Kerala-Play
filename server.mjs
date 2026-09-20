@@ -1706,6 +1706,68 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           receivedTransactionId: received.id,
         }); return;
       }
+      if (path === '/api/community/events' && request.method === 'GET') {
+        send(response, 200, communityEventsSummary(user)); return;
+      }
+      if (path === '/api/community/events/participate' && request.method === 'POST') {
+        limited(`community-event:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const timestamp = now();
+        const summary = communityEventsSummary(user, timestamp);
+        const event = summary.current;
+        requireValue(event?.status === 'active', 409, 'This community event is not active right now.');
+        requireValue(typeof body.eventId === 'string' && body.eventId === event.id, 409, 'This community event has changed. Refresh the notice board.');
+        const state = jobStateFor(user);
+        requireValue(!state.communityEvents.completedIds.includes(event.id), 409, 'You already participated in this event.');
+        requireValue(!state.active, 409, 'Finish your active job before joining a community event.');
+        requireValue(!state.npcFavors.active, 409, 'Finish your current village favor before joining a community event.');
+        const personal = state.garage.activeVehicleId
+          ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
+          : null;
+        requireValue(!personal?.entered, 409, 'Exit your personal vehicle before participating.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before participating.');
+        requireValue(
+          Math.hypot(Number(event.target.x) - live.x, Number(event.target.z) - live.z) <= Number(event.target.radius || 6) + .4,
+          409,
+          `Move closer to ${event.target.label} to join this community event.`
+        );
+
+        const cashReward = Math.max(0, Math.min(200, Math.floor(Number(event.cashReward || 0))));
+        const pointsReward = Math.max(0, Math.min(50, Math.floor(Number(event.pointsReward || 0))));
+        const transaction = walletTransaction(user, cashReward, 'community_event', event.title);
+        user.points = Math.max(0, Number(user.points || 0) + pointsReward);
+        state.communityEvents.completedIds.push(event.id);
+        state.communityEvents.completedIds = state.communityEvents.completedIds.slice(-COMMUNITY_EVENT_HISTORY_LIMIT);
+        state.communityEvents.contributions = Math.max(0, Number(state.communityEvents.contributions || 0)) + 1;
+        dirty = true;
+        addNotification(user, {
+          sourceKey: `community:${event.id}`,
+          kind: 'event',
+          title: 'Community event completed',
+          message: `${event.title} · ₹${cashReward} + ${pointsReward} points received.`,
+          severity: 'success',
+          target: 'events',
+        });
+        await persist();
+        profileChanged(user);
+        const updated = communityEventsSummary(user, timestamp);
+        send(response, 200, {
+          completed: {
+            id: event.id,
+            title: event.title,
+            cashReward,
+            pointsReward,
+            target: event.target,
+          },
+          wallet: walletSummary(user),
+          user: publicUser(user),
+          reputation: updated.reputation,
+          events: updated,
+          transaction,
+        }); return;
+      }
+
       if (path === '/api/npc/relationships' && request.method === 'GET') {
         send(response, 200, npcRelationshipSummary(user)); return;
       }
