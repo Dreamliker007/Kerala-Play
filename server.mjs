@@ -1074,11 +1074,82 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       });
     }
     relationships.sort((a, b) => b.score - a.score || a.npcIndex - b.npcIndex);
-    const value = Math.max(0, Math.min(100, Math.round((breadthScore / (NPC_RELATIONSHIP_COUNT * 20)) * 100)));
+    const relationshipValue = Math.max(0, Math.min(100, Math.round((breadthScore / (NPC_RELATIONSHIP_COUNT * 20)) * 100)));
+    const communityContributions = Math.max(0, Number(state.communityEvents?.contributions || 0));
+    const communityBonus = Math.min(20, communityContributions * 2);
+    const value = Math.max(0, Math.min(100, relationshipValue + communityBonus));
     return {
-      reputation: { value, tier: localReputationTier(value), met: relationships.length, totalNpcs: NPC_RELATIONSHIP_COUNT },
+      reputation: {
+        value,
+        tier: localReputationTier(value),
+        met: relationships.length,
+        totalNpcs: NPC_RELATIONSHIP_COUNT,
+        relationshipValue,
+        communityContributions,
+        communityBonus,
+      },
       relationships,
       activeFavor: npcFavorSummary(user),
+    };
+  }
+
+  function communityEventForSlot(slot) {
+    const numericSlot = Math.max(0, Math.floor(Number(slot) || 0));
+    const spec = COMMUNITY_EVENT_CATALOG[numericSlot % COMMUNITY_EVENT_CATALOG.length];
+    const target = PUBLIC_RIDE_DESTINATIONS[spec.targetId];
+    const startsAt = numericSlot * COMMUNITY_EVENT_INTERVAL_MS;
+    return {
+      id: `community:${numericSlot}:${spec.key}`,
+      slot: numericSlot,
+      key: spec.key,
+      icon: spec.icon,
+      title: spec.title,
+      description: spec.description,
+      action: spec.action,
+      startsAt,
+      endsAt: startsAt + COMMUNITY_EVENT_ACTIVE_MS,
+      cashReward: spec.cash,
+      pointsReward: spec.points,
+      target: {
+        id: target.id,
+        label: target.label,
+        x: Number(target.x),
+        z: Number(target.z),
+        radius: 6,
+      },
+    };
+  }
+
+  function communityEventsSummary(user, timestamp = now()) {
+    const state = jobStateFor(user);
+    const slot = Math.floor(timestamp / COMMUNITY_EVENT_INTERVAL_MS);
+    const current = communityEventForSlot(slot);
+    const previous = slot > 0 ? communityEventForSlot(slot - 1) : null;
+    const upcoming = communityEventForSlot(slot + 1);
+    const completed = new Set(state.communityEvents.completedIds);
+    const activeNow = timestamp >= current.startsAt && timestamp < current.endsAt;
+    const currentView = {
+      ...current,
+      status: activeNow ? (completed.has(current.id) ? 'completed' : 'active') : 'ended',
+      completed: completed.has(current.id),
+      secondsRemaining: activeNow ? Math.max(0, Math.ceil((current.endsAt - timestamp) / 1000)) : 0,
+    };
+    const recent = previous ? [{
+      ...previous,
+      status: completed.has(previous.id) ? 'completed' : 'ended',
+      completed: completed.has(previous.id),
+    }] : [];
+    return {
+      serverNow: timestamp,
+      current: currentView,
+      upcoming: {
+        ...upcoming,
+        status: 'upcoming',
+        secondsUntilStart: Math.max(0, Math.ceil((upcoming.startsAt - timestamp) / 1000)),
+      },
+      recent,
+      contributions: Number(state.communityEvents.contributions || 0),
+      reputation: npcRelationshipSummary(user).reputation,
     };
   }
 
