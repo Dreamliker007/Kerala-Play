@@ -167,24 +167,42 @@ export function createSupabaseStore({
   let worldStateWarningShown = false;
 
   async function request(path, { method = 'GET', body } = {}) {
-    const response = await fetchImpl(`${baseUrl}/rest/v1/${path}`, {
-      method,
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-        Accept: 'application/json',
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const text = await response.text();
-    if (!response.ok) {
-      let details = text;
-      try { details = JSON.parse(text)?.message || text; } catch { /* keep response text */ }
-      throw new Error(`Supabase request failed (${response.status}): ${details || response.statusText}`);
+    const attempts = 4;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      let response;
+      try {
+        response = await fetchImpl(`${baseUrl}/rest/v1/${path}`, {
+          method,
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            Accept: 'application/json',
+            ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+      } catch (error) {
+        if (attempt + 1 >= attempts) throw error;
+        await new Promise(resolve => setTimeout(resolve, 750 * (attempt + 1)));
+        continue;
+      }
+
+      const text = await response.text();
+      if (!response.ok) {
+        let details = text;
+        try { details = JSON.parse(text)?.message || text; } catch { /* keep response text */ }
+        const transientClockSkew = response.status === 401 && /JWT issued at future/i.test(String(details));
+        const transientStatus = [429, 502, 503, 504].includes(response.status);
+        if ((transientClockSkew || transientStatus) && attempt + 1 < attempts) {
+          await new Promise(resolve => setTimeout(resolve, 750 * (attempt + 1)));
+          continue;
+        }
+        throw new Error(`Supabase request failed (${response.status}): ${details || response.statusText}`);
+      }
+      if (!text) return null;
+      try { return JSON.parse(text); } catch { return text; }
     }
-    if (!text) return null;
-    try { return JSON.parse(text); } catch { return text; }
+    throw new Error('Supabase request failed after retrying.');
   }
 
   async function optionalWorldRequest(path, options) {
