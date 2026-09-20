@@ -571,6 +571,67 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
 }
 
 function createSoundscape() {
+  // Keep the opt-in ambience deliberately small. The previous procedural
+  // soundscape built a large buffer plus eight live filters in the tap event;
+  // that can stall some Android WebViews while the game is rendering.
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) throw new Error('Web Audio is unavailable');
+  const context = new AudioContext({ latencyHint: 'interactive' });
+  const master = context.createGain();
+  master.gain.value = .12;
+  master.connect(context.destination);
+  let closed = false;
+  let nextCue = 0;
+
+  function chirp(frequency, duration, volume, type = 'sine') {
+    if (closed || context.state !== 'running') return;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const now = context.currentTime;
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, now);
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(40, frequency * .78), now + duration);
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + .025);
+    gain.gain.exponentialRampToValueAtTime(.0001, now + duration);
+    oscillator.connect(gain).connect(master);
+    oscillator.start(now);
+    oscillator.stop(now + duration + .03);
+  }
+
+  function update({ daylight = 1, rain = 0, nearWater = false, moving = false, lightning = 0 }) {
+    if (closed || context.state !== 'running' || context.currentTime < nextCue) return;
+    if (lightning > .7) {
+      chirp(76, .42, .025, 'triangle');
+      nextCue = context.currentTime + 5;
+    } else if (rain > .35) {
+      // A soft rain cue, not a continuously running noisy audio graph.
+      chirp(340 + rain * 100, .12, .012, 'sine');
+      nextCue = context.currentTime + 4.5;
+    } else if (daylight > .35) {
+      chirp(1450 + Math.random() * 420, .11, .018, 'sine');
+      nextCue = context.currentTime + 5 + Math.random() * 3;
+    } else if (nearWater || moving) {
+      chirp(240, .16, .009, 'triangle');
+      nextCue = context.currentTime + 5;
+    } else {
+      nextCue = context.currentTime + 3;
+    }
+  }
+
+  async function resume() {
+    if (closed) return;
+    await context.resume();
+    if (context.state !== 'running') throw new Error('Audio awaits a user gesture');
+    nextCue = context.currentTime + .7;
+  }
+  async function suspend() { if (!closed && context.state !== 'closed') await context.suspend(); }
+  async function dispose() { if (!closed) { closed = true; master.disconnect(); await context.close().catch(() => {}); } }
+  return { update, resume, suspend, dispose };
+}
+
+/* Legacy full procedural soundscape retained below only for reference. */
+function createSoundscapeLegacy() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) throw new Error('Web Audio is unavailable');
   const context = new AudioContext();
