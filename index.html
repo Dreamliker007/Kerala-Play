@@ -46,6 +46,8 @@
     #mission-card strong { display:block; color:#f6d66b; margin-bottom:3px; font-size:12px; }
     #landmark-status { color:#d3ece1; font-size:11px; }
     #quick-actions { position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:14px; display:grid; gap:8px; pointer-events:auto; }
+    #hud-menu-toggle { position:absolute; z-index:6; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:48px; height:48px; border:1px solid rgba(255,255,255,.36); border-radius:14px; color:#fff; background:rgba(8,35,43,.84); box-shadow:0 4px 14px rgba(0,0,0,.2); font-size:20px; cursor:pointer; pointer-events:auto; }
+    body.hud-menu-collapsed #quick-actions { display:none; }
     .hud-icon { width:48px; height:48px; border:1px solid rgba(255,255,255,.36); border-radius:14px; color:#fff; background:rgba(8,35,43,.78); box-shadow:0 4px 14px rgba(0,0,0,.18); font-size:20px; cursor:pointer; touch-action:manipulation; }
     .hud-icon span { display:block; margin-top:-1px; font-size:8px; font-weight:900; letter-spacing:.4px; }
     .hud-icon[aria-expanded="true"] { background:rgba(38,133,91,.95); border-color:#b9ffe1; }
@@ -97,9 +99,14 @@
     #dm-input { min-width:0; flex:1; border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:8px; color:#fff; background:#163139; font:inherit; }
     #toast { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:50%; transform:translateX(-50%); max-width:260px; padding:8px 11px; border-radius:10px; color:#fff; background:rgba(21,105,69,.93); box-shadow:0 4px 17px rgba(0,0,0,.24); text-align:center; font-size:11px; font-weight:800; pointer-events:none; }
     #asset-notice { display:none; position:absolute; left:50%; top:calc(env(safe-area-inset-top) + 14px); transform:translateX(-50%); max-width:310px; padding:8px 10px; border-radius:9px; color:#fff7d7; background:rgba(93,60,10,.85); font-size:11px; text-align:center; }
-    #onboarding { position:fixed; inset:0; z-index:30; display:flex; justify-content:center; align-items:center; pointer-events:none; }
+    #onboarding { position:fixed; inset:0; z-index:30; pointer-events:none; }
     #onboarding[hidden] { display:none; }
-    .onboarding-card { width:min(380px, calc(100vw - 36px)); padding:17px 19px 15px; border:1px solid rgba(167,255,204,.42); border-radius:18px; color:#f7fff9; background:linear-gradient(145deg, rgba(12,51,53,.95), rgba(8,26,34,.96)); box-shadow:0 14px 42px rgba(0,0,0,.42); text-align:center; pointer-events:auto; }
+    .onboarding-card { position:absolute; left:max(16px, env(safe-area-inset-left)); bottom:calc(env(safe-area-inset-bottom) + 18px); width:min(360px, calc(100vw - 116px)); padding:13px 15px 12px 76px; border:1px solid rgba(167,255,204,.42); border-radius:18px; color:#f7fff9; background:linear-gradient(145deg, rgba(12,51,53,.95), rgba(8,26,34,.96)); box-shadow:0 14px 42px rgba(0,0,0,.42); text-align:left; pointer-events:auto; }
+    .guide-avatar { position:absolute; left:12px; bottom:12px; display:grid; place-items:center; width:53px; height:53px; border:2px solid #8df0b5; border-radius:50%; background:radial-gradient(circle at 50% 28%, #f0b485 0 15%, transparent 16%), linear-gradient(160deg, transparent 0 30%, #202a36 31% 52%, #55a96f 53%); box-shadow:0 0 0 4px rgba(88,224,142,.13); font-size:0; }
+    .guide-avatar::after { content:'Maya'; position:absolute; top:57px; color:#bde9ce; font:800 9px system-ui,sans-serif; }
+    #onboarding-pointer { position:fixed; z-index:31; width:52px; height:52px; border:2px solid #81f1a9; border-radius:14px; box-shadow:0 0 0 5px rgba(73,222,128,.18), 0 0 24px rgba(83,232,143,.72); pointer-events:none; transform:translate(-50%,-50%); }
+    #onboarding-pointer::after { content:'Tap here'; position:absolute; top:-27px; left:50%; transform:translateX(-50%); padding:4px 7px; border-radius:7px; color:#082019; background:#8df0b5; white-space:nowrap; font:900 10px system-ui,sans-serif; }
+    #onboarding-pointer[hidden] { display:none; }
     .onboarding-kicker { color:#8df0b5; font:800 10px/1 system-ui,sans-serif; letter-spacing:1.1px; }
     #onboarding-title { margin:7px 0 6px; font:900 21px/1.1 system-ui,sans-serif; }
     #onboarding-copy { margin:0; color:#d2e9df; font:600 12px/1.45 system-ui,sans-serif; }
@@ -110,8 +117,8 @@
     #onboarding-skip { border:0; padding:7px 2px; color:#b8d6c9; background:transparent; font:700 11px system-ui,sans-serif; cursor:pointer; }
     #onboarding-next { min-width:122px; border:1px solid rgba(220,255,232,.42); border-radius:10px; padding:9px 12px; color:#06231a; background:#5be08e; font:900 12px system-ui,sans-serif; cursor:pointer; }
     #onboarding-next[hidden] { display:none; }
-    body.onboarding-actions #quick-actions { z-index:31; }
-    @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) { .onboarding-card { width:min(350px, 46vw); padding:13px 15px 12px; border-radius:14px; } #onboarding-title { font-size:17px; } #onboarding-copy { font-size:10px; } #onboarding-progress { margin:9px 0; } #onboarding-next { padding:7px 10px; font-size:10px; } }
+    body.onboarding-actions #quick-actions, body.onboarding-actions #hud-menu-toggle { z-index:31; }
+    @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) { .onboarding-card { left:calc(env(safe-area-inset-left) + 12px); bottom:calc(env(safe-area-inset-bottom) + 10px); width:min(330px, 42vw); padding:10px 12px 9px 64px; border-radius:14px; } .guide-avatar { width:45px; height:45px; left:10px; bottom:10px; } .guide-avatar::after { top:48px; font-size:8px; } #onboarding-title { font-size:15px; } #onboarding-copy { font-size:10px; } #onboarding-progress { margin:7px 0; } #onboarding-next { padding:7px 10px; font-size:10px; } }
     #profile-modal { display:none; position:fixed; inset:0; z-index:20; align-items:center; justify-content:center; padding:20px; background:rgba(3,15,18,.72); color:#fff; }
     #profile-modal.open { display:flex; }
     .profile-card { width:min(360px, 100%); padding:22px; border:1px solid rgba(255,255,255,.25); border-radius:18px; background:linear-gradient(145deg, #143e43, #0c2229); box-shadow:0 12px 36px rgba(0,0,0,.38); }
@@ -149,6 +156,7 @@
       #landmark-status { display:none; }
       #online-chip { top:calc(env(safe-area-inset-top) + 6px); right:calc(env(safe-area-inset-right) + 8px); max-width:72px; padding:5px 6px; font-size:8px; }
       #quick-actions { top:calc(env(safe-area-inset-top) + 6px); right:calc(env(safe-area-inset-right) + 86px); left:142px; display:flex; gap:4px; overflow-x:auto; overflow-y:hidden; max-width:none; padding-bottom:3px; scrollbar-width:none; }
+      #hud-menu-toggle { top:calc(env(safe-area-inset-top) + 6px); right:calc(env(safe-area-inset-right) + 8px); width:36px; height:36px; border-radius:10px; font-size:15px; }
       #quick-actions::-webkit-scrollbar { display:none; }
       .hud-icon { flex:0 0 36px; width:36px; height:36px; border-radius:10px; font-size:14px; }
       .hud-icon span { font-size:6px; letter-spacing:0; }
@@ -189,6 +197,7 @@
       #online-chip { top:calc(env(safe-area-inset-top) + 14px); right:70px; max-width:64px; padding:6px 7px; font-size:9px; }
       #online-chip span { max-width:35px; overflow:hidden; }
       #quick-actions { top:calc(env(safe-area-inset-top) + 14px); right:8px; gap:5px; }
+      #hud-menu-toggle { top:calc(env(safe-area-inset-top) + 14px); right:8px; width:42px; height:42px; border-radius:12px; font-size:17px; }
       .hud-icon { width:42px; height:42px; border-radius:12px; font-size:17px; }
       .hud-icon span { font-size:7px; }
       #joystick-base { opacity:.45; }
@@ -659,6 +668,7 @@
     <output id="progress-chip" aria-live="polite" hidden>Lv. 1 · 0 points</output>
     <output id="online-chip" aria-live="polite"><i></i><span id="online-count">Connecting…</span></output>
     <button id="mission-card" type="button" aria-label="Open tasks" hidden><strong>● Current Mission</strong><span id="mission-text">Explore Kerala landmarks</span><br><span id="landmark-status">Tap TASKS for rewards</span></button>
+    <button id="hud-menu-toggle" type="button" aria-label="Show game controls" aria-controls="quick-actions" aria-expanded="false">☰</button>
     <div id="quick-actions" aria-label="Expandable game panels">
       <button id="map-open" class="hud-icon" type="button" aria-label="Open Kerala map" aria-controls="minimap" aria-expanded="false">🗺<span>MAP</span></button>
       <button id="people-toggle" class="hud-icon" type="button" aria-label="Open people" aria-controls="people-panel" aria-expanded="false">👥<span>PEOPLE</span></button>
@@ -679,7 +689,7 @@
         <path id="kerala-outline" d="M55 8 C63 13 67 20 70 29 L76 38 L73 48 L82 58 L79 68 L88 80 L83 91 L90 103 L86 114 L92 126 L87 138 L95 151 L90 163 L97 176 L91 188 L94 201 L87 214 L90 226 L83 239 L82 251 L75 263 L72 275 L64 285 L58 294 L52 286 L48 276 L42 268 L43 257 L36 248 L39 237 L31 226 L35 215 L27 204 L32 192 L25 181 L30 169 L23 157 L29 145 L24 133 L30 121 L25 109 L31 97 L27 85 L34 74 L30 63 L38 52 L35 41 L43 31 L42 21 L49 14 Z"/>
         <g class="district-lines" clip-path="url(#kerala-clip)"><path d="M22 58 H92 M22 101 H94 M22 142 H97 M22 184 H96 M25 225 H90 M35 263 H82"/></g>
         <g id="district-labels" aria-label="Kerala districts">
-          <text class="district-label" x="58" y="18">Kasaragod</text><text class="district-label" x="55" y="32">Kannur</text><text class="district-label" x="58" y="48">Wayanad</text><text class="district-label" x="56" y="64">Kozhikode</text><text class="district-label" x="58" y="82">Malappuram</text><text class="district-label" x="61" y="101">Palakkad</text><text class="district-label" x="58" y="120">Thrissur</text><text class="district-label" x="57" y="141">Ernakulam</text><text class="district-label" x="57" y="160">Idukki</text><text class="district-label" x="57" y="179">Kottayam</text><text class="district-label" x="57" y="198">Pathanamthitta</text><text class="district-label" x="57" y="218">Alappuzha</text><text class="district-label" x="56" y="240">Kollam</text><text class="district-label" x="57" y="266">Thiruvananthapuram</text>
+          <text class="district-label" x="55" y="18">Kasaragod</text><text class="district-label" x="57" y="34">Kannur</text><text class="district-label" x="48" y="51">Wayanad</text><text class="district-label" x="60" y="64">Kozhikode</text><text class="district-label" x="58" y="83">Malappuram</text><text class="district-label" x="72" y="102">Palakkad</text><text class="district-label" x="55" y="120">Thrissur</text><text class="district-label" x="54" y="141">Ernakulam</text><text class="district-label" x="72" y="157">Idukki</text><text class="district-label" x="62" y="177">Kottayam</text><text class="district-label" x="69" y="196">Pathanamthitta</text><text class="district-label" x="48" y="208">Alappuzha</text><text class="district-label" x="57" y="238">Kollam</text><text class="district-label" x="57" y="265">Thiruvananthapuram</text>
         </g>
         <line id="map-route" hidden /><g id="landmark-layer"></g><g id="job-map-marker" hidden aria-label="Job mission target"><circle r="6.3"></circle><text>J</text></g><g id="map-player" aria-label="Your location"><circle r="6.4"></circle><path d="M0 -5 L4 5 L0 2.4 L-4 5 Z"></path></g>
       </svg>
@@ -756,12 +766,14 @@
   <section id="npc-profile" hidden aria-label="Village guide profile"><button type="button" class="panel-close" aria-label="Close guide profile">×</button><h2></h2><p></p></section>
   <section id="onboarding" hidden aria-label="Kerala Play starter guide">
     <div class="onboarding-card">
+      <div class="guide-avatar" aria-hidden="true"></div>
       <div class="onboarding-kicker">KERALA PLAY · STARTER GUIDE</div>
       <h2 id="onboarding-title">Welcome to Kerala Play</h2>
       <p id="onboarding-copy">Learn the essentials in less than a minute, then the whole world is yours to explore.</p>
       <div id="onboarding-progress" aria-hidden="true"></div>
       <div class="onboarding-actions"><button id="onboarding-skip" type="button">Skip guide</button><button id="onboarding-next" type="button">Start guide</button></div>
     </div>
+    <div id="onboarding-pointer" hidden aria-hidden="true"></div>
   </section>
 
   <script type="module" src="./boot.js"></script>

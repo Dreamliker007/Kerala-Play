@@ -69,6 +69,8 @@ const onboardingCopy = document.querySelector('#onboarding-copy');
 const onboardingProgress = document.querySelector('#onboarding-progress');
 const onboardingNext = document.querySelector('#onboarding-next');
 const onboardingSkip = document.querySelector('#onboarding-skip');
+const onboardingPointer = document.querySelector('#onboarding-pointer');
+const hudMenuToggle = document.querySelector('#hud-menu-toggle');
 document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
 const runtimeIsMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
 const villagers = [];
@@ -157,14 +159,14 @@ let challengeRound = null;
 let challengeGeneration = 0;
 const ONBOARDING_STORAGE_KEY = 'kerala-play-onboarding-v1';
 const onboardingSteps = [
-  { title: 'Welcome to Kerala Play', copy: 'Learn the essentials in less than a minute, then the whole world is yours to explore.', button: 'Start guide' },
-  { title: 'Move around', copy: 'Use the left joystick (or WASD keys) and walk a few steps.', target: 'move' },
-  { title: 'Look around', copy: 'Swipe or drag on the right side of the screen to move the camera.', target: 'camera' },
-  { title: 'Run faster', copy: 'Hold the RUN button to move quickly. Release it when you want to stop.', target: 'run' },
-  { title: 'Meet Kerala locals', copy: 'Tap an NPC or player name in the world to view their profile.', target: 'npc' },
-  { title: 'Find your way', copy: 'Tap MAP at the top to see Kerala landmarks and your location.', target: 'map' },
-  { title: 'Your first goals', copy: 'Tap TASKS at the top. Completing tasks earns points and levels.', target: 'tasks' },
-  { title: 'You are ready!', copy: 'Explore Kerala, meet people and complete your first task. Have fun!', button: 'Start exploring' }
+  { title: 'Hi, I’m Maya!', copy: 'I’ll show you around Kerala Play. Follow the glowing pointers — you will learn by playing.', button: 'Let’s go' },
+  { title: 'Move around', copy: 'Use this joystick to walk. Try moving a little now.', target: 'move' },
+  { title: 'Look around', copy: 'Drag on the open right side of the screen to turn the camera.', target: 'camera' },
+  { title: 'Run faster', copy: 'Hold RUN when you want to move quickly.', target: 'run' },
+  { title: 'Your game menu', copy: 'Tap this button whenever you want to see the map, people, chat and other controls.', target: 'menu' },
+  { title: 'Find your way', copy: 'Now tap MAP. It shows your Kerala location and landmarks.', target: 'map' },
+  { title: 'Your first goals', copy: 'Tap TASKS to see goals. Completing them earns points and levels.', target: 'tasks' },
+  { title: 'You are ready!', copy: 'That’s it! I’ll be nearby whenever you need the controls. Enjoy Kerala Play.', button: 'Start exploring' }
 ];
 let onboardingStep = -1;
 let onboardingQueued = false;
@@ -1487,6 +1489,23 @@ function onboardingCompleteStored() {
   catch { return false; }
 }
 
+function onboardingTarget(step) {
+  const targets = {
+    move: '#joystick-base', camera: '#camera-zone', run: '#run', menu: '#hud-menu-toggle',
+    map: '#map-open', tasks: '#task-toggle'
+  };
+  return step?.target ? document.querySelector(targets[step.target]) : null;
+}
+
+function placeOnboardingPointer(step) {
+  const target = onboardingTarget(step);
+  if (!target) { onboardingPointer.hidden = true; return; }
+  const rect = target.getBoundingClientRect();
+  onboardingPointer.style.left = `${rect.left + rect.width / 2}px`;
+  onboardingPointer.style.top = `${rect.top + rect.height / 2}px`;
+  onboardingPointer.hidden = false;
+}
+
 function renderOnboarding() {
   const step = onboardingSteps[onboardingStep];
   if (!step) return;
@@ -1501,6 +1520,7 @@ function renderOnboarding() {
   onboardingNext.textContent = step.button || '';
   onboarding.hidden = false;
   document.body.classList.add('onboarding-actions');
+  requestAnimationFrame(() => placeOnboardingPointer(step));
 }
 
 function finishOnboarding(skipped = false) {
@@ -1508,6 +1528,7 @@ function finishOnboarding(skipped = false) {
   onboardingStep = -1;
   onboardingQueued = false;
   onboarding.hidden = true;
+  onboardingPointer.hidden = true;
   document.body.classList.remove('onboarding-actions');
   try { localStorage.setItem(onboardingStorageKey(), 'complete'); } catch { /* Private browsing can still use the guide once. */ }
   if (!skipped) showToast('Starter guide complete · Kerala is yours to explore!');
@@ -1524,6 +1545,10 @@ function recordOnboardingAction(action) {
   if (onboardingStep < 0 || onboardingSteps[onboardingStep]?.target !== action) return;
   advanceOnboarding();
 }
+
+addEventListener('resize', () => {
+  if (onboardingStep >= 0) placeOnboardingPointer(onboardingSteps[onboardingStep]);
+});
 
 function maybeStartOnboarding(force = onboardingForceRequested) {
   onboardingQueued = false;
@@ -2039,6 +2064,14 @@ async function answerCoconut(value, generation) {
 
 function wireInterface() {
   updateProfileHud(); updateProgressHud(); renderTasks(); renderMapLandmarks(); setOpenPanel();
+  document.body.classList.add('hud-menu-collapsed');
+  hudMenuToggle?.addEventListener('click', () => {
+    const expanded = document.body.classList.toggle('hud-menu-collapsed') === false;
+    hudMenuToggle.setAttribute('aria-expanded', String(expanded));
+    hudMenuToggle.setAttribute('aria-label', expanded ? 'Hide game controls' : 'Show game controls');
+    hudMenuToggle.textContent = expanded ? '×' : '☰';
+    recordOnboardingAction('menu');
+  });
   mapOpen.addEventListener('click', () => { setOpenPanel(minimap.classList.contains('open') ? null : 'map'); recordOnboardingAction('map'); });
   mapClose.addEventListener('click', () => setOpenPanel());
   mapLabelToggle.addEventListener('click', () => {

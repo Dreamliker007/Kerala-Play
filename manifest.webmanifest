@@ -6,5 +6,8 @@
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#16323f",
-  "theme_color": "#4a8cda"
+  "theme_color": "#075f65",
+  "icons": [
+    { "src": "assets/kerala-play-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
 }

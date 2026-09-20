@@ -25,5 +25,6 @@ for (const file of files) {
   await cp(file, `www/${file}`, { recursive: true });
 }
 await cp('vendor', 'www/vendor', { recursive: true });
+await cp('assets', 'www/assets', { recursive: true });
 
 console.log('Kerala Play mobile web assets prepared in www/.');
