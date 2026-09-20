@@ -1336,7 +1336,11 @@ function performWorldActivity(activityId) {
   if (spot.kind === 'bus') {
     const phase = spot.id === 'town-bus' ? 1.4 : 3.2;
     const minutes = 2 + Math.floor(((villageTime * .18 + phase) % 5 + 5) % 5);
-    showToast(`${spot.label} · next bus about ${minutes} min · wait near the shelter`, 3600);
+    const destination = spot.id === 'town-bus' ? 'South Stop' : 'Town Junction';
+    showToast(`Village Line · ${spot.label} → ${destination} · next bus about ${minutes} min`, 3800);
+    window.dispatchEvent(new CustomEvent('kerala-bus-stop-view', {
+      detail: { routeId: 'village-line', stopId: spot.id, destination, minutes },
+    }));
     return;
   }
 
