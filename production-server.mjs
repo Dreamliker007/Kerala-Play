@@ -4,24 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createGameServer } from './server.mjs';
 import { createSupabaseStore } from './supabase-store.mjs';
+import { worldAlertsFromEnv } from './world-alerts.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(ROOT, '.data-production-cache');
 const DATABASE_PATH = resolve(DATA_DIR, 'game.json');
 const SYNC_INTERVAL = Math.max(250, Number(process.env.KP_SYNC_INTERVAL_MS || 1000));
-
-function worldAlertsFromEnv() {
-  const raw = process.env.KP_WORLD_ALERTS_JSON;
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error('expected a JSON array');
-    return parsed;
-  } catch (error) {
-    console.error('[Kerala Play] KP_WORLD_ALERTS_JSON ignored:', error.message);
-    return [];
-  }
-}
 
 async function atomicWrite(path, content) {
   const temporary = `${path}.${randomUUID()}.tmp`;
