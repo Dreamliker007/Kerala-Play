@@ -2174,7 +2174,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       updateProximityWorld(players);
       onPlayers(players);
     });
-    listen('social', async () => { await refreshPeople(); await refreshUser(); if (!profileModal.hidden && profileId && profileId !== user?.id) await openProfile(profileId, true); });
+    listen('social', async () => { await refreshPeople(); await refreshGroups(); await refreshUser(); if (!profileModal.hidden && profileId && profileId !== user?.id) await openProfile(profileId, true); if (!groupModal.hidden && activeGroupId) await openGroup(activeGroupId, true); });
+    listen('group-message', async value => {
+      if (activeGroupId === value.groupId && !groupModal.hidden) await openGroup(value.groupId, true);
+      else { if (peopleFilter === 'groups') run(refreshGroups, peopleError); toast('New group message'); }
+    });
     listen('message', async value => {
       if (activePeer?.id === value.peerId && dmPanel.classList.contains('open')) await loadMessages();
       else { chatToggle?.classList.add('unread'); toast(`New message${people.find(person => person.id === value.peerId)?.username ? ` from ${people.find(person => person.id === value.peerId).username}` : ''}`); }
@@ -2195,9 +2199,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     sessionVersion++;
     cleanupVoice(); clearMessageURLs();
     source?.close(); source = null;
-    peopleVersion++; messageVersion++; profileVersion++;
-    people = []; peopleSignature = ''; activePeer = null; profileId = null;
-    closePanels(); closeProfile();
+    peopleVersion++; groupsVersion++; groupMessageVersion++; messageVersion++; profileVersion++;
+    people = []; peopleSignature = ''; groupsSnapshot = { groups: [], invites: [], limits: {} }; activePeer = null; profileId = null; activeGroupId = null;
+    closePanels(); closeProfile(); closeGroup();
     dmInput.value = ''; dmLog.replaceChildren();
     setUser(next);
     authModal.hidden = true;
@@ -2207,6 +2211,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     setConnection(false);
     startEvents();
     await run(refreshPeople, peopleError);
+    await run(refreshGroups, peopleError);
     await run(refreshJobs, jobsError);
     await run(refreshGarage, garageError);
     await run(refreshNeeds, walletError);
@@ -2227,9 +2232,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     source?.close(); source = null;
     cleanupVoice(); clearMessageURLs();
     if (notificationsTimer) { clearInterval(notificationsTimer); notificationsTimer = null; }
-    peopleVersion++; messageVersion++; profileVersion++;
-    people = []; peopleSignature = ''; activePeer = null; profileId = null;
-    closePanels(); closeProfile();
+    peopleVersion++; groupsVersion++; groupMessageVersion++; messageVersion++; profileVersion++;
+    people = []; peopleSignature = ''; groupsSnapshot = { groups: [], invites: [], limits: {} }; activePeer = null; profileId = null; activeGroupId = null;
+    closePanels(); closeProfile(); closeGroup();
     setUser(null); setConnection(false); onPlayers([]); onDisconnect();
     if (walletBalance) walletBalance.textContent = '₹0';
     notificationsSnapshot = null;
