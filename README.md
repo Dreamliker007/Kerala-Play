@@ -562,3 +562,7 @@ No movement speed, server authority, collision, economy, backend/database or Sup
 V100.4 reduces always-on screen clutter on phones. Kerala Play now starts with the secondary HUD details hidden while keeping the main menu button available. Tapping the menu reveals the profile, online state, daily needs and quick-action controls together; closing it hides those overlays again so the world remains easier to see.
 
 The Kerala Play brand stays as a small persistent identity chip, and gameplay controls such as joystick, RUN/vehicle controls and contextual INTERACT actions remain available at all times. This is a UI-only change and does not alter movement, accounts, economy, multiplayer or server authority.
+
+## V102.8 In-Page Password Recovery
+
+Password recovery no longer relies on browser prompts. The Forgot password flow now remains in the Kerala Play sign-in card: players request an email OTP, open their inbox, return to the unchanged page, and enter the six-digit code and a new password in the same form. The reset page uses the browser's one-time-code input hint on mobile and returns the player to sign-in after a successful reset.

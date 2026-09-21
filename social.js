@@ -383,6 +383,24 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const forgot = button('Forgot password?', () => renderReset()); forgot.className = 'social-link';
   authForm.append(field('First name', firstName), field('Username', username), usernameNote, field('Password', password), signupContact, signupFields, authSubmit, providerDivider, providerRow, forgot, authError);
   authCard.append(authLogo, authTitle, authIntro, authTabs, authForm, authNote);
+  const resetForm = node('form', 'social-form');
+  resetForm.hidden = true;
+  const resetTitle = node('h2', '', 'Reset password');
+  const resetIntro = node('p', 'social-muted', 'Enter the username, email, or mobile number used when you registered. We will send a code to the saved email address.');
+  const resetIdentifier = input('text', { required: true, maxLength: 80, autocomplete: 'username', placeholder: 'Username, email, or mobile number' });
+  const resetCode = input('text', { required: true, inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6, autocomplete: 'one-time-code', placeholder: '6-digit code' });
+  const resetPassword = input('password', { required: true, minLength: 8, maxLength: 128, autocomplete: 'new-password', placeholder: 'New password (8+ characters)' });
+  const resetCredentials = node('div');
+  resetCredentials.hidden = true;
+  resetCredentials.append(field('OTP from email', resetCode), field('New password', resetPassword));
+  const resetSubmit = node('button', 'social-button primary', 'Send OTP to my email');
+  resetSubmit.type = 'submit';
+  const resetBack = button('Back to log in', () => renderAuth('login'), 'social-button secondary');
+  const resetError = node('div', 'social-error');
+  resetError.setAttribute('role', 'status');
+  resetError.setAttribute('aria-live', 'polite');
+  resetForm.append(resetTitle, resetIntro, field('Account', resetIdentifier), resetCredentials, resetSubmit, resetBack, resetError);
+  authCard.append(resetForm);
   authModal.append(authCard);
   document.body.append(authModal);
 
@@ -416,6 +434,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   function renderAuth(mode = authMode, error = '') {
     authMode = mode;
     authModal.hidden = false;
+    resetForm.hidden = true;
+    authTabs.hidden = false;
+    authForm.hidden = false;
     signupFields.hidden = mode !== 'signup';
     signupContact.hidden = mode !== 'signup';
     firstName.parentElement.hidden = mode !== 'signup';
@@ -464,11 +485,37 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     return true;
   }
 
-  async function renderReset() {
-    const identifier = window.prompt('Enter your username, email, or mobile number:');
-    if (!identifier) return;
-    await run(async () => { const result = await api('/api/auth/forgot', { identifier }); window.alert(result.message); const code = window.prompt('Enter the 6-digit reset code from the server console:'); if (!code) return; const next = window.prompt('Choose a new password (8+ characters):'); if (!next) return; await api('/api/auth/reset', { code, password: next }); window.alert('Password reset. You can log in now.'); }, authError);
+  function renderReset() {
+    authModal.hidden = false;
+    authTabs.hidden = true;
+    authForm.hidden = true;
+    authNote.hidden = true;
+    resetForm.hidden = false;
+    resetError.textContent = '';
+    queueMicrotask(() => resetIdentifier.focus());
   }
+  resetForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!resetForm.reportValidity()) return;
+    resetSubmit.disabled = true;
+    await run(async () => {
+      if (resetCredentials.hidden) {
+        const result = await api('/api/auth/forgot', { identifier: resetIdentifier.value.trim() });
+        resetIntro.textContent = `${result.message} Check your email, then enter the OTP and a new password below. This page will stay open while you check email.`;
+        resetCredentials.hidden = false;
+        resetSubmit.textContent = 'Reset password';
+        resetCode.focus();
+      } else {
+        await api('/api/auth/reset', { code: resetCode.value.trim(), password: resetPassword.value });
+        resetCode.value = '';
+        resetPassword.value = '';
+        resetCredentials.hidden = true;
+        resetSubmit.textContent = 'Send OTP to my email';
+        renderAuth('login', 'Password reset. You can log in now.');
+      }
+    }, resetError);
+    resetSubmit.disabled = false;
+  });
   authForm.addEventListener('submit', async event => {
     event.preventDefault();
     if (!authForm.reportValidity()) return;
