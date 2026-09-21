@@ -1938,6 +1938,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       if (source !== events || !user) return;
       if (connected) { setConnection(false); cleanupVoice(); onDisconnect(); onPlayers([]); run(refreshUser); }
     };
+    listen('session-revoked', () => {
+      endSession('This Kerala Play account was signed in on another device.');
+    });
     listen('world', value => {
       const players = value.players || [];
       setConnection(true, players.length);
