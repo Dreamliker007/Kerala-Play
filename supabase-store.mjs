@@ -154,6 +154,22 @@ function mapWalletTransactionFromRow(row) {
   };
 }
 
+function mapSessionToRow(session) {
+  return {
+    token_hash: session.key,
+    user_id: session.id,
+    expires_at: iso(session.expires),
+  };
+}
+
+function mapSessionFromRow(row) {
+  return {
+    key: row.token_hash,
+    id: row.user_id,
+    expires: Date.parse(row.expires_at) || 0,
+  };
+}
+
 export function createSupabaseStore({
   url = process.env.SUPABASE_URL,
   serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -223,12 +239,13 @@ export function createSupabaseStore({
   }
 
   async function load() {
-    const [users, follows, blocks, messages, transactions, worldStates] = await Promise.all([
+    const [users, follows, blocks, messages, transactions, sessions, worldStates] = await Promise.all([
       request('kp_users?select=*&order=created_at.asc'),
       request('kp_follows?select=*&order=created_at.asc'),
       request('kp_blocks?select=*&order=created_at.asc'),
       request('kp_messages?select=*&order=created_at.asc'),
       request('kp_wallet_transactions?select=*&order=created_at.asc'),
+      request('kp_sessions?select=*&order=created_at.asc'),
       optionalWorldRequest('kp_world_state?select=*&order=updated_at.asc'),
     ]);
     const worldByUser = new Map((worldStates || []).map(row => [row.user_id, row]));
@@ -239,6 +256,7 @@ export function createSupabaseStore({
       blocks: (blocks || []).map(row => ({ from: row.from_id, to: row.to_id })),
       messages: (messages || []).map(mapMessageFromRow),
       transactions: (transactions || []).map(mapWalletTransactionFromRow),
+      sessions: (sessions || []).map(mapSessionFromRow).filter(session => session.expires > Date.now()),
     };
   }
 
@@ -253,6 +271,12 @@ export function createSupabaseStore({
       transactions: (db.transactions || []).map(mapWalletTransactionToRow),
     };
     await request('rpc/kp_replace_snapshot', { method: 'POST', body: { payload } });
+
+    // Sessions use hashed tokens only and survive Render sleep/restarts.
+    await request('kp_sessions?token_hash=not.is.null', { method: 'DELETE' });
+    const sessionRows = (db.sessions || []).map(mapSessionToRow).filter(session => Date.parse(session.expires_at) > Date.now());
+    if (sessionRows.length) await request('kp_sessions', { method: 'POST', body: sessionRows });
+
     const worldPayload = (db.users || []).map(mapWorldStateToRow).filter(Boolean);
     await optionalWorldRequest('rpc/kp_replace_world_state', { method: 'POST', body: { payload: worldPayload } });
   }
