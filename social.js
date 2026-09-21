@@ -1488,7 +1488,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const person = { ...result.user, relationship: result.relationship || result.user.relationship, blocked: result.blocked || result.user.blocked, canMessage: result.canMessage ?? result.user.canMessage };
       const own = person.id === user.id;
       const header = node('div', 'social-profile-header');
-      const title = node('h2', '', person.username);
+      const title = node('h2', '', person.name || person.username);
       title.id = 'social-profile-title';
       const close = button('×', closeProfile, 'panel-close'); close.setAttribute('aria-label', 'Close profile');
       header.append(avatar(person), title, close);
@@ -1512,16 +1512,23 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         function renderOwnProfile(editing) {
           if (!editing) return;
           const form = node('form', 'social-form');
+          const displayName = input('text', { value: person.name || person.username, maxLength: 40, required: true, autocomplete: 'given-name' });
+          const accountUsername = input('text', { value: person.accountUsername || person.username, maxLength: 24, required: true, pattern: '(?=.*[A-Za-z])[A-Za-z0-9_]{3,24}', autocomplete: 'username', spellcheck: false });
+          const usernameLockedUntil = Number(person.usernameChangeAvailableAt || 0);
+          const usernameLocked = usernameLockedUntil > Date.now();
+          accountUsername.disabled = usernameLocked;
+          const usernameNote = node('small', 'social-muted', usernameLocked ? `Username can be changed again in ${Math.ceil((usernameLockedUntil - Date.now()) / 86400000)} days.` : 'Username changes are limited to once every 10 days.');
           const district = select(districts, person.district);
           const gender = select([['male', 'Male'], ['female', 'Female'], ['other', 'Other']], person.gender);
-          const row = node('div', 'social-fields-row'); row.append(field('District', district), field('Avatar', gender));
+          const row = node('div', 'social-fields-row'); row.append(field('Name', displayName), field('District', district));
+          const identityRow = node('div', 'social-fields-row'); identityRow.append(field('Username', accountUsername), field('Avatar', gender));
           const bio = node('textarea'); bio.value = person.bio || ''; bio.maxLength = 180; bio.rows = 3;
           bio.placeholder = 'Tell people a little about yourself';
           const save = node('button', 'social-button primary', 'Save changes'); save.type = 'submit';
           const cancel = button('Cancel', () => openProfile(person.id, true), 'social-button secondary');
           const actions = node('div', 'social-actions profile-edit-actions'); actions.append(save, cancel);
-          form.append(node('p', 'social-muted', 'Update the details other players see. Username and account identity stay protected.'), row, field('About you', bio), actions);
-          form.addEventListener('submit', async event => { event.preventDefault(); save.disabled = true; cancel.disabled = true; await run(async () => { const response = await api('/api/profile', { district: district.value, gender: gender.value, bio: bio.value.trim() }, 'PATCH'); if (response.user) setUser(response.user); else await refreshUser(); toast('Profile saved'); await openProfile(person.id, true); }, error); save.disabled = false; cancel.disabled = false; });
+          form.append(node('p', 'social-muted', 'Update the details other players see. Username changes are limited to once every 10 days.'), row, identityRow, usernameNote, field('About you', bio), actions);
+          form.addEventListener('submit', async event => { event.preventDefault(); save.disabled = true; cancel.disabled = true; await run(async () => { const response = await api('/api/profile', { displayName: displayName.value.trim(), username: accountUsername.value.trim(), district: district.value, gender: gender.value, bio: bio.value.trim() }, 'PATCH'); if (response.user) setUser(response.user); else await refreshUser(); toast('Profile saved'); await openProfile(person.id, true); }, error); save.disabled = false; cancel.disabled = false; });
           profileCard.replaceChildren(header, form, error);
           district.focus();
         }
