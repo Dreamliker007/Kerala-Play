@@ -5,6 +5,20 @@ const localServerHelp = 'Start the Kerala Play server with npm start, then open 
 const productionServerHelp = 'Kerala Play account service is starting or temporarily unavailable. Please wait a few seconds and try again.';
 const serverHelp = localHostnames.has(location.hostname) ? localServerHelp : productionServerHelp;
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const productionWakeUrl = localHostnames.has(location.hostname) ? '' : 'https://kerala-play-1.onrender.com/api/session';
+
+function wakeProductionBackend() {
+  if (!productionWakeUrl) return;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  fetch(`${productionWakeUrl}?wake=${Date.now()}`, {
+    method: 'GET',
+    mode: 'no-cors',
+    cache: 'no-store',
+    credentials: 'omit',
+    signal: controller.signal,
+  }).catch(() => {}).finally(() => clearTimeout(timeout));
+}
 
 export async function api(path, body, method) {
   if (!/^https?:$/.test(location.protocol)) throw new Error(serverHelp);
@@ -404,6 +418,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     authSubmit.disabled = true;
     authSubmit.textContent = authMode === 'signup' ? 'Creating account…' : 'Connecting…';
     authError.textContent = '';
+    wakeProductionBackend();
+    if (authMode === 'login') await wait(1600);
     await run(async () => {
       const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, ...(authMode === 'signup' ? { email: signupEmail.value, mobile: signupMobile.value, district: signupDistrict.value, gender: signupGender.value } : {}) });
       password.value = '';
@@ -2285,7 +2301,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   updateProximityButton();
   setConnection(false);
   const initialVersion = sessionVersion;
+  wakeProductionBackend();
   void (async () => {
+    await wait(900);
     let result = null;
     try { result = await api('/api/session'); }
     catch { /* Cold-start errors stay out of the login form while the service warms. */ }
