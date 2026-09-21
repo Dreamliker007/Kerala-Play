@@ -1535,6 +1535,34 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       } else {
         profileCard.append(node('p', 'social-bio', person.bio || 'This explorer has not added a bio yet.'), node('p', 'social-muted', relationshipText(person)));
         const actions = relationshipButtons(person, error);
+        const report = button('Report', () => {
+          const form = node('form', 'social-form');
+          const reason = select([
+            ['harassment', 'Harassment or bullying'],
+            ['cheating', 'Cheating or exploit abuse'],
+            ['impersonation', 'Impersonation'],
+            ['inappropriate', 'Inappropriate content or behaviour'],
+            ['spam', 'Spam'],
+            ['other', 'Other'],
+          ], 'harassment');
+          const details = node('textarea'); details.maxLength = 500; details.rows = 4; details.placeholder = 'Add details that will help moderation review this report (optional)';
+          const submit = node('button', 'social-button danger', 'Submit report'); submit.type = 'submit';
+          const cancel = button('Cancel', () => openProfile(person.id, true), 'social-button secondary');
+          const reportActions = node('div', 'social-actions'); reportActions.append(submit, cancel);
+          form.append(node('p', 'social-muted', `Report ${person.name || person.username}. Reports are private and the other player is not notified.`), field('Reason', reason), field('Details', details), reportActions);
+          form.addEventListener('submit', async event => {
+            event.preventDefault(); submit.disabled = true; cancel.disabled = true;
+            await run(async () => {
+              await api(`/api/reports/${encodeURIComponent(person.id)}`, { reason: reason.value, details: details.value.trim() });
+              toast('Report submitted for moderation review');
+              await openProfile(person.id, true);
+            }, error);
+            submit.disabled = false; cancel.disabled = false;
+          });
+          profileCard.replaceChildren(header, form, error);
+          reason.focus();
+        }, 'social-button secondary');
+        actions.append(report);
         if (!person.blocked) actions.append(button('Block', () => run(async () => { await api(`/api/blocks/${encodeURIComponent(person.id)}`, { blocked: true }); closePeer(person.id); receiving.delete(person.id); receiversReady.delete(person.id); if (activePeer?.id === person.id) { cancelRecording(); stopTalking(); } await refreshPeople(); await refreshUser(); await openProfile(person.id, true); }, error), 'social-button danger'));
         profileCard.append(actions);
       }
