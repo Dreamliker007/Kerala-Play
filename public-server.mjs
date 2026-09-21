@@ -166,24 +166,40 @@ if (gameRequestListener) {
 
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || '0.0.0.0';
-server.listen(port, host, () => {
-  console.log(`Kerala Play running at http://${host}:${server.address().port}`);
-  if (API_UPSTREAM) {
-    const warmTarget = new URL('/api/session', API_UPSTREAM);
-    void fetchUpstream(warmTarget, {
+let upstreamKeepaliveTimer = null;
+
+async function warmProductionApi(label = 'warm-up') {
+  if (!API_UPSTREAM) return;
+  const warmTarget = new URL('/api/session', API_UPSTREAM);
+  try {
+    const response = await fetchUpstream(warmTarget, {
       method: 'GET',
       headers: { Accept: 'application/json', origin: API_UPSTREAM, referer: `${API_UPSTREAM}/` },
       redirect: 'manual',
-    }, 'GET', '/api/session')
-      .then(response => response?.body?.cancel?.().catch?.(() => {}))
-      .then(() => console.log('[Kerala Play] production API warm-up ready'))
-      .catch(error => console.warn('[Kerala Play] production API warm-up pending:', error.message));
+    }, 'GET', '/api/session');
+    await response?.body?.cancel?.().catch?.(() => {});
+    console.log(`[Kerala Play] production API ${label} ready`);
+  } catch (error) {
+    console.warn(`[Kerala Play] production API ${label} pending:`, error.message);
+  }
+}
+
+server.listen(port, host, () => {
+  console.log(`Kerala Play running at http://${host}:${server.address().port}`);
+  if (API_UPSTREAM) {
+    void warmProductionApi('warm-up');
+    upstreamKeepaliveTimer = setInterval(() => void warmProductionApi('keepalive'), 8 * 60 * 1000);
+    upstreamKeepaliveTimer.unref();
   }
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, async () => {
-    try { await server.shutdown(); process.exit(0); }
+    try {
+      if (upstreamKeepaliveTimer) clearInterval(upstreamKeepaliveTimer);
+      await server.shutdown();
+      process.exit(0);
+    }
     catch (error) { console.error('[Kerala Play] shutdown failed:', error); process.exit(1); }
   });
 }
