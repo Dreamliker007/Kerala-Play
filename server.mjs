@@ -162,6 +162,10 @@ const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
 const REPORT_REASONS = Object.freeze(['harassment', 'cheating', 'impersonation', 'inappropriate', 'spam', 'other']);
 const REPORT_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const REPORT_HISTORY_LIMIT = 80;
+const GROUP_MEMBER_LIMIT = 12;
+const GROUP_MEMBERSHIP_LIMIT = 8;
+const GROUP_MESSAGE_LIMIT = 100;
+const GROUP_NAME_MAX = 40;
 function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
 const SESSION_AGE = 365 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
@@ -226,12 +230,26 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   try { db = JSON.parse(await readFile(databasePath, 'utf8')); }
   catch (error) {
     if (error.code !== 'ENOENT') throw new Error(`Cannot read saved game data: ${error.message}`);
-    db = { version: 1, users: [], follows: [], blocks: [], messages: [] };
+    db = { version: 1, users: [], follows: [], blocks: [], messages: [], groups: [] };
   }
-  if (db.version !== 1 || !['users', 'follows', 'blocks', 'messages'].every(key => Array.isArray(db[key])) || (db.transactions !== undefined && !Array.isArray(db.transactions)) || (db.sessions !== undefined && !Array.isArray(db.sessions))) throw new Error('Unsupported saved game data.');
+  if (db.version !== 1 || !['users', 'follows', 'blocks', 'messages'].every(key => Array.isArray(db[key])) || (db.groups !== undefined && !Array.isArray(db.groups)) || (db.transactions !== undefined && !Array.isArray(db.transactions)) || (db.sessions !== undefined && !Array.isArray(db.sessions))) throw new Error('Unsupported saved game data.');
   let migrated = false;
   if (!Array.isArray(db.transactions)) { db.transactions = []; migrated = true; }
   if (!Array.isArray(db.sessions)) { db.sessions = []; migrated = true; }
+  if (!Array.isArray(db.groups)) { db.groups = []; migrated = true; }
+  const existingUserIds = new Set(db.users.map(user => user.id));
+  const normalizedGroups = [];
+  for (const raw of db.groups) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw) || typeof raw.id !== 'string' || typeof raw.ownerId !== 'string' || !existingUserIds.has(raw.ownerId)) { migrated = true; continue; }
+    const name = String(raw.name || '').trim().slice(0, GROUP_NAME_MAX);
+    if (name.length < 3) { migrated = true; continue; }
+    const members = [...new Set([raw.ownerId, ...(Array.isArray(raw.members) ? raw.members : [])])].filter(id => existingUserIds.has(id)).slice(0, GROUP_MEMBER_LIMIT);
+    const memberSet = new Set(members);
+    const invites = [...new Set(Array.isArray(raw.invites) ? raw.invites : [])].filter(id => existingUserIds.has(id) && !memberSet.has(id)).slice(0, GROUP_MEMBER_LIMIT);
+    const messages = (Array.isArray(raw.messages) ? raw.messages : []).filter(message => message && typeof message.id === 'string' && existingUserIds.has(message.from) && typeof message.body === 'string' && message.body.trim() && Number.isFinite(Number(message.createdAt))).slice(-GROUP_MESSAGE_LIMIT).map(message => ({ id: message.id, from: message.from, body: message.body.trim().slice(0, 240), createdAt: Number(message.createdAt) }));
+    normalizedGroups.push({ id: raw.id, name, ownerId: raw.ownerId, members, invites, messages, createdAt: Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : now() });
+  }
+  if (JSON.stringify(normalizedGroups) !== JSON.stringify(db.groups)) { db.groups = normalizedGroups; migrated = true; }
   for (const user of db.users) {
     if (!Number.isInteger(user.walletBalance) || user.walletBalance < 0 || user.walletBalance > WALLET_LIMIT) {
       user.walletBalance = STARTER_BALANCE; migrated = true;
@@ -338,6 +356,32 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   function socialChanged() {
     for (const id of clients.keys()) emit(id, 'social', {});
     worldDirty = true;
+  }
+  function groupById(id) { return db.groups.find(group => group.id === id); }
+  function userGroupCount(userId) { return db.groups.filter(group => group.members.includes(userId)).length; }
+  function groupMemberView(memberId, viewerId, ownerId) {
+    const member = findUser(memberId);
+    if (!member) return null;
+    if (memberId !== viewerId && blocked(viewerId, memberId)) return { id: memberId, username: 'Hidden member', blocked: true, owner: memberId === ownerId, online: false };
+    const profile = publicUser(member);
+    return { id: memberId, username: profile.username, district: profile.district, gender: profile.gender, level: profile.level, owner: memberId === ownerId, online: online(memberId), blocked: false };
+  }
+  function groupView(group, viewerId) {
+    const isMember = group.members.includes(viewerId);
+    const invited = group.invites.includes(viewerId);
+    const members = isMember ? group.members.map(id => groupMemberView(id, viewerId, group.ownerId)).filter(Boolean) : [];
+    return { id: group.id, name: group.name, ownerId: group.ownerId, memberCount: group.members.length, members, invited, isMember, isOwner: group.ownerId === viewerId, inviteCount: group.invites.length, createdAt: group.createdAt };
+  }
+  function groupsSummary(user) {
+    const relevant = db.groups.filter(group => group.members.includes(user.id) || group.invites.includes(user.id));
+    return { groups: relevant.filter(group => group.members.includes(user.id)).map(group => groupView(group, user.id)), invites: relevant.filter(group => group.invites.includes(user.id)).map(group => groupView(group, user.id)), limits: { membersPerGroup: GROUP_MEMBER_LIMIT, memberships: GROUP_MEMBERSHIP_LIMIT, messageLength: 240 } };
+  }
+  function requireGroup(user, groupId, { member = true, owner = false } = {}) {
+    const group = groupById(groupId);
+    requireValue(group, 404, 'Group not found.');
+    if (member) requireValue(group.members.includes(user.id), 403, 'Join this group first.');
+    if (owner) requireValue(group.ownerId === user.id, 403, 'Only the group owner can do that.');
+    return group;
   }
   function profileChanged(user) { emit(user.id, 'profile', { user: publicUser(user) }); }
   function worldSnapshot(viewerId) {
@@ -474,7 +518,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       title: String(title || 'Kerala Play'),
       message: String(message || ''),
       severity: ['info', 'warning', 'critical', 'success'].includes(severity) ? severity : 'info',
-      target: ['wallet', 'home', 'garage', 'jobs', 'people', 'events'].includes(target) ? target : '',
+      target: ['wallet', 'home', 'garage', 'jobs', 'people', 'groups', 'events'].includes(target) ? target : '',
       createdAt: now(),
     };
     notifications.items.push(item);
@@ -2962,6 +3006,122 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const people = db.users.filter(peer => peer.id !== user.id && (!blocked(user.id, peer.id) || ownBlock(user.id, peer.id))).map(peer => ({ ...(blocked(user.id, peer.id) ? blockedUser(peer) : publicUser(peer)), relationship: relation(user.id, peer.id), blocked: ownBlock(user.id, peer.id), online: !blocked(user.id, peer.id) && online(peer.id), canMessage: !blocked(user.id, peer.id) && accepted(user.id, peer.id) }));
         const self = publicUser(user);
         send(response, 200, { people, followers: self.followers, following: self.following }); return;
+      }
+      if (path === '/api/groups' && request.method === 'GET') {
+        send(response, 200, groupsSummary(user)); return;
+      }
+      if (path === '/api/groups' && request.method === 'POST') {
+        limited(`group-create:${user.id}`, 10, 60 * 60 * 1000);
+        const body = await jsonBody(request);
+        const name = typeof body.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
+        requireValue(name.length >= 3 && name.length <= GROUP_NAME_MAX && /^[\p{L}\p{N}][\p{L}\p{N} .&'_-]*$/u.test(name), 400, 'Group name must be 3–40 letters or numbers.');
+        requireValue(userGroupCount(user.id) < GROUP_MEMBERSHIP_LIMIT, 409, 'You have reached the group membership limit.');
+        requireValue(!db.groups.some(group => group.name.toLowerCase() === name.toLowerCase()), 409, 'That group name is already in use.');
+        const group = { id: randomUUID(), name, ownerId: user.id, members: [user.id], invites: [], messages: [], createdAt: now() };
+        db.groups.push(group);
+        await persist(); socialChanged();
+        send(response, 201, { group: groupView(group, user.id), summary: groupsSummary(user) }); return;
+      }
+      const groupInviteMatch = path.match(/^\/api\/groups\/([^/]+)\/invite$/);
+      if (groupInviteMatch && request.method === 'POST') {
+        limited(`group-invite:${user.id}`, 30, 60 * 60 * 1000);
+        const group = requireGroup(user, groupInviteMatch[1], { member: true, owner: true });
+        const body = await jsonBody(request);
+        const peer = requirePeer(user, body.peerId);
+        requireValue(!blocked(user.id, peer.id) && accepted(user.id, peer.id), 403, 'Only accepted contacts can be invited.');
+        requireValue(group.members.length + group.invites.length < GROUP_MEMBER_LIMIT, 409, 'This group is full.');
+        requireValue(!group.members.includes(peer.id), 409, 'This player is already in the group.');
+        requireValue(!group.invites.includes(peer.id), 409, 'This player already has a group invite.');
+        requireValue(userGroupCount(peer.id) < GROUP_MEMBERSHIP_LIMIT, 409, 'This player has reached the group membership limit.');
+        group.invites.push(peer.id);
+        addNotification(peer, {
+          sourceKey: `group-invite:${group.id}:${peer.id}:${now()}`,
+          kind: 'social',
+          title: 'Group invitation',
+          message: `${publicUser(user).username} invited you to ${group.name}.`,
+          severity: 'info',
+          target: 'groups',
+        });
+        await persist(); socialChanged();
+        send(response, 200, { group: groupView(group, user.id) }); return;
+      }
+      const groupRespondMatch = path.match(/^\/api\/groups\/([^/]+)\/respond$/);
+      if (groupRespondMatch && request.method === 'POST') {
+        limited(`group-respond:${user.id}`, 30, 60 * 60 * 1000);
+        const group = requireGroup(user, groupRespondMatch[1], { member: false });
+        const body = await jsonBody(request);
+        requireValue(['accept', 'decline'].includes(body.action), 400, 'Choose accept or decline.');
+        requireValue(group.invites.includes(user.id), 409, 'No pending invitation for this group.');
+        group.invites = group.invites.filter(id => id !== user.id);
+        if (body.action === 'accept') {
+          requireValue(!blocked(user.id, group.ownerId), 403, 'This group invitation is no longer available.');
+          requireValue(group.members.length < GROUP_MEMBER_LIMIT, 409, 'This group is full.');
+          requireValue(userGroupCount(user.id) < GROUP_MEMBERSHIP_LIMIT, 409, 'You have reached the group membership limit.');
+          group.members.push(user.id);
+          const owner = findUser(group.ownerId);
+          if (owner) addNotification(owner, {
+            sourceKey: `group-joined:${group.id}:${user.id}:${now()}`,
+            kind: 'social', title: 'Group member joined',
+            message: `${publicUser(user).username} joined ${group.name}.`, severity: 'success', target: 'groups',
+          });
+        }
+        await persist(); socialChanged();
+        send(response, 200, { summary: groupsSummary(user) }); return;
+      }
+      const groupLeaveMatch = path.match(/^\/api\/groups\/([^/]+)\/leave$/);
+      if (groupLeaveMatch && request.method === 'POST') {
+        limited(`group-leave:${user.id}`, 20, 60 * 60 * 1000);
+        const group = requireGroup(user, groupLeaveMatch[1]);
+        group.members = group.members.filter(id => id !== user.id);
+        group.invites = group.invites.filter(id => id !== user.id);
+        let deleted = false;
+        if (!group.members.length) {
+          db.groups = db.groups.filter(item => item !== group);
+          deleted = true;
+        } else if (group.ownerId === user.id) {
+          group.ownerId = group.members[0];
+          const newOwner = findUser(group.ownerId);
+          if (newOwner) addNotification(newOwner, {
+            sourceKey: `group-owner:${group.id}:${newOwner.id}:${now()}`,
+            kind: 'social', title: 'You are now group owner',
+            message: `You are now the owner of ${group.name}.`, severity: 'info', target: 'groups',
+          });
+        }
+        await persist(); socialChanged();
+        send(response, 200, { deleted, summary: groupsSummary(user) }); return;
+      }
+      const groupMessagesMatch = path.match(/^\/api\/groups\/([^/]+)\/messages$/);
+      if (groupMessagesMatch) {
+        const group = requireGroup(user, groupMessagesMatch[1]);
+        if (request.method === 'GET') {
+          const messages = group.messages.filter(message => message.from === user.id || !blocked(user.id, message.from)).map(message => {
+            const sender = findUser(message.from);
+            return { ...message, fromName: sender ? publicUser(sender).username : 'Former member', own: message.from === user.id };
+          });
+          send(response, 200, { group: groupView(group, user.id), messages }); return;
+        }
+        if (request.method === 'POST') {
+          limited(`group-message:${user.id}`, 40, 60000);
+          const body = await jsonBody(request);
+          requireValue(typeof body.body === 'string' && body.body.trim().length > 0 && body.body.trim().length <= 240, 400, 'Group message must contain 1–240 characters.');
+          const message = { id: randomUUID(), from: user.id, body: body.body.trim(), createdAt: now() };
+          group.messages.push(message);
+          if (group.messages.length > GROUP_MESSAGE_LIMIT) group.messages = group.messages.slice(-GROUP_MESSAGE_LIMIT);
+          for (const memberId of group.members) {
+            if (memberId === user.id || blocked(user.id, memberId)) continue;
+            const member = findUser(memberId);
+            if (!member) continue;
+            addNotification(member, {
+              sourceKey: `group-message:${message.id}:${memberId}`,
+              kind: 'social', title: group.name,
+              message: `${publicUser(user).username} sent a group message.`, severity: 'info', target: 'groups',
+            });
+            emit(memberId, 'group-message', { groupId: group.id, messageId: message.id });
+          }
+          await persist();
+          emit(user.id, 'group-message', { groupId: group.id, messageId: message.id });
+          send(response, 201, { message: { ...message, fromName: publicUser(user).username, own: true } }); return;
+        }
       }
       const profileMatch = path.match(/^\/api\/profile\/([^/]+)$/);
       if (profileMatch && request.method === 'GET') {
