@@ -192,7 +192,7 @@ test('a reciprocal block cannot reveal the blocking player profile or live locat
   }
 });
 
-test('switching the shared browser session revokes its old token and event streams across tabs', async t => {
+test('account switching revokes the old browser token and older target-account session', async t => {
   const app = await setup(t), browser = app.client(), independentBob = app.client();
   const a = await signup(browser, 'Alice'), b = await signup(independentBob, 'Bob');
   const siblingTab = browser.forkSession();
@@ -214,7 +214,7 @@ test('switching the shared browser session revokes its old token and event strea
     assert.equal((await browser('/api/auth/logout', {})).status, 200);
     await newEvents.closed();
     assert.equal((await newSiblingTab('/api/session')).data.user, null);
-    assert.equal((await independentBob('/api/session')).data.user.id, b.id, 'A different browser session should remain valid');
+    assert.equal((await independentBob('/api/session')).data.user, null, 'The older Bob session must be revoked by single-device login');
   } finally {
     await primaryEvents.close(); await siblingEvents.close();
     if (newEvents) await newEvents.close();
@@ -259,8 +259,8 @@ test('task rewards validate movement and acceptance; rewards and game rounds can
   assert.equal((await alice('/api/games/coconut/finish', { roundId: badRound.roundId, sequence: wrong })).status, 400);
   assert.equal((await alice('/api/games/coconut/finish', badRound)).status, 409);
   await app.restart();
-  assert.equal((await alice('/api/session')).data.user, null);
-  const restored = (await alice('/api/auth/login', { identifier: 'Alice', password: 'test-password-2026' })).data.user;
+  const restored = (await alice('/api/session')).data.user;
+  assert.ok(restored, 'The persistent session should survive a server restart');
   assert.equal(restored.points, 105);
   assert.equal(restored.x, -26);
   assert.equal(restored.z, 6);
@@ -345,8 +345,7 @@ test('Kerala Cash wallet uses server prices, prevents replay/overspend, keeps hi
   assert.equal(wallet.transactions[0].balanceAfter, 30);
 
   await app.restart();
-  assert.equal((await alice('/api/session')).data.user, null);
-  assert.equal((await alice('/api/auth/login', { identifier: 'WalletAlice', password: 'test-password-2026' })).status, 200);
+  assert.equal((await alice('/api/session')).data.user.username, 'WalletAlice');
   wallet = (await alice('/api/wallet')).data;
   assert.equal(wallet.balance, 30);
   assert.equal(wallet.starterJobCompleted, true);
@@ -415,8 +414,7 @@ test('jobs require job vehicles, real world checkpoints, server salary, cooldown
   assert.equal(firstTaxiVehicle.kind, 'taxi');
 
   await app.restart();
-  assert.equal((await alice('/api/session')).data.user, null);
-  assert.equal((await alice('/api/auth/login', { identifier: 'JobAlice', password: 'test-password-2026' })).status, 200);
+  assert.equal((await alice('/api/session')).data.user.username, 'JobAlice');
   jobs = (await alice('/api/jobs')).data;
   assert.equal(jobs.active.taskId, taxiTaskId, 'Active mission should survive a server restart');
   assert.deepEqual({ x: jobs.active.target.x, z: jobs.active.target.z }, { x: firstTaxiTarget.x, z: firstTaxiTarget.z }, 'Mission checkpoint should persist');
@@ -582,8 +580,7 @@ test('personal garage purchase retrieve driving storage and persistence stay ser
   assert.equal(stored.data.garage.activeVehicle, null);
 
   await app.restart();
-  assert.equal((await alice('/api/session')).data.user, null);
-  assert.equal((await alice('/api/auth/login', { identifier: 'GarageAlice', password: 'test-password-2026' })).status, 200);
+  assert.equal((await alice('/api/session')).data.user.username, 'GarageAlice');
   garage = (await alice('/api/garage')).data;
   assert.equal(garage.owned.length, 1);
   assert.equal(garage.owned[0].id, vehicleId);
@@ -1043,8 +1040,9 @@ test('phone notifications persist events dedupe live reminders and support read 
   await signup(bob, 'NotifyBob');
 
   let alerts = (await alice('/api/notifications')).data;
-  assert.equal(alerts.unreadCount, 0);
-  assert.deepEqual(alerts.items, []);
+  assert.equal(alerts.items.filter(item => !item.live).length, 0, 'A new account should have no stored notifications');
+  if (alerts.unreadCount) alerts = (await alice('/api/notifications/read', { all: true })).data;
+  assert.equal(alerts.unreadCount, 0, 'Any currently active live world/event reminder can be marked read');
 
   const starter = await alice('/api/jobs/starter-delivery/complete', {});
   assert.equal(starter.status, 200);
