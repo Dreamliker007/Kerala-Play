@@ -132,6 +132,17 @@ const host = process.env.HOST || '0.0.0.0';
 server.listen(port, host, () => {
   console.log(`Kerala Play production backend running at http://${host}:${server.address().port}`);
   console.log('[Kerala Play] durable storage: Supabase');
+  const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (supabaseUrl && serviceKey) {
+    void fetch(`${supabaseUrl}/auth/v1/settings`, {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Accept: 'application/json' },
+    }).then(async response => {
+      const settings = await response.json().catch(() => ({}));
+      const external = settings?.external || {};
+      console.log(`[Kerala Play] OAuth providers: google=${external.google === true} facebook=${external.facebook === true}`);
+    }).catch(error => console.warn('[Kerala Play] OAuth provider status unavailable:', error.message));
+  }
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
