@@ -277,3 +277,17 @@
 .community-event-actions button { flex:1; }
 #events-panel :focus-visible { outline:3px solid #ffe298; outline-offset:3px; }
 @media (max-width:560px) { #events-panel { width:min(340px,calc(100vw - 86px)); max-height:calc(100dvh - 40px - env(safe-area-inset-top)); } }
+
+
+/* Profile view/edit states */
+.profile-view-actions { margin-top:14px; }
+.profile-edit-button { width:100%; margin-top:0; }
+.profile-edit-actions { display:flex; gap:8px; margin-top:6px; }
+.profile-edit-actions .social-button { flex:1; margin-top:0; }
+@media (orientation:landscape) and (max-height:580px) {
+  #social-profile-modal { align-items:flex-start; padding-top:10px; padding-bottom:10px; }
+  #social-profile-modal .social-card { width:min(620px,100%); max-height:calc(100dvh - 20px); padding:16px 20px; }
+  #social-profile-modal .social-stats { margin:10px 0; padding:9px 0; }
+  #social-profile-modal .social-field { margin:8px 0; }
+  #social-profile-modal .social-card textarea { min-height:58px; }
+}
