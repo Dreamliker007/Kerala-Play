@@ -392,13 +392,17 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   authForm.addEventListener('submit', async event => {
     event.preventDefault();
     if (!authForm.reportValidity()) return;
+    const submitLabel = authMode === 'signup' ? 'Create account & explore' : 'Log in & explore';
     authSubmit.disabled = true;
+    authSubmit.textContent = authMode === 'signup' ? 'Creating account…' : 'Connecting…';
+    authError.textContent = '';
     await run(async () => {
       const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, ...(authMode === 'signup' ? { email: signupEmail.value, mobile: signupMobile.value, district: signupDistrict.value, gender: signupGender.value } : {}) });
       password.value = '';
       await beginSession(result.user, authMode === 'signup');
     }, authError);
     authSubmit.disabled = false;
+    if (!user) authSubmit.textContent = submitLabel;
   });
 
   peoplePanel.replaceChildren(panelHeader('People', peoplePanel));
@@ -2273,12 +2277,35 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   updateProximityButton();
   setConnection(false);
   const initialVersion = sessionVersion;
-  run(async () => {
-    const result = await api('/api/session');
+  void (async () => {
+    let result = null;
+    try { result = await api('/api/session'); }
+    catch { /* Cold-start errors stay out of the login form while the service warms. */ }
+
     if (initialVersion !== sessionVersion) return;
-    if (result.user) await beginSession(result.user);
-    else renderAuth();
-  }, authError).then(() => { if (!user && authModal.hidden) renderAuth('login', authError.textContent); });
+    if (result?.user) {
+      await beginSession(result.user);
+      return;
+    }
+
+    if (authModal.hidden) renderAuth('login');
+
+    // Free production instances can need time to wake. Keep warming in the
+    // background without stealing focus or showing a false login error.
+    for (const delay of [2500, 5000, 8000]) {
+      await wait(delay);
+      if (initialVersion !== sessionVersion || user) return;
+      try {
+        const retry = await api('/api/session');
+        if (initialVersion !== sessionVersion || user) return;
+        if (retry?.user) {
+          await beginSession(retry.user);
+          return;
+        }
+        return;
+      } catch { /* stay on the usable login form and retry quietly */ }
+    }
+  })();
 
   return {
     closePanels,
