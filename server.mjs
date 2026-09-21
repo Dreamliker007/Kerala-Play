@@ -254,11 +254,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       migrated = true;
     }
   }
-  const sessions = new Map(
-    db.sessions
-      .filter(item => item && typeof item.key === 'string' && typeof item.id === 'string' && Number(item.expires) > now() && db.users.some(user => user.id === item.id))
-      .map(item => [item.key, { id: item.id, expires: Number(item.expires) }]),
-  );
+  const latestSessionByUser = new Map();
+  for (const item of db.sessions) {
+    if (!item || typeof item.key !== 'string' || typeof item.id !== 'string' || Number(item.expires) <= now() || !db.users.some(user => user.id === item.id)) continue;
+    const current = latestSessionByUser.get(item.id);
+    if (!current || Number(item.expires) > current.expires) latestSessionByUser.set(item.id, { key: item.key, id: item.id, expires: Number(item.expires) });
+  }
+  const sessions = new Map([...latestSessionByUser.values()].map(item => [item.key, { id: item.id, expires: item.expires }]));
+  if (sessions.size !== db.sessions.length) migrated = true;
   const clients = new Map(), presence = new Map(), rounds = new Map(), rates = new Map(), resetTokens = new Map();
   function syncSessionsToDb() {
     db.sessions = [...sessions.entries()]
@@ -378,11 +381,24 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { user, key };
   }
   async function startSession(user, response, request) {
-    const previous = sessionFor(request);
-    if (previous) {
-      sessions.delete(previous.key);
-      for (const client of clients.get(previous.user.id) || []) if (client.key === previous.key) client.response.end();
+    const revokedKeys = new Set();
+    for (const [key, session] of sessions) {
+      if (session.id !== user.id) continue;
+      revokedKeys.add(key);
+      sessions.delete(key);
     }
+
+    const connections = clients.get(user.id);
+    if (connections?.size) {
+      for (const client of [...connections]) {
+        if (!revokedKeys.has(client.key)) continue;
+        try {
+          client.response.write(`event: session-revoked\ndata: ${JSON.stringify({ reason: 'signed-in-elsewhere' })}\n\n`);
+        } catch { /* The stale client may already be gone. */ }
+        client.response.end();
+      }
+    }
+
     const token = randomBytes(32).toString('hex');
     sessions.set(hashToken(token), { id: user.id, expires: now() + SESSION_AGE });
     dirty = true;
