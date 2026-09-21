@@ -1504,19 +1504,27 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const error = node('div', 'social-error'); error.setAttribute('role', 'status');
       profileCard.replaceChildren(header, node('p', 'social-muted', `${person.district || 'Kerala'} · ${person.gender === 'female' ? 'Female' : 'Male'} avatar`), stats);
       if (own) {
-        const form = node('form', 'social-form');
-        const district = select(districts, person.district);
-        const gender = select([['male', 'Male'], ['female', 'Female']], person.gender);
-        const row = node('div', 'social-fields-row'); row.append(field('District', district), field('Avatar', gender));
-        const bio = node('textarea'); bio.value = person.bio || ''; bio.maxLength = 180; bio.rows = 3;
-        bio.placeholder = 'Tell people a little about yourself';
-        const save = node('button', 'social-button primary', 'Save profile'); save.type = 'submit';
-        form.append(row, field('About you', bio), save);
-        form.addEventListener('submit', async event => { event.preventDefault(); save.disabled = true; await run(async () => { const response = await api('/api/profile', { district: district.value, gender: gender.value, bio: bio.value.trim() }, 'PATCH'); if (response.user) setUser(response.user); else await refreshUser(); toast('Profile saved'); closeProfile(); }, error); save.disabled = false; });
-        const logout = button('Log out', () => run(async () => { await api('/api/auth/logout', {}); endSession(); }, error), 'social-button secondary');
-        const socialActions = node('div', 'social-actions');
-        socialActions.append(button('Followers & requests', () => { peopleFilter = 'followers'; openPeople(); }), logout);
-        profileCard.append(form, socialActions);
+        const editActions = node('div', 'social-actions profile-view-actions');
+        const edit = button('Edit profile', () => renderOwnProfile(true), 'social-button primary profile-edit-button');
+        edit.setAttribute('aria-label', 'Edit your profile');
+        editActions.append(edit);
+        profileCard.append(node('p', 'social-bio', person.bio || 'This explorer has not added a bio yet.'), editActions);
+        function renderOwnProfile(editing) {
+          if (!editing) return;
+          const form = node('form', 'social-form');
+          const district = select(districts, person.district);
+          const gender = select([['male', 'Male'], ['female', 'Female'], ['other', 'Other']], person.gender);
+          const row = node('div', 'social-fields-row'); row.append(field('District', district), field('Avatar', gender));
+          const bio = node('textarea'); bio.value = person.bio || ''; bio.maxLength = 180; bio.rows = 3;
+          bio.placeholder = 'Tell people a little about yourself';
+          const save = node('button', 'social-button primary', 'Save changes'); save.type = 'submit';
+          const cancel = button('Cancel', () => openProfile(person.id, true), 'social-button secondary');
+          const actions = node('div', 'social-actions profile-edit-actions'); actions.append(save, cancel);
+          form.append(node('p', 'social-muted', 'Update the details other players see. Username and account identity stay protected.'), row, field('About you', bio), actions);
+          form.addEventListener('submit', async event => { event.preventDefault(); save.disabled = true; cancel.disabled = true; await run(async () => { const response = await api('/api/profile', { district: district.value, gender: gender.value, bio: bio.value.trim() }, 'PATCH'); if (response.user) setUser(response.user); else await refreshUser(); toast('Profile saved'); await openProfile(person.id, true); }, error); save.disabled = false; cancel.disabled = false; });
+          profileCard.replaceChildren(header, form, error);
+          district.focus();
+        }
       } else {
         profileCard.append(node('p', 'social-bio', person.bio || 'This explorer has not added a bio yet.'), node('p', 'social-muted', relationshipText(person)));
         const actions = relationshipButtons(person, error);
