@@ -1804,11 +1804,13 @@ function updateWorldInteract() {
       worldInteract.dataset.mode = closeEnough ? (favorReady ? 'npc-favor-start' : 'npc-talk') : '';
       worldInteract.dataset.npc = closeEnough ? String(data.npcIndex) : '';
       worldInteract.disabled = talking || !closeEnough;
-      worldInteract.title = closeEnough
-        ? (favorReady ? `${data.favorOffer.title} · reward ₹${Number(data.favorOffer.reward || 0)}` : `Talk to ${data.name}`)
-        : `${data.name} · ${nearbyNpc.distance.toFixed(1)} m away`;
+      worldInteract.title = talking
+        ? `Conversation with ${data.name}`
+        : closeEnough
+          ? (favorReady ? `${data.favorOffer.title} · reward ₹${Number(data.favorOffer.reward || 0)}` : `Talk to ${data.name}`)
+          : `${data.name} · ${nearbyNpc.distance.toFixed(1)} m away`;
       worldInteract.textContent = talking
-        ? `TALKING · ${String(data.name).toUpperCase()}`
+        ? `💬 ${String(data.name).toUpperCase()}`
         : closeEnough
           ? favorReady
             ? `HELP · ${String(data.name).toUpperCase()}`
@@ -2390,7 +2392,8 @@ function updateRemotePlayers(delta, camera) {
     labelPosition.copy(labelWorldPosition); labelPosition.y += 2.65;
     labelPosition.project(camera);
     const labelDistance = object.userData.npc ? (runtimeIsMobile ? 22 : 30) : 45;
-    let visible = !!profile && object.visible && !!label.textContent && distance < labelDistance && labelPosition.z > -1 && labelPosition.z < 1 && Math.abs(labelPosition.x) < .95 && Math.abs(labelPosition.y) < .93;
+    const npcTalking = !!object.userData.npc && Number(object.userData.interactionUntil || 0) > performance.now();
+    let visible = !!profile && object.visible && !!label.textContent && !npcTalking && distance < labelDistance && labelPosition.z > -1 && labelPosition.z < 1 && Math.abs(labelPosition.x) < .95 && Math.abs(labelPosition.y) < .93;
     const screenX = (labelPosition.x + 1) * innerWidth / 2;
     const screenY = (1 - labelPosition.y) * innerHeight / 2;
     if (visible && object !== playerRef) {
@@ -4071,9 +4074,19 @@ function updateVillagers(time) {
     }
 
     if (Number(data.interactionUntil || 0) > performance.now()) {
-      const dx = Number(data.interactionPlayerX) - villager.position.x;
-      const dz = Number(data.interactionPlayerZ) - villager.position.z;
-      if (Math.hypot(dx, dz) > .05) villager.rotation.y = Math.atan2(dx, dz);
+      const playerX = Number(playerRef?.position.x ?? data.interactionPlayerX);
+      const playerZ = Number(playerRef?.position.z ?? data.interactionPlayerZ);
+      let dx = playerX - villager.position.x;
+      let dz = playerZ - villager.position.z;
+      const talkDistance = Math.hypot(dx, dz);
+      if (talkDistance > .05) villager.rotation.y = Math.atan2(dx, dz);
+      if (talkDistance > .05 && talkDistance < 1.35) {
+        const separation = Math.min(.12, 1.35 - talkDistance);
+        villager.position.x -= (dx / talkDistance) * separation;
+        villager.position.z -= (dz / talkDistance) * separation;
+        dx = playerX - villager.position.x;
+        dz = playerZ - villager.position.z;
+      }
       animateHuman(human, time * .62 + data.offset, 0);
       const greetBeat = (Math.sin(time * 4.1 + data.offset) + 1) * .5;
       if (parts.rightArm) parts.rightArm.rotation.x = -.28 - greetBeat * .38;
