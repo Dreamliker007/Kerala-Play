@@ -291,3 +291,8 @@
   #social-profile-modal .social-field { margin:8px 0; }
   #social-profile-modal .social-card textarea { min-height:58px; }
 }
+
+
+.profile-edit-actions { align-items:stretch; }
+@media (max-width:560px) { .profile-edit-actions .social-button { min-height:44px; } }
+@media (orientation:landscape) and (max-height:580px) { #social-profile-modal .social-fields-row { gap:10px; } #social-profile-modal .social-fields-row > .social-field { min-width:0; } }
