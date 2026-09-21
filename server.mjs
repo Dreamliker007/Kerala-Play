@@ -316,10 +316,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const position = presence.get(user.id), saved = savedPosition(user);
     let level = 1, remaining = user.points, next = 100;
     while (remaining >= next) { remaining -= next; level++; next = 100 + (level - 1) * 50; }
-    const displayName = user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username);
-    return { id: user.id, username: displayName, name: displayName, district: user.district, gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
+    const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username);
+    return { id: user.id, username: displayName, name: displayName, displayName, accountUsername: user.username, usernameChangedAt: Number(user.usernameChangedAt || 0), usernameChangeAvailableAt: Number(user.usernameChangedAt || 0) + 10 * 24 * 60 * 60 * 1000, district: user.district, gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
   }
-  function blockedUser(user) { const displayName = user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username); return { id: user.id, username: displayName, name: displayName, blocked: true }; }
+  function blockedUser(user) { const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username); return { id: user.id, username: displayName, name: displayName, blocked: true }; }
   function online(id) { return !!presence.get(id) && now() - presence.get(id).lastSeen < 20000; }
   function emit(id, event, payload) {
     const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
@@ -1602,7 +1602,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
         requireValue(/^[A-Za-z][A-Za-z '-]{1,39}$/.test(firstName), 400, 'Enter a valid first name.');
         const [spawnX, spawnZ] = DISTRICTS[district];
-        const user = { id: randomUUID(), firstName, username, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldX: spawnX + 12, worldZ: spawnZ, worldRotation: 0, worldUpdatedAt: now() };
+        const user = { id: randomUUID(), firstName, displayName: firstName, username, usernameChangedAt: 0, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldX: spawnX + 12, worldZ: spawnZ, worldRotation: 0, worldUpdatedAt: now() };
         db.users.push(user); walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash'); await persist(); await startSession(user, response, request); socialChanged();
         send(response, 201, { user: publicUser(user) }); return;
       }
@@ -1740,6 +1740,15 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(body.district === undefined || Object.hasOwn(DISTRICTS, body.district), 400, 'Choose a valid Kerala district.');
         requireValue(body.gender === undefined || ['male', 'female', 'other'].includes(body.gender), 400, 'Choose a valid avatar.');
         requireValue(body.bio === undefined || (typeof body.bio === 'string' && body.bio.length <= 180), 400, 'Bio must be 180 characters or fewer.');
+        requireValue(body.displayName === undefined || (typeof body.displayName === 'string' && /^[A-Za-z][A-Za-z '-]{1,39}$/.test(body.displayName.trim())), 400, 'Name must be 2–40 letters.');
+        requireValue(body.username === undefined || (typeof body.username === 'string' && /^(?=.*[A-Za-z])[A-Za-z0-9_]{3,24}$/.test(body.username.trim())), 400, 'Username must be 3–24 characters and include at least one letter.');
+        if (body.username !== undefined && body.username.trim().toLowerCase() !== user.username.toLowerCase()) {
+          requireValue(now() - Number(user.usernameChangedAt || 0) >= 10 * 24 * 60 * 60 * 1000, 409, 'Username can be changed again after 10 days.');
+          requireValue(!db.users.some(candidate => candidate.id !== user.id && candidate.username.toLowerCase() === body.username.trim().toLowerCase()), 409, 'That username is already taken.');
+          user.username = body.username.trim();
+          user.usernameChangedAt = now();
+        }
+        if (body.displayName !== undefined) { user.displayName = body.displayName.trim(); user.firstName = user.displayName; }
         const relocate = body.district && body.district !== user.district;
         if (body.district !== undefined) user.district = body.district;
         if (body.gender !== undefined) user.gender = body.gender;
