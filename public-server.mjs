@@ -5,7 +5,9 @@ import { createGameServer } from './server.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const API_UPSTREAM = String(process.env.KP_API_UPSTREAM || '').replace(/\/$/, '');
-const API_TIMEOUT_MS = Math.max(5000, Number(process.env.KP_API_TIMEOUT_MS || 45000));
+const API_TIMEOUT_MS = Math.max(5000, Number(process.env.KP_API_TIMEOUT_MS || 15000));
+const API_WAKE_WINDOW_MS = Math.max(API_TIMEOUT_MS, Number(process.env.KP_API_WAKE_WINDOW_MS || 70000));
+const API_RETRY_DELAY_MS = Math.max(750, Number(process.env.KP_API_RETRY_DELAY_MS || 2200));
 
 function worldAlertsFromEnv() {
   const raw = process.env.KP_WORLD_ALERTS_JSON;
@@ -27,24 +29,37 @@ function transientUpstreamStatus(status) {
 
 async function fetchUpstream(target, options, requestMethod, pathname) {
   const safeRetry = ['GET', 'HEAD'].includes(requestMethod) || (requestMethod === 'POST' && pathname === '/api/auth/login');
-  const attempts = safeRetry ? 2 : 1;
+  const deadline = Date.now() + (safeRetry ? API_WAKE_WINDOW_MS : API_TIMEOUT_MS);
   let lastResponse = null;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
+  let lastError = null;
+  let attempt = 0;
+
+  while (Date.now() < deadline) {
+    attempt += 1;
+    const remaining = Math.max(1000, deadline - Date.now());
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), Math.min(API_TIMEOUT_MS, remaining));
     try {
       const upstream = await fetch(target, { ...options, signal: controller.signal });
       lastResponse = upstream;
-      if (!transientUpstreamStatus(upstream.status) || attempt + 1 >= attempts) return upstream;
+      lastError = null;
+      if (!safeRetry || !transientUpstreamStatus(upstream.status)) return upstream;
       await upstream.body?.cancel?.().catch?.(() => {});
     } catch (error) {
-      if (attempt + 1 >= attempts) throw error;
+      lastError = error;
+      if (!safeRetry) throw error;
     } finally {
       clearTimeout(timeout);
     }
-    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    if (!safeRetry || Date.now() >= deadline) break;
+    const backoff = Math.min(5000, API_RETRY_DELAY_MS + Math.max(0, attempt - 1) * 350);
+    await new Promise(resolve => setTimeout(resolve, Math.min(backoff, Math.max(0, deadline - Date.now()))));
   }
-  return lastResponse;
+
+  if (lastResponse) return lastResponse;
+  if (lastError) throw lastError;
+  throw new Error('Production API did not become ready in time');
 }
 
 // Preserve the existing game/API server while exposing stable public policy
@@ -151,7 +166,20 @@ if (gameRequestListener) {
 
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || '0.0.0.0';
-server.listen(port, host, () => console.log(`Kerala Play running at http://${host}:${server.address().port}`));
+server.listen(port, host, () => {
+  console.log(`Kerala Play running at http://${host}:${server.address().port}`);
+  if (API_UPSTREAM) {
+    const warmTarget = new URL('/api/session', API_UPSTREAM);
+    void fetchUpstream(warmTarget, {
+      method: 'GET',
+      headers: { Accept: 'application/json', origin: API_UPSTREAM, referer: `${API_UPSTREAM}/` },
+      redirect: 'manual',
+    }, 'GET', '/api/session')
+      .then(response => response?.body?.cancel?.().catch?.(() => {}))
+      .then(() => console.log('[Kerala Play] production API warm-up ready'))
+      .catch(error => console.warn('[Kerala Play] production API warm-up pending:', error.message));
+  }
+});
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, async () => {
