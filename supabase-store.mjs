@@ -1,4 +1,5 @@
 const INLINE_AUDIO_PREFIX = 'inline-base64:';
+const EMBEDDED_GROUPS_KEY = '__socialGroupsOwned';
 
 function required(value, name) {
   if (!value) throw new Error(`${name} is required for the production backend.`);
@@ -249,12 +250,20 @@ export function createSupabaseStore({
       optionalWorldRequest('kp_world_state?select=*&order=updated_at.asc'),
     ]);
     const worldByUser = new Map((worldStates || []).map(row => [row.user_id, row]));
+    const mappedUsers = (users || []).map(row => applyWorldState(mapUserFromRow(row), worldByUser.get(row.id)));
+    const groups = [];
+    for (const user of mappedUsers) {
+      const embedded = user.jobState?.[EMBEDDED_GROUPS_KEY];
+      if (Array.isArray(embedded)) groups.push(...embedded);
+      if (user.jobState && typeof user.jobState === 'object') delete user.jobState[EMBEDDED_GROUPS_KEY];
+    }
     return {
       version: 1,
-      users: (users || []).map(row => applyWorldState(mapUserFromRow(row), worldByUser.get(row.id))),
+      users: mappedUsers,
       follows: (follows || []).map(row => ({ from: row.from_id, to: row.to_id, status: row.status })),
       blocks: (blocks || []).map(row => ({ from: row.from_id, to: row.to_id })),
       messages: (messages || []).map(mapMessageFromRow),
+      groups,
       transactions: (transactions || []).map(mapWalletTransactionFromRow),
       sessions: (sessions || []).map(mapSessionFromRow).filter(session => session.expires > Date.now()),
     };
@@ -263,8 +272,24 @@ export function createSupabaseStore({
   async function save(snapshot) {
     const db = typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot;
     if (!db || db.version !== 1) throw new Error('Unsupported Kerala Play snapshot.');
+    // Groups are embedded in the owner's existing job_state JSON during the
+    // transitional persistence phase. This keeps production durable without
+    // requiring a new Supabase table before the wider social-schema migration.
+    const groupsByOwner = new Map();
+    for (const group of db.groups || []) {
+      if (!group?.ownerId) continue;
+      const owned = groupsByOwner.get(group.ownerId) || [];
+      owned.push(group);
+      groupsByOwner.set(group.ownerId, owned);
+    }
     const payload = {
-      users: (db.users || []).map(mapUserToRow),
+      users: (db.users || []).map(user => mapUserToRow({
+        ...user,
+        jobState: {
+          ...(user.jobState && typeof user.jobState === 'object' ? user.jobState : {}),
+          [EMBEDDED_GROUPS_KEY]: groupsByOwner.get(user.id) || [],
+        },
+      })),
       follows: (db.follows || []).map(follow => ({ from_id: follow.from, to_id: follow.to, status: follow.status })),
       blocks: (db.blocks || []).map(block => ({ from_id: block.from, to_id: block.to })),
       messages: (db.messages || []).map(mapMessageToRow),

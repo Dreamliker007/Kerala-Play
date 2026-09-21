@@ -29,6 +29,8 @@ jobs:
           node --check game.js
           node --check environment.js
           node --check social.js
+          node --check supabase-store.mjs
+          node --check production-server.mjs
           node --check boot.js
       - name: Run Android release config check
         run: npm run mobile:release:check

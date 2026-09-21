@@ -130,6 +130,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   let profileId = null;
   let peopleFilter = 'followers';
   let peopleSearch = '';
+  let groupsSnapshot = { groups: [], invites: [], limits: {} };
+  let groupsVersion = 0;
+  let groupMessageVersion = 0;
+  let activeGroupId = null;
+  let groupReturnFocus = null;
   let messageVersion = 0;
   let profileVersion = 0;
   let peopleVersion = 0;
@@ -414,8 +419,19 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   profileModal.append(profileCard);
   document.body.append(profileModal);
 
+  const groupModal = node('section', 'social-modal');
+  groupModal.id = 'social-group-modal';
+  groupModal.setAttribute('role', 'dialog');
+  groupModal.setAttribute('aria-modal', 'true');
+  groupModal.setAttribute('aria-labelledby', 'social-group-title');
+  groupModal.hidden = true;
+  const groupCard = node('div', 'social-card group-card');
+  groupModal.append(groupCard);
+  document.body.append(groupModal);
+
   function trapFocus(event) {
     event.stopPropagation();
+    if (event.key === 'Escape' && !groupModal.hidden) { closeGroup(); return; }
     if (event.key === 'Escape' && !profileModal.hidden) { closeProfile(); return; }
     if (event.key !== 'Tab') return;
     const elements = [...event.currentTarget.querySelectorAll('button, input, select, textarea, a[href], [tabindex="0"]')].filter(element => !element.disabled && element.getClientRects().length);
@@ -426,7 +442,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   authModal.addEventListener('keydown', trapFocus);
   profileModal.addEventListener('keydown', trapFocus);
+  groupModal.addEventListener('keydown', trapFocus);
   profileModal.addEventListener('click', event => { if (event.target === profileModal) closeProfile(); });
+  groupModal.addEventListener('click', event => { if (event.target === groupModal) closeGroup(); });
   for (const panel of [peoplePanel, dmPanel, chatPanel]) {
     panel?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape') { closePanels(); chatToggle?.focus(); } });
     panel?.addEventListener('pointerdown', event => event.stopPropagation());
@@ -540,8 +558,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const peopleTabs = node('div', 'social-tabs people-tabs');
   // People is intentionally a private social space: only relationship lists
   // are shown here. New players can still be met naturally in the world.
-  for (const [value, label] of [['followers', 'Followers'], ['following', 'Following'], ['requests', 'Requests']]) {
-    const tab = button(label, () => { peopleFilter = value; renderPeople(); });
+  for (const [value, label] of [['followers', 'Followers'], ['following', 'Following'], ['requests', 'Requests'], ['groups', 'Groups']]) {
+    const tab = button(label, () => { peopleFilter = value; renderPeople(); if (value === 'groups') run(refreshGroups, peopleError); });
     tab.dataset.filter = value;
     peopleTabs.append(tab);
   }
@@ -665,20 +683,85 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     else card.append(relationshipButtons(person));
     return card;
   }
+  function groupById(id) {
+    return [...(groupsSnapshot.groups || []), ...(groupsSnapshot.invites || [])].find(group => group.id === id) || null;
+  }
+  async function refreshGroups() {
+    if (!user) return groupsSnapshot;
+    const version = ++groupsVersion;
+    const result = await api('/api/groups');
+    if (!user || version !== groupsVersion) return groupsSnapshot;
+    groupsSnapshot = result || { groups: [], invites: [], limits: {} };
+    if (peopleFilter === 'groups') renderPeople();
+    if (activeGroupId && !groupModal.hidden && !(groupsSnapshot.groups || []).some(group => group.id === activeGroupId)) closeGroup();
+    return groupsSnapshot;
+  }
+  function renderGroupsList() {
+    const createForm = node('form', 'social-form group-create-form');
+    const name = input('text', { placeholder: 'New group name', maxLength: 40, required: true, autocomplete: 'off' });
+    const create = node('button', 'social-button primary', 'Create group'); create.type = 'submit';
+    createForm.append(field('Create a group', name), create);
+    createForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!name.value.trim()) return;
+      create.disabled = true;
+      await run(async () => {
+        const result = await api('/api/groups', { name: name.value.trim() });
+        name.value = '';
+        groupsSnapshot = result.summary || await api('/api/groups');
+        renderPeople();
+        if (result.group?.id) await openGroup(result.group.id);
+      }, peopleError);
+      create.disabled = false;
+    });
+    peopleList.append(createForm);
+
+    const invites = groupsSnapshot.invites || [];
+    if (invites.length) peopleList.append(node('strong', 'group-section-title', 'Invitations'));
+    for (const group of invites) {
+      const card = node('article', 'people-entry group-entry');
+      const info = node('div');
+      info.append(node('strong', '', group.name), node('small', 'social-muted', `${group.memberCount} member${group.memberCount === 1 ? '' : 's'} · invitation pending`));
+      const actions = node('div', 'social-actions');
+      actions.append(
+        button('Accept', () => run(async () => { await api(`/api/groups/${encodeURIComponent(group.id)}/respond`, { action: 'accept' }); await refreshGroups(); }, peopleError)),
+        button('Decline', () => run(async () => { await api(`/api/groups/${encodeURIComponent(group.id)}/respond`, { action: 'decline' }); await refreshGroups(); }, peopleError), 'social-button secondary')
+      );
+      card.append(info, actions); peopleList.append(card);
+    }
+
+    const groups = groupsSnapshot.groups || [];
+    if (groups.length) peopleList.append(node('strong', 'group-section-title', 'Your groups'));
+    if (!groups.length && !invites.length) peopleList.append(node('p', 'social-empty', 'No groups yet. Create one and invite an accepted contact.'));
+    for (const group of groups) {
+      const card = node('article', 'people-entry group-entry');
+      const open = button('', () => run(() => openGroup(group.id), peopleError), 'social-person-name');
+      const badge = node('span', 'social-avatar group-avatar', group.name.slice(0, 1).toUpperCase());
+      const details = node('span');
+      details.append(node('strong', '', group.name), node('small', '', `${group.memberCount} member${group.memberCount === 1 ? '' : 's'}${group.isOwner ? ' · You own this group' : ''}`));
+      open.append(badge, details);
+      card.append(open, button('Open', () => run(() => openGroup(group.id), peopleError), 'social-button secondary'));
+      peopleList.append(card);
+    }
+  }
   function renderPeople() {
     peopleList.replaceChildren();
     for (const tab of peopleTabs.children) tab.setAttribute('aria-pressed', String(tab.dataset.filter === peopleFilter));
-    const visible = people.filter(person => {
-      if (person.id === user?.id || !person.username?.toLowerCase().includes(peopleSearch)) return false;
-      if (peopleFilter === 'blocked') return person.blocked;
-      if (person.blocked) return false;
-      if (peopleFilter === 'followers') return ['follower', 'mutual'].includes(person.relationship);
-      if (peopleFilter === 'following') return ['following', 'mutual'].includes(person.relationship);
-      if (peopleFilter === 'requests') return ['outgoing', 'incoming'].includes(person.relationship);
-      return true;
-    }).sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
-    if (!visible.length) peopleList.append(node('p', 'social-empty', 'No people in this list yet.'));
-    for (const person of visible) peopleList.append(personCard(person));
+    search.hidden = peopleFilter === 'groups';
+    if (peopleFilter === 'groups') renderGroupsList();
+    else {
+      const visible = people.filter(person => {
+        if (person.id === user?.id || !person.username?.toLowerCase().includes(peopleSearch)) return false;
+        if (peopleFilter === 'blocked') return person.blocked;
+        if (person.blocked) return false;
+        if (peopleFilter === 'followers') return ['follower', 'mutual'].includes(person.relationship);
+        if (peopleFilter === 'following') return ['following', 'mutual'].includes(person.relationship);
+        if (peopleFilter === 'requests') return ['outgoing', 'incoming'].includes(person.relationship);
+        return true;
+      }).sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
+      if (!visible.length) peopleList.append(node('p', 'social-empty', 'No people in this list yet.'));
+      for (const person of visible) peopleList.append(personCard(person));
+    }
     conversations.replaceChildren();
     const contacts = people.filter(person => person.id !== user?.id && canMessage(person));
     if (!contacts.length) conversations.append(node('p', 'social-empty', 'No accepted contacts yet. Open People to send or accept a follow request.'), button('Find people', openPeople));
@@ -969,6 +1052,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     else if (target === 'garage') openGarage();
     else if (target === 'jobs') openJobs();
     else if (target === 'people') openPeople();
+    else if (target === 'groups') { peopleFilter = 'groups'; openPeople(); run(refreshGroups, peopleError); }
     else if (target === 'events') openEvents();
   }
 
@@ -1452,9 +1536,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function openPeople() {
     if (!requireUser()) return;
-    closeProfile(); showPanel(peoplePanel);
+    closeProfile(); closeGroup(); showPanel(peoplePanel);
     run(refreshPeople, peopleError);
-    search.focus();
+    if (peopleFilter === 'groups') run(refreshGroups, peopleError);
+    else search.focus();
   }
   window.addEventListener('kerala-open-blocked', () => {
     if (!requireUser()) return;
@@ -1466,6 +1551,101 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (!requireUser()) return;
     closeProfile(); showPanel(chatPanel);
     run(refreshPeople, peopleError);
+  }
+  function closeGroup() {
+    if (groupModal.hidden) return;
+    groupModal.hidden = true;
+    activeGroupId = null;
+    groupMessageVersion++;
+    if (groupReturnFocus?.isConnected) groupReturnFocus.focus();
+  }
+  async function openGroup(id, preserveFocus = false) {
+    if (!requireUser()) return;
+    if (!preserveFocus) groupReturnFocus = document.activeElement;
+    activeGroupId = id;
+    const version = ++groupMessageVersion;
+    groupModal.hidden = false;
+    groupCard.replaceChildren(node('p', 'social-muted', 'Loading group…'));
+    await run(async () => {
+      const result = await api(`/api/groups/${encodeURIComponent(id)}/messages`);
+      if (groupModal.hidden || version !== groupMessageVersion) return;
+      const group = result.group;
+      const header = node('div', 'social-profile-header');
+      const title = node('h2', '', group.name); title.id = 'social-group-title';
+      const close = button('×', closeGroup, 'panel-close'); close.setAttribute('aria-label', 'Close group');
+      header.append(node('span', 'social-avatar group-avatar', group.name.slice(0, 1).toUpperCase()), title, close);
+
+      const members = node('div', 'group-members');
+      members.append(node('strong', '', `Members · ${group.memberCount}`));
+      for (const member of group.members || []) {
+        const row = node('div', 'group-member-row');
+        row.append(node('span', '', member.blocked ? 'Hidden member' : member.username), node('small', 'social-muted', `${member.owner ? 'Owner · ' : ''}${member.online ? '● Online' : 'Offline'}`));
+        members.append(row);
+      }
+
+      const error = node('div', 'social-error'); error.setAttribute('role', 'status');
+      const inviteBox = node('div', 'group-invite-box');
+      if (group.isOwner) {
+        const existing = new Set((group.members || []).map(member => member.id));
+        const candidates = people.filter(person => canMessage(person) && !person.blocked && !existing.has(person.id));
+        if (candidates.length && group.memberCount + Number(group.inviteCount || 0) < Number(groupsSnapshot.limits?.membersPerGroup || 12)) {
+          const inviteForm = node('form', 'social-form');
+          const inviteSelect = select(candidates.map(person => [person.id, person.username]), candidates[0]?.id);
+          const inviteButton = node('button', 'social-button secondary', 'Invite contact'); inviteButton.type = 'submit';
+          inviteForm.append(field('Invite an accepted contact', inviteSelect), inviteButton);
+          inviteForm.addEventListener('submit', async event => {
+            event.preventDefault(); inviteButton.disabled = true;
+            await run(async () => {
+              await api(`/api/groups/${encodeURIComponent(group.id)}/invite`, { peerId: inviteSelect.value });
+              toast('Group invitation sent');
+              await refreshGroups();
+              await openGroup(group.id, true);
+            }, error);
+            inviteButton.disabled = false;
+          });
+          inviteBox.append(inviteForm);
+        } else inviteBox.append(node('p', 'social-muted', 'No eligible accepted contacts to invite right now.'));
+      }
+
+      const log = node('div', 'group-message-log'); log.setAttribute('role', 'log'); log.setAttribute('aria-live', 'polite');
+      const messages = result.messages || [];
+      if (!messages.length) log.append(node('p', 'social-empty', 'No group messages yet.'));
+      for (const message of messages) {
+        const bubble = node('div', `group-message ${message.own ? 'own' : ''}`);
+        const created = new Date(message.createdAt);
+        bubble.append(node('strong', '', message.own ? 'You' : message.fromName), node('span', '', message.body), node('small', 'social-muted', Number.isNaN(created.getTime()) ? '' : created.toLocaleString()));
+        log.append(bubble);
+      }
+
+      const form = node('form', 'group-message-form');
+      const messageInput = input('text', { placeholder: 'Message the group', maxLength: 240, required: true, autocomplete: 'off' });
+      const send = node('button', 'social-button primary', 'Send'); send.type = 'submit';
+      form.append(messageInput, send);
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const body = messageInput.value.trim(); if (!body) return;
+        send.disabled = true;
+        await run(async () => {
+          await api(`/api/groups/${encodeURIComponent(group.id)}/messages`, { body });
+          messageInput.value = '';
+          await openGroup(group.id, true);
+        }, error);
+        send.disabled = false;
+      });
+
+      const leave = button(group.isOwner && group.memberCount === 1 ? 'Delete group' : 'Leave group', () => run(async () => {
+        await api(`/api/groups/${encodeURIComponent(group.id)}/leave`, {});
+        closeGroup();
+        await refreshGroups();
+        toast(group.isOwner && group.memberCount === 1 ? 'Group deleted' : 'You left the group');
+      }, error), 'social-button danger');
+      const actions = node('div', 'social-actions'); actions.append(leave);
+      groupCard.replaceChildren(header, node('p', 'social-muted', group.isOwner ? 'You own this group. Invite accepted contacts and chat together.' : 'Private group for members.'), members, inviteBox, node('strong', 'group-section-title', 'Group chat'), log, form, actions, error);
+      if (!preserveFocus) close.focus();
+    }, null);
+    if (version === groupMessageVersion && !groupCard.querySelector('#social-group-title')) {
+      groupCard.replaceChildren(node('p', 'social-error', 'Could not load this group. Please try again.'), button('Close', closeGroup));
+    }
   }
   function closeProfile() {
     if (profileModal.hidden) return;
@@ -1994,7 +2174,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       updateProximityWorld(players);
       onPlayers(players);
     });
-    listen('social', async () => { await refreshPeople(); await refreshUser(); if (!profileModal.hidden && profileId && profileId !== user?.id) await openProfile(profileId, true); });
+    listen('social', async () => { await refreshPeople(); await refreshGroups(); await refreshUser(); if (!profileModal.hidden && profileId && profileId !== user?.id) await openProfile(profileId, true); if (!groupModal.hidden && activeGroupId) await openGroup(activeGroupId, true); });
+    listen('group-message', async value => {
+      if (activeGroupId === value.groupId && !groupModal.hidden) await openGroup(value.groupId, true);
+      else { if (peopleFilter === 'groups') run(refreshGroups, peopleError); toast('New group message'); }
+    });
     listen('message', async value => {
       if (activePeer?.id === value.peerId && dmPanel.classList.contains('open')) await loadMessages();
       else { chatToggle?.classList.add('unread'); toast(`New message${people.find(person => person.id === value.peerId)?.username ? ` from ${people.find(person => person.id === value.peerId).username}` : ''}`); }
@@ -2015,9 +2199,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     sessionVersion++;
     cleanupVoice(); clearMessageURLs();
     source?.close(); source = null;
-    peopleVersion++; messageVersion++; profileVersion++;
-    people = []; peopleSignature = ''; activePeer = null; profileId = null;
-    closePanels(); closeProfile();
+    peopleVersion++; groupsVersion++; groupMessageVersion++; messageVersion++; profileVersion++;
+    people = []; peopleSignature = ''; groupsSnapshot = { groups: [], invites: [], limits: {} }; activePeer = null; profileId = null; activeGroupId = null;
+    closePanels(); closeProfile(); closeGroup();
     dmInput.value = ''; dmLog.replaceChildren();
     setUser(next);
     authModal.hidden = true;
@@ -2027,6 +2211,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     setConnection(false);
     startEvents();
     await run(refreshPeople, peopleError);
+    await run(refreshGroups, peopleError);
     await run(refreshJobs, jobsError);
     await run(refreshGarage, garageError);
     await run(refreshNeeds, walletError);
@@ -2047,9 +2232,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     source?.close(); source = null;
     cleanupVoice(); clearMessageURLs();
     if (notificationsTimer) { clearInterval(notificationsTimer); notificationsTimer = null; }
-    peopleVersion++; messageVersion++; profileVersion++;
-    people = []; peopleSignature = ''; activePeer = null; profileId = null;
-    closePanels(); closeProfile();
+    peopleVersion++; groupsVersion++; groupMessageVersion++; messageVersion++; profileVersion++;
+    people = []; peopleSignature = ''; groupsSnapshot = { groups: [], invites: [], limits: {} }; activePeer = null; profileId = null; activeGroupId = null;
+    closePanels(); closeProfile(); closeGroup();
     setUser(null); setConnection(false); onPlayers([]); onDisconnect();
     if (walletBalance) walletBalance.textContent = '₹0';
     notificationsSnapshot = null;
