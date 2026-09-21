@@ -1616,8 +1616,12 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         });
         const authUser = await authResponse.json().catch(() => null);
         requireValue(authResponse.ok && authUser?.id, 401, 'Social sign in could not be verified.');
-        const provider = String(authUser.app_metadata?.provider || authUser.identities?.[0]?.provider || '').toLowerCase();
-        requireValue(!provider || provider === body.provider, 401, 'Social sign in provider does not match.');
+        const providerCandidates = new Set([
+          authUser.app_metadata?.provider,
+          ...(Array.isArray(authUser.app_metadata?.providers) ? authUser.app_metadata.providers : []),
+          ...(Array.isArray(authUser.identities) ? authUser.identities.map(identity => identity?.provider) : []),
+        ].filter(Boolean).map(provider => String(provider).toLowerCase()));
+        requireValue(!providerCandidates.size || providerCandidates.has(body.provider), 401, 'Social sign in provider does not match.');
         const email = String(authUser.email || '').trim().toLowerCase();
         requireValue(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 400, 'Your social account must share an email address.');
 
