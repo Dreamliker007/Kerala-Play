@@ -2378,17 +2378,29 @@ function updateRemotePlayers(delta, camera) {
   if (!refreshLabels) return;
   remoteLabelAccumulator = 0;
   camera.updateMatrixWorld();
-  for (const object of [playerRef, ...villagers, ...remotePlayers.values()]) {
+  const occupiedLabels = [];
+  const labelObjects = [playerRef, ...remotePlayers.values(), ...villagers];
+  const overlapX = runtimeIsMobile ? 96 : 78;
+  const overlapY = runtimeIsMobile ? 30 : 24;
+  for (const object of labelObjects) {
     if (!object?.userData.label) continue;
     const label = object.userData.label;
     object.getWorldPosition(labelWorldPosition);
     const distance = camera.position.distanceTo(labelWorldPosition);
     labelPosition.copy(labelWorldPosition); labelPosition.y += 2.65;
     labelPosition.project(camera);
-    const labelDistance = object.userData.npc ? 30 : 45;
-    const visible = !!profile && object.visible && !!label.textContent && distance < labelDistance && labelPosition.z > -1 && labelPosition.z < 1 && Math.abs(labelPosition.x) < .95 && Math.abs(labelPosition.y) < .93;
+    const labelDistance = object.userData.npc ? (runtimeIsMobile ? 22 : 30) : 45;
+    let visible = !!profile && object.visible && !!label.textContent && distance < labelDistance && labelPosition.z > -1 && labelPosition.z < 1 && Math.abs(labelPosition.x) < .95 && Math.abs(labelPosition.y) < .93;
+    const screenX = (labelPosition.x + 1) * innerWidth / 2;
+    const screenY = (1 - labelPosition.y) * innerHeight / 2;
+    if (visible && object !== playerRef) {
+      visible = !occupiedLabels.some(point => Math.abs(point.x - screenX) < overlapX && Math.abs(point.y - screenY) < overlapY);
+    }
     label.hidden = !visible;
-    if (visible) label.style.transform = 'translate(-50%, -100%) translate(' + ((labelPosition.x + 1) * innerWidth / 2).toFixed(1) + 'px,' + ((1 - labelPosition.y) * innerHeight / 2).toFixed(1) + 'px)';
+    if (visible) {
+      label.style.transform = 'translate(-50%, -100%) translate(' + screenX.toFixed(1) + 'px,' + screenY.toFixed(1) + 'px)';
+      occupiedLabels.push({ x: screenX, y: screenY });
+    }
   }
 }
 
@@ -2777,14 +2789,36 @@ async function answerCoconut(value, generation) {
   finally { if (generation === challengeGeneration) { challengeRound = null; challengePlay.disabled = false; } }
 }
 
+let hudMenuCollapseTimer = null;
+
+function setHudMenuExpanded(expanded) {
+  document.body.classList.toggle('hud-menu-collapsed', !expanded);
+  if (!hudMenuToggle) return;
+  hudMenuToggle.setAttribute('aria-expanded', String(expanded));
+  hudMenuToggle.setAttribute('aria-label', expanded ? 'Hide game controls' : 'Show game controls');
+  hudMenuToggle.textContent = expanded ? '×' : '☰';
+}
+
+function scheduleHudMenuCollapse(delay = 5200) {
+  clearTimeout(hudMenuCollapseTimer);
+  if (onboardingStep >= 0 || document.body.classList.contains('hud-menu-collapsed')) return;
+  hudMenuCollapseTimer = setTimeout(() => setHudMenuExpanded(false), delay);
+}
+
+function collapseHudMenuAfterAction() {
+  if (onboardingStep >= 0) return;
+  clearTimeout(hudMenuCollapseTimer);
+  requestAnimationFrame(() => setHudMenuExpanded(false));
+}
+
 function wireInterface() {
   updateProfileHud(); updateProgressHud(); renderTasks(); renderMapLandmarks(); setOpenPanel();
-  document.body.classList.add('hud-menu-collapsed');
+  setHudMenuExpanded(false);
   hudMenuToggle?.addEventListener('click', () => {
-    const expanded = document.body.classList.toggle('hud-menu-collapsed') === false;
-    hudMenuToggle.setAttribute('aria-expanded', String(expanded));
-    hudMenuToggle.setAttribute('aria-label', expanded ? 'Hide game controls' : 'Show game controls');
-    hudMenuToggle.textContent = expanded ? '×' : '☰';
+    const expanded = document.body.classList.contains('hud-menu-collapsed');
+    setHudMenuExpanded(expanded);
+    if (expanded) scheduleHudMenuCollapse();
+    else clearTimeout(hudMenuCollapseTimer);
     recordOnboardingAction('menu');
   });
   mapOpen.addEventListener('click', () => {
@@ -2792,6 +2826,7 @@ function wireInterface() {
     setOpenPanel(opening ? 'map' : null);
     if (opening) requestAnimationFrame(() => { renderMapLandmarks(); applyMapZoom(mapZoom); });
     recordOnboardingAction('map');
+    collapseHudMenuAfterAction();
   });
   mapClose.addEventListener('click', () => setOpenPanel());
   mapLabelToggle.addEventListener('click', () => {
@@ -2802,7 +2837,10 @@ function wireInterface() {
   mapZoomIn?.addEventListener('click', () => applyMapZoom(mapZoom + .25));
   mapZoomOut?.addEventListener('click', () => applyMapZoom(mapZoom - .25));
   mapZoomReset?.addEventListener('click', () => applyMapZoom(1));
-  taskToggle.addEventListener('click', () => { setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'); recordOnboardingAction('tasks'); });
+  taskToggle.addEventListener('click', () => { setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'); recordOnboardingAction('tasks'); collapseHudMenuAfterAction(); });
+  document.querySelector('#quick-actions')?.addEventListener('click', event => {
+    if (event.target.closest('.hud-icon')) collapseHudMenuAfterAction();
+  });
   fullscreenToggle?.addEventListener('click', async () => {
     try {
       if (!document.fullscreenElement) {
