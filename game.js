@@ -2339,7 +2339,14 @@ function synchronizePlayers(players) {
     );
     if (!data.moving) remote.userData.velocity.set(0, 0, 0);
     else if (remote.userData.velocity.lengthSq() > 81) remote.userData.velocity.setLength(9);
-    remote.userData.target.set(data.x, 0, data.z);
+    const networkTarget = new THREE.Vector3(data.x, 0, data.z);
+    // Reconcile a stale/interrupted stream immediately so another player never
+    // appears frozen several metres behind their server position.
+    if (remote.position.distanceTo(networkTarget) > 4.5) {
+      remote.position.copy(networkTarget);
+      remote.userData.predicted.copy(networkTarget);
+    }
+    remote.userData.target.copy(networkTarget);
     remote.userData.targetAt = receivedAt;
     remote.userData.yaw = Number(data.rotation) || 0;
     remote.userData.moving = !!data.moving;
