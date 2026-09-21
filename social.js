@@ -6,6 +6,24 @@ const productionServerHelp = 'Kerala Play account service is starting or tempora
 const serverHelp = localHostnames.has(location.hostname) ? localServerHelp : productionServerHelp;
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const productionWakeUrl = localHostnames.has(location.hostname) ? '' : 'https://kerala-play-1.onrender.com/api/session';
+const SUPABASE_PROJECT_URL = 'https://rxywllmflxuovhlbkext.supabase.co';
+
+function socialRedirectUrl(provider) {
+  const url = new URL(location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('kp_oauth', provider);
+  return url.toString();
+}
+
+function beginProviderSignIn(provider) {
+  if (!['google', 'facebook'].includes(provider)) return;
+  wakeProductionBackend();
+  const authorize = new URL('/auth/v1/authorize', SUPABASE_PROJECT_URL);
+  authorize.searchParams.set('provider', provider);
+  authorize.searchParams.set('redirect_to', socialRedirectUrl(provider));
+  location.assign(authorize.toString());
+}
 
 function wakeProductionBackend() {
   if (!productionWakeUrl) return;
@@ -349,12 +367,21 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   signupFields.append(field('District', signupDistrict), field('Avatar', signupGender));
   const authSubmit = node('button', 'social-button primary', 'Log in');
   authSubmit.type = 'submit';
+  const providerDivider = node('div', 'auth-provider-divider', 'or continue with');
+  const providerRow = node('div', 'auth-provider-row');
+  const googleAuth = button('Google', () => beginProviderSignIn('google'), 'auth-provider google');
+  const facebookAuth = button('Facebook', () => beginProviderSignIn('facebook'), 'auth-provider facebook');
+  googleAuth.type = 'button';
+  facebookAuth.type = 'button';
+  googleAuth.setAttribute('aria-label', 'Continue with Google');
+  facebookAuth.setAttribute('aria-label', 'Continue with Facebook');
+  providerRow.append(googleAuth, facebookAuth);
   const authError = node('div', 'social-error');
   authError.setAttribute('role', 'status');
   authError.setAttribute('aria-live', 'polite');
   const authNote = node('p', 'social-muted', 'New accounts start at 0 points. Earn rewards by completing tasks and winning games.');
   const forgot = button('Forgot password?', () => renderReset()); forgot.className = 'social-link';
-  authForm.append(field('First name', firstName), field('Username', username), usernameNote, field('Password', password), signupContact, signupFields, authSubmit, forgot, authError);
+  authForm.append(field('First name', firstName), field('Username', username), usernameNote, field('Password', password), signupContact, signupFields, authSubmit, providerDivider, providerRow, forgot, authError);
   authCard.append(authLogo, authTitle, authIntro, authTabs, authForm, authNote);
   authModal.append(authCard);
   document.body.append(authModal);
@@ -402,10 +429,41 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     signupTab.setAttribute('aria-pressed', String(mode === 'signup'));
     loginTab.setAttribute('aria-pressed', String(mode === 'login'));
     authSubmit.textContent = mode === 'signup' ? 'Create account & explore' : 'Log in & explore';
+    providerDivider.textContent = mode === 'signup' ? 'or create with' : 'or continue with';
     password.autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
     authError.textContent = error;
     queueMicrotask(() => username.focus());
   }
+  async function completeOAuthCallback() {
+    const query = new URLSearchParams(location.search);
+    const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const provider = String(query.get('kp_oauth') || '').toLowerCase();
+    if (!provider) return false;
+
+    const errorMessage = hash.get('error_description') || hash.get('error') || query.get('error_description') || query.get('error');
+    const accessToken = hash.get('access_token');
+    const cleanUrl = location.pathname || '/';
+    history.replaceState({}, document.title, cleanUrl);
+
+    if (errorMessage) {
+      renderAuth('login', decodeURIComponent(errorMessage.replace(/\+/g, ' ')));
+      return true;
+    }
+    if (!accessToken) {
+      renderAuth('login', 'Social sign in did not return a valid session. Please try again.');
+      return true;
+    }
+
+    try {
+      wakeProductionBackend();
+      const result = await api('/api/auth/oauth', { provider, accessToken });
+      await beginSession(result.user, !!result.created);
+    } catch (error) {
+      renderAuth('login', error?.message || 'Social sign in failed.');
+    }
+    return true;
+  }
+
   async function renderReset() {
     const identifier = window.prompt('Enter your username, email, or mobile number:');
     if (!identifier) return;
@@ -2303,6 +2361,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const initialVersion = sessionVersion;
   wakeProductionBackend();
   void (async () => {
+    if (await completeOAuthCallback()) return;
     await wait(900);
     let result = null;
     try { result = await api('/api/session'); }
