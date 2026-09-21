@@ -1543,6 +1543,28 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const session = sessionFor(request);
         send(response, 200, { user: session ? publicUser(session.user) : null }); return;
       }
+      if (path === '/api/auth/provider-status' && request.method === 'GET') {
+        const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!/^https:\/\//.test(supabaseUrl) || !serviceKey) {
+          send(response, 200, { google: false, facebook: false, configured: false }); return;
+        }
+        try {
+          const settingsResponse = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Accept: 'application/json' },
+          });
+          const settings = await settingsResponse.json().catch(() => ({}));
+          const external = settings?.external || {};
+          send(response, 200, {
+            google: external.google === true,
+            facebook: external.facebook === true,
+            configured: settingsResponse.ok,
+          });
+        } catch {
+          send(response, 200, { google: false, facebook: false, configured: false });
+        }
+        return;
+      }
       if (path === '/api/auth/signup' && request.method === 'POST') {
         limited(`auth:${ip}`, 30, 15 * 60000);
         const body = await jsonBody(request);
