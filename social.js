@@ -15,14 +15,15 @@ export async function api(path, body, method) {
     headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   };
-  const attempts = requestMethod === 'GET' ? 2 : 1;
+  const safeLoginRetry = requestMethod === 'POST' && path === '/api/auth/login';
+  const attempts = requestMethod === 'GET' ? 2 : (safeLoginRetry ? 3 : 1);
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     let response;
     try {
       response = await fetch(path, options);
     } catch {
-      if (attempt + 1 < attempts) { await wait(900); continue; }
+      if (attempt + 1 < attempts) { await wait(safeLoginRetry ? 1500 * (attempt + 1) : 900); continue; }
       throw new Error(`Cannot reach the Kerala Play server. ${serverHelp}`);
     }
 
@@ -30,12 +31,12 @@ export async function api(path, body, method) {
     let result;
     try { result = text ? JSON.parse(text) : {}; }
     catch {
-      if (attempt + 1 < attempts) { await wait(900); continue; }
+      if (attempt + 1 < attempts) { await wait(safeLoginRetry ? 1500 * (attempt + 1) : 900); continue; }
       throw new Error(serverHelp);
     }
 
     if (!response.ok) {
-      if (attempt + 1 < attempts && [502, 503, 504].includes(response.status)) { await wait(900); continue; }
+      if (attempt + 1 < attempts && [429, 502, 503, 504].includes(response.status)) { await wait(safeLoginRetry ? 1500 * (attempt + 1) : 900); continue; }
       const error = new Error(result.error || result.message || `Request failed (${response.status}).`);
       error.status = response.status;
       throw error;
