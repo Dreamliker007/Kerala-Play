@@ -16,27 +16,35 @@ export async function api(path, body, method) {
     body: body === undefined ? undefined : JSON.stringify(body),
   };
   const safeLoginRetry = requestMethod === 'POST' && path === '/api/auth/login';
-  const attempts = requestMethod === 'GET' ? 2 : (safeLoginRetry ? 3 : 1);
+  const attempts = requestMethod === 'GET' ? 2 : 1;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     let response;
+    const controller = new AbortController();
+    const timeoutMs = safeLoginRetry ? 32000 : (requestMethod === 'GET' ? 18000 : 22000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      response = await fetch(path, options);
-    } catch {
-      if (attempt + 1 < attempts) { await wait(safeLoginRetry ? 1500 * (attempt + 1) : 900); continue; }
+      response = await fetch(path, { ...options, signal: controller.signal });
+    } catch (error) {
+      if (attempt + 1 < attempts) { await wait(900); continue; }
+      if (error?.name === 'AbortError') {
+        throw new Error('Kerala Play server is waking up. Please wait a few seconds and tap Log in again.');
+      }
       throw new Error(`Cannot reach the Kerala Play server. ${serverHelp}`);
+    } finally {
+      clearTimeout(timeout);
     }
 
     const text = await response.text();
     let result;
     try { result = text ? JSON.parse(text) : {}; }
     catch {
-      if (attempt + 1 < attempts) { await wait(safeLoginRetry ? 1500 * (attempt + 1) : 900); continue; }
+      if (attempt + 1 < attempts) { await wait(900); continue; }
       throw new Error(serverHelp);
     }
 
     if (!response.ok) {
-      if (attempt + 1 < attempts && [429, 502, 503, 504].includes(response.status)) { await wait(safeLoginRetry ? 1500 * (attempt + 1) : 900); continue; }
+      if (attempt + 1 < attempts && [429, 502, 503, 504].includes(response.status)) { await wait(900); continue; }
       const error = new Error(result.error || result.message || `Request failed (${response.status}).`);
       error.status = response.status;
       throw error;
