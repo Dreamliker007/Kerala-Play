@@ -3052,11 +3052,13 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const body = await jsonBody(request);
         requireValue(['accept', 'decline'].includes(body.action), 400, 'Choose accept or decline.');
         requireValue(group.invites.includes(user.id), 409, 'No pending invitation for this group.');
-        group.invites = group.invites.filter(id => id !== user.id);
         if (body.action === 'accept') {
           requireValue(!blocked(user.id, group.ownerId), 403, 'This group invitation is no longer available.');
           requireValue(group.members.length < GROUP_MEMBER_LIMIT, 409, 'This group is full.');
           requireValue(userGroupCount(user.id) < GROUP_MEMBERSHIP_LIMIT, 409, 'You have reached the group membership limit.');
+        }
+        group.invites = group.invites.filter(id => id !== user.id);
+        if (body.action === 'accept') {
           group.members.push(user.id);
           const owner = findUser(group.ownerId);
           if (owner) addNotification(owner, {
