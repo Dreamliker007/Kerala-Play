@@ -122,6 +122,27 @@ test('a receiver must accept a follow before text, voice messages or live voice;
   assert.equal((await alice('/api/session')).data.user.following, 0);
 });
 
+test('player reports validate reasons, prevent rapid duplicates and persist', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  const aliceUser = await signup(alice, 'ReportAlice'), bobUser = await signup(bob, 'ReportBob');
+
+  assert.equal((await alice(`/api/reports/${aliceUser.id}`, { reason: 'spam' })).status, 404);
+  assert.equal((await alice(`/api/reports/${bobUser.id}`, { reason: 'invalid-reason' })).status, 400);
+  assert.equal((await alice(`/api/reports/${bobUser.id}`, { reason: 'spam', details: 'x'.repeat(501) })).status, 400);
+
+  const created = await alice(`/api/reports/${bobUser.id}`, { reason: 'harassment', details: 'Repeated abusive chat.' });
+  assert.equal(created.status, 201);
+  assert.equal(created.data.report.targetId, bobUser.id);
+  assert.equal(created.data.report.reason, 'harassment');
+  assert.equal(created.data.report.status, 'open');
+  assert.equal((await alice(`/api/reports/${bobUser.id}`, { reason: 'spam' })).status, 409);
+
+  await app.restart();
+  assert.equal((await alice(`/api/reports/${bobUser.id}`, { reason: 'spam' })).status, 409);
+  app.advance(24 * 60 * 60 * 1000 + 1);
+  assert.equal((await alice(`/api/reports/${bobUser.id}`, { reason: 'spam' })).status, 201);
+});
+
 test('nearby voice works without follows, enforces distance and respects blocks', async t => {
   const app = await setup(t), alice = app.client(), bob = app.client();
   const a = await signup(alice, 'Alice'), b = await signup(bob, 'Bob');
