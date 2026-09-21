@@ -118,7 +118,7 @@ button:disabled { cursor:default; }
     pointer-events:none !important;
     z-index:8 !important;
     top:calc(env(safe-area-inset-top) + 8px) !important;
-    right:calc(env(safe-area-inset-right) + 204px) !important;
+    right:calc(env(safe-area-inset-right) + 60px) !important;
     max-width:78px !important;
     min-height:28px;
     padding:4px 7px !important;
