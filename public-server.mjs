@@ -5,7 +5,7 @@ import { createGameServer } from './server.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const API_UPSTREAM = String(process.env.KP_API_UPSTREAM || '').replace(/\/$/, '');
-const API_TIMEOUT_MS = Math.max(3000, Number(process.env.KP_API_TIMEOUT_MS || 12000));
+const API_TIMEOUT_MS = Math.max(5000, Number(process.env.KP_API_TIMEOUT_MS || 45000));
 
 function worldAlertsFromEnv() {
   const raw = process.env.KP_WORLD_ALERTS_JSON;
@@ -25,8 +25,9 @@ function transientUpstreamStatus(status) {
   return [429, 502, 503, 504].includes(Number(status));
 }
 
-async function fetchUpstream(target, options, requestMethod) {
-  const attempts = ['GET', 'HEAD'].includes(requestMethod) ? 2 : 1;
+async function fetchUpstream(target, options, requestMethod, pathname) {
+  const safeRetry = ['GET', 'HEAD'].includes(requestMethod) || (requestMethod === 'POST' && pathname === '/api/auth/login');
+  const attempts = safeRetry ? 2 : 1;
   let lastResponse = null;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const controller = new AbortController();
@@ -41,7 +42,7 @@ async function fetchUpstream(target, options, requestMethod) {
     } finally {
       clearTimeout(timeout);
     }
-    await new Promise(resolve => setTimeout(resolve, 650));
+    await new Promise(resolve => setTimeout(resolve, 1500));
   }
   return lastResponse;
 }
@@ -82,7 +83,7 @@ if (gameRequestListener) {
             headers,
             body,
             redirect: 'manual',
-          }, requestMethod);
+          }, requestMethod, pathname);
 
           if (!upstream) throw new Error('No response from production API');
           const responseHeaders = {};
