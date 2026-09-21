@@ -130,6 +130,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   let profileId = null;
   let peopleFilter = 'followers';
   let peopleSearch = '';
+  let groupsSnapshot = { groups: [], invites: [], limits: {} };
+  let groupsVersion = 0;
+  let groupMessageVersion = 0;
+  let activeGroupId = null;
+  let groupReturnFocus = null;
   let messageVersion = 0;
   let profileVersion = 0;
   let peopleVersion = 0;
@@ -414,8 +419,19 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   profileModal.append(profileCard);
   document.body.append(profileModal);
 
+  const groupModal = node('section', 'social-modal');
+  groupModal.id = 'social-group-modal';
+  groupModal.setAttribute('role', 'dialog');
+  groupModal.setAttribute('aria-modal', 'true');
+  groupModal.setAttribute('aria-labelledby', 'social-group-title');
+  groupModal.hidden = true;
+  const groupCard = node('div', 'social-card group-card');
+  groupModal.append(groupCard);
+  document.body.append(groupModal);
+
   function trapFocus(event) {
     event.stopPropagation();
+    if (event.key === 'Escape' && !groupModal.hidden) { closeGroup(); return; }
     if (event.key === 'Escape' && !profileModal.hidden) { closeProfile(); return; }
     if (event.key !== 'Tab') return;
     const elements = [...event.currentTarget.querySelectorAll('button, input, select, textarea, a[href], [tabindex="0"]')].filter(element => !element.disabled && element.getClientRects().length);
@@ -426,7 +442,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   authModal.addEventListener('keydown', trapFocus);
   profileModal.addEventListener('keydown', trapFocus);
+  groupModal.addEventListener('keydown', trapFocus);
   profileModal.addEventListener('click', event => { if (event.target === profileModal) closeProfile(); });
+  groupModal.addEventListener('click', event => { if (event.target === groupModal) closeGroup(); });
   for (const panel of [peoplePanel, dmPanel, chatPanel]) {
     panel?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape') { closePanels(); chatToggle?.focus(); } });
     panel?.addEventListener('pointerdown', event => event.stopPropagation());
@@ -540,8 +558,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const peopleTabs = node('div', 'social-tabs people-tabs');
   // People is intentionally a private social space: only relationship lists
   // are shown here. New players can still be met naturally in the world.
-  for (const [value, label] of [['followers', 'Followers'], ['following', 'Following'], ['requests', 'Requests']]) {
-    const tab = button(label, () => { peopleFilter = value; renderPeople(); });
+  for (const [value, label] of [['followers', 'Followers'], ['following', 'Following'], ['requests', 'Requests'], ['groups', 'Groups']]) {
+    const tab = button(label, () => { peopleFilter = value; renderPeople(); if (value === 'groups') run(refreshGroups, peopleError); });
     tab.dataset.filter = value;
     peopleTabs.append(tab);
   }
