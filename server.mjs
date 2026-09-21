@@ -216,7 +216,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!message) return null;
     const kind = ['world', 'weather', 'emergency', 'event'].includes(alert.kind) ? alert.kind : 'world';
     const severity = ['info', 'warning', 'critical', 'success'].includes(alert.severity) ? alert.severity : 'info';
-    const target = ['wallet', 'home', 'garage', 'jobs', 'people', 'events'].includes(alert.target) ? alert.target : '';
+    const target = ['wallet', 'home', 'garage', 'jobs', 'people', 'groups', 'events'].includes(alert.target) ? alert.target : '';
     const startsAt = Number.isFinite(Number(alert.startsAt)) ? Math.max(0, Number(alert.startsAt)) : 0;
     const endsAt = Number.isFinite(Number(alert.endsAt)) ? Math.max(0, Number(alert.endsAt)) : 0;
     const districts = Array.isArray(alert.districts)
