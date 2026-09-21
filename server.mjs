@@ -159,7 +159,10 @@ const MOVEMENT_PROFILES = Object.freeze({
   taxi: { rate: 14, maxCredit: 36 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
+const REPORT_REASONS = Object.freeze(['harassment', 'cheating', 'impersonation', 'inappropriate', 'spam', 'other']);
+const REPORT_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const REPORT_HISTORY_LIMIT = 80;
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
 const SESSION_AGE = 365 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -248,6 +251,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) { user.jobState.notifications = { items: [], read: {} }; migrated = true; }
     if (!Array.isArray(user.jobState.notifications.items)) { user.jobState.notifications.items = []; migrated = true; }
     if (!user.jobState.notifications.read || typeof user.jobState.notifications.read !== 'object' || Array.isArray(user.jobState.notifications.read)) { user.jobState.notifications.read = {}; migrated = true; }
+    if (!Array.isArray(user.jobState.reports)) { user.jobState.reports = []; migrated = true; }
+    const cleanReports = user.jobState.reports.filter(report => report && typeof report === 'object' && typeof report.id === 'string' && typeof report.targetId === 'string' && REPORT_REASONS.includes(report.reason) && Number.isFinite(Number(report.createdAt))).slice(-REPORT_HISTORY_LIMIT);
+    if (cleanReports.length !== user.jobState.reports.length) { user.jobState.reports = cleanReports; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
     if (user.walletBalance > 0 && !db.transactions.some(transaction => transaction.userId === user.id)) {
       db.transactions.push({ id: randomUUID(), userId: user.id, type: 'credit', amount: user.walletBalance, balanceAfter: user.walletBalance, kind: 'opening', description: 'Opening Kerala Cash balance', createdAt: Number(user.createdAt) || now() });
@@ -381,15 +387,28 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { user, key };
   }
   async function startSession(user, response, request) {
-    const revokedKeys = new Set();
-    for (const [key, session] of sessions) {
-      if (session.id !== user.id) continue;
-      revokedKeys.add(key);
+    const revokedByUser = new Map();
+    const rememberRevoked = (userId, key) => {
+      if (!revokedByUser.has(userId)) revokedByUser.set(userId, new Set());
+      revokedByUser.get(userId).add(key);
       sessions.delete(key);
+    };
+
+    // Replacing the account in this browser must also close any live streams
+    // that still carry the previous account's session token.
+    const incomingToken = cookieToken(request);
+    const incomingKey = incomingToken ? hashToken(incomingToken) : '';
+    const incomingSession = incomingKey ? sessions.get(incomingKey) : null;
+    if (incomingSession && incomingSession.id !== user.id) rememberRevoked(incomingSession.id, incomingKey);
+
+    // Kerala Play allows one active device/session per account.
+    for (const [key, session] of [...sessions]) {
+      if (session.id === user.id) rememberRevoked(user.id, key);
     }
 
-    const connections = clients.get(user.id);
-    if (connections?.size) {
+    for (const [userId, revokedKeys] of revokedByUser) {
+      const connections = clients.get(userId);
+      if (!connections?.size) continue;
       for (const client of [...connections]) {
         if (!revokedKeys.has(client.key)) continue;
         try {
@@ -956,6 +975,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 };
     if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] };
     if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) user.jobState.notifications = { items: [], read: {} };
+    if (!Array.isArray(user.jobState.reports)) user.jobState.reports = [];
     if (!user.jobState.npcRelations || typeof user.jobState.npcRelations !== 'object' || Array.isArray(user.jobState.npcRelations)) user.jobState.npcRelations = {};
     if (!user.jobState.npcFavors || typeof user.jobState.npcFavors !== 'object' || Array.isArray(user.jobState.npcFavors)) user.jobState.npcFavors = { active: null, cooldowns: {}, completed: 0 };
     if (!user.jobState.communityEvents || typeof user.jobState.communityEvents !== 'object' || Array.isArray(user.jobState.communityEvents)) user.jobState.communityEvents = { completedIds: [], contributions: 0 };
@@ -2949,6 +2969,23 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(!blocked(user.id, peer.id) || ownBlock(user.id, peer.id), 404, 'Player not found.');
         const isBlocked = blocked(user.id, peer.id);
         send(response, 200, { user: isBlocked ? blockedUser(peer) : publicUser(peer), relationship: relation(user.id, peer.id), blocked: isBlocked, canMessage: !isBlocked && accepted(user.id, peer.id) }); return;
+      }
+      const reportMatch = path.match(/^\/api\/reports\/([^/]+)$/);
+      if (reportMatch && request.method === 'POST') {
+        limited(`report:${user.id}`, 8, 60 * 60 * 1000);
+        const peer = requirePeer(user, reportMatch[1]);
+        const body = await jsonBody(request);
+        const reason = typeof body.reason === 'string' ? body.reason.trim().toLowerCase() : '';
+        const details = typeof body.details === 'string' ? body.details.trim() : '';
+        requireValue(REPORT_REASONS.includes(reason), 400, 'Choose a valid report reason.');
+        requireValue(details.length <= 500, 400, 'Report details must be 500 characters or fewer.');
+        const reports = jobStateFor(user).reports;
+        requireValue(!reports.some(report => report.targetId === peer.id && now() - Number(report.createdAt || 0) < REPORT_DUPLICATE_WINDOW_MS), 409, 'You already reported this player recently.');
+        const report = { id: randomUUID(), reporterId: user.id, targetId: peer.id, reason, details, createdAt: now(), status: 'open' };
+        reports.push(report);
+        if (reports.length > REPORT_HISTORY_LIMIT) reports.splice(0, reports.length - REPORT_HISTORY_LIMIT);
+        await persist();
+        send(response, 201, { report: { id: report.id, targetId: report.targetId, reason: report.reason, createdAt: report.createdAt, status: report.status } }); return;
       }
       const followMatch = path.match(/^\/api\/follows\/([^/]+)$/);
       if (followMatch && request.method === 'POST') {
