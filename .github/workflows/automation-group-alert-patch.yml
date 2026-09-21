@@ -1,0 +1,55 @@
+name: Apply group alert target patch
+on:
+  push:
+    branches: [fix/group-world-alert-target]
+    paths: [.github/workflows/automation-group-alert-patch.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/group-world-alert-target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Apply regression fix and test
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          server = Path('server.mjs')
+          text = server.read_text()
+          old = "const target = ['wallet', 'home', 'garage', 'jobs', 'people', 'events'].includes(alert.target) ? alert.target : '';"
+          new = "const target = ['wallet', 'home', 'garage', 'jobs', 'people', 'groups', 'events'].includes(alert.target) ? alert.target : '';"
+          if old not in text:
+              raise SystemExit('Expected world-alert target allowlist not found')
+          server.write_text(text.replace(old, new, 1))
+          tests = Path('server.test.mjs')
+          t = tests.read_text()
+          marker = "        districts: ['Ernakulam'],\n      },"
+          replacement = "        districts: ['Ernakulam'],\n        target: 'groups',\n      },"
+          if marker not in t:
+              raise SystemExit('Expected world alert fixture not found')
+          t = t.replace(marker, replacement, 1)
+          assertion = "  assert.equal(rain.live, true);"
+          if assertion not in t:
+              raise SystemExit('Expected world alert assertion not found')
+          t = t.replace(assertion, assertion + "\n  assert.equal(rain.target, 'groups');", 1)
+          tests.write_text(t)
+          PY
+          npm test
+          node --check server.mjs
+          node --check social.js
+          npm run mobile:release:check
+      - name: Commit tested patch
+        shell: bash
+        run: |
+          rm .github/workflows/automation-group-alert-patch.yml
+          git config user.name 'Kerala Play Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add server.mjs server.test.mjs .github/workflows/automation-group-alert-patch.yml
+          git commit -m 'Fix group-targeted world alerts'
+          git push origin HEAD:fix/group-world-alert-target
