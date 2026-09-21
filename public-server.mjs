@@ -28,7 +28,7 @@ function transientUpstreamStatus(status) {
 }
 
 async function fetchUpstream(target, options, requestMethod, pathname) {
-  const safeRetry = ['GET', 'HEAD'].includes(requestMethod) || (requestMethod === 'POST' && pathname === '/api/auth/login');
+  const safeRetry = ['GET', 'HEAD'].includes(requestMethod);
   const deadline = Date.now() + (safeRetry ? API_WAKE_WINDOW_MS : API_TIMEOUT_MS);
   let lastResponse = null;
   let lastError = null;
