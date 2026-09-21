@@ -2193,7 +2193,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       activeFavor: result.activeFavor || null,
     });
     if (result.activeFavor) {
-      toast(`${result.activeFavor.npcName} · ${result.activeFavor.title} → ${result.activeFavor.target?.label || 'destination'} · reward ${formatCash(result.activeFavor.reward || 0)}`, 4600);
+      window.dispatchEvent(new CustomEvent('kerala-npc-favor-route-ready', { detail: result.activeFavor }));
     }
   }, peopleError));
 
