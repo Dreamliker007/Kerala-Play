@@ -683,20 +683,85 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     else card.append(relationshipButtons(person));
     return card;
   }
+  function groupById(id) {
+    return [...(groupsSnapshot.groups || []), ...(groupsSnapshot.invites || [])].find(group => group.id === id) || null;
+  }
+  async function refreshGroups() {
+    if (!user) return groupsSnapshot;
+    const version = ++groupsVersion;
+    const result = await api('/api/groups');
+    if (!user || version !== groupsVersion) return groupsSnapshot;
+    groupsSnapshot = result || { groups: [], invites: [], limits: {} };
+    if (peopleFilter === 'groups') renderPeople();
+    if (activeGroupId && !groupModal.hidden && !(groupsSnapshot.groups || []).some(group => group.id === activeGroupId)) closeGroup();
+    return groupsSnapshot;
+  }
+  function renderGroupsList() {
+    const createForm = node('form', 'social-form group-create-form');
+    const name = input('text', { placeholder: 'New group name', maxLength: 40, required: true, autocomplete: 'off' });
+    const create = node('button', 'social-button primary', 'Create group'); create.type = 'submit';
+    createForm.append(field('Create a group', name), create);
+    createForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!name.value.trim()) return;
+      create.disabled = true;
+      await run(async () => {
+        const result = await api('/api/groups', { name: name.value.trim() });
+        name.value = '';
+        groupsSnapshot = result.summary || await api('/api/groups');
+        renderPeople();
+        if (result.group?.id) await openGroup(result.group.id);
+      }, peopleError);
+      create.disabled = false;
+    });
+    peopleList.append(createForm);
+
+    const invites = groupsSnapshot.invites || [];
+    if (invites.length) peopleList.append(node('strong', 'group-section-title', 'Invitations'));
+    for (const group of invites) {
+      const card = node('article', 'people-entry group-entry');
+      const info = node('div');
+      info.append(node('strong', '', group.name), node('small', 'social-muted', `${group.memberCount} member${group.memberCount === 1 ? '' : 's'} · invitation pending`));
+      const actions = node('div', 'social-actions');
+      actions.append(
+        button('Accept', () => run(async () => { await api(`/api/groups/${encodeURIComponent(group.id)}/respond`, { action: 'accept' }); await refreshGroups(); }, peopleError)),
+        button('Decline', () => run(async () => { await api(`/api/groups/${encodeURIComponent(group.id)}/respond`, { action: 'decline' }); await refreshGroups(); }, peopleError), 'social-button secondary')
+      );
+      card.append(info, actions); peopleList.append(card);
+    }
+
+    const groups = groupsSnapshot.groups || [];
+    if (groups.length) peopleList.append(node('strong', 'group-section-title', 'Your groups'));
+    if (!groups.length && !invites.length) peopleList.append(node('p', 'social-empty', 'No groups yet. Create one and invite an accepted contact.'));
+    for (const group of groups) {
+      const card = node('article', 'people-entry group-entry');
+      const open = button('', () => run(() => openGroup(group.id), peopleError), 'social-person-name');
+      const badge = node('span', 'social-avatar group-avatar', group.name.slice(0, 1).toUpperCase());
+      const details = node('span');
+      details.append(node('strong', '', group.name), node('small', '', `${group.memberCount} member${group.memberCount === 1 ? '' : 's'}${group.isOwner ? ' · You own this group' : ''}`));
+      open.append(badge, details);
+      card.append(open, button('Open', () => run(() => openGroup(group.id), peopleError), 'social-button secondary'));
+      peopleList.append(card);
+    }
+  }
   function renderPeople() {
     peopleList.replaceChildren();
     for (const tab of peopleTabs.children) tab.setAttribute('aria-pressed', String(tab.dataset.filter === peopleFilter));
-    const visible = people.filter(person => {
-      if (person.id === user?.id || !person.username?.toLowerCase().includes(peopleSearch)) return false;
-      if (peopleFilter === 'blocked') return person.blocked;
-      if (person.blocked) return false;
-      if (peopleFilter === 'followers') return ['follower', 'mutual'].includes(person.relationship);
-      if (peopleFilter === 'following') return ['following', 'mutual'].includes(person.relationship);
-      if (peopleFilter === 'requests') return ['outgoing', 'incoming'].includes(person.relationship);
-      return true;
-    }).sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
-    if (!visible.length) peopleList.append(node('p', 'social-empty', 'No people in this list yet.'));
-    for (const person of visible) peopleList.append(personCard(person));
+    search.hidden = peopleFilter === 'groups';
+    if (peopleFilter === 'groups') renderGroupsList();
+    else {
+      const visible = people.filter(person => {
+        if (person.id === user?.id || !person.username?.toLowerCase().includes(peopleSearch)) return false;
+        if (peopleFilter === 'blocked') return person.blocked;
+        if (person.blocked) return false;
+        if (peopleFilter === 'followers') return ['follower', 'mutual'].includes(person.relationship);
+        if (peopleFilter === 'following') return ['following', 'mutual'].includes(person.relationship);
+        if (peopleFilter === 'requests') return ['outgoing', 'incoming'].includes(person.relationship);
+        return true;
+      }).sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
+      if (!visible.length) peopleList.append(node('p', 'social-empty', 'No people in this list yet.'));
+      for (const person of visible) peopleList.append(personCard(person));
+    }
     conversations.replaceChildren();
     const contacts = people.filter(person => person.id !== user?.id && canMessage(person));
     if (!contacts.length) conversations.append(node('p', 'social-empty', 'No accepted contacts yet. Open People to send or accept a follow request.'), button('Find people', openPeople));
