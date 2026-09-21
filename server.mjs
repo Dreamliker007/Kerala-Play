@@ -1580,6 +1580,82 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         await startSession(user, response, request); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
       }
+      if (path === '/api/auth/oauth' && request.method === 'POST') {
+        limited(`auth:${ip}`, 30, 15 * 60000);
+        const body = await jsonBody(request);
+        requireValue(['google', 'facebook'].includes(body.provider), 400, 'Choose Google or Facebook sign in.');
+        requireValue(typeof body.accessToken === 'string' && body.accessToken.length >= 20 && body.accessToken.length <= 8192, 400, 'OAuth session token is missing.');
+        const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        requireValue(/^https:\/\//.test(supabaseUrl) && serviceKey, 503, 'Social sign in is not configured on the Kerala Play server.');
+
+        const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+          headers: { apikey: serviceKey, Authorization: `Bearer ${body.accessToken}`, Accept: 'application/json' },
+        });
+        const authUser = await authResponse.json().catch(() => null);
+        requireValue(authResponse.ok && authUser?.id, 401, 'Social sign in could not be verified.');
+        const provider = String(authUser.app_metadata?.provider || authUser.identities?.[0]?.provider || '').toLowerCase();
+        requireValue(!provider || provider === body.provider, 401, 'Social sign in provider does not match.');
+        const email = String(authUser.email || '').trim().toLowerCase();
+        requireValue(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 400, 'Your social account must share an email address.');
+
+        let user = db.users.find(candidate => candidate.email === email);
+        let created = false;
+        if (!user) {
+          const metadata = authUser.user_metadata || {};
+          const rawName = String(metadata.given_name || metadata.first_name || metadata.name || email.split('@')[0] || 'Player');
+          let firstName = rawName.split(/\s+/)[0].replace(/[^A-Za-z'-]/g, '').slice(0, 40);
+          if (firstName.length < 2) firstName = 'Player';
+
+          let base = email.split('@')[0].replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '').slice(0, 18);
+          if (!/[A-Za-z]/.test(base)) base = `player_${base}`;
+          if (base.length < 3) base = `player_${base || 'kp'}`;
+          let username = base.slice(0, 24);
+          for (let suffix = 1; db.users.some(candidate => candidate.username.toLowerCase() === username.toLowerCase()); suffix += 1) {
+            const tail = String(suffix);
+            username = `${base.slice(0, Math.max(1, 24 - tail.length))}${tail}`;
+          }
+
+          const salt = randomBytes(16).toString('hex');
+          const randomPassword = randomBytes(48).toString('hex');
+          const [spawnX, spawnZ] = DISTRICTS.Ernakulam;
+          user = {
+            id: randomUUID(),
+            firstName,
+            username,
+            email,
+            mobile: '',
+            passwordHash: (await scrypt(randomPassword, salt, 64)).toString('hex'),
+            salt,
+            district: 'Ernakulam',
+            gender: 'other',
+            bio: '',
+            points: 0,
+            completedTasks: [],
+            walkMeters: 0,
+            visitedLandmarks: [],
+            createdAt: now(),
+            gameDay: '',
+            gameWins: 0,
+            walletBalance: 0,
+            economyActions: [],
+            jobState: freshJobState(),
+            worldX: spawnX + 12,
+            worldZ: spawnZ,
+            worldRotation: 0,
+            worldUpdatedAt: now(),
+          };
+          db.users.push(user);
+          walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash');
+          await persist();
+          created = true;
+        }
+
+        await startSession(user, response, request);
+        socialChanged();
+        send(response, created ? 201 : 200, { user: publicUser(user), created, provider: body.provider });
+        return;
+      }
       if (path === '/api/auth/forgot' && request.method === 'POST') {
         const body = await jsonBody(request); const identifier = typeof body.identifier === 'string' ? body.identifier.trim().toLowerCase() : '';
         const user = db.users.find(candidate => candidate.username.toLowerCase() === identifier || candidate.email === identifier || candidate.mobile === body.identifier?.trim());
