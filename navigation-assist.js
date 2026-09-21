@@ -1,4 +1,4 @@
-const VERSION = 'V102.3';
+const VERSION = 'V102.5';
 window.KERALA_PLAY_VERSION = VERSION;
 
 const style = document.createElement('style');
@@ -10,7 +10,7 @@ style.textContent = `
   #navigation-assist .nav-copy { min-width:0; }
   #navigation-assist strong, #navigation-assist small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #navigation-assist small { margin-top:2px; color:#c4e4d6; font-size:8px; font-weight:700; }
-  @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) { #navigation-assist { top:calc(env(safe-area-inset-top) + 10px); max-width:38vw; padding:5px 8px; } #navigation-assist .nav-arrow { width:20px; height:20px; font-size:12px; } }
+  @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) { #navigation-assist { top:calc(env(safe-area-inset-top) + 12px); max-width:36vw; padding:5px 8px; } #navigation-assist .nav-arrow { width:20px; height:20px; font-size:12px; } }
 `;
 document.head.append(style);
 
