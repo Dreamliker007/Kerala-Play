@@ -1197,6 +1197,7 @@ test('server-owned world alerts are filtered by time and district and keep read 
         message: 'Use extra care on village roads.',
         severity: 'warning',
         districts: ['Ernakulam'],
+        target: 'groups',
       },
       {
         id: 'kottayam-only-test',
@@ -1216,6 +1217,7 @@ test('server-owned world alerts are filtered by time and district and keep read 
   assert.equal(rain.kind, 'weather');
   assert.equal(rain.severity, 'warning');
   assert.equal(rain.live, true);
+  assert.equal(rain.target, 'groups');
   assert.equal(alerts.items.some(item => item.id === 'world:kottayam-only-test'), false);
 
   assert.equal((await alice('/api/notifications/read', { id: rain.id })).status, 200);
