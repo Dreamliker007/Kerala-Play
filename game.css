@@ -53,3 +53,56 @@ button:disabled { cursor:default; }
   }
 }
 @media (prefers-reduced-motion:reduce) { #coconut-keys button { transition:none; } }
+
+
+/* V102.4 compact mobile HUD: keep actions off the centre of the road view. */
+@media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) {
+  body.hud-menu-collapsed #quick-actions {
+    display:none !important;
+  }
+  body:not(.hud-menu-collapsed) #quick-actions {
+    display:grid !important;
+    top:calc(env(safe-area-inset-top) + 56px) !important;
+    right:calc(env(safe-area-inset-right) + 8px) !important;
+    left:auto !important;
+    transform:none !important;
+    grid-template-columns:repeat(4,40px) !important;
+    gap:4px !important;
+    width:max-content !important;
+    max-width:none !important;
+    max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 66px) !important;
+    padding:4px !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    border:1px solid rgba(255,255,255,.10) !important;
+    border-radius:13px !important;
+    background:rgba(7,18,28,.52) !important;
+    box-shadow:0 8px 24px rgba(0,0,0,.18) !important;
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+  }
+  #quick-actions .hud-icon {
+    width:40px !important;
+    height:40px !important;
+    flex:0 0 40px !important;
+    border-radius:10px !important;
+    font-size:16px !important;
+  }
+  #quick-actions .hud-icon span { display:none !important; }
+  #hud-menu-toggle {
+    top:calc(env(safe-area-inset-top) + 8px) !important;
+    right:calc(env(safe-area-inset-right) + 8px) !important;
+    width:40px !important;
+    height:40px !important;
+    border-radius:11px !important;
+    font-size:16px !important;
+  }
+  .avatar-name {
+    max-width:132px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    padding:2px 5px;
+    font-size:7.5px;
+    background:rgba(7,24,30,.58);
+  }
+}
