@@ -160,7 +160,7 @@ const MOVEMENT_PROFILES = Object.freeze({
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
 function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
-const SESSION_AGE = 7 * 24 * 60 * 60 * 1000;
+const SESSION_AGE = 365 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
 const PUBLIC_EXTENSIONS = new Set(['.js', '.css', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico', '.woff', '.woff2', '.glb', '.gltf', '.bin', '.mp3', '.ogg', '.wav', '.webm', '.json']);
@@ -225,9 +225,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (error.code !== 'ENOENT') throw new Error(`Cannot read saved game data: ${error.message}`);
     db = { version: 1, users: [], follows: [], blocks: [], messages: [] };
   }
-  if (db.version !== 1 || !['users', 'follows', 'blocks', 'messages'].every(key => Array.isArray(db[key])) || (db.transactions !== undefined && !Array.isArray(db.transactions))) throw new Error('Unsupported saved game data.');
+  if (db.version !== 1 || !['users', 'follows', 'blocks', 'messages'].every(key => Array.isArray(db[key])) || (db.transactions !== undefined && !Array.isArray(db.transactions)) || (db.sessions !== undefined && !Array.isArray(db.sessions))) throw new Error('Unsupported saved game data.');
   let migrated = false;
   if (!Array.isArray(db.transactions)) { db.transactions = []; migrated = true; }
+  if (!Array.isArray(db.sessions)) { db.sessions = []; migrated = true; }
   for (const user of db.users) {
     if (!Number.isInteger(user.walletBalance) || user.walletBalance < 0 || user.walletBalance > WALLET_LIMIT) {
       user.walletBalance = STARTER_BALANCE; migrated = true;
@@ -253,9 +254,20 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       migrated = true;
     }
   }
-  const sessions = new Map(), clients = new Map(), presence = new Map(), rounds = new Map(), rates = new Map(), resetTokens = new Map();
+  const sessions = new Map(
+    db.sessions
+      .filter(item => item && typeof item.key === 'string' && typeof item.id === 'string' && Number(item.expires) > now() && db.users.some(user => user.id === item.id))
+      .map(item => [item.key, { id: item.id, expires: Number(item.expires) }]),
+  );
+  const clients = new Map(), presence = new Map(), rounds = new Map(), rates = new Map(), resetTokens = new Map();
+  function syncSessionsToDb() {
+    db.sessions = [...sessions.entries()]
+      .filter(([, session]) => Number(session.expires) > now() && findUser(session.id))
+      .map(([key, session]) => ({ key, id: session.id, expires: Number(session.expires) }));
+  }
   let dirty = migrated, worldDirty = false, saveQueue = Promise.resolve();
   function persist() {
+    syncSessionsToDb();
     const snapshot = JSON.stringify(db);
     dirty = false;
     const save = saveQueue.then(async () => {
@@ -353,11 +365,19 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const token = cookieToken(request);
     const key = token ? hashToken(token) : '';
     const session = sessions.get(key);
-    if (!session || session.expires <= now()) { sessions.delete(key); return null; }
+    if (!session || session.expires <= now()) {
+      if (sessions.delete(key)) dirty = true;
+      return null;
+    }
     const user = findUser(session.id);
-    return user ? { user, key } : null;
+    if (!user) {
+      sessions.delete(key);
+      dirty = true;
+      return null;
+    }
+    return { user, key };
   }
-  function startSession(user, response, request) {
+  async function startSession(user, response, request) {
     const previous = sessionFor(request);
     if (previous) {
       sessions.delete(previous.key);
@@ -365,9 +385,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     }
     const token = randomBytes(32).toString('hex');
     sessions.set(hashToken(token), { id: user.id, expires: now() + SESSION_AGE });
+    dirty = true;
     const secure = request.socket.encrypted || process.env.COOKIE_SECURE === '1';
     response.setHeader('Set-Cookie', `kp_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_AGE / 1000}${secure ? '; Secure' : ''}`);
     if (!presence.has(user.id)) place(user);
+    await persist();
   }
   function send(response, status, data) {
     response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -1543,7 +1565,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(/^[A-Za-z][A-Za-z '-]{1,39}$/.test(firstName), 400, 'Enter a valid first name.');
         const [spawnX, spawnZ] = DISTRICTS[district];
         const user = { id: randomUUID(), firstName, username, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldX: spawnX + 12, worldZ: spawnZ, worldRotation: 0, worldUpdatedAt: now() };
-        db.users.push(user); walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash'); await persist(); startSession(user, response, request); socialChanged();
+        db.users.push(user); walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash'); await persist(); await startSession(user, response, request); socialChanged();
         send(response, 201, { user: publicUser(user) }); return;
       }
       if (path === '/api/auth/login' && request.method === 'POST') {
@@ -1555,7 +1577,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const comparison = await scrypt(body.password, user?.salt || 'not-an-account-salt', 64);
         const valid = timingSafeEqual(comparison, user ? Buffer.from(user.passwordHash, 'hex') : Buffer.alloc(64));
         requireValue(user && valid, 401, 'Username or password is incorrect.');
-        startSession(user, response, request); socialChanged();
+        await startSession(user, response, request); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
       }
       if (path === '/api/auth/forgot' && request.method === 'POST') {
@@ -1588,9 +1610,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       const user = session.user;
       if (path === '/api/auth/logout' && request.method === 'POST') {
         sessions.delete(session.key);
+        dirty = true;
         for (const client of clients.get(user.id) || []) if (client.key === session.key) client.response.end();
         if (![...sessions.values()].some(item => item.id === user.id && item.expires > now())) presence.delete(user.id);
         response.setHeader('Set-Cookie', 'kp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0');
+        await persist();
         socialChanged(); send(response, 200, { ok: true }); return;
       }
       if (path === '/api/profile' && request.method === 'PATCH') {
