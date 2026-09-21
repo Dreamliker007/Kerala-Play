@@ -387,15 +387,28 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { user, key };
   }
   async function startSession(user, response, request) {
-    const revokedKeys = new Set();
-    for (const [key, session] of sessions) {
-      if (session.id !== user.id) continue;
-      revokedKeys.add(key);
+    const revokedByUser = new Map();
+    const rememberRevoked = (userId, key) => {
+      if (!revokedByUser.has(userId)) revokedByUser.set(userId, new Set());
+      revokedByUser.get(userId).add(key);
       sessions.delete(key);
+    };
+
+    // Replacing the account in this browser must also close any live streams
+    // that still carry the previous account's session token.
+    const incomingToken = cookieToken(request);
+    const incomingKey = incomingToken ? hashToken(incomingToken) : '';
+    const incomingSession = incomingKey ? sessions.get(incomingKey) : null;
+    if (incomingSession && incomingSession.id !== user.id) rememberRevoked(incomingSession.id, incomingKey);
+
+    // Kerala Play allows one active device/session per account.
+    for (const [key, session] of [...sessions]) {
+      if (session.id === user.id) rememberRevoked(user.id, key);
     }
 
-    const connections = clients.get(user.id);
-    if (connections?.size) {
+    for (const [userId, revokedKeys] of revokedByUser) {
+      const connections = clients.get(userId);
+      if (!connections?.size) continue;
       for (const client of [...connections]) {
         if (!revokedKeys.has(client.key)) continue;
         try {
