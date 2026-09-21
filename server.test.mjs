@@ -414,9 +414,11 @@ test('jobs require job vehicles, real world checkpoints, server salary, cooldown
   assert.equal(firstTaxiVehicle.kind, 'taxi');
 
   await app.restart();
-  assert.equal((await alice('/api/session')).data.user.username, 'JobAlice');
+  const restoredJobUser = (await alice('/api/session')).data.user;
+  assert.equal(restoredJobUser.username, 'JobAlice');
   jobs = (await alice('/api/jobs')).data;
   assert.equal(jobs.active.taskId, taxiTaskId, 'Active mission should survive a server restart');
+  assert.equal((await alice('/api/world/move', { x: restoredJobUser.x, z: restoredJobUser.z, rotation: restoredJobUser.rotation, moving: false })).status, 200, 'Reconnect should re-establish presence at the saved position');
   assert.deepEqual({ x: jobs.active.target.x, z: jobs.active.target.z }, { x: firstTaxiTarget.x, z: firstTaxiTarget.z }, 'Mission checkpoint should persist');
   assert.deepEqual({ x: jobs.active.vehicle.x, z: jobs.active.vehicle.z }, { x: firstTaxiVehicle.x, z: firstTaxiVehicle.z }, 'Parked job vehicle should persist');
 
