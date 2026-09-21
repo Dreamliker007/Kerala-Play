@@ -143,6 +143,56 @@ test('player reports validate reasons, prevent rapid duplicates and persist', as
   assert.equal((await alice(`/api/reports/${bobUser.id}`, { reason: 'spam' })).status, 201);
 });
 
+test('social groups support creation invites membership chat ownership transfer and persistence', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client(), carol = app.client();
+  const aliceUser = await signup(alice, 'GroupAlice'), bobUser = await signup(bob, 'GroupBob'), carolUser = await signup(carol, 'GroupCarol');
+
+  assert.equal((await alice(`/api/follows/${bobUser.id}`, { action: 'request' })).status, 200);
+  assert.equal((await bob(`/api/follows/${aliceUser.id}`, { action: 'accept' })).status, 200);
+
+  const created = await alice('/api/groups', { name: 'Kerala Riders' });
+  assert.equal(created.status, 201);
+  const groupId = created.data.group.id;
+  assert.equal(created.data.group.isOwner, true);
+  assert.equal(created.data.group.memberCount, 1);
+
+  assert.equal((await alice(`/api/groups/${groupId}/invite`, { peerId: carolUser.id })).status, 403, 'Only accepted contacts can be invited');
+  assert.equal((await alice(`/api/groups/${groupId}/invite`, { peerId: bobUser.id })).status, 200);
+  let bobGroups = (await bob('/api/groups')).data;
+  assert.equal(bobGroups.invites.length, 1);
+  assert.equal(bobGroups.invites[0].id, groupId);
+  const inviteAlert = (await bob('/api/notifications')).data.items.find(item => item.target === 'groups' && item.title === 'Group invitation');
+  assert.ok(inviteAlert);
+
+  assert.equal((await bob(`/api/groups/${groupId}/respond`, { action: 'accept' })).status, 200);
+  bobGroups = (await bob('/api/groups')).data;
+  assert.equal(bobGroups.groups[0].memberCount, 2);
+  assert.equal(bobGroups.groups[0].isMember, true);
+
+  const posted = await bob(`/api/groups/${groupId}/messages`, { body: 'Meet at the bus stand.' });
+  assert.equal(posted.status, 201);
+  let chat = await alice(`/api/groups/${groupId}/messages`);
+  assert.equal(chat.status, 200);
+  assert.equal(chat.data.messages.at(-1).body, 'Meet at the bus stand.');
+  assert.equal(chat.data.messages.at(-1).fromName, 'GroupBob');
+
+  assert.equal((await alice(`/api/groups/${groupId}/leave`, {})).status, 200);
+  bobGroups = (await bob('/api/groups')).data;
+  assert.equal(bobGroups.groups[0].isOwner, true, 'Ownership should transfer when the owner leaves');
+
+  await app.restart();
+  bobGroups = (await bob('/api/groups')).data;
+  assert.equal(bobGroups.groups.length, 1);
+  assert.equal(bobGroups.groups[0].id, groupId);
+  assert.equal(bobGroups.groups[0].isOwner, true);
+  chat = await bob(`/api/groups/${groupId}/messages`);
+  assert.equal(chat.status, 200);
+  assert.equal(chat.data.messages.at(-1).body, 'Meet at the bus stand.');
+
+  assert.equal((await bob(`/api/groups/${groupId}/leave`, {})).status, 200);
+  assert.equal((await bob('/api/groups')).data.groups.length, 0);
+});
+
 test('nearby voice works without follows, enforces distance and respects blocks', async t => {
   const app = await setup(t), alice = app.client(), bob = app.client();
   const a = await signup(alice, 'Alice'), b = await signup(bob, 'Bob');
