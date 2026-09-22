@@ -1842,6 +1842,36 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         })).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 200);
         send(response, 200, { reports }); return;
       }
+      const adminReportMatch = path.match(/^\/api\/admin\/reports\/([^/]+)$/);
+      if (adminReportMatch && request.method === 'PATCH') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        limited(`admin-action:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        requireValue(body.status === 'resolved' || body.status === 'dismissed', 400, 'Choose resolved or dismissed.');
+        const reportId = decodeURIComponent(adminReportMatch[1]);
+        let report = null, reporter = null;
+        for (const candidate of db.users) {
+          const found = (candidate.jobState?.reports || []).find(item => item.id === reportId);
+          if (found) { report = found; reporter = candidate; break; }
+        }
+        requireValue(report, 404, 'Report not found.');
+        requireValue((report.status || 'open') === 'open', 409, 'This report is already closed.');
+        const target = db.users.find(peer => peer.id === report.targetId);
+        report.status = body.status;
+        report.reviewedAt = now();
+        report.reviewedBy = user.id;
+        const entry = {
+          id: randomUUID(), actorId: user.id, actorUsername: user.username,
+          action: `report_${body.status}`, reportId: report.id,
+          reporterId: reporter?.id || '', targetId: report.targetId,
+          targetUsername: target?.username || 'Unknown player', createdAt: now()
+        };
+        db.adminAuditLog.push(entry);
+        if (db.adminAuditLog.length > 1000) db.adminAuditLog.splice(0, db.adminAuditLog.length - 1000);
+        dirty = true;
+        await persist();
+        send(response, 200, { report: { id: report.id, status: report.status, reviewedAt: report.reviewedAt }, audit: entry }); return;
+      }
       if (path === '/api/admin/audit' && request.method === 'GET') {
         requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
         send(response, 200, { entries: db.adminAuditLog.slice(-100).reverse() }); return;
