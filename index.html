@@ -1204,6 +1204,7 @@
       <button id="jobs-toggle" class="hud-icon" type="button" aria-label="Open jobs" aria-controls="jobs-panel" aria-expanded="false">💼<span>JOBS</span></button>
       <button id="task-toggle" class="hud-icon" type="button" aria-label="Open tasks" aria-controls="task-panel" aria-expanded="false">★<span>TASKS</span></button>
       <button id="progression-toggle" class="hud-icon" type="button" aria-label="Open achievements and leaderboards" aria-controls="progression-panel" aria-expanded="false">🏆<span>PROGRESS</span></button>
+      <button id="admin-toggle" class="hud-icon" type="button" aria-label="Open admin live operations" aria-controls="admin-panel" aria-expanded="false" hidden>🛡️<span>ADMIN</span></button>
       <button id="fullscreen-toggle" class="hud-icon" type="button" aria-label="Enter fullscreen">⛶<span>FULL</span></button>
     </div>
     <aside id="minimap" aria-label="Kerala mini-map">
@@ -1258,6 +1259,14 @@
       <div id="progression-achievements" aria-live="polite"></div>
       <div class="wallet-section"><strong>Category Leaderboards</strong><p class="panel-note">Recognition is activity-based. Kerala Cash and wealth are never ranked.</p><div id="progression-categories" class="progression-categories"></div><div id="progression-leaderboard" aria-live="polite"></div></div>
       <div id="progression-error" class="social-error" role="status"></div>
+    </section>
+    <section id="admin-panel" aria-label="Admin live operations">
+      <div class="panel-heading"><span>Admin · Live Operations</span><button id="admin-close" class="panel-close" type="button" aria-label="Close admin dashboard">×</button></div>
+      <p class="panel-note">Read-only operational overview. Intervention controls will be added separately with audit logging.</p>
+      <div id="admin-metrics" class="progression-achievements" aria-live="polite"></div>
+      <div class="wallet-history-heading"><strong>Server-owned metrics</strong><button id="admin-refresh" type="button">Refresh</button></div>
+      <small id="admin-generated" class="social-muted">Not loaded</small>
+      <div id="admin-error" class="social-error" role="status"></div>
     </section>
     <section id="phone-panel" aria-label="Kerala Phone notifications and reminders">
       <div class="panel-heading"><span>Kerala Phone</span><button id="phone-close" class="panel-close" type="button" aria-label="Close Kerala Phone">×</button></div>
