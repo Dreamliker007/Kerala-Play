@@ -1276,3 +1276,21 @@ test('progression API exposes server-owned recognition and category leaderboards
   progression = await alice('/api/progression');
   assert.notEqual(progression.data.recognition.title, 'Injected');
 });
+
+
+test('admin live-ops overview is protected and summarizes server-owned state', async t => {
+  const app = await setup(t, { adminUsernames: ['AdminAlice'] });
+  const admin = app.client(), player = app.client();
+  await signup(admin, 'AdminAlice');
+  await signup(player, 'RegularBob');
+
+  assert.equal((await player('/api/admin/overview')).status, 403);
+  const overview = await admin('/api/admin/overview');
+  assert.equal(overview.status, 200);
+  assert.equal(overview.data.players.total, 2);
+  assert.equal(overview.data.players.online, 2);
+  assert.equal(overview.data.moderation.reportsOpen, 0);
+  assert.ok(overview.data.economy.combinedMoney >= 0);
+  assert.equal(overview.data.activity.activeJobs, 0);
+  assert.equal(typeof overview.data.generatedAt, 'number');
+});
