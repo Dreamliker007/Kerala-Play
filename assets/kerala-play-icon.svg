@@ -1,31 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Kerala Play app icon">
-  <defs>
-    <linearGradient id="bg" x1="58" y1="42" x2="454" y2="470" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#06313b"/>
-      <stop offset=".54" stop-color="#075f65"/>
-      <stop offset="1" stop-color="#123456"/>
-    </linearGradient>
-    <linearGradient id="land" x1="180" y1="70" x2="340" y2="430" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#b8f19a"/>
-      <stop offset=".55" stop-color="#54d486"/>
-      <stop offset="1" stop-color="#1ca56c"/>
-    </linearGradient>
-    <linearGradient id="play" x1="219" y1="198" x2="322" y2="310" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fff4b0"/>
-      <stop offset="1" stop-color="#f3c85a"/>
-    </linearGradient>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
-      <feDropShadow dx="0" dy="13" stdDeviation="14" flood-color="#00191e" flood-opacity=".42"/>
-    </filter>
-  </defs>
-  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
-  <circle cx="256" cy="247" r="171" fill="none" stroke="#d8fff0" stroke-opacity=".08" stroke-width="2"/>
-  <circle cx="256" cy="247" r="132" fill="none" stroke="#d8fff0" stroke-opacity=".06" stroke-width="2"/>
-  <path d="M118 384C186 346 284 344 401 380" fill="none" stroke="#79d9ed" stroke-opacity=".72" stroke-width="18" stroke-linecap="round"/>
-  <g filter="url(#shadow)">
-    <path d="M262 67c-18 15-29 33-32 54-4 26-18 45-22 69-5 28-4 50-13 75-9 24-4 50-10 76-5 22 2 43 14 64 11 20 24 33 38 41 8 5 14 1 17-8 5-16 8-34 17-50 10-17 23-31 29-51 7-23 20-43 20-68 0-25 12-46 9-70-3-24 8-46 1-67-7-21-19-39-33-52-14-14-25-20-35-13Z" fill="url(#land)" stroke="#eaffdc" stroke-width="5" stroke-linejoin="round"/>
-    <path d="M234 182 324 251 234 320Z" fill="url(#play)" stroke="#fff9d7" stroke-width="5" stroke-linejoin="round"/>
-  </g>
-  <path d="M146 107c27-24 58-40 92-48M368 102c-25-22-53-36-83-44" fill="none" stroke="#fff" stroke-opacity=".15" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="404" cy="126" r="9" fill="#f3c85a" opacity=".86"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Kerala Play">
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#063f3f"/><stop offset="1" stop-color="#061b20"/></linearGradient><linearGradient id="gold" x2="0" y2="1"><stop stop-color="#fff1b2"/><stop offset=".5" stop-color="#e5b94c"/><stop offset="1" stop-color="#9b6519"/></linearGradient><linearGradient id="leaf" x2="1" y2="1"><stop stop-color="#a8e63b"/><stop offset="1" stop-color="#08773f"/></linearGradient></defs>
+<rect x="10" y="10" width="492" height="492" rx="104" fill="url(#bg)" stroke="#d6b45a" stroke-width="8"/>
+<path d="M128 82h72v139L322 82h91L279 232l145 198h-96L224 286l-24 27v117h-72z" fill="url(#gold)"/>
+<path d="M183 315c74-91 135-104 202-84-59 8-106 39-148 100 54-25 102-25 145-7-77 2-129 33-171 92-20-27-29-60-28-101z" fill="url(#leaf)" stroke="#d9b34d" stroke-width="5"/>
+<path d="M82 445h348" stroke="#d6b45a" stroke-width="5" stroke-linecap="round"/>
+<text x="256" y="474" text-anchor="middle" fill="#f6e5b4" font-family="Arial,sans-serif" font-size="27" font-weight="800" letter-spacing="8">PLAY</text></svg>
