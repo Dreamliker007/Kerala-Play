@@ -274,6 +274,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!Array.isArray(user.jobState.notifications.items)) { user.jobState.notifications.items = []; migrated = true; }
     if (!user.jobState.notifications.read || typeof user.jobState.notifications.read !== 'object' || Array.isArray(user.jobState.notifications.read)) { user.jobState.notifications.read = {}; migrated = true; }
     if (!Array.isArray(user.jobState.reports)) { user.jobState.reports = []; migrated = true; }
+    if (!user.moderation || typeof user.moderation !== 'object' || Array.isArray(user.moderation)) { user.moderation = { warnings: [], mutedUntil: 0 }; migrated = true; }
+    if (!Array.isArray(user.moderation.warnings)) { user.moderation.warnings = []; migrated = true; }
+    if (!Number.isFinite(Number(user.moderation.mutedUntil))) { user.moderation.mutedUntil = 0; migrated = true; }
     const cleanReports = user.jobState.reports.filter(report => report && typeof report === 'object' && typeof report.id === 'string' && typeof report.targetId === 'string' && REPORT_REASONS.includes(report.reason) && Number.isFinite(Number(report.createdAt))).slice(-REPORT_HISTORY_LIMIT);
     if (cleanReports.length !== user.jobState.reports.length) { user.jobState.reports = cleanReports; migrated = true; }
     if (user.jobState.active && (typeof user.jobState.active !== 'object' || !JOB_DEFINITIONS[user.jobState.active.jobId] || !Array.isArray(user.jobState.active.checkpoints))) { user.jobState.active = null; migrated = true; }
@@ -1892,6 +1895,38 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           world: { configuredAlerts: configuredWorldAlerts.length },
           audit: { entries: db.adminAuditLog.length },
         }); return;
+      }
+      const adminModerationMatch = path.match(/^\/api\/admin\/players\/([^/]+)\/(warn|mute)$/);
+      if (adminModerationMatch && request.method === 'POST') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        limited(`admin-action:${user.id}`, 30, 60000);
+        const target = findUser(decodeURIComponent(adminModerationMatch[1]));
+        requireValue(target, 404, 'Player not found.');
+        requireValue(target.id !== user.id, 400, 'You cannot moderate your own account.');
+        const body = await jsonBody(request);
+        const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+        requireValue(reason.length >= 3 && reason.length <= 240, 400, 'Moderation reason must be 3–240 characters.');
+        if (!target.moderation || typeof target.moderation !== 'object') target.moderation = { warnings: [], mutedUntil: 0 };
+        if (!Array.isArray(target.moderation.warnings)) target.moderation.warnings = [];
+        const action = adminModerationMatch[2];
+        let mutedUntil = Number(target.moderation.mutedUntil || 0);
+        if (action === 'warn') {
+          target.moderation.warnings.push({ id: randomUUID(), reason, actorId: user.id, createdAt: now() });
+          target.moderation.warnings = target.moderation.warnings.slice(-50);
+          addNotification(target, { sourceKey: `moderation:warning:${now()}`, kind: 'security', title: 'Admin warning', message: reason, severity: 'warning' });
+        } else {
+          const durationMinutes = Number(body.durationMinutes);
+          requireValue(Number.isInteger(durationMinutes) && [15, 60, 360, 1440].includes(durationMinutes), 400, 'Choose a supported mute duration.');
+          mutedUntil = Math.max(now(), mutedUntil) + durationMinutes * 60000;
+          target.moderation.mutedUntil = mutedUntil;
+          addNotification(target, { sourceKey: `moderation:mute:${now()}`, kind: 'security', title: 'Communication muted', message: `${reason} · Until ${new Date(mutedUntil).toISOString()}`, severity: 'warning' });
+        }
+        const entry = { id: randomUUID(), actorId: user.id, actorUsername: user.username, action: `player_${action}`, targetId: target.id, targetUsername: target.username, reason, mutedUntil: action === 'mute' ? mutedUntil : 0, createdAt: now() };
+        db.adminAuditLog.push(entry);
+        if (db.adminAuditLog.length > 1000) db.adminAuditLog.splice(0, db.adminAuditLog.length - 1000);
+        dirty = true;
+        await persist();
+        send(response, 200, { ok: true, action, target: { id: target.id, username: target.username }, mutedUntil: action === 'mute' ? mutedUntil : 0 }); return;
       }
       if (path === '/api/admin/actions/note' && request.method === 'POST') {
         requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
