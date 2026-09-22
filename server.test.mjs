@@ -1368,3 +1368,25 @@ test('admin can resolve or dismiss reports with audit logging', async t => {
   assert.equal(audit.data.entries[0].reportId, reportId);
   assert.equal(audit.data.entries[0].targetUsername, 'TargetCara');
 });
+
+
+test('admin warn and mute actions are protected, persisted, and audited', async t => {
+  const app = await setup(t, { adminUsernames: ['AdminAlice'] });
+  const admin = app.client(), player = app.client(), other = app.client();
+  const adminUser = await signup(admin, 'AdminAlice');
+  const playerUser = await signup(player, 'RegularBob');
+  await signup(other, 'OtherCara');
+
+  assert.equal((await player(`/api/admin/players/${playerUser.id}/warn`, { reason: 'No access' })).status, 403);
+  assert.equal((await admin(`/api/admin/players/${adminUser.id}/warn`, { reason: 'Self action' })).status, 400);
+  assert.equal((await admin(`/api/admin/players/${playerUser.id}/warn`, { reason: 'Please follow community rules.' })).status, 200);
+  assert.equal((await admin(`/api/admin/players/${playerUser.id}/mute`, { reason: 'Repeated spam', durationMinutes: 17 })).status, 400);
+  const muted = await admin(`/api/admin/players/${playerUser.id}/mute`, { reason: 'Repeated spam', durationMinutes: 15 });
+  assert.equal(muted.status, 200);
+  assert.ok(muted.data.mutedUntil > Date.now());
+
+  const audit = await admin('/api/admin/audit');
+  assert.equal(audit.data.entries[0].action, 'player_mute');
+  assert.equal(audit.data.entries[1].action, 'player_warn');
+  assert.equal(audit.data.entries[0].targetId, playerUser.id);
+});
