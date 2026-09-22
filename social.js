@@ -476,19 +476,23 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const resetForm = node('form', 'social-form');
   resetForm.hidden = true;
   const resetTitle = node('h2', '', 'Reset password');
-  const resetIntro = node('p', 'social-muted', 'Enter the username, email, or mobile number used when you registered. We will send a code to the saved email address.');
+  const resetIntro = node('p', 'social-muted', 'Enter the username, email, or mobile number used when you registered.');
   const resetIdentifier = input('text', { required: true, maxLength: 80, autocomplete: 'username', placeholder: 'Username, email, or mobile number' });
-  const resetCode = input('text', { required: true, inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6, autocomplete: 'one-time-code', placeholder: '6-digit code' });
-  const resetPassword = input('password', { required: true, minLength: 8, maxLength: 128, autocomplete: 'new-password', placeholder: 'New password (8+ characters)' });
-  const resetCredentials = node('div');
-  resetCredentials.append(field('OTP from email', resetCode), field('New password', resetPassword));
-  const resetSubmit = node('button', 'social-button primary', 'Send OTP to my email');
+  const resetCode = input('text', { inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6, autocomplete: 'one-time-code', placeholder: '6-digit code' });
+  const resetPassword = input('password', { minLength: 8, maxLength: 128, autocomplete: 'new-password', placeholder: 'New password (8+ characters)' });
+  const resetConfirmPassword = input('password', { minLength: 8, maxLength: 128, autocomplete: 'new-password', placeholder: 'Confirm new password' });
+  const resetAccountStep = node('div');
+  resetAccountStep.append(field('Account', resetIdentifier));
+  const resetVerifyStep = node('div');
+  resetVerifyStep.hidden = true;
+  resetVerifyStep.append(field('OTP from email', resetCode), field('New password', resetPassword), field('Confirm password', resetConfirmPassword));
+  const resetSubmit = node('button', 'social-button primary', 'Send email OTP');
   resetSubmit.type = 'submit';
   const resetBack = button('Back to log in', () => renderAuth('login'), 'social-button secondary');
   const resetError = node('div', 'social-error');
   resetError.setAttribute('role', 'status');
   resetError.setAttribute('aria-live', 'polite');
-  resetForm.append(resetTitle, resetIntro, field('Account', resetIdentifier), resetCredentials, resetSubmit, resetBack, resetError);
+  resetForm.append(resetTitle, resetIntro, resetAccountStep, resetVerifyStep, resetSubmit, resetBack, resetError);
   authCard.append(resetForm);
   authModal.append(authCard);
   document.body.append(authModal);
@@ -587,6 +591,20 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     return true;
   }
 
+  function setResetStep(step = 'account') {
+    const verifying = step === 'verify';
+    resetAccountStep.hidden = verifying;
+    resetVerifyStep.hidden = !verifying;
+    resetIdentifier.required = !verifying;
+    resetCode.required = verifying;
+    resetPassword.required = verifying;
+    resetConfirmPassword.required = verifying;
+    resetSubmit.textContent = verifying ? 'Save new password' : 'Send email OTP';
+    resetIntro.textContent = verifying
+      ? 'Enter the 6-digit OTP sent to your saved email, then choose and confirm your new password.'
+      : 'Enter the username, email, or mobile number used when you registered.';
+  }
+
   function renderReset() {
     authModal.hidden = false;
     authTabs.hidden = true;
@@ -596,7 +614,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     resetError.textContent = '';
     resetCode.value = '';
     resetPassword.value = '';
-    resetSubmit.textContent = 'Send OTP to my email';
+    resetConfirmPassword.value = '';
+    setResetStep('account');
     queueMicrotask(() => resetIdentifier.focus());
   }
   resetForm.addEventListener('submit', async event => {
@@ -604,16 +623,18 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (!resetForm.reportValidity()) return;
     resetSubmit.disabled = true;
     await run(async () => {
-      if (resetSubmit.textContent !== 'Reset password') {
+      if (!resetAccountStep.hidden) {
         const result = await api('/api/auth/forgot', { identifier: resetIdentifier.value.trim() });
-        resetIntro.textContent = `${result.message} Check your email, then enter the OTP and a new password below. This page will stay open while you check email.`;
-        resetSubmit.textContent = 'Reset password';
+        resetIntro.textContent = `${result.message} Enter the OTP below to continue.`;
+        setResetStep('verify');
         resetCode.focus();
       } else {
+        if (resetPassword.value !== resetConfirmPassword.value) throw new Error('New password and confirm password must match.');
         await api('/api/auth/reset', { code: resetCode.value.trim(), password: resetPassword.value });
         resetCode.value = '';
         resetPassword.value = '';
-        resetSubmit.textContent = 'Send OTP to my email';
+        resetConfirmPassword.value = '';
+        setResetStep('account');
         renderAuth('login', 'Password reset. You can log in now.');
       }
     }, resetError);
