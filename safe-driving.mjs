@@ -44,4 +44,15 @@ export function applySafeDrivingCredit(progress = {}, creditedMeters = 0) {
   };
 }
 
+export function applySafeDrivingProgress(progress = {}, segmentInput = {}) {
+  const segment = safeDrivingSegment(segmentInput);
+  const next = applySafeDrivingCredit(progress, segment.creditedMeters);
+  return {
+    ...next,
+    compliant: segment.compliant,
+    creditedMeters: segment.creditedMeters,
+    reason: segment.reason,
+  };
+}
+
 export const SAFE_DRIVING_METERS_PER_POINT = METERS_PER_POINT;
