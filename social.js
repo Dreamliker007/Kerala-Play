@@ -285,6 +285,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const adminRefresh = $('admin-refresh');
   const adminReportsRefresh = $('admin-reports-refresh');
   const adminReports = $('admin-reports');
+  const adminAuditRefresh = $('admin-audit-refresh');
+  const adminAudit = $('admin-audit');
   const adminGenerated = $('admin-generated');
   const adminError = $('admin-error');
   let adminTimer = null;
@@ -342,6 +344,29 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     toast(action === 'warn' ? 'Player warning sent.' : 'Player muted for 1 hour.');
     await refreshAdminOverview();
   }
+  function renderAdminAudit(data) {
+    if (!adminAudit) return;
+    adminAudit.replaceChildren();
+    const entries = data?.entries || [];
+    if (!entries.length) { adminAudit.append(node('p', 'panel-note', 'No admin actions recorded yet.')); return; }
+    for (const entry of entries) {
+      const card = node('article', 'achievement-card');
+      const action = String(entry.action || 'admin_action').replaceAll('_', ' ');
+      const target = entry.targetUsername ? ` · ${entry.targetUsername}` : '';
+      card.append(
+        node('strong', '', `${action}${target}`),
+        node('small', 'social-muted', `${entry.actorUsername || 'Admin'} · ${new Date(entry.createdAt || Date.now()).toLocaleString()}`)
+      );
+      if (entry.reason) card.append(node('p', 'panel-note', entry.reason));
+      else if (entry.note) card.append(node('p', 'panel-note', entry.note));
+      adminAudit.append(card);
+    }
+  }
+  async function refreshAdminAudit() {
+    const data = await api('/api/admin/audit');
+    renderAdminAudit(data);
+    return data;
+  }
   async function closeAdminReport(reportId, status) {
     if (!confirm(`${status === 'resolved' ? 'Resolve' : 'Dismiss'} this moderation report?`)) return;
     const result = await api(`/api/admin/reports/${encodeURIComponent(reportId)}`, { status }, 'PATCH');
@@ -370,7 +395,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   async function openAdmin() {
     showPanel(adminPanel);
     await refreshAdminOverview();
-    await refreshAdminReports();
+    await Promise.all([refreshAdminReports(), refreshAdminAudit()]);
     if (adminTimer) clearInterval(adminTimer);
     adminTimer = setInterval(() => { if (user && adminPanel?.classList.contains('open')) run(refreshAdminOverview, adminError); }, 15000);
   }
@@ -2540,6 +2565,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   adminClose?.addEventListener('click', () => { closePanels(); adminToggle?.focus(); });
   adminRefresh?.addEventListener('click', () => run(refreshAdminOverview, adminError));
   adminReportsRefresh?.addEventListener('click', () => run(refreshAdminReports, adminError));
+  adminAuditRefresh?.addEventListener('click', () => run(refreshAdminAudit, adminError));
   jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
   jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
   phoneNotifications?.addEventListener('click', event => {
