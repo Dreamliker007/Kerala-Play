@@ -55,4 +55,21 @@ export function applySafeDrivingProgress(progress = {}, segmentInput = {}) {
   };
 }
 
+export function safeDrivingProgressFromRecord(record = {}) {
+  const points = Math.max(0, Math.floor(Number(record.safeDrivingPoints) || 0));
+  const rawMeters = Math.max(0, Number(record.safeDrivingMeters) || 0);
+  return {
+    points,
+    meters: rawMeters % METERS_PER_POINT,
+  };
+}
+
+export function safeDrivingProgressPatch(progress = {}) {
+  const normalized = applySafeDrivingCredit(progress, 0);
+  return {
+    safeDrivingPoints: normalized.points,
+    safeDrivingMeters: normalized.meters,
+  };
+}
+
 export const SAFE_DRIVING_METERS_PER_POINT = METERS_PER_POINT;

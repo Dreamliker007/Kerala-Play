@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySafeDrivingCredit, applySafeDrivingProgress, safeDrivingSegment } from './safe-driving.mjs';
+import {
+  applySafeDrivingCredit,
+  applySafeDrivingProgress,
+  safeDrivingProgressFromRecord,
+  safeDrivingProgressPatch,
+  safeDrivingSegment,
+} from './safe-driving.mjs';
 
 test('credits only compliant insured licensed driving under the zone tolerance', () => {
   const eligible = safeDrivingSegment({ distance: 5, elapsed: .75, speedKmh: 40, speedLimit: 40, licenceValid: true, insuranceActive: true });
@@ -50,6 +56,17 @@ test('ineligible movement preserves durable progress exactly', () => {
   assert.equal(next.earned, 0);
   assert.equal(next.compliant, false);
   assert.equal(next.creditedMeters, 0);
+});
+
+test('maps persisted player fields into bounded safe-driving progress', () => {
+  assert.deepEqual(safeDrivingProgressFromRecord({ safeDrivingPoints: 99, safeDrivingMeters: 8 }), { points: 99, meters: 8 });
+  assert.deepEqual(safeDrivingProgressFromRecord({ safeDrivingPoints: -4, safeDrivingMeters: 27 }), { points: 0, meters: 7 });
+  assert.deepEqual(safeDrivingProgressFromRecord({ safeDrivingPoints: 'bad', safeDrivingMeters: NaN }), { points: 0, meters: 0 });
+});
+
+test('produces a persistence patch using canonical player field names', () => {
+  assert.deepEqual(safeDrivingProgressPatch({ points: 100, meters: 5 }), { safeDrivingPoints: 100, safeDrivingMeters: 5 });
+  assert.deepEqual(safeDrivingProgressPatch({ points: 3.9, meters: 25 }), { safeDrivingPoints: 5, safeDrivingMeters: 5 });
 });
 
 test('never grants credit for malformed or stationary movement', () => {
