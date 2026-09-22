@@ -265,6 +265,19 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   let jobsSnapshot = null;
   let jobsTimer = null;
   const profileChip = $('profile-chip');
+  const progressionPanel = $('progression-panel');
+  const progressionToggle = $('progression-toggle');
+  const progressionClose = $('progression-close');
+  const progressionTitle = $('progression-title');
+  const progressionSummary = $('progression-summary');
+  const progressionAchievements = $('progression-achievements');
+  const progressionCategories = $('progression-categories');
+  const progressionLeaderboard = $('progression-leaderboard');
+  const progressionRefresh = $('progression-refresh');
+  const progressionError = $('progression-error');
+  let progressionSnapshot = null;
+  let leaderboardCategoriesSnapshot = [];
+  let activeLeaderboardCategory = 'jobs';
 
   function toast(message) { onToast(message); }
   function notifyState() { for (const listener of listeners) listener({ user, connected }); }
@@ -298,7 +311,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function closePanels() {
     cancelRecording(); stopTalking();
-    for (const panel of [peoplePanel, dmPanel, chatPanel, phonePanel, eventsPanel, walletPanel, homePanel, garagePanel, jobsPanel, worldShopPanel]) panel?.classList.remove('open');
+    for (const panel of [peoplePanel, dmPanel, chatPanel, phonePanel, eventsPanel, walletPanel, homePanel, garagePanel, jobsPanel, progressionPanel, worldShopPanel]) panel?.classList.remove('open');
     peopleToggle?.setAttribute('aria-expanded', 'false');
     chatToggle?.setAttribute('aria-expanded', 'false');
     phoneToggle?.setAttribute('aria-expanded', 'false');
@@ -307,6 +320,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     homeToggle?.setAttribute('aria-expanded', 'false');
     garageToggle?.setAttribute('aria-expanded', 'false');
     jobsToggle?.setAttribute('aria-expanded', 'false');
+    progressionToggle?.setAttribute('aria-expanded', 'false');
     if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
     if (eventsTimer) { clearInterval(eventsTimer); eventsTimer = null; }
   }
@@ -326,6 +340,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     homeToggle?.setAttribute('aria-expanded', String(panel === homePanel));
     garageToggle?.setAttribute('aria-expanded', String(panel === garagePanel));
     jobsToggle?.setAttribute('aria-expanded', String(panel === jobsPanel));
+    progressionToggle?.setAttribute('aria-expanded', String(panel === progressionPanel));
   }
   function panelHeader(title, panel, id) {
     const header = node('div', 'panel-heading');
@@ -1159,6 +1174,73 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     showPanel(homePanel);
     run(refreshHome, homeError);
   }
+  function renderProgression(summary) {
+    progressionSnapshot = summary?.recognition || null;
+    if (!progressionSnapshot) return;
+    if (progressionTitle) progressionTitle.textContent = progressionSnapshot.title || 'Newcomer';
+    if (progressionSummary) progressionSummary.textContent = `${progressionSnapshot.unlockedCount || 0} of ${progressionSnapshot.totalCount || 0} achievements unlocked`;
+    progressionAchievements?.replaceChildren();
+    for (const achievement of progressionSnapshot.achievements || []) {
+      const card = node('article', `progression-achievement${achievement.unlocked ? ' unlocked' : ''}`);
+      const head = node('div', 'progression-row');
+      head.append(node('strong', '', `${achievement.unlocked ? '✓' : '○'} ${achievement.title}`), node('span', '', achievement.unlocked ? achievement.badge : `${achievement.progress}/${achievement.threshold}`));
+      const meter = document.createElement('progress');
+      meter.max = Math.max(1, Number(achievement.threshold || 1));
+      meter.value = Math.min(meter.max, Number(achievement.progress || 0));
+      card.append(head, meter);
+      progressionAchievements?.append(card);
+    }
+  }
+
+  function renderLeaderboardCategories(categories) {
+    leaderboardCategoriesSnapshot = Array.isArray(categories) ? categories : [];
+    progressionCategories?.replaceChildren();
+    for (const category of leaderboardCategoriesSnapshot) {
+      const item = button(category.label, () => run(() => refreshLeaderboard(category.id), progressionError), 'progression-category');
+      item.classList.toggle('active', category.id === activeLeaderboardCategory);
+      item.dataset.category = category.id;
+      progressionCategories?.append(item);
+    }
+  }
+
+  function renderLeaderboard(board) {
+    if (!progressionLeaderboard) return;
+    progressionLeaderboard.replaceChildren();
+    const entries = Array.isArray(board?.entries) ? board.entries : [];
+    if (!entries.length) {
+      progressionLeaderboard.append(node('p', 'social-empty', 'No ranked activity yet. Complete world activities to appear here.'));
+      return;
+    }
+    for (const entry of entries) {
+      const row = node('article', 'leaderboard-entry');
+      row.append(node('strong', 'leaderboard-rank', `#${entry.rank}`), node('span', 'leaderboard-player', entry.username ? `@${entry.username}` : entry.name), node('b', 'leaderboard-score', String(entry.score)));
+      progressionLeaderboard.append(row);
+    }
+  }
+
+  async function refreshLeaderboard(categoryId = activeLeaderboardCategory) {
+    activeLeaderboardCategory = leaderboardCategoriesSnapshot.some(item => item.id === categoryId) ? categoryId : (leaderboardCategoriesSnapshot[0]?.id || 'jobs');
+    progressionCategories?.querySelectorAll('[data-category]').forEach(item => item.classList.toggle('active', item.dataset.category === activeLeaderboardCategory));
+    const board = await api(`/api/leaderboards/${encodeURIComponent(activeLeaderboardCategory)}`);
+    renderLeaderboard(board);
+    return board;
+  }
+
+  async function refreshProgression() {
+    if (!user) return null;
+    const [summary, categories] = await Promise.all([api('/api/progression'), api('/api/leaderboards')]);
+    renderProgression(summary);
+    renderLeaderboardCategories(categories.categories || []);
+    await refreshLeaderboard(activeLeaderboardCategory);
+    return summary;
+  }
+
+  function openProgression() {
+    if (!requireUser()) return;
+    showPanel(progressionPanel);
+    run(refreshProgression, progressionError);
+  }
+
   function insuranceLabel(vehicle) {
     if (!vehicle?.insuranceActive) return 'Insurance expired';
     const days = Math.max(1, Math.ceil(Number(vehicle.insuranceRemainingMs || 0) / 86400000));
@@ -2278,6 +2360,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   garageMarketRefresh?.addEventListener('click', () => run(refreshGarage, garageError));
   trafficRefresh?.addEventListener('click', () => run(refreshTraffic, garageError));
   jobsToggle?.addEventListener('click', () => jobsPanel?.classList.contains('open') ? closePanels() : openJobs());
+  progressionToggle?.addEventListener('click', () => progressionPanel?.classList.contains('open') ? closePanels() : openProgression());
+  progressionClose?.addEventListener('click', () => { closePanels(); progressionToggle?.focus(); });
+  progressionRefresh?.addEventListener('click', () => run(refreshProgression, progressionError));
   jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
   jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
   phoneNotifications?.addEventListener('click', event => {
