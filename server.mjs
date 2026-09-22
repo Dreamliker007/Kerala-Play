@@ -3162,7 +3162,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const peer = findUser(profileMatch[1]); requireValue(peer, 404, 'Player not found.');
         requireValue(!blocked(user.id, peer.id) || ownBlock(user.id, peer.id), 404, 'Player not found.');
         const isBlocked = blocked(user.id, peer.id);
-        send(response, 200, { user: isBlocked ? blockedUser(peer) : publicUser(peer), relationship: relation(user.id, peer.id), blocked: isBlocked, canMessage: !isBlocked && accepted(user.id, peer.id) }); return;
+        send(response, 200, { user: isBlocked ? blockedUser(peer) : publicUser(peer), recognition: isBlocked ? null : progressionProfile(peer).recognition, relationship: relation(user.id, peer.id), blocked: isBlocked, canMessage: !isBlocked && accepted(user.id, peer.id) }); return;
       }
       const reportMatch = path.match(/^\/api\/reports\/([^/]+)$/);
       if (reportMatch && request.method === 'POST') {
