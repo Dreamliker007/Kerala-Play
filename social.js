@@ -321,11 +321,26 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         const actions = node('div', 'profile-actions');
         const resolve = button('Resolve', () => closeAdminReport(report.id, 'resolved'), 'social-button primary');
         const dismiss = button('Dismiss', () => closeAdminReport(report.id, 'dismissed'), 'social-button secondary');
-        actions.append(resolve, dismiss);
+        const warn = button('Warn player', () => moderateReportedPlayer(report, 'warn'), 'social-button secondary');
+        const mute = button('Mute 1h', () => moderateReportedPlayer(report, 'mute'), 'social-button secondary');
+        actions.append(resolve, dismiss, warn, mute);
         card.append(actions);
       }
       adminReports.append(card);
     }
+  }
+  async function moderateReportedPlayer(report, action) {
+    const targetId = report?.target?.id;
+    if (!targetId) return;
+    const reason = prompt(`${action === 'warn' ? 'Warning' : 'Mute'} reason for ${report.target?.username || 'player'}:`, report.details || report.reason || '');
+    if (reason === null) return;
+    const cleanReason = reason.trim();
+    if (cleanReason.length < 3 || cleanReason.length > 240) { toast('Reason must be 3–240 characters.'); return; }
+    const body = action === 'mute' ? { reason: cleanReason, durationMinutes: 60 } : { reason: cleanReason };
+    if (!confirm(`${action === 'warn' ? 'Warn' : 'Mute for 1 hour'} ${report.target?.username || 'this player'}?`)) return;
+    await api(`/api/admin/players/${encodeURIComponent(targetId)}/${action}`, body);
+    toast(action === 'warn' ? 'Player warning sent.' : 'Player muted for 1 hour.');
+    await refreshAdminOverview();
   }
   async function closeAdminReport(reportId, status) {
     if (!confirm(`${status === 'resolved' ? 'Resolve' : 'Dismiss'} this moderation report?`)) return;
