@@ -208,7 +208,8 @@ async function jsonBody(request) {
 }
 
 /** A local, persistent multiplayer server. Sessions and live connections expire on restart. */
-export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publicDir = ROOT, now = Date.now, worldAlerts = [] } = {}) {
+export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publicDir = ROOT, now = Date.now, worldAlerts = [], adminUsernames = [] } = {}) {
+  const adminAccounts = new Set((Array.isArray(adminUsernames) ? adminUsernames : []).map(value => String(value).trim().toLowerCase()).filter(Boolean));
   const configuredWorldAlerts = (Array.isArray(worldAlerts) ? worldAlerts : []).slice(0, 50).map((alert, index) => {
     if (!alert || typeof alert !== 'object' || Array.isArray(alert)) return null;
     const rawId = typeof alert.id === 'string' ? alert.id.trim() : '';
@@ -1824,6 +1825,22 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       const session = sessionFor(request);
       requireValue(session, 401, 'Please sign in first.');
       const user = session.user;
+      if (path === '/api/admin/overview' && request.method === 'GET') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        const allReports = db.users.flatMap(peer => peer.jobState?.reports || []);
+        const openReports = allReports.filter(report => report.status === 'open').length;
+        const walletTotal = db.users.reduce((sum, peer) => sum + Math.max(0, Number(peer.wallet) || 0), 0);
+        const bankTotal = db.users.reduce((sum, peer) => sum + Math.max(0, Number(peer.jobState?.bank?.balance) || 0), 0);
+        const activeJobs = db.users.filter(peer => peer.jobState?.active).length;
+        send(response, 200, {
+          generatedAt: now(),
+          players: { total: db.users.length, online: presence.size },
+          moderation: { reportsTotal: allReports.length, reportsOpen: openReports },
+          economy: { walletTotal, bankTotal, combinedMoney: walletTotal + bankTotal },
+          activity: { activeJobs },
+          world: { configuredAlerts: configuredWorldAlerts.length },
+        }); return;
+      }
       if (path === '/api/auth/logout' && request.method === 'POST') {
         sessions.delete(session.key);
         dirty = true;
