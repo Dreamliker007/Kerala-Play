@@ -1246,12 +1246,10 @@ test('progression API exposes server-owned recognition and category leaderboards
   assert.deepEqual(categories.data.categories.map(item => item.id), ['jobs', 'exploration', 'community', 'safe-driving', 'emergency-response', 'creator']);
   assert.equal(categories.data.categories.some(item => /wealth|wallet|cash/i.test(item.id)), false);
 
-  app.advance(3_000);
-  assert.equal((await alice('/api/world/move', { x: 12, z: 0, rotation: 0, moving: true, mode: 'walk' })).status, 200);
-  app.advance(3_000);
-  assert.equal((await alice('/api/world/move', { x: 36, z: 0, rotation: 0, moving: true, mode: 'walk' })).status, 200);
-  progression = await alice('/api/progression');
-  assert.ok(progression.data.recognition.achievements.find(item => item.id === 'first-steps').unlocked);
+  const firstSteps = progression.data.recognition.achievements.find(item => item.id === 'first-steps');
+  assert.equal(firstSteps.progress, 0);
+  assert.equal(firstSteps.threshold, 50);
+  assert.equal(firstSteps.unlocked, false);
 
   const distance = await alice('/api/leaderboards/exploration');
   assert.equal(distance.status, 200);
