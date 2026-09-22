@@ -1337,3 +1337,34 @@ test('admin moderation report queue is protected and includes report context', a
   assert.equal(queue.data.reports[0].details, 'Repeated unwanted messages.');
   assert.equal(queue.data.reports[0].status, 'open');
 });
+
+
+test('admin can resolve or dismiss reports with audit logging', async t => {
+  const app = await setup(t, { adminUsernames: ['AdminAlice'] });
+  const admin = app.client(), reporter = app.client(), target = app.client();
+  await signup(admin, 'AdminAlice');
+  await signup(reporter, 'ReporterBob');
+  const targetUser = await signup(target, 'TargetCara');
+
+  const created = await reporter(`/api/reports/${targetUser.id}`, { reason: 'harassment', details: 'Repeated unwanted messages.' });
+  assert.equal(created.status, 201);
+  const queue = await admin('/api/admin/reports');
+  const reportId = queue.data.reports[0].id;
+
+  assert.equal((await reporter(`/api/admin/reports/${reportId}`, { status: 'resolved' }, 'PATCH')).status, 403);
+  assert.equal((await admin(`/api/admin/reports/${reportId}`, { status: 'invalid' }, 'PATCH')).status, 400);
+
+  const resolved = await admin(`/api/admin/reports/${reportId}`, { status: 'resolved' }, 'PATCH');
+  assert.equal(resolved.status, 200);
+  assert.equal(resolved.data.report.status, 'resolved');
+  assert.equal((await admin(`/api/admin/reports/${reportId}`, { status: 'dismissed' }, 'PATCH')).status, 409);
+
+  const after = await admin('/api/admin/reports');
+  assert.equal(after.data.reports[0].status, 'resolved');
+  const overview = await admin('/api/admin/overview');
+  assert.equal(overview.data.moderation.reportsOpen, 0);
+  const audit = await admin('/api/admin/audit');
+  assert.equal(audit.data.entries[0].action, 'report_resolved');
+  assert.equal(audit.data.entries[0].reportId, reportId);
+  assert.equal(audit.data.entries[0].targetUsername, 'TargetCara');
+});
