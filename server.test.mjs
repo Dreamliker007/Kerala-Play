@@ -1316,3 +1316,24 @@ test('admin audit log is protected and records controlled actions', async t => {
   const overview = await admin('/api/admin/overview');
   assert.equal(overview.data.audit.entries, 1);
 });
+
+
+test('admin moderation report queue is protected and includes report context', async t => {
+  const app = await setup(t, { adminUsernames: ['AdminAlice'] });
+  const admin = app.client(), reporter = app.client(), target = app.client();
+  await signup(admin, 'AdminAlice');
+  await signup(reporter, 'ReporterBob');
+  const targetUser = await signup(target, 'TargetCara');
+
+  const created = await reporter(`/api/reports/${targetUser.id}`, { reason: 'harassment', details: 'Repeated unwanted messages.' });
+  assert.equal(created.status, 201);
+  assert.equal((await reporter('/api/admin/reports')).status, 403);
+
+  const queue = await admin('/api/admin/reports');
+  assert.equal(queue.status, 200);
+  assert.equal(queue.data.reports.length, 1);
+  assert.equal(queue.data.reports[0].target.username, 'TargetCara');
+  assert.equal(queue.data.reports[0].reporter.username, 'ReporterBob');
+  assert.equal(queue.data.reports[0].details, 'Repeated unwanted messages.');
+  assert.equal(queue.data.reports[0].status, 'open');
+});
