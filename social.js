@@ -481,7 +481,6 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const resetCode = input('text', { required: true, inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6, autocomplete: 'one-time-code', placeholder: '6-digit code' });
   const resetPassword = input('password', { required: true, minLength: 8, maxLength: 128, autocomplete: 'new-password', placeholder: 'New password (8+ characters)' });
   const resetCredentials = node('div');
-  resetCredentials.hidden = true;
   resetCredentials.append(field('OTP from email', resetCode), field('New password', resetPassword));
   const resetSubmit = node('button', 'social-button primary', 'Send OTP to my email');
   resetSubmit.type = 'submit';
@@ -595,6 +594,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     authNote.hidden = true;
     resetForm.hidden = false;
     resetError.textContent = '';
+    resetCode.value = '';
+    resetPassword.value = '';
+    resetSubmit.textContent = 'Send OTP to my email';
     queueMicrotask(() => resetIdentifier.focus());
   }
   resetForm.addEventListener('submit', async event => {
@@ -602,17 +604,15 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (!resetForm.reportValidity()) return;
     resetSubmit.disabled = true;
     await run(async () => {
-      if (resetCredentials.hidden) {
+      if (resetSubmit.textContent !== 'Reset password') {
         const result = await api('/api/auth/forgot', { identifier: resetIdentifier.value.trim() });
         resetIntro.textContent = `${result.message} Check your email, then enter the OTP and a new password below. This page will stay open while you check email.`;
-        resetCredentials.hidden = false;
         resetSubmit.textContent = 'Reset password';
         resetCode.focus();
       } else {
         await api('/api/auth/reset', { code: resetCode.value.trim(), password: resetPassword.value });
         resetCode.value = '';
         resetPassword.value = '';
-        resetCredentials.hidden = true;
         resetSubmit.textContent = 'Send OTP to my email';
         renderAuth('login', 'Password reset. You can log in now.');
       }
