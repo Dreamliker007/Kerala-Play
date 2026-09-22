@@ -30,7 +30,8 @@ await atomicWrite(DATABASE_PATH, initialSnapshot);
 // missing. This also validates that the installed schema matches this server.
 await store.save(initialSnapshot);
 
-const server = await createGameServer({ dataDir: DATA_DIR, worldAlerts: worldAlertsFromEnv() });
+const adminUsernames = String(process.env.KP_ADMIN_USERNAMES || '').split(',').map(value => value.trim()).filter(Boolean);
+const server = await createGameServer({ dataDir: DATA_DIR, worldAlerts: worldAlertsFromEnv(), adminUsernames });
 
 // Keep the game server's strict static-file allowlist, but expose public policy
 // pages at stable, human-readable URLs required by app stores.
