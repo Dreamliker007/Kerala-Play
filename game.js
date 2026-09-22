@@ -209,6 +209,26 @@ let onboardingTypeToken = 0;
 const districtStarts = {
   Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
 };
+const worldZones = Object.freeze([
+  Object.freeze({ id: 'north-coast', name: 'North Kerala', districts: ['Kasaragod', 'Kannur', 'Wayanad'], minZ: 38, maxZ: 72 }),
+  Object.freeze({ id: 'malabar', name: 'Malabar', districts: ['Kozhikode', 'Malappuram'], minZ: 18, maxZ: 38 }),
+  Object.freeze({ id: 'central', name: 'Central Kerala', districts: ['Palakkad', 'Thrissur', 'Ernakulam', 'Idukki'], minZ: -4, maxZ: 32 }),
+  Object.freeze({ id: 'midlands', name: 'Kerala Midlands', districts: ['Kottayam', 'Alappuzha', 'Pathanamthitta'], minZ: -40, maxZ: 2 }),
+  Object.freeze({ id: 'south', name: 'South Kerala', districts: ['Kollam', 'Thiruvananthapuram'], minZ: -72, maxZ: -38 }),
+]);
+const roadNetwork = Object.freeze([
+  Object.freeze({ id: 'state-spine', name: 'Kerala State Road', axis: 'z', center: 0, min: -72, max: 72, halfWidth: 7.75, displayLimit: 40, bikeLimit: 6.6, taxiLimit: 6.4 }),
+  Object.freeze({ id: 'village-link', name: 'Village Link Road', axis: 'x', center: -22, min: -72, max: 16, halfWidth: 5.75, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
+]);
+function worldZoneAt(x, z) {
+  const district = Object.entries(districtStarts).reduce((best, [name, point]) => {
+    const distance = Math.hypot(x - point[0], z - point[1]);
+    return !best || distance < best.distance ? { name, distance } : best;
+  }, null)?.name || 'Kottayam';
+  const zone = worldZones.find(item => item.districts.includes(district)) || worldZones[2];
+  return { ...zone, district };
+}
+
 const landmarks = [
   { id: 'bekal', name: 'Bekal Fort', icon: 'F', x: -7, z: 60, district: 'Kasaragod', kind: 'landmark' },
   { id: 'munnar', name: 'Munnar Tea Hills', icon: 'M', x: 42, z: 26, district: 'Idukki', kind: 'landmark' },
@@ -634,9 +654,15 @@ function updateFootstepEffects(delta, player, moving, running, phase = 0) {
 }
 
 function roadZoneAt(x, z) {
-  if (Math.abs(x) <= 7.75) return { id: 'main', label: 'MAIN ROAD', displayLimit: 40, bikeLimit: 6.6, taxiLimit: 6.4 };
-  if (x >= -72 && x <= 16 && Math.abs(z + 22) <= 5.75) return { id: 'village', label: 'VILLAGE ROAD', displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 };
-  return { id: 'offroad', label: 'OFF ROAD', displayLimit: 20, bikeLimit: 3.25, taxiLimit: 3.0 };
+  for (const road of roadNetwork) {
+    const cross = road.axis === 'z' ? x : z;
+    const along = road.axis === 'z' ? z : x;
+    if (Math.abs(cross - road.center) <= road.halfWidth && along >= road.min && along <= road.max) {
+      return { id: road.id, label: road.name.toUpperCase(), displayLimit: road.displayLimit, bikeLimit: road.bikeLimit, taxiLimit: road.taxiLimit };
+    }
+  }
+  const zone = worldZoneAt(x, z);
+  return { id: 'offroad', label: `${zone.district.toUpperCase()} · OFF ROAD`, displayLimit: 20, bikeLimit: 3.25, taxiLimit: 3.0 };
 }
 
 function ensureDriveAudio() {
