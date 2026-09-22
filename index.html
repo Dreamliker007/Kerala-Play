@@ -165,6 +165,22 @@
     @media (max-width: 560px) { #profile-chip { top:calc(env(safe-area-inset-top) + 62px); left:16px; max-width:145px; } #progress-chip { top:calc(env(safe-area-inset-top) + 105px); left:16px; max-width:165px; } #mission-card { top:calc(env(safe-area-inset-top) + 144px); width:166px; } #online-chip { top:calc(env(safe-area-inset-top) + 242px); right:14px; max-width:118px; } #hint { display:none; } #minimap, #chat-panel, #people-panel, #task-panel, #phone-panel, #wallet-panel, #home-panel, #garage-panel, #jobs-panel, #progression-panel, #dm-panel { width:min(284px, calc(100vw - 88px)); max-height:min(56dvh, 350px); } #kerala-map { height:220px; } }
     #needs-hud { position:fixed; left:50%; top:calc(env(safe-area-inset-top) + 14px); bottom:auto; z-index:6; transform:translateX(-50%); display:flex; gap:6px; padding:5px 7px; border:1px solid rgba(255,255,255,.14); border-radius:10px; background:rgba(7,20,25,.78); backdrop-filter:blur(7px); font:800 9px system-ui,sans-serif; color:#eaf7ef; pointer-events:none; }
     #needs-hud[hidden] { display:none; }
+    /* Keep core status readable beside the top-right online/menu cluster on mobile landscape. */
+    @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) {
+      #needs-hud {
+        left:auto;
+        right:calc(env(safe-area-inset-right) + 150px);
+        top:calc(env(safe-area-inset-top) + 7px);
+        transform:none;
+        max-width:170px;
+        gap:3px;
+        padding:4px 6px;
+        white-space:nowrap;
+      }
+      #needs-hud span { min-width:32px; }
+      #online-chip { right:calc(env(safe-area-inset-right) + 66px); }
+    }
+
     #needs-hud span { display:inline-flex; align-items:center; gap:3px; min-width:42px; justify-content:center; }
     #needs-hud span.warning { color:#ffd08a; }
     #needs-hud span.critical { color:#ff9c86; }

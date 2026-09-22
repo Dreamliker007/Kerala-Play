@@ -2445,7 +2445,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       action.disabled = true;
       if (action.dataset.jobAction === 'start') {
         const result = await api(`/api/jobs/${encodeURIComponent(action.dataset.jobId)}/start`, {});
-        renderJobs(result.jobs); toast(`${result.jobs.jobs.find(job => job.id === action.dataset.jobId)?.title || 'Job'} started · follow the mission route`);
+        renderJobs(result.jobs);
+        closePanels();
+        jobsToggle?.focus();
+        toast(`${result.jobs.jobs.find(job => job.id === action.dataset.jobId)?.title || 'Job'} started · follow the mission route`);
       } else if (action.dataset.jobAction === 'checkpoint') {
         const result = await api(`/api/jobs/${encodeURIComponent(action.dataset.jobId)}/checkpoint`, { taskId: action.dataset.taskId });
         renderJobs(result.jobs); toast(`${result.checkpoint.action} complete · next mission step ready`);
