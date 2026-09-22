@@ -1240,6 +1240,11 @@ test('progression API exposes server-owned recognition and category leaderboards
   assert.equal(progression.status, 200);
   assert.equal(progression.data.recognition.title, 'Newcomer');
   assert.ok(Array.isArray(progression.data.recognition.achievements));
+  assert.deepEqual(progression.data.recognition.availableTitles, ['Newcomer']);
+  assert.equal((await alice('/api/progression/title', { title: 'Explorer' })).status, 409);
+  const selectedTitle = await alice('/api/progression/title', { title: 'Newcomer' });
+  assert.equal(selectedTitle.status, 200);
+  assert.equal(selectedTitle.data.recognition.title, 'Newcomer');
 
   const categories = await alice('/api/leaderboards');
   assert.equal(categories.status, 200);

@@ -1184,6 +1184,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const card = node('article', `progression-achievement${achievement.unlocked ? ' unlocked' : ''}`);
       const head = node('div', 'progression-row');
       head.append(node('strong', '', `${achievement.unlocked ? '✓' : '○'} ${achievement.title}`), node('span', '', achievement.unlocked ? achievement.badge : `${achievement.progress}/${achievement.threshold}`));
+      if (achievement.unlocked) {
+        const useTitle = button(progressionSnapshot.title === achievement.badge ? 'Using title' : 'Use title', () => run(() => selectProgressionTitle(achievement.badge), progressionError), 'progression-title-action');
+        useTitle.disabled = progressionSnapshot.title === achievement.badge;
+        card.append(useTitle);
+      }
       const meter = document.createElement('progress');
       meter.max = Math.max(1, Number(achievement.threshold || 1));
       meter.value = Math.min(meter.max, Number(achievement.progress || 0));
@@ -1216,6 +1221,13 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       row.append(node('strong', 'leaderboard-rank', `#${entry.rank}`), node('span', 'leaderboard-player', entry.username ? `@${entry.username}` : entry.name), node('b', 'leaderboard-score', String(entry.score)));
       progressionLeaderboard.append(row);
     }
+  }
+
+  async function selectProgressionTitle(title) {
+    const result = await api('/api/progression/title', { title });
+    renderProgression(result);
+    toast(`${result.recognition.title} is now your profile title`);
+    return result;
   }
 
   async function refreshLeaderboard(categoryId = activeLeaderboardCategory) {

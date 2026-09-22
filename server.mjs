@@ -358,7 +358,24 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     };
   }
   function progressionProfile(user) {
-    return { recognition: recognitionSummary(progressionStats(user)) };
+    const recognition = recognitionSummary(progressionStats(user));
+    const availableTitles = ['Newcomer', ...recognition.badges];
+    const selectedTitle = availableTitles.includes(user.selectedTitle) ? user.selectedTitle : recognition.title;
+    return { recognition: { ...recognition, title: selectedTitle, availableTitles } };
+  }
+  function syncRecognitionNotifications(user) {
+    const recognition = recognitionSummary(progressionStats(user));
+    for (const achievement of recognition.achievements.filter(item => item.unlocked)) {
+      addNotification(user, {
+        sourceKey: `achievement:${achievement.id}`,
+        kind: 'achievement',
+        title: `Achievement unlocked · ${achievement.title}`,
+        message: `${achievement.badge} title is now available to use on your profile.`,
+        severity: 'success',
+        target: '',
+      });
+    }
+    return progressionProfile(user);
   }
   function blockedUser(user) { const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username); return { id: user.id, username: displayName, name: displayName, blocked: true }; }
   function online(id) { return !!presence.get(id) && now() - presence.get(id).lastSeen < 20000; }
@@ -3020,6 +3037,21 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         }); return;
       }
       if (path === '/api/progression' && request.method === 'GET') {
+        const progression = syncRecognitionNotifications(user);
+        if (dirty) await persist();
+        send(response, 200, progression); return;
+      }
+      if (path === '/api/progression/title' && request.method === 'POST') {
+        limited(`progression-title:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const progression = progressionProfile(user);
+        const title = typeof body.title === 'string' ? body.title.trim() : '';
+        requireValue(progression.recognition.availableTitles.includes(title), 409, 'Unlock this title before using it.');
+        user.selectedTitle = title;
+        dirty = true;
+        await persist();
+        profileChanged(user);
+        socialChanged();
         send(response, 200, progressionProfile(user)); return;
       }
       if (path === '/api/leaderboards' && request.method === 'GET') {
