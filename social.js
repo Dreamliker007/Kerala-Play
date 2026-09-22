@@ -1787,6 +1787,18 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       for (const [value, label] of [[person.points || 0, 'points'], [person.level || 1, 'level'], [Array.isArray(person.followers) ? person.followers.length : person.followers || 0, 'followers'], [Array.isArray(person.following) ? person.following.length : person.following || 0, 'following']]) {
         const stat = node('div'); stat.append(node('strong', '', String(value)), node('small', '', label)); stats.append(stat);
       }
+      const recognition = result.recognition || null;
+      const recognitionBox = node('section', 'profile-recognition');
+      if (recognition) {
+        recognitionBox.append(node('strong', 'profile-recognition-title', `🏆 ${recognition.title || 'Newcomer'}`));
+        recognitionBox.append(node('small', 'social-muted', `${Number(recognition.unlockedCount || 0)}/${Number(recognition.totalCount || 0)} achievements unlocked`));
+        const unlocked = (recognition.achievements || []).filter(item => item.unlocked);
+        if (unlocked.length) {
+          const badges = node('div', 'profile-badges');
+          for (const item of unlocked.slice(0, 4)) badges.append(node('span', 'profile-badge', `${item.badge} ${item.title}`));
+          recognitionBox.append(badges);
+        }
+      }
       const error = node('div', 'social-error'); error.setAttribute('role', 'status');
       profileCard.replaceChildren(header, node('p', 'social-muted', `${person.district || 'Kerala'} · ${person.gender === 'female' ? 'Female' : 'Male'} avatar`), stats);
       if (recognition) profileCard.append(recognitionBox);
