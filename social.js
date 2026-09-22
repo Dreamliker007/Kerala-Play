@@ -283,6 +283,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const adminClose = $('admin-close');
   const adminMetrics = $('admin-metrics');
   const adminRefresh = $('admin-refresh');
+  const adminReportsRefresh = $('admin-reports-refresh');
+  const adminReports = $('admin-reports');
   const adminGenerated = $('admin-generated');
   const adminError = $('admin-error');
   let adminTimer = null;
@@ -304,6 +306,25 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     }
     if (adminGenerated) adminGenerated.textContent = `Updated ${new Date(data.generatedAt || Date.now()).toLocaleTimeString()}`;
   }
+  function renderAdminReports(data) {
+    if (!adminReports) return;
+    adminReports.replaceChildren();
+    const reports = data?.reports || [];
+    if (!reports.length) { adminReports.append(node('p', 'panel-note', 'No moderation reports yet.')); return; }
+    for (const report of reports) {
+      const card = node('article', 'achievement-card');
+      const head = node('strong', '', `${report.status === 'open' ? '🔴' : '✓'} ${report.reason || 'Report'} · ${report.target?.username || 'Unknown'}`);
+      const meta = node('small', 'social-muted', `Reported by ${report.reporter?.username || 'Unknown'} · ${new Date(report.createdAt || Date.now()).toLocaleString()}`);
+      card.append(head, meta);
+      if (report.details) card.append(node('p', 'panel-note', report.details));
+      adminReports.append(card);
+    }
+  }
+  async function refreshAdminReports() {
+    const data = await api('/api/admin/reports');
+    renderAdminReports(data);
+    return data;
+  }
   async function refreshAdminOverview() {
     const data = await api('/api/admin/overview');
     if (adminToggle) adminToggle.hidden = false;
@@ -321,6 +342,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   async function openAdmin() {
     showPanel(adminPanel);
     await refreshAdminOverview();
+    await refreshAdminReports();
     if (adminTimer) clearInterval(adminTimer);
     adminTimer = setInterval(() => { if (user && adminPanel?.classList.contains('open')) run(refreshAdminOverview, adminError); }, 15000);
   }
@@ -2420,6 +2442,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     notificationsSnapshot = null;
     if (adminToggle) adminToggle.hidden = true;
     if (adminMetrics) adminMetrics.replaceChildren();
+    if (adminReports) adminReports.replaceChildren();
     if (adminTimer) { clearInterval(adminTimer); adminTimer = null; }
     npcRelationshipsSnapshot = null;
     eventsSnapshot = null;
@@ -2467,6 +2490,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   adminToggle?.addEventListener('click', () => adminPanel?.classList.contains('open') ? closePanels() : run(openAdmin, adminError));
   adminClose?.addEventListener('click', () => { closePanels(); adminToggle?.focus(); });
   adminRefresh?.addEventListener('click', () => run(refreshAdminOverview, adminError));
+  adminReportsRefresh?.addEventListener('click', () => run(refreshAdminReports, adminError));
   jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
   jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
   phoneNotifications?.addEventListener('click', event => {
