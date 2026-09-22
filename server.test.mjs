@@ -1259,6 +1259,11 @@ test('progression API exposes server-owned recognition and category leaderboards
   const afterBlock = await alice('/api/leaderboards/exploration');
   assert.equal(afterBlock.data.entries.some(entry => entry.id === bobUser.id), false);
 
+  const bobProfile = await alice('/api/profile/' + bobUser.id);
+  assert.equal(bobProfile.status, 200);
+  assert.equal(bobProfile.data.recognition.title, 'Newcomer');
+  assert.ok(Array.isArray(bobProfile.data.recognition.achievements));
+
   assert.equal((await alice('/api/profile', { recognition: { title: 'Injected' }, safeDrivingPoints: 999999 })).status, 404);
   progression = await alice('/api/progression');
   assert.notEqual(progression.data.recognition.title, 'Injected');
