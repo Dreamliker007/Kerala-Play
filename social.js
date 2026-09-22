@@ -1665,6 +1665,18 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         members.append(row);
       }
 
+      const recognition = result.recognition;
+      const recognitionBox = node('section', 'profile-recognition');
+      if (recognition) {
+        recognitionBox.append(node('strong', 'profile-recognition-title', `🏆 ${recognition.title || 'Newcomer'}`));
+        const unlocked = (recognition.achievements || []).filter(item => item.unlocked);
+        recognitionBox.append(node('small', 'social-muted', `${Number(recognition.unlockedCount || 0)}/${Number(recognition.totalCount || 0)} achievements unlocked`));
+        if (unlocked.length) {
+          const badges = node('div', 'profile-badges');
+          for (const item of unlocked.slice(0, 4)) badges.append(node('span', 'profile-badge', `${item.badge} ${item.title}`));
+          recognitionBox.append(badges);
+        }
+      }
       const error = node('div', 'social-error'); error.setAttribute('role', 'status');
       const inviteBox = node('div', 'group-invite-box');
       if (group.isOwner) {
@@ -1745,7 +1757,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     onOpenProfile(profileId);
     profileCard.replaceChildren(node('p', 'social-muted', 'Loading profile…'));
     await run(async () => {
-      const result = profileId === user.id ? { user } : await api(`/api/profile/${encodeURIComponent(profileId)}`);
+      const result = profileId === user.id ? { user, ...(await api('/api/progression')) } : await api(`/api/profile/${encodeURIComponent(profileId)}`);
       if (profileModal.hidden || version !== profileVersion) return;
       const person = { ...result.user, relationship: result.relationship || result.user.relationship, blocked: result.blocked || result.user.blocked, canMessage: result.canMessage ?? result.user.canMessage };
       const own = person.id === user.id;
@@ -1765,6 +1777,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       }
       const error = node('div', 'social-error'); error.setAttribute('role', 'status');
       profileCard.replaceChildren(header, node('p', 'social-muted', `${person.district || 'Kerala'} · ${person.gender === 'female' ? 'Female' : 'Male'} avatar`), stats);
+      if (recognition) profileCard.append(recognitionBox);
       if (own) {
         const editActions = node('div', 'social-actions profile-view-actions');
         const edit = button('Edit profile', () => renderOwnProfile(true), 'social-button primary profile-edit-button');
