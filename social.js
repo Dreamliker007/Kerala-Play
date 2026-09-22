@@ -278,6 +278,52 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   let progressionSnapshot = null;
   let leaderboardCategoriesSnapshot = [];
   let activeLeaderboardCategory = 'jobs';
+  const adminPanel = $('admin-panel');
+  const adminToggle = $('admin-toggle');
+  const adminClose = $('admin-close');
+  const adminMetrics = $('admin-metrics');
+  const adminRefresh = $('admin-refresh');
+  const adminGenerated = $('admin-generated');
+  const adminError = $('admin-error');
+  let adminTimer = null;
+
+  function renderAdminOverview(data) {
+    if (!adminMetrics) return;
+    adminMetrics.replaceChildren();
+    const cards = [
+      ['👥 Players', `${data.players?.online ?? 0} online · ${data.players?.total ?? 0} total`],
+      ['🛡 Moderation', `${data.moderation?.reportsOpen ?? 0} open · ${data.moderation?.reportsTotal ?? 0} reports`],
+      ['💰 Economy', `₹${Number(data.economy?.combinedMoney || 0).toLocaleString()} combined`],
+      ['💼 Jobs', `${data.activity?.activeJobs ?? 0} active`],
+      ['📢 World alerts', `${data.world?.configuredAlerts ?? 0} configured`],
+    ];
+    for (const [title, value] of cards) {
+      const card = node('article', 'achievement-card unlocked');
+      card.append(node('strong', '', title), node('small', 'social-muted', value));
+      adminMetrics.append(card);
+    }
+    if (adminGenerated) adminGenerated.textContent = `Updated ${new Date(data.generatedAt || Date.now()).toLocaleTimeString()}`;
+  }
+  async function refreshAdminOverview() {
+    const data = await api('/api/admin/overview');
+    if (adminToggle) adminToggle.hidden = false;
+    renderAdminOverview(data);
+    return data;
+  }
+  async function discoverAdminAccess() {
+    if (!user || !adminToggle) return;
+    try { await refreshAdminOverview(); }
+    catch (error) {
+      if (error?.status === 403) { adminToggle.hidden = true; return; }
+      throw error;
+    }
+  }
+  async function openAdmin() {
+    showPanel(adminPanel);
+    await refreshAdminOverview();
+    if (adminTimer) clearInterval(adminTimer);
+    adminTimer = setInterval(() => { if (user && adminPanel?.classList.contains('open')) run(refreshAdminOverview, adminError); }, 15000);
+  }
 
   function toast(message) { onToast(message); }
   function notifyState() { for (const listener of listeners) listener({ user, connected }); }
@@ -311,7 +357,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function closePanels() {
     cancelRecording(); stopTalking();
-    for (const panel of [peoplePanel, dmPanel, chatPanel, phonePanel, eventsPanel, walletPanel, homePanel, garagePanel, jobsPanel, progressionPanel, worldShopPanel]) panel?.classList.remove('open');
+    for (const panel of [peoplePanel, dmPanel, chatPanel, phonePanel, eventsPanel, walletPanel, homePanel, garagePanel, jobsPanel, progressionPanel, adminPanel, worldShopPanel]) panel?.classList.remove('open');
     peopleToggle?.setAttribute('aria-expanded', 'false');
     chatToggle?.setAttribute('aria-expanded', 'false');
     phoneToggle?.setAttribute('aria-expanded', 'false');
@@ -321,6 +367,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     garageToggle?.setAttribute('aria-expanded', 'false');
     jobsToggle?.setAttribute('aria-expanded', 'false');
     progressionToggle?.setAttribute('aria-expanded', 'false');
+    adminToggle?.setAttribute('aria-expanded', 'false');
+    if (adminTimer) { clearInterval(adminTimer); adminTimer = null; }
     if (jobsTimer) { clearInterval(jobsTimer); jobsTimer = null; }
     if (eventsTimer) { clearInterval(eventsTimer); eventsTimer = null; }
   }
@@ -2351,6 +2399,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     await run(refreshNotifications, phoneError);
     await run(refreshNpcRelationships, peopleError);
     await run(refreshCommunityEvents, eventsError);
+    await run(discoverAdminAccess);
     if (notificationsTimer) clearInterval(notificationsTimer);
     notificationsTimer = setInterval(() => {
       if (!user) return;
@@ -2369,6 +2418,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     setUser(null); setConnection(false); onPlayers([]); onDisconnect();
     if (walletBalance) walletBalance.textContent = '₹0';
     notificationsSnapshot = null;
+    if (adminToggle) adminToggle.hidden = true;
+    if (adminMetrics) adminMetrics.replaceChildren();
+    if (adminTimer) { clearInterval(adminTimer); adminTimer = null; }
     npcRelationshipsSnapshot = null;
     eventsSnapshot = null;
     if (eventsTimer) { clearInterval(eventsTimer); eventsTimer = null; }
@@ -2412,6 +2464,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   progressionToggle?.addEventListener('click', () => progressionPanel?.classList.contains('open') ? closePanels() : openProgression());
   progressionClose?.addEventListener('click', () => { closePanels(); progressionToggle?.focus(); });
   progressionRefresh?.addEventListener('click', () => run(refreshProgression, progressionError));
+  adminToggle?.addEventListener('click', () => adminPanel?.classList.contains('open') ? closePanels() : run(openAdmin, adminError));
+  adminClose?.addEventListener('click', () => { closePanels(); adminToggle?.focus(); });
+  adminRefresh?.addEventListener('click', () => run(refreshAdminOverview, adminError));
   jobsClose?.addEventListener('click', () => { closePanels(); jobsToggle?.focus(); });
   jobsRefresh?.addEventListener('click', () => run(refreshJobs, jobsError));
   phoneNotifications?.addEventListener('click', event => {
