@@ -4,6 +4,8 @@ import { promisify } from 'node:util';
 import { mkdir, readFile, writeFile, rename, realpath } from 'node:fs/promises';
 import { dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { recognitionSummary } from './recognition.mjs';
+import { categoryLeaderboard, leaderboardCategories } from './leaderboards.mjs';
 
 const scrypt = promisify(scryptCallback);
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -342,6 +344,21 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     while (remaining >= next) { remaining -= next; level++; next = 100 + (level - 1) * 50; }
     const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username);
     return { id: user.id, username: displayName, name: displayName, displayName, accountUsername: user.username, usernameChangedAt: Number(user.usernameChangedAt || 0), usernameChangeAvailableAt: Number(user.usernameChangedAt || 0) + 10 * 24 * 60 * 60 * 1000, district: user.district, gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
+  }
+  function progressionStats(user) {
+    const jobsCompleted = Object.values(user.jobState?.completed || {}).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
+    return {
+      walkMeters: Math.floor(Math.max(0, Number(user.walkMeters) || 0)),
+      visitedLandmarks: [...new Set(user.visitedLandmarks || [])],
+      communityContributions: Math.max(0, Number(user.jobState?.communityEvents?.contributions) || 0),
+      jobsCompleted,
+      safeDrivingPoints: Math.max(0, Number(user.safeDrivingPoints) || 0),
+      emergencyResponses: Math.max(0, Number(user.emergencyResponses) || 0),
+      creatorContributions: Math.max(0, Number(user.creatorContributions) || 0),
+    };
+  }
+  function progressionProfile(user) {
+    return { recognition: recognitionSummary(progressionStats(user)) };
   }
   function blockedUser(user) { const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username); return { id: user.id, username: displayName, name: displayName, blocked: true }; }
   function online(id) { return !!presence.get(id) && now() - presence.get(id).lastSeen < 20000; }
@@ -3001,6 +3018,21 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           purchase: { itemId: body.itemId, name: item.name, price: item.price, needs: item.needs },
           transaction,
         }); return;
+      }
+      if (path === '/api/progression' && request.method === 'GET') {
+        send(response, 200, progressionProfile(user)); return;
+      }
+      if (path === '/api/leaderboards' && request.method === 'GET') {
+        send(response, 200, { categories: leaderboardCategories() }); return;
+      }
+      const leaderboardMatch = path.match(/^\/api\/leaderboards\/([^/]+)$/);
+      if (leaderboardMatch && request.method === 'GET') {
+        const players = db.users
+          .filter(peer => peer.id === user.id || !blocked(user.id, peer.id))
+          .map(peer => ({ id: peer.id, name: publicUser(peer).name, username: peer.username, stats: progressionStats(peer) }));
+        try { send(response, 200, categoryLeaderboard(leaderboardMatch[1], players)); }
+        catch { send(response, 404, { error: 'Leaderboard category not found.' }); }
+        return;
       }
       if (path === '/api/people' && request.method === 'GET') {
         const people = db.users.filter(peer => peer.id !== user.id && (!blocked(user.id, peer.id) || ownBlock(user.id, peer.id))).map(peer => ({ ...(blocked(user.id, peer.id) ? blockedUser(peer) : publicUser(peer)), relationship: relation(user.id, peer.id), blocked: ownBlock(user.id, peer.id), online: !blocked(user.id, peer.id) && online(peer.id), canMessage: !blocked(user.id, peer.id) && accepted(user.id, peer.id) }));

@@ -1229,3 +1229,37 @@ test('server-owned world alerts are filtered by time and district and keep read 
   alerts = (await alice('/api/notifications')).data;
   assert.equal(alerts.items.find(item => item.id === rain.id).read, true);
 });
+
+
+test('progression API exposes server-owned recognition and category leaderboards without wealth ranking', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  const aliceUser = await signup(alice, 'ProgressAlice');
+  const bobUser = await signup(bob, 'ProgressBob');
+
+  let progression = await alice('/api/progression');
+  assert.equal(progression.status, 200);
+  assert.equal(progression.data.recognition.title, 'Newcomer');
+  assert.ok(Array.isArray(progression.data.recognition.achievements));
+
+  const categories = await alice('/api/leaderboards');
+  assert.equal(categories.status, 200);
+  assert.deepEqual(categories.data.categories.map(item => item.id), ['jobs', 'exploration', 'community', 'safe-driving', 'emergency-response', 'creator']);
+  assert.equal(categories.data.categories.some(item => /wealth|wallet|cash/i.test(item.id)), false);
+
+  const firstSteps = progression.data.recognition.achievements.find(item => item.id === 'first-steps');
+  assert.equal(firstSteps.progress, 0);
+  assert.equal(firstSteps.threshold, 50);
+  assert.equal(firstSteps.unlocked, false);
+
+  const distance = await alice('/api/leaderboards/exploration');
+  assert.equal(distance.status, 200);
+  assert.equal(distance.data.category.id, 'exploration');
+
+  assert.equal((await alice('/api/blocks/' + bobUser.id, { action: 'block' })).status, 200);
+  const afterBlock = await alice('/api/leaderboards/exploration');
+  assert.equal(afterBlock.data.entries.some(entry => entry.id === bobUser.id), false);
+
+  assert.equal((await alice('/api/profile', { recognition: { title: 'Injected' }, safeDrivingPoints: 999999 })).status, 404);
+  progression = await alice('/api/progression');
+  assert.notEqual(progression.data.recognition.title, 'Injected');
+});
