@@ -240,6 +240,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   if (!Array.isArray(db.transactions)) { db.transactions = []; migrated = true; }
   if (!Array.isArray(db.sessions)) { db.sessions = []; migrated = true; }
   if (!Array.isArray(db.groups)) { db.groups = []; migrated = true; }
+  if (!Array.isArray(db.adminAuditLog)) { db.adminAuditLog = []; migrated = true; }
   const existingUserIds = new Set(db.users.map(user => user.id));
   const normalizedGroups = [];
   for (const raw of db.groups) {
@@ -1825,6 +1826,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       const session = sessionFor(request);
       requireValue(session, 401, 'Please sign in first.');
       const user = session.user;
+      if (path === '/api/admin/audit' && request.method === 'GET') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        send(response, 200, { entries: db.adminAuditLog.slice(-100).reverse() }); return;
+      }
       if (path === '/api/admin/overview' && request.method === 'GET') {
         requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
         const allReports = db.users.flatMap(peer => peer.jobState?.reports || []);
@@ -1839,7 +1844,21 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           economy: { walletTotal, bankTotal, combinedMoney: walletTotal + bankTotal },
           activity: { activeJobs },
           world: { configuredAlerts: configuredWorldAlerts.length },
+          audit: { entries: db.adminAuditLog.length },
         }); return;
+      }
+      if (path === '/api/admin/actions/note' && request.method === 'POST') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        limited(`admin-action:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const note = typeof body.note === 'string' ? body.note.trim() : '';
+        requireValue(note.length >= 3 && note.length <= 240, 400, 'Admin note must be 3–240 characters.');
+        const entry = { id: randomUUID(), actorId: user.id, actorUsername: user.username, action: 'note', note, createdAt: now() };
+        db.adminAuditLog.push(entry);
+        if (db.adminAuditLog.length > 1000) db.adminAuditLog.splice(0, db.adminAuditLog.length - 1000);
+        dirty = true;
+        await persist();
+        send(response, 201, { entry }); return;
       }
       if (path === '/api/auth/logout' && request.method === 'POST') {
         sessions.delete(session.key);
