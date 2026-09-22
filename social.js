@@ -1806,7 +1806,19 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         const editActions = node('div', 'social-actions profile-view-actions');
         const edit = button('Edit profile', () => renderOwnProfile(true), 'social-button primary profile-edit-button');
         edit.setAttribute('aria-label', 'Edit your profile');
-        editActions.append(edit);
+        const logout = button('Log out', async () => {
+          if (!window.confirm('Log out of Kerala Play?')) return;
+          logout.disabled = true;
+          edit.disabled = true;
+          await run(async () => {
+            await api('/api/auth/logout', {});
+            endSession('You have been logged out.');
+          }, error);
+          logout.disabled = false;
+          edit.disabled = false;
+        }, 'social-button danger profile-logout-button');
+        logout.setAttribute('aria-label', 'Log out of Kerala Play');
+        editActions.append(edit, logout);
         profileCard.append(node('p', 'social-bio', person.bio || 'This explorer has not added a bio yet.'), editActions);
         function renderOwnProfile(editing) {
           if (!editing) return;
