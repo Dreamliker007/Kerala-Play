@@ -1294,3 +1294,25 @@ test('admin live-ops overview is protected and summarizes server-owned state', a
   assert.equal(overview.data.activity.activeJobs, 0);
   assert.equal(typeof overview.data.generatedAt, 'number');
 });
+
+
+test('admin audit log is protected and records controlled actions', async t => {
+  const app = await setup(t, { adminUsernames: ['AdminAlice'] });
+  const admin = app.client(), player = app.client();
+  await signup(admin, 'AdminAlice');
+  await signup(player, 'RegularBob');
+
+  assert.equal((await player('/api/admin/audit')).status, 403);
+  assert.equal((await player('/api/admin/actions/note', { note: 'Should fail' })).status, 403);
+  assert.equal((await admin('/api/admin/actions/note', { note: 'Reviewed live operations.' })).status, 201);
+
+  const audit = await admin('/api/admin/audit');
+  assert.equal(audit.status, 200);
+  assert.equal(audit.data.entries.length, 1);
+  assert.equal(audit.data.entries[0].actorUsername, 'AdminAlice');
+  assert.equal(audit.data.entries[0].action, 'note');
+  assert.equal(audit.data.entries[0].note, 'Reviewed live operations.');
+
+  const overview = await admin('/api/admin/overview');
+  assert.equal(overview.data.audit.entries, 1);
+});
