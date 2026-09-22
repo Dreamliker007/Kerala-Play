@@ -1323,9 +1323,11 @@ test('admin moderation report queue is protected and includes report context', a
   const admin = app.client(), reporter = app.client(), target = app.client();
   await signup(admin, 'AdminAlice');
   await signup(reporter, 'ReporterBob');
-  const targetUser = await signup(target, 'TargetCara');
+  await signup(target, 'TargetCara');
+  const targetProfile = await target('/api/me');
+  assert.equal(targetProfile.status, 200);
 
-  const created = await reporter(`/api/reports/${targetUser.data.user.id}`, { reason: 'harassment', details: 'Repeated unwanted messages.' });
+  const created = await reporter(`/api/reports/${targetProfile.data.user.id}`, { reason: 'harassment', details: 'Repeated unwanted messages.' });
   assert.equal(created.status, 201);
   assert.equal((await reporter('/api/admin/reports')).status, 403);
 
