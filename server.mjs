@@ -1826,6 +1826,22 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       const session = sessionFor(request);
       requireValue(session, 401, 'Please sign in first.');
       const user = session.user;
+      if (path === '/api/admin/reports' && request.method === 'GET') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        const reports = db.users.flatMap(reporter => (reporter.jobState?.reports || []).map(report => {
+          const target = db.users.find(peer => peer.id === report.targetId);
+          return {
+            id: report.id,
+            status: report.status || 'open',
+            reason: report.reason,
+            details: report.details || '',
+            createdAt: report.createdAt,
+            reporter: { id: reporter.id, username: reporter.username },
+            target: { id: report.targetId, username: target?.username || 'Unknown player' },
+          };
+        })).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 200);
+        send(response, 200, { reports }); return;
+      }
       if (path === '/api/admin/audit' && request.method === 'GET') {
         requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
         send(response, 200, { entries: db.adminAuditLog.slice(-100).reverse() }); return;
