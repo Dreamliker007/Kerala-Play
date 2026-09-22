@@ -4,6 +4,8 @@ const DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'kerala-explorer', title: 'Kerala Explorer', badge: 'Discoverer', metric: 'visitedLandmarks', threshold: 5 }),
   Object.freeze({ id: 'community-helper', title: 'Community Helper', badge: 'Neighbour', metric: 'communityContributions', threshold: 3 }),
   Object.freeze({ id: 'career-starter', title: 'Career Starter', badge: 'Worker', metric: 'jobsCompleted', threshold: 3 }),
+  Object.freeze({ id: 'safe-driver', title: 'Safe Driver', badge: 'Safe Driver', metric: 'safeDrivingPoints', threshold: 100 }),
+  Object.freeze({ id: 'road-guardian', title: 'Road Guardian', badge: 'Road Guardian', metric: 'safeDrivingPoints', threshold: 500 }),
 ]);
 
 function metricValue(stats, metric) {
