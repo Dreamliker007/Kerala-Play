@@ -72,4 +72,14 @@ export function safeDrivingProgressPatch(progress = {}) {
   };
 }
 
+export function applySafeDrivingMovement(record = {}, segmentInput = {}) {
+  const previous = safeDrivingProgressFromRecord(record);
+  const progress = applySafeDrivingProgress(previous, segmentInput);
+  return {
+    progress,
+    patch: safeDrivingProgressPatch(progress),
+    changed: progress.points !== previous.points || progress.meters !== previous.meters,
+  };
+}
+
 export const SAFE_DRIVING_METERS_PER_POINT = METERS_PER_POINT;
