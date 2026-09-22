@@ -1255,7 +1255,7 @@ test('progression API exposes server-owned recognition and category leaderboards
   assert.equal(distance.status, 200);
   assert.equal(distance.data.category.id, 'exploration');
 
-  assert.equal((await alice('/api/blocks/' + bobUser.id, { action: 'block' })).status, 200);
+  assert.equal((await alice('/api/blocks/' + bobUser.id, { blocked: true })).status, 200);
   const afterBlock = await alice('/api/leaderboards/exploration');
   assert.equal(afterBlock.data.entries.some(entry => entry.id === bobUser.id), false);
 
