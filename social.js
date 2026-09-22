@@ -317,8 +317,21 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const meta = node('small', 'social-muted', `Reported by ${report.reporter?.username || 'Unknown'} · ${new Date(report.createdAt || Date.now()).toLocaleString()}`);
       card.append(head, meta);
       if (report.details) card.append(node('p', 'panel-note', report.details));
+      if (report.status === 'open') {
+        const actions = node('div', 'profile-actions');
+        const resolve = button('Resolve', () => closeAdminReport(report.id, 'resolved'), 'social-button primary');
+        const dismiss = button('Dismiss', () => closeAdminReport(report.id, 'dismissed'), 'social-button secondary');
+        actions.append(resolve, dismiss);
+        card.append(actions);
+      }
       adminReports.append(card);
     }
+  }
+  async function closeAdminReport(reportId, status) {
+    if (!confirm(`${status === 'resolved' ? 'Resolve' : 'Dismiss'} this moderation report?`)) return;
+    const result = await api(`/api/admin/reports/${encodeURIComponent(reportId)}`, { status }, 'PATCH');
+    await Promise.all([refreshAdminReports(), refreshAdminOverview()]);
+    toast(`Report ${result.report?.status || status}.`);
   }
   async function refreshAdminReports() {
     const data = await api('/api/admin/reports');
