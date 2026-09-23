@@ -313,18 +313,24 @@ test('private files and cross-origin writes are rejected', async t => {
 test('task rewards validate movement and acceptance; rewards and game rounds cannot replay; progress persists', async t => {
   const app = await setup(t), alice = app.client();
   await signup(alice, 'Alice');
+  const atlasRide = await alice('/api/travel/ride/quote?destinationId=district-attraction%3AErnakulam%3Amattancherry-palace');
+  assert.equal(atlasRide.status, 200);
+  assert.equal(atlasRide.data.destination.label, 'Mattancherry Palace');
+  assert.deepEqual([atlasRide.data.destination.x, atlasRide.data.destination.z], [-10, 23]);
   assert.equal((await alice('/api/tasks/walk-50/claim', {})).status, 409);
   assert.equal((await alice('/api/tasks/visit-landmark/claim', {})).status, 409);
   assert.equal((await alice('/api/tasks/social/claim', {})).status, 409);
   assert.equal((await alice('/api/tasks/open-map/claim', {})).data.reward, 10);
   assert.equal((await alice('/api/tasks/open-map/claim', {})).status, 409);
   assert.equal((await alice('/api/world/move', { x: 60, z: 60, rotation: 0, moving: true })).status, 409);
-  app.advance(2000);
-  assert.equal((await alice('/api/world/move', { x: -26, z: 6, rotation: 0, moving: true })).status, 200);
+  for (const [x, z] of [[-14, 13], [-10, 20], [-10, 23]]) {
+    app.advance(2000);
+    assert.equal((await alice('/api/world/move', { x, z, rotation: 0, moving: true })).status, 200);
+  }
   assert.equal((await alice('/api/tasks/visit-landmark/claim', {})).data.reward, 50);
   for (let i = 0; i < 10; i++) {
     app.advance(1000);
-    assert.equal((await alice('/api/world/move', { x: i % 2 ? -26 : -20, z: 6, rotation: 0, moving: true })).status, 200);
+    assert.equal((await alice('/api/world/move', { x: -10 + (i + 1) * 6, z: 23, rotation: 0, moving: true })).status, 200);
   }
   assert.equal((await alice('/api/tasks/walk-50/claim', {})).data.reward, 25);
   const round = (await alice('/api/games/coconut/start', {})).data;
@@ -341,8 +347,8 @@ test('task rewards validate movement and acceptance; rewards and game rounds can
   const restored = (await alice('/api/session')).data.user;
   assert.ok(restored, 'The persistent session should survive a server restart');
   assert.equal(restored.points, 105);
-  assert.equal(restored.x, -26);
-  assert.equal(restored.z, 6);
+  assert.equal(restored.x, 50);
+  assert.equal(restored.z, 23);
   assert.equal(restored.rotation, 0);
   assert.equal((await alice('/api/tasks/open-map/claim', {})).status, 409);
 });

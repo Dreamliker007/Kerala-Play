@@ -111,6 +111,22 @@
     #map-player circle { fill:#fff; stroke:#152f3b; stroke-width:1.5; }
     #map-player path { fill:#1ee879; stroke:#062f1c; stroke-width:.8; }
     #map-status { display:block; min-height:15px; color:rgba(255,255,255,.88); font-size:10px; text-align:center; }
+    #district-guide { margin-top:6px; border:1px solid rgba(176,232,200,.22); border-radius:10px; background:rgba(255,255,255,.045); }
+    #district-guide > summary { display:flex; align-items:center; gap:7px; padding:8px; color:#eafff1; cursor:pointer; list-style:none; font:800 10px/1.2 system-ui,sans-serif; }
+    #district-guide > summary::-webkit-details-marker { display:none; }
+    #district-guide > summary::after { content:'+'; margin-left:auto; color:#9fe4bb; font-size:14px; }
+    #district-guide[open] > summary::after { content:'−'; }
+    #district-guide-content { max-height:230px; overflow:auto; padding:0 8px 8px; touch-action:pan-y; }
+    .district-guide-identity { margin:0 0 6px; color:#e3f6eb; font:700 9px/1.4 system-ui,sans-serif; }
+    .district-guide-section { padding:5px 0; border-top:1px solid rgba(255,255,255,.09); }
+    .district-guide-section strong, .district-guide-spots-heading { display:block; color:#aee3c3; font:900 8px/1.2 system-ui,sans-serif; letter-spacing:.25px; }
+    .district-guide-section p { margin:3px 0 0; color:#d0e6da; font:600 8px/1.35 system-ui,sans-serif; }
+    .district-guide-spots { padding-top:7px; border-top:1px solid rgba(255,255,255,.10); }
+    .district-guide-routes { display:grid; gap:5px; margin-top:5px; }
+    .district-guide-route { width:100%; border:1px solid rgba(255,255,255,.11); border-radius:8px; padding:6px 7px; color:#f5fff8; background:rgba(65,139,91,.14); text-align:left; cursor:pointer; touch-action:manipulation; }
+    .district-guide-route b, .district-guide-route small { display:block; }
+    .district-guide-route b { font:800 9px/1.2 system-ui,sans-serif; }
+    .district-guide-route small { margin-top:3px; color:#c1dfce; font:600 8px/1.3 system-ui,sans-serif; }
     #nearby-places { display:grid; gap:5px; margin-top:7px; }
     .nearby-place { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:7px 8px; color:#eefcf4; background:rgba(255,255,255,.055); font:700 9px/1.25 system-ui,sans-serif; text-align:left; cursor:pointer; touch-action:manipulation; }
     .nearby-place b { display:block; color:#fff; font-size:10px; }
@@ -1167,8 +1183,8 @@
       #kp-splash p { font-size:8px; }
     }
   </style>
-  <link rel="stylesheet" href="./social.css?v=108.0">
-  <link rel="stylesheet" href="./game.css?v=108.0">
+  <link rel="stylesheet" href="./social.css?v=109.0">
+  <link rel="stylesheet" href="./game.css?v=109.0">
 </head>
 <body>
   <div id="kp-splash" role="status" aria-label="Loading Kerala Play">
@@ -1262,6 +1278,10 @@
         <line id="map-route" hidden /><g id="landmark-layer"></g><g id="job-map-marker" hidden aria-label="Job mission target"><circle r="6.3"></circle><text>J</text></g><g id="map-player" aria-label="Your location"><circle r="6.4"></circle><path d="M0 -5 L4 5 L0 2.4 L-4 5 Z"></path></g>
       </svg>
       <output id="map-status" aria-live="polite">Village · You</output>
+      <details id="district-guide" aria-label="District places and culture">
+        <summary><strong id="district-guide-heading">District guide</strong><span>Places &amp; culture</span></summary>
+        <div id="district-guide-content"></div>
+      </details>
       <div id="nearby-places" aria-label="Nearby places"></div>
       <small class="map-credit">Boundary data: <a href="https://projects.datameet.org/maps/districts/" target="_blank" rel="noopener noreferrer">DataMeet Community Maps</a> · CC BY 4.0</small>
     </aside>
@@ -1391,6 +1411,6 @@
     <div id="onboarding-pointer" hidden aria-hidden="true"></div>
   </section>
 
-  <script type="module" src="./boot.js?v=108.0"></script>
+  <script type="module" src="./boot.js?v=109.0"></script>
 </body>
 </html>
