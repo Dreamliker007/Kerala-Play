@@ -144,6 +144,13 @@ test('Village Line serves Town Centre as an authoritative stop', async tt => {
   assert.equal(Number(centre.data.fare), Number(south.data.fare));
 });
 
+test('Town Market is recognized by the server-owned world shop economy', async tt => {
+  const app = await setup(tt), client = app.client();
+  await signup(client, 'TownMarketPlayer');
+  const response = await client('/api/world/shop/purchase', { shopId: 'town-market', itemId: 'water' });
+  assert.notEqual(response.status, 404, 'Town Market should be a known server world shop');
+});
+
 test('player reports validate reasons, prevent rapid duplicates and persist', async t => {
   const app = await setup(t), alice = app.client(), bob = app.client();
   const aliceUser = await signup(alice, 'ReportAlice'), bobUser = await signup(bob, 'ReportBob');
