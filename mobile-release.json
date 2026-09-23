@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "1.0.3",
+  "versionCode": 5,
+  "versionName": "1.0.4",
   "track": "closed-testing",
-  "notes": "V104.0 expanded world with a full drivable Ernakulam city, city bus/services, traffic and NPC life"
+  "notes": "V105.0 camera collision, stable avatar recovery, redesigned Ernakulam railway precinct and safer city roads"
 }
