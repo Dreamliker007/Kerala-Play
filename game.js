@@ -1635,10 +1635,9 @@ function performWorldActivity(activityId) {
       }).catch(error => showToast(error.message || 'Clinic care unavailable', 3600));
       return;
     }
-    const message = spot.service === 'police'
-      ? 'Kerala Police Station · public help desk is available'
-      : 'Fire & Rescue Station · emergency response crew is on duty';
-    showToast(message, 3600);
+    api('/api/world/emergency-help', { method: 'POST', body: JSON.stringify({ service: spot.service }) }).then(result => {
+      showToast(`${result?.label || spot.label} · help request logged`, 3600);
+    }).catch(error => showToast(error.message || 'Public help desk unavailable', 3600));
     return;
   }
 
