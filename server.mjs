@@ -1660,11 +1660,41 @@ function publicRideDestinationDistrict(destinationId) {
   if (destinationId === 'temple') return 'Thiruvananthapuram';
   return 'Kottayam';
 }
+function genericRideDestination(user, destinationId) {
+  const district = genericDistrictWorld(user);
+  if (!district) return null;
+  const profile = districtCityProfile(district);
+  const config = districtWorldConfig(district);
+  const destinations = {
+    'district-centre': { id:'district-centre', label:profile.centre, x:0, z:0, arrivalX:4, arrivalZ:0 },
+    'district-rail': { id:'district-rail', label:`${district} Railway Station`, x:config.train.x, z:config.train.z, arrivalX:config.train.arrivalX, arrivalZ:config.train.arrivalZ },
+    'district-market': { id:'district-market', label:profile.market, x:20, z:16, arrivalX:24, arrivalZ:16 },
+    'district-cafe': { id:'district-cafe', label:profile.cafe, x:-44, z:22, arrivalX:-40, arrivalZ:22 },
+    'district-hospital': { id:'district-hospital', label:`${district} District Hospital`, x:-20, z:16, arrivalX:-16, arrivalZ:16 },
+    'district-police': { id:'district-police', label:`${district} District Police`, x:-20, z:-18, arrivalX:-16, arrivalZ:-18 },
+    'district-fire': { id:'district-fire', label:`${district} Fire & Rescue`, x:20, z:-18, arrivalX:16, arrivalZ:-18 },
+    'district-home': { id:'district-home', label:`${district} Rental Home`, x:-24, z:-36, arrivalX:-24, arrivalZ:-31 },
+    'district-rest': { id:'district-rest', label:`${district} Rest Park`, x:-10, z:-10, arrivalX:-7, arrivalZ:-10 },
+    'district-fuel': { id:'district-fuel', label:`${district} Fuel Station`, x:18, z:-48, arrivalX:14, arrivalZ:-48 },
+    'district-service': { id:'district-service', label:`${district} Service Garage`, x:-18, z:-48, arrivalX:-14, arrivalZ:-48 },
+    'district-landmark': { id:'district-landmark', label:profile.landmark, x:50, z:45, arrivalX:44, arrivalZ:45 },
+    'district-centre-bus': { id:'district-centre-bus', label:`${profile.centre} Bus Stop`, x:10, z:8, arrivalX:7, arrivalZ:8 },
+    'district-market-bus': { id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:18, arrivalX:25, arrivalZ:18 },
+    'district-rail-bus': { id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-6, arrivalX:-31, arrivalZ:-6 },
+  };
+  if (config.airport) destinations['district-airport'] = { id:'district-airport', label:`${district} Airport`, x:config.airport.x, z:config.airport.z, arrivalX:config.airport.arrivalX, arrivalZ:config.airport.arrivalZ };
+  return destinations[destinationId] || null;
+}
+function publicRideDestinationForUser(user, destinationId) {
+  return genericRideDestination(user, destinationId) || PUBLIC_RIDE_DESTINATIONS[destinationId] || null;
+}
 
   function publicRideQuote(user, destinationId) {
-    const destination = PUBLIC_RIDE_DESTINATIONS[destinationId];
+    const destination = publicRideDestinationForUser(user, destinationId);
     requireValue(destination, 404, 'Ride destination not found.');
-    requireValue(publicRideDestinationDistrict(destinationId) === currentWorldDistrict(user), 409, 'Auto and taxi rides stay inside the current district. Use train or flight for another district.');
+    if (!genericDistrictWorld(user)) {
+      requireValue(publicRideDestinationDistrict(destinationId) === currentWorldDistrict(user), 409, 'Auto and taxi rides stay inside the current district. Use train or flight for another district.');
+    }
     const state = jobStateFor(user);
     requireValue(!state.active, 409, 'Finish your active job before booking a public ride.');
     const personal = state.garage.activeVehicleId
@@ -1736,10 +1766,12 @@ function publicRideDestinationDistrict(destinationId) {
   }
   function buildJobCheckpoints(user, jobId) {
     const base = jobPosition(user);
+    const district = currentWorldDistrict(user);
+    const city = districtCityProfile(district);
     const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinateFor(user, base.x, dx, 'x'), z: missionCoordinateFor(user, base.z, dz, 'z') });
-    if (jobId === 'delivery') return [point('Village Parcel Hub', 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
-    if (jobId === 'taxi') return [point('Passenger Pickup', 'Pick up passenger', -7, 5), point('Town Junction', 'Drop off passenger', -20, -7)];
-    return [point('Village Shop', 'Check in for shift', 9, -5)];
+    if (jobId === 'delivery') return [point(`${district} Parcel Hub`, 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
+    if (jobId === 'taxi') return [point(`${city.centre} Passenger Pickup`, 'Pick up passenger', -7, 5), point(city.secondary, 'Drop off passenger', -20, -7)];
+    return [point(genericDistrictWorld(user) ? city.market : 'Village Shop', 'Check in for shift', 9, -5)];
   }
   function personalVehicleSummary(user) {
     const state = jobStateFor(user);
@@ -2591,7 +2623,8 @@ function publicRideDestinationDistrict(destinationId) {
         const option = quote.options.find(item => item.id === serviceId);
         requireValue(option?.available, 409, serviceId === 'auto' ? 'Auto-rickshaw is for shorter local trips. Choose taxi for this destination.' : 'This ride is not available.');
         requireValue(user.walletBalance >= option.fare, 409, 'Not enough Kerala Cash for this ride.');
-        const destination = PUBLIC_RIDE_DESTINATIONS[destinationId];
+        const destination = publicRideDestinationForUser(user, destinationId);
+        requireValue(destination, 404, 'Ride destination not found.');
         const live = presence.get(user.id) || place(user);
         const transaction = walletTransaction(user, -option.fare, 'public_ride', `${service.label} · ${destination.label}`);
         const timestamp = now();
