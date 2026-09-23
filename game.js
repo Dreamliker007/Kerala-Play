@@ -6304,16 +6304,66 @@ function addDistrictAirport(scene, district, x, z) {
   registerFarVisual(board, x, z, 72);
 }
 
+function addDistrictSignatureLandmark(scene, district, profile, x = 50, z = 45) {
+  if (profile.landmarkKind === 'fort') {
+    addFortLandmark(scene, x, z);
+  } else if (profile.landmarkKind === 'hills') {
+    addTeaHills(scene, x, z);
+  } else if (profile.landmarkKind === 'water') {
+    addBackwaterHouseboat(scene, x, z);
+  } else if (profile.landmarkKind === 'dam') {
+    addBoxCollider(x, z, 4.8, 1.1, 'district-dam');
+    const group = new THREE.Group();
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(12, 8), new THREE.MeshStandardMaterial({ color:0x3b879d, roughness:.32, metalness:.05 }));
+    water.rotation.x = -Math.PI / 2;
+    water.position.set(0,.025,2.8);
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(10,4.6,1.3), new THREE.MeshStandardMaterial({ color:0xa9a79e, roughness:.94 }));
+    wall.position.set(0,2.3,0);
+    const crest = new THREE.Mesh(new THREE.BoxGeometry(10.8,.22,1.8), new THREE.MeshStandardMaterial({ color:0xd1cec2, roughness:.9 }));
+    crest.position.set(0,4.7,0);
+    group.add(water,wall,crest);
+    group.position.set(x,0,z);
+    scene.add(group);
+    landmarkBeacon(scene,x,z-2.8,0x76b6d6);
+  } else {
+    const park = new THREE.Group();
+    const lawn = new THREE.Mesh(new THREE.CircleGeometry(7.5,32), new THREE.MeshStandardMaterial({ color:0x5f8a4d, roughness:1 }));
+    lawn.rotation.x = -Math.PI/2;
+    lawn.position.y=.018;
+    park.add(lawn);
+    park.position.set(x,0,z);
+    scene.add(park);
+    addBench(scene,x-2.6,z);
+    addBench(scene,x+2.6,z);
+    addPalm(scene,x-5,z-3,.72);
+    addPalm(scene,x+5,z-3,.72);
+    landmarkBeacon(scene,x,z-3,0x7fc66e);
+  }
+  const label = createWorldSignMesh({
+    title: profile.landmark.toUpperCase(),
+    subtitle: `${district.toUpperCase()} · LANDMARK`,
+    background: '#315f78',
+  }, 5.0, .92);
+  label.position.set(x,3.4,z-5.4);
+  scene.add(label);
+  registerFarVisual(label,x,z-5.4,90);
+}
+
 function addGenericDistrictWorld(scene, district) {
   const config = DISTRICT_INSTANCE_CONFIG[district] || DISTRICT_INSTANCE_CONFIG.Kottayam;
+  const profile = districtCityProfile(district);
   const roadMat = new THREE.MeshStandardMaterial({ color:0xaeb5b8, roughness:.91, metalness:.015 });
   weatherRoadSurfaces.push({ material:roadMat, baseRoughness:.91, baseMetalness:.015, baseColor:roadMat.color.clone() });
   const lineMat = new THREE.MeshStandardMaterial({ color:0xf1d46d, roughness:.75 });
 
   const roads = [
-    [0, 0, 12, 136],
-    [0, 0, 136, 10],
+    [0, 0, 12, 160],
+    [0, 0, 150, 10],
+    [20, 22, 76, 7],
     [-24, -6, 48, 7],
+    [-24, -36, 86, 7],
+    [25, 45, 74, 7],
+    [-35, 34, 64, 7],
   ];
   if (config.airport) roads.push([22, -28, 44, 7]);
   for (const [x,z,width,depth] of roads) {
@@ -6323,16 +6373,21 @@ function addGenericDistrictWorld(scene, district) {
     scene.add(road);
     addRoadEdges(scene, x, z, width, depth);
   }
-  for (let z=-62; z<=62; z+=9) {
+  for (let z=-74; z<=74; z+=9) {
     const dash = new THREE.Mesh(new THREE.PlaneGeometry(.18,4), lineMat);
-    dash.rotation.x = -Math.PI/2; dash.position.set(0,.032,z); scene.add(dash);
+    dash.rotation.x = -Math.PI/2;
+    dash.position.set(0,.032,z);
+    scene.add(dash);
   }
-  for (let x=-62; x<=62; x+=9) {
+  for (let x=-70; x<=70; x+=9) {
     const dash = new THREE.Mesh(new THREE.PlaneGeometry(4,.16), lineMat);
-    dash.rotation.x = -Math.PI/2; dash.position.set(x,.033,0); scene.add(dash);
+    dash.rotation.x = -Math.PI/2;
+    dash.position.set(x,.033,0);
+    scene.add(dash);
   }
 
   addRailTracks(scene, config.train.x, -17, 30);
+  addRailPlatform(scene, config.train.x, -9.6, 28);
   addCivicBuilding(scene, config.train.x, -12, {
     title: `${district.toUpperCase()} RAILWAY`,
     subtitle: 'KERALA DISTRICT TRAINS',
@@ -6346,50 +6401,73 @@ function addGenericDistrictWorld(scene, district) {
   }, 4.4, .88);
   railBoard.position.set(config.train.x,2.35,-6.7);
   scene.add(railBoard);
-  registerFarVisual(railBoard,config.train.x,-6.7,68);
+  registerFarVisual(railBoard,config.train.x,-6.7,72);
 
   const districtBoard = createWorldSignMesh({
-    title: `${district.toUpperCase()} CITY`,
-    subtitle: 'KERALA PLAY · DISTRICT WORLD',
+    title: profile.centre.toUpperCase(),
+    subtitle: `${profile.secondary.toUpperCase()} · KERALA PLAY`,
     background: '#245979',
-  }, 5.2, .96);
+  }, 5.4, .98);
   districtBoard.position.set(9,2.55,8);
   scene.add(districtBoard);
-  registerFarVisual(districtBoard,9,8,80);
+  registerFarVisual(districtBoard,9,8,86);
 
-  addShop(scene, 20, 16, `${district.toUpperCase()} MARKET`, 'FOOD · GROCERIES · DAILY NEEDS');
-  addCivicBuilding(scene, -20, 16, { title:'DISTRICT HOSPITAL', subtitle:'HEALTH · EMERGENCY', color:0x2d7d63, collider:'district-hospital' });
+  addShop(scene, 20, 16, profile.market.toUpperCase(), 'FOOD · GROCERIES · DAILY NEEDS');
+  addShop(scene, -44, 22, profile.cafe.toUpperCase(), 'TEA · MEALS · SNACKS');
+  addCivicBuilding(scene, -20, 16, { title:'DISTRICT HOSPITAL', subtitle:`${district.toUpperCase()} · HEALTH`, color:0x2d7d63, collider:'district-hospital' });
   addCivicBuilding(scene, -20, -18, { title:'KERALA POLICE', subtitle:`${district.toUpperCase()} DISTRICT`, color:0x315b84, collider:'district-police' });
   addCivicBuilding(scene, 20, -18, { title:'FIRE & RESCUE', subtitle:'EMERGENCY SERVICES', color:0xa84437, collider:'district-fire' });
   addFuelStation(scene, 18, -48);
   addServiceGarage(scene, -18, -48);
+
   addPhotoHouse(scene, -24, -36, 10.2, 6.8);
   const districtHomeMarker = new THREE.Group();
   districtHomeMarker.add(missionTag('Rental Home', '#654b36'));
   districtHomeMarker.position.set(-24, 0, -30.8);
   scene.add(districtHomeMarker);
   addBench(scene, -10, -10);
-  addBusStop(scene, 10, 8, Math.PI, 'CITY BUS');
-  addBusStop(scene, -10, 8, Math.PI, 'RAIL LINK');
+
+  addBusStop(scene, 10, 8, Math.PI, 'CITY CENTRE');
+  addBusStop(scene, 28, 18, -Math.PI / 2, 'MARKET');
+  addBusStop(scene, -34, -6, Math.PI / 2, 'RAILWAY LINK');
 
   addCityTower(scene, -36, 31, 10, 8, 14, 0xc7b999, 'DISTRICT RESIDENCY');
   addCityTower(scene, 36, 31, 11, 9, 17, 0xaeb6ba, 'COMMERCIAL PLAZA');
   addCityTower(scene, -36, -34, 9, 8, 13, 0xc9b49a, 'APARTMENTS');
   addCityTower(scene, 36, -34, 10, 8, 15, 0xb0b9c0, 'CITY OFFICES');
-  [[-54,48],[54,48],[-54,-58],[54,-58]].forEach(([x,z]) => addHouse(scene,x,z,0xe7ddca,0x8e523f));
-  [[-60,20,.78],[60,20,.82],[-58,-20,.76],[58,-20,.80],[25,55,.74],[-25,55,.77]].forEach(([x,z,s]) => addPalm(scene,x,z,s));
+  addCityTower(scene, -58, 8, 9, 7, 12, 0xc4b59a, 'LOCAL LODGE');
+  addCityTower(scene, 58, 8, 9, 7, 13, 0xb3bdc1, 'BUSINESS BLOCK');
+
+  for (const [x,z] of [[-54,48],[-38,54],[-54,-58],[-36,-62],[54,-58],[68,-42],[64,28],[45,62]]) {
+    addHouse(scene,x,z,0xe7ddca,0x8e523f);
+  }
+  [[-68,20,.78],[68,20,.82],[-62,-20,.76],[62,-20,.80],[25,66,.74],[-25,66,.77],[-68,52,.75],[68,52,.79]]
+    .forEach(([x,z,s]) => addPalm(scene,x,z,s));
+
+  addParkingLot(scene, 38, 16, 18, 6);
+  addParkedVehicle(scene,'car',0x7d8b91,34,16,Math.PI/2);
+  addParkedVehicle(scene,'auto',0x2b773f,39,16,Math.PI/2);
+  addParkedVehicle(scene,'bike',0x316d58,44,16,Math.PI/2);
 
   addPhotoVillager(scene, 13, 12, 5.5, .34, .7, .70, { role:'Local', nightHide:true });
   addPhotoVillager(scene, -13, 12, 5.2, .32, 2.1, .71, { role:'Commuter' });
   addPhotoVillager(scene, 9, -12, 5.0, .31, 3.4, .70, { role:'Local', nightHide:true });
   addPhotoVillager(scene, -9, -12, 4.8, .30, 5.2, .70, { role:'Worker' });
-  addRoadVehicle(scene, { kind:'car', axis:'z', fixed:-2.6, min:-64, max:64, progress:-42, direction:1, speed:6.6, color:0x496f9f, flowPhase:1.1 });
-  addRoadVehicle(scene, { kind:'auto', axis:'z', fixed:2.7, min:-64, max:64, progress:28, direction:-1, speed:5.4, color:0x2b773f, flowPhase:2.7 });
-  addRoadVehicle(scene, { kind:'bike', axis:'x', fixed:-2.3, min:-64, max:64, progress:-30, direction:1, speed:7.2, color:0x8b3e35, flowPhase:4.2 });
-  addRoadVehicle(scene, { kind:'bus', axis:'x', fixed:2.4, min:-64, max:64, progress:42, direction:-1, speed:4.8, color:0xd9b32d, flowPhase:3.4, stops:[10,-10] });
+  addPhotoVillager(scene, 22, 20, 2.8, .27, 1.4, .70, { role:'Shopper', nightHide:true, shelterX:20, shelterZ:19 });
+  addPhotoVillager(scene, -42, 25, 2.4, .25, 2.8, .70, { role:'Cafe Customer', shelterX:-44, shelterZ:25 });
+  addPhotoVillager(scene, -18, 19, 2.0, .24, 4.6, .71, { role:'Hospital Staff', shelterX:-20, shelterZ:19 });
+  addPhotoVillager(scene, -32, -4, 3.0, .25, 5.8, .69, { role:'Rail Commuter', shelterX:-34, shelterZ:-6 });
 
+  addRoadVehicle(scene, { kind:'car', axis:'z', fixed:-2.6, min:-72, max:72, progress:-42, direction:1, speed:6.6, color:0x496f9f, flowPhase:1.1 });
+  addRoadVehicle(scene, { kind:'auto', axis:'z', fixed:2.7, min:-72, max:72, progress:28, direction:-1, speed:5.4, color:0x2b773f, flowPhase:2.7 });
+  addRoadVehicle(scene, { kind:'bike', axis:'x', fixed:-2.3, min:-70, max:70, progress:-30, direction:1, speed:7.2, color:0x8b3e35, flowPhase:4.2 });
+  addRoadVehicle(scene, { kind:'bus', axis:'x', fixed:2.4, min:-70, max:70, progress:42, direction:-1, speed:4.8, color:0xd9b32d, flowPhase:3.4, stops:[10,-34] });
+  addRoadVehicle(scene, { kind:'car', axis:'x', fixed:22, min:-52, max:54, progress:-20, direction:1, speed:5.8, color:0x687a86, flowPhase:5.1 });
+
+  addDistrictSignatureLandmark(scene,district,profile,50,45);
   if (config.airport) addDistrictAirport(scene, district, config.airport.x, config.airport.z);
 }
+
 
 function buildWorld(scene) {
   staticColliders.length = 0;
