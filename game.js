@@ -103,7 +103,7 @@ const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTA
   const generic = {
     district,
     order: index,
-    bounds: { minX:-78, maxX:78, minZ:-78, maxZ:78 },
+    bounds: { minX:-110, maxX:110, minZ:-110, maxZ:110 },
     spawn: { x:12, z:0, rotation:0 },
     train: { x:-42, z:-6, radius:7.2 },
     airport: DISTRICT_AIRPORTS.has(district) ? { x:42, z:-28, radius:8.2 } : null,
@@ -220,11 +220,34 @@ function generatedDistrictTravelSpots() {
   const config = currentDistrictInstance();
   const generated = [];
   if (district !== 'Kottayam' && district !== 'Ernakulam') {
-    generated.push(Object.freeze({
-      id: 'district-rail', kind: 'train', stationId: config.train?.id || 'district-rail',
-      label: `${district} Railway Station`, x:config.train.x, z:config.train.z,
-      radius:config.train.radius, discoverRadius:11,
-    }));
+    generated.push(
+      Object.freeze({
+        id: 'district-rail', kind: 'train', stationId: config.train?.id || 'district-rail',
+        label: `${district} Railway Station`, x:config.train.x, z:config.train.z,
+        radius:config.train.radius, discoverRadius:11,
+      }),
+      Object.freeze({
+        id:'district-market', kind:'shop', label:`${district} City Market`,
+        x:20, z:16, radius:4.8, discoverRadius:8.2, openHour:5.5, closeHour:22,
+        items:['water','tea','snack','meal'],
+      }),
+      Object.freeze({
+        id:'district-hospital', kind:'service', service:'clinic', clinicId:'district-hospital',
+        label:`${district} District Hospital`, x:-20, z:16, radius:5.8, discoverRadius:9,
+      }),
+      Object.freeze({
+        id:'district-police', kind:'service', service:'police', servicePointId:'district-police',
+        label:`${district} District Police`, x:-20, z:-18, radius:5.8, discoverRadius:9,
+      }),
+      Object.freeze({
+        id:'district-fire', kind:'service', service:'fire', servicePointId:'district-fire',
+        label:`${district} Fire & Rescue`, x:20, z:-18, radius:5.8, discoverRadius:9,
+      }),
+      Object.freeze({
+        id:'district-rest', kind:'rest', label:`${district} Rest Bench`,
+        x:-10, z:-10, radius:4.2, discoverRadius:7.2,
+      }),
+    );
   }
   if (config.airport) {
     generated.push(Object.freeze({
@@ -634,14 +657,23 @@ function addCivicBuilding(scene, x, z, { title, subtitle, color = 0x3b6780, acce
 function nearestVehicleStation() {
   const vehicle = currentDriveVehicle();
   if (!playerRef || !vehicle?.entered) return null;
+  const district = currentWorldDistrictName();
   const candidates = [];
-  for (const [action, station] of Object.entries(vehicle.stations || {})) {
-    candidates.push({ action: action === 'fuel' ? 'refuel' : 'repair', station });
+  if (district === 'Kottayam') {
+    for (const [action, station] of Object.entries(vehicle.stations || {})) {
+      candidates.push({ action: action === 'fuel' ? 'refuel' : 'repair', station });
+    }
+  } else if (district === 'Ernakulam') {
+    candidates.push(
+      { action:'refuel', station:{ id:'ernakulam-fuel', label:'Ernakulam Fuel Station', x:-119, z:105, radius:7 } },
+      { action:'repair', station:{ id:'ernakulam-service', label:'Ernakulam Auto Garage', x:-182, z:160, radius:7 } },
+    );
+  } else {
+    candidates.push(
+      { action:'refuel', station:{ id:'district-fuel', label:`${district} Fuel Station`, x:18, z:-48, radius:7 } },
+      { action:'repair', station:{ id:'district-service', label:`${district} Service Garage`, x:-18, z:-48, radius:7 } },
+    );
   }
-  candidates.push(
-    { action: 'refuel', station: { id: 'ernakulam-fuel', label: 'Ernakulam Fuel Station', x: -119, z: 105, radius: 7 } },
-    { action: 'repair', station: { id: 'ernakulam-service', label: 'Ernakulam Auto Garage', x: -182, z: 160, radius: 7 } },
-  );
   for (const candidate of candidates) {
     const distance = Math.hypot(playerRef.position.x - Number(candidate.station.x), playerRef.position.z - Number(candidate.station.z));
     if (distance <= Number(candidate.station.radius || 7)) return { ...candidate, distance };
@@ -2075,6 +2107,11 @@ function updateWorldInteract() {
         worldInteract.disabled = !closeEnough;
         worldInteract.textContent = closeEnough ? 'OPEN FLIGHT ROUTES' : `NEARBY · ${spot.label.toUpperCase()}`;
         worldInteract.title = closeEnough ? `${spot.label} · fly to another airport district` : worldInteract.title;
+      } else if (spot.kind === 'rest') {
+        worldInteract.dataset.mode = closeEnough ? 'needs-rest' : '';
+        worldInteract.disabled = !closeEnough;
+        worldInteract.textContent = closeEnough ? 'REST · RECOVER ENERGY' : `NEARBY · ${spot.label.toUpperCase()}`;
+        worldInteract.title = closeEnough ? spot.label : worldInteract.title;
       } else if (spot.kind === 'bus') {
         const status = busTravelStatus?.stop?.id === spot.id ? busTravelStatus : null;
         const serverOffset = Number(status?.serverNow || 0) - Number(status?.receivedAt || 0);
@@ -2896,7 +2933,7 @@ function destinationDirection(place, player = playerRef) {
 }
 
 function destinationBusSuggestion(place, player = playerRef) {
-  if (!place || !player || place.kind === 'bus') return '';
+  if (currentWorldDistrictName() !== 'Kottayam' || !place || !player || place.kind === 'bus') return '';
   const town = navigationPlaces.find(item => item.id === 'town-bus');
   const south = navigationPlaces.find(item => item.id === 'south-bus');
   const playerTown = placeDistance(town, player);
@@ -2916,6 +2953,10 @@ function currentNavigationPlaces() {
   return [
     { id:'district-centre', name:`${district} City Centre`, icon:'C', x:0, z:0, kind:'town', district },
     { id:'district-rail', name:`${district} Railway Station`, icon:'🚆', x:config.train.x, z:config.train.z, kind:'rail', district },
+    { id:'district-market', name:`${district} City Market`, icon:'S', x:20, z:16, kind:'shop', district },
+    { id:'district-hospital', name:`${district} District Hospital`, icon:'+', x:-20, z:16, kind:'health', district },
+    { id:'district-police', name:`${district} District Police`, icon:'P', x:-20, z:-18, kind:'police', district },
+    { id:'district-fire', name:`${district} Fire & Rescue`, icon:'F', x:20, z:-18, kind:'emergency', district },
     ...(config.airport ? [{ id:'district-airport', name:`${district} Airport`, icon:'✈', x:config.airport.x, z:config.airport.z, kind:'airport', district }] : []),
   ];
 }
@@ -6240,6 +6281,12 @@ function addGenericDistrictWorld(scene, district) {
   addCivicBuilding(scene, 20, -18, { title:'FIRE & RESCUE', subtitle:'EMERGENCY SERVICES', color:0xa84437, collider:'district-fire' });
   addFuelStation(scene, 18, -48);
   addServiceGarage(scene, -18, -48);
+  addPhotoHouse(scene, -24, -36, 10.2, 6.8);
+  const districtHomeMarker = new THREE.Group();
+  districtHomeMarker.add(missionTag('Rental Home', '#654b36'));
+  districtHomeMarker.position.set(-24, 0, -30.8);
+  scene.add(districtHomeMarker);
+  addBench(scene, -10, -10);
   addBusStop(scene, 10, 8, Math.PI, 'CITY BUS');
   addBusStop(scene, -10, 8, Math.PI, 'RAIL LINK');
 
