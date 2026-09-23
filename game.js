@@ -258,6 +258,10 @@ const navigationPlaces = Object.freeze([
   Object.freeze({ id: 'town-centre', name: 'Town Centre', icon: 'T', x: 0, z: 22, kind: 'town', district: 'Kottayam' }),
   Object.freeze({ id: 'market-quarter', name: 'Market Quarter', icon: 'M', x: -30, z: 22, kind: 'town', district: 'Kottayam' }),
   Object.freeze({ id: 'south-junction', name: 'South Junction', icon: 'J', x: 0, z: -22, kind: 'junction', district: 'Kottayam' }),
+  Object.freeze({ id: 'town-clinic', name: 'Kerala Community Clinic', icon: '+', x: 28, z: 28, kind: 'health', district: 'Kottayam' }),
+  Object.freeze({ id: 'town-police', name: 'Kerala Police Station', icon: 'P', x: -31, z: 14, kind: 'police', district: 'Kottayam' }),
+  Object.freeze({ id: 'town-fire', name: 'Fire & Rescue Station', icon: 'F', x: -48, z: 8, kind: 'emergency', district: 'Kottayam' }),
+  Object.freeze({ id: 'town-market', name: 'Town Market', icon: 'S', x: 31, z: 15, kind: 'shop', district: 'Kottayam' }),
 ]);
 const taskCatalog = [
   { id: 'open-map', title: 'Open the Kerala map', target: 1, reward: 10 },
@@ -485,6 +489,27 @@ function addServiceGarage(scene, x, z) {
   group.position.set(x, 0, z);
   scene.add(group);
   addBoxCollider(x, z, 3.7, 2.6, 'service-garage');
+}
+
+function addCivicBuilding(scene, x, z, { title, subtitle, color = 0x3b6780, accent = 0xf1eee3, collider = 'civic-building' } = {}) {
+  const group = new THREE.Group();
+  const wall = new THREE.MeshStandardMaterial({ color: accent, roughness: .90 });
+  const trim = new THREE.MeshStandardMaterial({ color, roughness: .78 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x75a9b7, roughness: .22, metalness: .08 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(9.2, 4.2, 6.2), wall);
+  body.position.y = 2.1;
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(9.7, .35, 6.7), trim);
+  roof.position.y = 4.38;
+  const entrance = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.7, .14), glass);
+  entrance.position.set(0, 1.55, 3.16);
+  const board = createWorldSignMesh({ title, subtitle, background: '#' + color.toString(16).padStart(6, '0') }, 5.8, .82);
+  board.position.set(0, 4.0, 3.24);
+  group.add(body, roof, entrance, board);
+  group.position.set(x, 0, z);
+  group.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+  scene.add(group);
+  registerFarVisual(board, x, z, 60);
+  addBoxCollider(x, z, 4.6, 3.1, collider);
 }
 
 function nearestVehicleStation() {
@@ -5687,6 +5712,11 @@ function buildWorld(scene) {
   addBench(scene, -10, -10);
   addFuelStation(scene, 11, -12);
   addServiceGarage(scene, -36, -15);
+  addShop(scene, 31, 15, 'TOWN MARKET', 'GROCERIES · TEA · DAILY NEEDS');
+  addCivicBuilding(scene, 28, 28, { title: 'COMMUNITY CLINIC', subtitle: 'HEALTH CENTRE · 24/7', color: 0x2d7d63, collider: 'clinic' });
+  addCivicBuilding(scene, -31, 14, { title: 'KERALA POLICE', subtitle: 'POLICE STATION', color: 0x315b84, collider: 'police-station' });
+  addCivicBuilding(scene, -48, 8, { title: 'FIRE & RESCUE', subtitle: 'EMERGENCY SERVICES', color: 0xa84437, collider: 'fire-station' });
+  addBusStop(scene, 13.0, 19.2, Math.PI, 'TOWN CENTRE');
   addTrafficCheckpoint(scene, 5.4, 18);
   addPhotoVillager(scene, -6, -50, 11, .55, 0, .78, { nightHide: true });
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
