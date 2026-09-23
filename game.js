@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=107.0';
-import { createAtmosphere } from './environment.js?v=107.0';
+import { initSocial, api } from './social.js?v=108.0';
+import { createAtmosphere } from './environment.js?v=108.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -119,18 +119,18 @@ const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTA
   return [district, generic];
 })));
 const DISTRICT_CITY_PROFILES = Object.freeze({
-  Kasaragod: Object.freeze({ centre:'Kasaragod Town', market:'Kasaragod Market', cafe:'Bekal Cafe', secondary:'Bekal Road', landmark:'Bekal Fort', landmarkKind:'fort' }),
-  Kannur: Object.freeze({ centre:'Kannur Town', market:'Fort Road Market', cafe:'Payyambalam Cafe', secondary:'Payyambalam', landmark:'St. Angelo Fort', landmarkKind:'fort' }),
-  Wayanad: Object.freeze({ centre:'Kalpetta Town', market:'Kalpetta Market', cafe:'Hill View Cafe', secondary:'Meppadi Road', landmark:'Edakkal Caves', landmarkKind:'hills' }),
-  Kozhikode: Object.freeze({ centre:'Kozhikode City', market:'SM Street Market', cafe:'Beach Road Cafe', secondary:'Beach Road', landmark:'Kozhikode Beach', landmarkKind:'water' }),
-  Malappuram: Object.freeze({ centre:'Malappuram Town', market:'Malappuram Market', cafe:'Malabar Cafe', secondary:'Kottakkunnu Road', landmark:'Kottakkunnu', landmarkKind:'hills' }),
-  Palakkad: Object.freeze({ centre:'Palakkad Town', market:'Fort Market', cafe:'Fort Gate Cafe', secondary:'Fort Road', landmark:'Palakkad Fort', landmarkKind:'fort' }),
-  Thrissur: Object.freeze({ centre:'Thrissur Round', market:'Sakthan Market', cafe:'Round Cafe', secondary:'Swaraj Round', landmark:'Thekkinkadu Maidan', landmarkKind:'park' }),
-  Idukki: Object.freeze({ centre:'Painavu Town', market:'Hill Market', cafe:'Dam View Cafe', secondary:'Dam Road', landmark:'Idukki Arch Dam', landmarkKind:'dam' }),
-  Alappuzha: Object.freeze({ centre:'Alappuzha Town', market:'Canal Market', cafe:'Boat Jetty Cafe', secondary:'Canal Road', landmark:'Alappuzha Backwaters', landmarkKind:'water' }),
-  Pathanamthitta: Object.freeze({ centre:'Pathanamthitta Town', market:'Central Market', cafe:'River View Cafe', secondary:'Konni Road', landmark:'Konni Eco Point', landmarkKind:'hills' }),
-  Kollam: Object.freeze({ centre:'Kollam City', market:'Chinnakada Market', cafe:'Lake View Cafe', secondary:'Ashtamudi Road', landmark:'Ashtamudi Lake', landmarkKind:'water' }),
-  Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', landmark:'Kanakakkunnu Grounds', landmarkKind:'park' }),
+  Kasaragod: Object.freeze({ centre:'Kasaragod Town', market:'Kasaragod Market', cafe:'Bekal Cafe', secondary:'Bekal Road', neighbourhood:'Kanhangad Link', landmark:'Bekal Fort', landmarkKind:'fort', environment:'coastal' }),
+  Kannur: Object.freeze({ centre:'Kannur Town', market:'Fort Road Market', cafe:'Payyambalam Cafe', secondary:'Payyambalam', neighbourhood:'Thavakkara', landmark:'St. Angelo Fort', landmarkKind:'fort', environment:'coastal' }),
+  Wayanad: Object.freeze({ centre:'Kalpetta Town', market:'Kalpetta Market', cafe:'Hill View Cafe', secondary:'Meppadi Road', neighbourhood:'Meppadi', landmark:'Edakkal Caves', landmarkKind:'hills', environment:'highland' }),
+  Kozhikode: Object.freeze({ centre:'Kozhikode City', market:'SM Street Market', cafe:'Beach Road Cafe', secondary:'Beach Road', neighbourhood:'Mananchira', landmark:'Kozhikode Beach', landmarkKind:'water', environment:'coastal' }),
+  Malappuram: Object.freeze({ centre:'Malappuram Town', market:'Malappuram Market', cafe:'Malabar Cafe', secondary:'Kottakkunnu Road', neighbourhood:'Up Hill', landmark:'Kottakkunnu', landmarkKind:'hills', environment:'highland' }),
+  Palakkad: Object.freeze({ centre:'Palakkad Town', market:'Fort Market', cafe:'Fort Gate Cafe', secondary:'Fort Road', neighbourhood:'Sultanpet', landmark:'Palakkad Fort', landmarkKind:'fort', environment:'plains' }),
+  Thrissur: Object.freeze({ centre:'Thrissur Round', market:'Sakthan Market', cafe:'Round Cafe', secondary:'Swaraj Round', neighbourhood:'East Fort', landmark:'Thekkinkadu Maidan', landmarkKind:'park', environment:'urban-park' }),
+  Idukki: Object.freeze({ centre:'Painavu Town', market:'Hill Market', cafe:'Dam View Cafe', secondary:'Dam Road', neighbourhood:'Cheruthoni', landmark:'Idukki Arch Dam', landmarkKind:'dam', environment:'highland' }),
+  Alappuzha: Object.freeze({ centre:'Alappuzha Town', market:'Canal Market', cafe:'Boat Jetty Cafe', secondary:'Canal Road', neighbourhood:'Mullakkal', landmark:'Alappuzha Backwaters', landmarkKind:'water', environment:'backwater' }),
+  Pathanamthitta: Object.freeze({ centre:'Pathanamthitta Town', market:'Central Market', cafe:'River View Cafe', secondary:'Konni Road', neighbourhood:'Central Junction', landmark:'Konni Eco Point', landmarkKind:'hills', environment:'highland' }),
+  Kollam: Object.freeze({ centre:'Kollam City', market:'Chinnakada Market', cafe:'Lake View Cafe', secondary:'Ashtamudi Road', neighbourhood:'Kadappakada', landmark:'Ashtamudi Lake', landmarkKind:'water', environment:'backwater' }),
+  Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', neighbourhood:'Palayam', landmark:'Kanakakkunnu Grounds', landmarkKind:'park', environment:'urban-park' }),
 });
 function districtCityProfile(district = currentWorldDistrictName()) {
   return DISTRICT_CITY_PROFILES[district] || Object.freeze({
@@ -140,6 +140,8 @@ function districtCityProfile(district = currentWorldDistrictName()) {
     secondary:`${district} Town Road`,
     landmark:`${district} Landmark`,
     landmarkKind:'park',
+    environment:'urban-park',
+    neighbourhood:`${district} Neighbourhood`,
   });
 }
 
@@ -289,6 +291,14 @@ function generatedDistrictTravelSpots() {
       Object.freeze({
         id:'district-rail-bus', kind:'bus', routeId:'district-city-line', label:`${district} Railway Bus Stop`,
         x:-34, z:-6, radius:4.2, discoverRadius:7.2,
+      }),
+      Object.freeze({
+        id:'district-neighbourhood-bus', kind:'bus', routeId:'district-city-line', label:`${city.neighbourhood} Bus Stop`,
+        x:-55, z:-34, radius:4.2, discoverRadius:7.2,
+      }),
+      Object.freeze({
+        id:'district-neighbourhood', kind:'view', label:city.neighbourhood,
+        x:-55, z:-34, radius:5.0, discoverRadius:9,
       }),
       Object.freeze({
         id:'district-landmark', kind:'view', label:city.landmark,
@@ -3047,9 +3057,11 @@ function currentNavigationPlaces() {
     { id:'district-fuel', name:`${district} Fuel Station`, icon:'F', x:18, z:-48, kind:'service', district },
     { id:'district-service', name:`${district} Service Garage`, icon:'G', x:-18, z:-48, kind:'service', district },
     { id:'district-landmark', name:city.landmark, icon:'L', x:50, z:45, kind:'landmark', district },
+    { id:'district-neighbourhood', name:city.neighbourhood, icon:'N', x:-55, z:-34, kind:'town', district },
     { id:'district-centre-bus', name:`${city.centre} Bus Stop`, icon:'🚌', x:10, z:8, kind:'bus', district },
     { id:'district-market-bus', name:`${city.market} Bus Stop`, icon:'🚌', x:28, z:18, kind:'bus', district },
     { id:'district-rail-bus', name:`${district} Railway Bus Stop`, icon:'🚌', x:-34, z:-6, kind:'bus', district },
+    { id:'district-neighbourhood-bus', name:`${city.neighbourhood} Bus Stop`, icon:'🚌', x:-55, z:-34, kind:'bus', district },
     ...(config.airport ? [{ id:'district-airport', name:`${district} Airport`, icon:'✈', x:config.airport.x, z:config.airport.z, kind:'airport', district }] : []),
   ];
 }
@@ -6006,7 +6018,7 @@ function addCityTower(scene, x, z, width, depth, height, color, title = '') {
     }
   }
   if (title) {
-    const board = createWorldSignMesh({ title, subtitle: 'ERNAKULAM CITY', background: '#315f78' }, Math.min(5.6, width * .72), .74);
+    const board = createWorldSignMesh({ title, subtitle: `${currentWorldDistrictName().toUpperCase()} CITY`, background: '#315f78' }, Math.min(5.6, width * .72), .74);
     board.position.set(0, Math.min(height - .65, 4.4), depth / 2 + .08);
     group.add(board);
     registerFarVisual(board, x, z, 85);
@@ -6361,6 +6373,80 @@ function addDistrictSignatureLandmark(scene, district, profile, x = 50, z = 45) 
   registerFarVisual(label,x,z-5.4,90);
 }
 
+function addDistrictIdentityEnvironment(scene, district, profile) {
+  const waterMat = new THREE.MeshStandardMaterial({ color:0x3b8ba0, roughness:.26, metalness:.06, transparent:true, opacity:.93 });
+  const sandMat = new THREE.MeshStandardMaterial({ color:0xc8b783, roughness:1 });
+  const fieldMat = new THREE.MeshStandardMaterial({ color:0x85a84c, roughness:1 });
+  const soilMat = new THREE.MeshStandardMaterial({ color:0x76623f, roughness:1 });
+
+  if (profile.environment === 'coastal') {
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(28, 150), waterMat);
+    sea.rotation.x = -Math.PI / 2;
+    sea.position.set(91,.02,18);
+    scene.add(sea);
+    const beach = new THREE.Mesh(new THREE.PlaneGeometry(3.2,150), sandMat);
+    beach.rotation.x = -Math.PI / 2;
+    beach.position.set(75.5,.025,18);
+    scene.add(beach);
+    [[72,-55,.82],[72,-26,.76],[72,4,.80],[72,36,.78],[72,66,.84]].forEach(([x,z,s]) => addPalm(scene,x,z,s));
+  } else if (profile.environment === 'backwater') {
+    const canal = new THREE.Mesh(new THREE.PlaneGeometry(13, 150), waterMat);
+    canal.rotation.x = -Math.PI / 2;
+    canal.position.set(-83,.02,15);
+    scene.add(canal);
+    const bankA = new THREE.Mesh(new THREE.PlaneGeometry(2.4,150), soilMat);
+    bankA.rotation.x = -Math.PI / 2;
+    bankA.position.set(-75.2,.023,15);
+    scene.add(bankA);
+    [[-72,-52,.76],[-72,-20,.82],[-72,14,.78],[-72,46,.84],[-72,70,.75]].forEach(([x,z,s]) => addPalm(scene,x,z,s));
+  } else if (profile.environment === 'highland') {
+    for (const [x,z,r] of [[80,70,6.4],[-82,70,5.6],[82,-70,5.0]]) {
+      const hill = new THREE.Mesh(new THREE.ConeGeometry(r,r*.72,18), new THREE.MeshStandardMaterial({ color:0x4f7c49, roughness:1 }));
+      hill.position.set(x,r*.34,z);
+      scene.add(hill);
+    }
+    [[70,58,.72,.3],[-70,60,.76,1.4],[73,-58,.68,2.0],[-72,-55,.70,.8]].forEach(([x,z,s,y]) => addBananaPlant(scene,x,z,s,y));
+  } else if (profile.environment === 'plains') {
+    for (const [x,z] of [[76,64],[-76,64],[76,-66]]) {
+      const field = new THREE.Mesh(new THREE.PlaneGeometry(18,11), soilMat);
+      field.rotation.x = -Math.PI/2;
+      field.position.set(x,.018,z);
+      scene.add(field);
+      for(let row=-4; row<=4; row+=1.15){
+        const rice = new THREE.Mesh(new THREE.BoxGeometry(17,.26,.22),fieldMat);
+        rice.position.set(x,.15,z+row);
+        scene.add(rice);
+      }
+    }
+  } else {
+    const park = new THREE.Mesh(new THREE.CircleGeometry(9,32), new THREE.MeshStandardMaterial({ color:0x5f8f50, roughness:1 }));
+    park.rotation.x = -Math.PI/2;
+    park.position.set(-77,.02,65);
+    scene.add(park);
+    addBench(scene,-79,65);
+    addBench(scene,-75,65);
+    addPalm(scene,-82,61,.72);
+    addPalm(scene,-72,61,.72);
+  }
+
+  const neighbourhoodBoard = createWorldSignMesh({
+    title: profile.neighbourhood.toUpperCase(),
+    subtitle: `${district.toUpperCase()} · LOCAL AREA`,
+    background:'#3f5d72',
+  },4.8,.86);
+  neighbourhoodBoard.position.set(-55,2.5,-31);
+  scene.add(neighbourhoodBoard);
+  registerFarVisual(neighbourhoodBoard,-55,-31,76);
+
+  addPhotoHouse(scene,-62,-41,9.4,6.3);
+  addPhotoHouse(scene,-48,-42,9.0,6.1);
+  addCityTower(scene,-58,-23,8.8,7.2,11,0xb9ad94,profile.neighbourhood.toUpperCase());
+  addParkingLot(scene,-55,-29,14,5.2);
+  addParkedVehicle(scene,'bike',0x315f78,-59,-29,Math.PI/2);
+  addParkedVehicle(scene,'auto',0x2b773f,-54,-29,Math.PI/2);
+  addParkedVehicle(scene,'car',0x7b6d65,-49,-29,Math.PI/2);
+}
+
 function addGenericDistrictWorld(scene, district) {
   const config = DISTRICT_INSTANCE_CONFIG[district] || DISTRICT_INSTANCE_CONFIG.Kottayam;
   const profile = districtCityProfile(district);
@@ -6442,6 +6528,7 @@ function addGenericDistrictWorld(scene, district) {
   addBusStop(scene, 10, 8, Math.PI, 'CITY CENTRE');
   addBusStop(scene, 28, 18, -Math.PI / 2, 'MARKET');
   addBusStop(scene, -34, -6, Math.PI / 2, 'RAILWAY LINK');
+  addBusStop(scene, -55, -34, Math.PI, profile.neighbourhood.toUpperCase());
 
   addCityTower(scene, -36, 31, 10, 8, 14, 0xc7b999, 'DISTRICT RESIDENCY');
   addCityTower(scene, 36, 31, 11, 9, 17, 0xaeb6ba, 'COMMERCIAL PLAZA');
@@ -6473,9 +6560,12 @@ function addGenericDistrictWorld(scene, district) {
   addRoadVehicle(scene, { kind:'car', axis:'z', fixed:-2.6, min:-72, max:72, progress:-42, direction:1, speed:6.6, color:0x496f9f, flowPhase:1.1 });
   addRoadVehicle(scene, { kind:'auto', axis:'z', fixed:2.7, min:-72, max:72, progress:28, direction:-1, speed:5.4, color:0x2b773f, flowPhase:2.7 });
   addRoadVehicle(scene, { kind:'bike', axis:'x', fixed:-2.3, min:-70, max:70, progress:-30, direction:1, speed:7.2, color:0x8b3e35, flowPhase:4.2 });
-  addRoadVehicle(scene, { kind:'bus', axis:'x', fixed:2.4, min:-70, max:70, progress:42, direction:-1, speed:4.8, color:0xd9b32d, flowPhase:3.4, stops:[10,-34] });
+  addRoadVehicle(scene, { kind:'bus', axis:'x', fixed:2.4, min:-70, max:70, progress:42, direction:-1, speed:4.8, color:0xd9b32d, flowPhase:3.4, stops:[10,28] });
   addRoadVehicle(scene, { kind:'car', axis:'x', fixed:22, min:-52, max:54, progress:-20, direction:1, speed:5.8, color:0x687a86, flowPhase:5.1 });
+  addRoadVehicle(scene, { kind:'bus', axis:'x', fixed:-36, min:-64, max:12, progress:-54, direction:1, speed:4.4, color:0xc89e2f, flowPhase:6.2, stops:[-55,-24] });
+  addRoadVehicle(scene, { kind:'auto', axis:'x', fixed:-36, min:-64, max:12, progress:-18, direction:-1, speed:5.0, color:0x2b773f, flowPhase:7.4 });
 
+  addDistrictIdentityEnvironment(scene,district,profile);
   addDistrictSignatureLandmark(scene,district,profile,50,45);
   if (config.airport) addDistrictAirport(scene, district, config.airport.x, config.airport.z);
 }
