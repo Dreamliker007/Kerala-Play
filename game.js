@@ -951,6 +951,8 @@ function updateDriveHud() {
   if (driveTools) driveTools.hidden = !driving;
   if (roadStatus) roadStatus.hidden = !driving;
   if (accelerateButton) accelerateButton.hidden = !driving;
+  if (jumpButton) jumpButton.hidden = driving;
+  if (cameraSwitchButton) cameraSwitchButton.hidden = !driving;
   if (runButton) runButton.classList.toggle('driving', driving);
   if (!driving || !playerRef) return;
   const zone = roadZoneAt(playerRef.position.x, playerRef.position.z);
