@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.0.6",
+  "versionCode": 8,
+  "versionName": "1.0.7",
   "track": "closed-testing",
-  "notes": "V107.0 develops all district worlds with richer city layouts, local bus routes, district landmarks, shops, services, traffic, NPCs and local rides"
+  "notes": "V108.0 adds district identity terrain, named neighbourhoods, four-stop city bus loops and neighbourhood transport across Kerala worlds"
 }
