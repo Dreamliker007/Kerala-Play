@@ -1419,3 +1419,28 @@ test('admin warn and mute actions are protected, persisted, and audited', async 
   assert.equal(audit.data.entries[1].action, 'player_warn');
   assert.equal(audit.data.entries[0].targetId, playerUser.id);
 });
+
+
+test('emergency help requires proximity and cannot farm recognition during cooldown', async t => {
+  let clock = Date.now();
+  const app = await setup(t, { now: () => clock });
+  const player = app.client();
+  await signup(player, 'ResponderAlice');
+
+  assert.equal((await player('/api/world/emergency-help', { service: 'police' })).status, 409);
+
+  const move = await player('/api/world/move', { x: -31, z: 14, rotation: 0, moving: false, mode: 'walk' });
+  assert.equal(move.status, 200);
+
+  const first = await player('/api/world/emergency-help', { service: 'police' });
+  assert.equal(first.status, 200);
+  assert.equal(first.data.emergencyResponses, 1);
+
+  const repeated = await player('/api/world/emergency-help', { service: 'police' });
+  assert.equal(repeated.status, 409);
+
+  clock += 60_001;
+  const second = await player('/api/world/emergency-help', { service: 'police' });
+  assert.equal(second.status, 200);
+  assert.equal(second.data.emergencyResponses, 2);
+});
