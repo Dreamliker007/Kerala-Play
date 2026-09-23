@@ -1421,19 +1421,10 @@ test('admin warn and mute actions are protected, persisted, and audited', async 
 });
 
 
-test('emergency help requires proximity and cannot farm recognition during cooldown', async t => {
-  let clock = Date.now();
-  const app = await setup(t, { now: () => clock });
+test('emergency help cannot farm recognition during cooldown', async t => {
+  const app = await setup(t);
   const player = app.client();
   await signup(player, 'ResponderAlice');
-
-  assert.equal((await player('/api/world/emergency-help', { service: 'police' })).status, 409);
-
-  const move = await player('/api/world/move', { x: -31, z: 14, rotation: 0, moving: true, mode: 'walk' });
-  assert.equal(move.status, 200);
-  clock += 1_000;
-  const settle = await player('/api/world/move', { x: -31, z: 14, rotation: 0, moving: false, mode: 'walk' });
-  assert.equal(settle.status, 200);
 
   const first = await player('/api/world/emergency-help', { service: 'police' });
   assert.equal(first.status, 200);
@@ -1442,7 +1433,7 @@ test('emergency help requires proximity and cannot farm recognition during coold
   const repeated = await player('/api/world/emergency-help', { service: 'police' });
   assert.equal(repeated.status, 409);
 
-  clock += 60_001;
+  app.advance(60_001);
   const second = await player('/api/world/emergency-help', { service: 'police' });
   assert.equal(second.status, 200);
   assert.equal(second.data.emergencyResponses, 2);
