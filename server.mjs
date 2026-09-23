@@ -13,6 +13,41 @@ const WORLD_LIMIT = 210;
 const DISTRICTS = {
   Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44],
 };
+const DISTRICT_WORLD_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
+const AIRPORT_DISTRICTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvananthapuram']);
+const GENERIC_WORLD_BOUNDS = Object.freeze({ minX:-78, maxX:78, minZ:-78, maxZ:78 });
+const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_ORDER.map((district, index) => {
+  const generic = {
+    district,
+    order:index,
+    bounds:GENERIC_WORLD_BOUNDS,
+    spawn:Object.freeze({ x:12, z:0, rotation:0 }),
+    train:Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-rail`, x:-42, z:-6, radius:7.2, arrivalX:-37, arrivalZ:-6 }),
+    airport:AIRPORT_DISTRICTS.has(district) ? Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-airport`, x:42, z:-28, radius:8.2, arrivalX:36, arrivalZ:-28 }) : null,
+  };
+  if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-78,maxX:78,minZ:-78,maxZ:78 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:7,z:-23,radius:7.2,arrivalX:11,arrivalZ:-23 }) })];
+  if (district === 'Ernakulam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-208,maxX:-96,minZ:82,maxZ:178 }), spawn:Object.freeze({ x:-184,z:110.5,rotation:0 }), train:Object.freeze({ id:'ernakulam-rail', x:-190,z:99.5,radius:6.6,arrivalX:-184,arrivalZ:110.5 }), airport:Object.freeze({ id:'ernakulam-airport', x:-112,z:166,radius:8.2,arrivalX:-118,arrivalZ:166 }) })];
+  return [district, Object.freeze(generic)];
+})));
+function currentWorldDistrict(user) {
+  const district = typeof user?.worldDistrict === 'string' && DISTRICT_WORLD_CONFIG[user.worldDistrict] ? user.worldDistrict : user?.district;
+  return DISTRICT_WORLD_CONFIG[district] ? district : 'Kottayam';
+}
+function districtWorldConfig(userOrDistrict) {
+  const district = typeof userOrDistrict === 'string' ? userOrDistrict : currentWorldDistrict(userOrDistrict);
+  return DISTRICT_WORLD_CONFIG[district] || DISTRICT_WORLD_CONFIG.Kottayam;
+}
+function insideDistrictWorld(config, x, z, margin = 0) {
+  return Number.isFinite(x) && Number.isFinite(z)
+    && x >= config.bounds.minX + margin && x <= config.bounds.maxX - margin
+    && z >= config.bounds.minZ + margin && z <= config.bounds.maxZ - margin;
+}
+function districtTravelFare(fromDistrict, toDistrict, mode = 'train') {
+  const from = DISTRICT_WORLD_CONFIG[fromDistrict]?.order ?? 0;
+  const to = DISTRICT_WORLD_CONFIG[toDistrict]?.order ?? 0;
+  const hops = Math.max(1, Math.abs(from - to));
+  return mode === 'flight' ? 140 + hops * 12 : 28 + hops * 5;
+}
 const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -160, 153], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
 const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250': 75, 'discover-3': 100, 'walk-500': 150, 'discover-5': 200, social: 35 };
 const STARTER_BALANCE = 500;
@@ -413,21 +448,22 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return 'none';
   }
   function spawnFor(user) {
-    const [landmarkX, z] = DISTRICTS[user.district];
-    return { x: landmarkX + 12, z };
+    const config = districtWorldConfig(user);
+    return { x: config.spawn.x, z: config.spawn.z, rotation: config.spawn.rotation || 0 };
   }
   function savedPosition(user) {
     const spawn = spawnFor(user);
+    const config = districtWorldConfig(user);
     const x = Number(user.worldX), z = Number(user.worldZ), rotation = Number(user.worldRotation);
-    const valid = Number.isFinite(x) && Number.isFinite(z) && Math.abs(x) <= 110.01 && Math.abs(z) <= 110.01;
-    return { x: valid ? x : spawn.x, z: valid ? z : spawn.z, rotation: Number.isFinite(rotation) ? rotation : 0, valid };
+    const valid = insideDistrictWorld(config, x, z, .01);
+    return { x: valid ? x : spawn.x, z: valid ? z : spawn.z, rotation: Number.isFinite(rotation) ? rotation : spawn.rotation || 0, valid };
   }
   function publicUser(user) {
     const position = presence.get(user.id), saved = savedPosition(user);
     let level = 1, remaining = user.points, next = 100;
     while (remaining >= next) { remaining -= next; level++; next = 100 + (level - 1) * 50; }
     const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username);
-    return { id: user.id, username: displayName, name: displayName, displayName, accountUsername: user.username, usernameChangedAt: Number(user.usernameChangedAt || 0), usernameChangeAvailableAt: Number(user.usernameChangedAt || 0) + 10 * 24 * 60 * 60 * 1000, district: user.district, gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
+    return { id: user.id, username: displayName, name: displayName, displayName, accountUsername: user.username, usernameChangedAt: Number(user.usernameChangedAt || 0), usernameChangeAvailableAt: Number(user.usernameChangedAt || 0) + 10 * 24 * 60 * 60 * 1000, district: user.district, worldDistrict: currentWorldDistrict(user), gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
   }
   function progressionStats(user) {
     const jobsCompleted = Object.values(user.jobState?.completed || {}).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
@@ -503,9 +539,15 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   }
   function profileChanged(user) { emit(user.id, 'profile', { user: publicUser(user) }); }
   function worldSnapshot(viewerId) {
-    return { players: [...presence.entries()].filter(([id]) => online(id) && !blocked(viewerId, id)).map(([id, state]) => {
+    const viewer = findUser(viewerId);
+    const viewerDistrict = viewer ? currentWorldDistrict(viewer) : 'Kottayam';
+    return { district: viewerDistrict, players: [...presence.entries()].filter(([id]) => {
+      if (!online(id) || blocked(viewerId, id)) return false;
+      const candidate = findUser(id);
+      return candidate && currentWorldDistrict(candidate) === viewerDistrict;
+    }).map(([id, state]) => {
       const user = findUser(id);
-      return { id, username: user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username), gender: user.gender, district: user.district, x: state.x, z: state.z, rotation: state.rotation, moving: state.moving, mode: state.mode || 'walk' };
+      return { id, username: user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username), gender: user.gender, district: user.district, worldDistrict: currentWorldDistrict(user), x: state.x, z: state.z, rotation: state.rotation, moving: state.moving, mode: state.mode || 'walk' };
     }) };
   }
   function place(user, { reset = false } = {}) {
@@ -519,7 +561,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       user.worldX = x; user.worldZ = z; user.worldRotation = rotation; user.worldUpdatedAt = now();
       dirty = true;
     }
-    const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now(), trafficSpeedStrikes: 0, trafficLastChallanAt: 0, trafficLicenceStrikes: 0, trafficLastLicenceChallanAt: 0 };
+    const state = { x, z, rotation, district: currentWorldDistrict(user), moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now(), trafficSpeedStrikes: 0, trafficLastChallanAt: 0, trafficLicenceStrikes: 0, trafficLastLicenceChallanAt: 0 };
     presence.set(user.id, state);
     const garage = jobStateFor(user).garage;
     const personal = garage.activeVehicleId ? garage.owned.find(vehicle => vehicle.id === garage.activeVehicleId) : null;
@@ -1784,7 +1826,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
         requireValue(/^[A-Za-z][A-Za-z '-]{1,39}$/.test(firstName), 400, 'Enter a valid first name.');
         const [spawnX, spawnZ] = DISTRICTS[district];
-        const user = { id: randomUUID(), firstName, displayName: firstName, username, usernameChangedAt: 0, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldX: spawnX + 12, worldZ: spawnZ, worldRotation: 0, worldUpdatedAt: now() };
+        const user = { id: randomUUID(), firstName, displayName: firstName, username, usernameChangedAt: 0, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldDistrict: district, worldX: districtWorldConfig(district).spawn.x, worldZ: districtWorldConfig(district).spawn.z, worldRotation: districtWorldConfig(district).spawn.rotation || 0, worldUpdatedAt: now() };
         db.users.push(user); walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash'); await persist(); await startSession(user, response, request); socialChanged();
         send(response, 201, { user: publicUser(user) }); return;
       }
@@ -1864,8 +1906,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
             walletBalance: 0,
             economyActions: [],
             jobState: freshJobState(),
-            worldX: spawnX + 12,
-            worldZ: spawnZ,
+            worldDistrict: 'Ernakulam',
+            worldX: districtWorldConfig('Ernakulam').spawn.x,
+            worldZ: districtWorldConfig('Ernakulam').spawn.z,
             worldRotation: 0,
             worldUpdatedAt: now(),
           };
@@ -2043,11 +2086,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           user.usernameChangedAt = now();
         }
         if (body.displayName !== undefined) { user.displayName = body.displayName.trim(); user.firstName = user.displayName; }
-        const relocate = body.district && body.district !== user.district;
         if (body.district !== undefined) user.district = body.district;
+        if (!user.worldDistrict || !DISTRICT_WORLD_CONFIG[user.worldDistrict]) user.worldDistrict = user.district;
         if (body.gender !== undefined) user.gender = body.gender;
         if (body.bio !== undefined) user.bio = body.bio.trim();
-        if (relocate) place(user, { reset: true });
         await persist(); profileChanged(user); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
       }
@@ -2447,6 +2489,84 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         }); return;
       }
 
+      if (path === '/api/travel/districts' && request.method === 'GET') {
+        const currentDistrict = currentWorldDistrict(user);
+        const current = districtWorldConfig(currentDistrict);
+        send(response, 200, {
+          currentDistrict,
+          districts: DISTRICT_WORLD_ORDER.map(district => {
+            const config = DISTRICT_WORLD_CONFIG[district];
+            return {
+              district,
+              order: config.order,
+              train: { available: true, id: config.train.id },
+              flight: { available: !!config.airport, id: config.airport?.id || null },
+              current: district === currentDistrict,
+            };
+          }),
+          hubs: {
+            train: { ...current.train, district: currentDistrict, label: `${currentDistrict} Railway Station` },
+            airport: current.airport ? { ...current.airport, district: currentDistrict, label: `${currentDistrict} Airport` } : null,
+          },
+        }); return;
+      }
+      if (path === '/api/travel/district/board' && request.method === 'POST') {
+        limited(`district-board:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const mode = body.mode === 'flight' ? 'flight' : 'train';
+        const fromDistrict = currentWorldDistrict(user);
+        const destinationDistrict = String(body.destinationDistrict || '');
+        requireValue(DISTRICT_WORLD_CONFIG[destinationDistrict], 404, 'Destination district not found.');
+        requireValue(destinationDistrict !== fromDistrict, 409, 'You are already in that district.');
+        const fromConfig = districtWorldConfig(fromDistrict);
+        const destinationConfig = districtWorldConfig(destinationDistrict);
+        const hub = mode === 'flight' ? fromConfig.airport : fromConfig.train;
+        const destinationHub = mode === 'flight' ? destinationConfig.airport : destinationConfig.train;
+        requireValue(hub && destinationHub, 409, mode === 'flight' ? 'Flights are only available between airport districts.' : 'Train travel is unavailable for this district.');
+        const stateForTravel = jobStateFor(user);
+        requireValue(!stateForTravel.active, 409, 'Finish your active job before inter-district travel.');
+        const personal = stateForTravel.garage.activeVehicleId ? stateForTravel.garage.owned.find(vehicle => vehicle.id === stateForTravel.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before travelling.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before travelling.');
+        requireValue(Math.hypot(live.x - hub.x, live.z - hub.z) <= hub.radius, 409, `Move closer to the ${mode === 'flight' ? 'airport' : 'railway station'}.`);
+        const fare = districtTravelFare(fromDistrict, destinationDistrict, mode);
+        const transaction = walletTransaction(user, -fare, mode === 'flight' ? 'flight_fare' : 'train_fare', `${fromDistrict} → ${destinationDistrict}`);
+        const timestamp = now();
+        user.worldDistrict = destinationDistrict;
+        live.district = destinationDistrict;
+        live.x = Number(destinationHub.arrivalX);
+        live.z = Number(destinationHub.arrivalZ);
+        live.rotation = 0;
+        live.moving = false;
+        live.mode = 'walk';
+        live.lastSeen = timestamp;
+        live.movedAt = timestamp;
+        live.movementCredit = 2;
+        user.worldX = live.x;
+        user.worldZ = live.z;
+        user.worldRotation = 0;
+        user.worldUpdatedAt = timestamp;
+        dirty = true;
+        worldDirty = true;
+        profileChanged(user);
+        await persist();
+        send(response, 200, {
+          wallet: walletSummary(user),
+          user: publicUser(user),
+          transaction,
+          travel: {
+            mode,
+            fare,
+            from: { district: fromDistrict, hubId: hub.id },
+            to: { district: destinationDistrict, hubId: destinationHub.id },
+            x: live.x,
+            z: live.z,
+            rotation: live.rotation,
+            district: destinationDistrict,
+          },
+        }); return;
+      }
       if (path === '/api/travel/train/route' && request.method === 'GET') {
         send(response, 200, {
           id: DISTRICT_RAIL_ROUTE.id,
@@ -3618,7 +3738,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/world/move' && request.method === 'POST') {
         limited(`move:${user.id}`, 20, 1000);
         const body = await jsonBody(request);
-        requireValue(Number.isFinite(body.x) && Number.isFinite(body.z) && Math.abs(body.x) <= WORLD_LIMIT + .01 && Math.abs(body.z) <= WORLD_LIMIT + .01 && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, 'Invalid avatar position.');
+        const movementWorld = districtWorldConfig(user);
+        requireValue(insideDistrictWorld(movementWorld, Number(body.x), Number(body.z), -.01) && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, `You reached the edge of ${currentWorldDistrict(user)}. Use train or flight to travel to another district.`);
         const requestedMode = body.mode === undefined ? 'walk' : body.mode;
         requireValue(Object.hasOwn(MOVEMENT_PROFILES, requestedMode), 400, 'Invalid movement mode.');
         const stateForMove = jobStateFor(user);
@@ -3629,6 +3750,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const expectedMode = active?.vehicleEntered && activeJob?.vehicle ? activeJob.vehicle : (personal?.entered && personalModel ? personalModel.kind : 'walk');
         requireValue(requestedMode === expectedMode, 409, 'Movement mode is out of sync. Re-enter the active vehicle if needed.');
         const state = presence.get(user.id) || place(user);
+        requireValue((state.district || currentWorldDistrict(user)) === currentWorldDistrict(user), 409, 'District world changed. Reload the current district.');
         const movement = MOVEMENT_PROFILES[requestedMode];
         const needsBeforeMove = needsSummary(user);
         const needsFactor = requestedMode === 'walk' ? Number(needsBeforeMove.movementFactor || 1) : 1;
