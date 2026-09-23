@@ -5745,6 +5745,57 @@ function buildWorld(scene) {
     behavior: 'crossing', fromX: -10.4, toX: 10.4, role: 'Pedestrian', nightHide: true,
   });
 
+  // Town service workers and commuters follow lightweight daily routines so
+  // the new service district changes character across the day.
+  addPhotoVillager(scene, 26.0, 27.0, 0, .24, .9, .70, {
+    behavior: 'task', facing: Math.PI, role: 'Clinic Staff',
+    shelterX: 26.0, shelterZ: 27.0,
+    dailySchedule: [
+      { start: 0, hidden: true, x: 20.0, z: 34.0, role: 'Local' },
+      { start: 6.6, x: 20.0, z: 34.0, behavior: 'idle', role: 'Commuter' },
+      { start: 7.2, x: 26.0, z: 27.0, behavior: 'task', role: 'Clinic Staff', facing: Math.PI, transitionHours: .55 },
+      { start: 13.0, x: 23.8, z: 24.8, behavior: 'social', role: 'Lunch Break', targetX: 25.0, targetZ: 24.6, transitionHours: .25 },
+      { start: 13.6, x: 26.0, z: 27.0, behavior: 'task', role: 'Clinic Staff', facing: Math.PI, transitionHours: .2 },
+      { start: 19.2, x: 13.2, z: 19.6, behavior: 'idle', role: 'Waiting', facing: Math.PI, transitionHours: .7 },
+      { start: 20.1, hidden: true, x: 20.0, z: 34.0, role: 'Local' },
+    ],
+  });
+  addPhotoVillager(scene, -29.0, 13.0, 0, .25, 2.2, .72, {
+    behavior: 'patrol', role: 'Police Patrol',
+    shelterX: -29.0, shelterZ: 13.0,
+    dailySchedule: [
+      { start: 0, x: -29.0, z: 13.0, behavior: 'idle', role: 'Night Duty', facing: Math.PI },
+      { start: 6.0, x: -29.0, z: 13.0, behavior: 'patrol', role: 'Police Patrol' },
+      { start: 12.5, x: -25.5, z: 17.0, behavior: 'social', role: 'Public Help', targetX: -24.4, targetZ: 17.2, transitionHours: .3 },
+      { start: 14.0, x: -29.0, z: 13.0, behavior: 'patrol', role: 'Police Patrol', transitionHours: .3 },
+      { start: 20.0, x: -29.0, z: 13.0, behavior: 'idle', role: 'Night Duty', facing: Math.PI, transitionHours: .35 },
+    ],
+  });
+  addPhotoVillager(scene, -46.0, 7.0, 0, .24, 4.1, .71, {
+    behavior: 'task', facing: Math.PI, role: 'Fire Crew',
+    shelterX: -46.0, shelterZ: 7.0,
+    dailySchedule: [
+      { start: 0, x: -46.0, z: 7.0, behavior: 'idle', role: 'Night Crew', facing: Math.PI },
+      { start: 7.0, x: -46.0, z: 7.0, behavior: 'task', role: 'Fire Crew', facing: Math.PI },
+      { start: 11.5, x: -42.0, z: 10.0, behavior: 'patrol', role: 'Equipment Check', transitionHours: .25 },
+      { start: 12.4, x: -46.0, z: 7.0, behavior: 'task', role: 'Fire Crew', facing: Math.PI, transitionHours: .25 },
+      { start: 19.0, x: -46.0, z: 7.0, behavior: 'idle', role: 'Night Crew', facing: Math.PI, transitionHours: .25 },
+    ],
+  });
+  addPhotoVillager(scene, 29.0, 15.0, 0, .23, 5.2, .69, {
+    behavior: 'task', facing: Math.PI, role: 'Market Vendor',
+    shelterX: 29.0, shelterZ: 15.0,
+    dailySchedule: [
+      { start: 0, hidden: true, x: 38.0, z: 8.0, role: 'Local' },
+      { start: 5.2, x: 38.0, z: 8.0, behavior: 'idle', role: 'Commuter' },
+      { start: 5.8, x: 29.0, z: 15.0, behavior: 'task', role: 'Market Vendor', facing: Math.PI, transitionHours: .55 },
+      { start: 11.0, x: 27.3, z: 17.0, behavior: 'social', role: 'Customer Help', targetX: 26.2, targetZ: 17.0, transitionHours: .2 },
+      { start: 11.5, x: 29.0, z: 15.0, behavior: 'task', role: 'Market Vendor', facing: Math.PI, transitionHours: .2 },
+      { start: 20.2, x: 38.0, z: 8.0, behavior: 'idle', role: 'Going Home', transitionHours: .65 },
+      { start: 21.0, hidden: true, x: 38.0, z: 8.0, role: 'Local' },
+    ],
+  });
+
   addPhotoVillager(scene, 10.1, 27.2, 0, .28, 2.4, .70, {
     behavior: 'idle', facing: Math.PI, role: 'Waiting',
     shelterX: 10.1, shelterZ: 26.95,
@@ -6535,11 +6586,11 @@ function updateTraffic(delta) {
       else if (distanceToCrossing >= 10.5 && distanceToCrossing < 15) targetSpeed = Math.min(targetSpeed, baseSpeed * .38);
     }
 
-    if (config.kind === 'bus' && config.axis === 'z') {
+    if (config.kind === 'bus') {
       if (Number(config.stopUntil || 0) > now) {
         targetSpeed = 0;
       } else {
-        const stops = [27.5, -50.5];
+        const stops = config.axis === 'z' ? [27.5, -50.5] : [13.0];
         for (const stopZ of stops) {
           if (Number(config.lastBusStop) === stopZ) continue;
           const stopDistance = (stopZ - Number(config.progress)) * Number(config.direction);
