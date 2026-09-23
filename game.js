@@ -5708,8 +5708,8 @@ function buildWorld(scene) {
   addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: -19.5, min: -69, max: 10, progress: -4, direction: -1, speed: 5.5, color: 0x31734a, flowPhase: 2.9 });
   // Town-route traffic makes the new Market Road feel connected without changing
   // the established state-road traffic controller.
-  addRoadVehicle(scene, { kind: 'bus', axis: 'x', fixed: 24.1, min: -15, max: 45, progress: -10, direction: 1, speed: 4.6, color: 0xd7aa2d, flowPhase: 1.7 });
-  addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: 19.9, min: -15, max: 45, progress: 34, direction: -1, speed: 5.1, color: 0x2d7650, flowPhase: 3.3 });
+  addRoadVehicle(scene, { kind: 'bus', axis: 'x', fixed: 24.1, min: -15, max: 20, progress: -10, direction: 1, speed: 4.6, color: 0xd7aa2d, flowPhase: 1.7 });
+  addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: 19.9, min: -15, max: 20, progress: 16, direction: -1, speed: 5.1, color: 0x2d7650, flowPhase: 3.3 });
   addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -40.7, min: -31, max: 19, progress: 12, direction: -1, speed: 5.4, color: 0x6f4a88, flowPhase: 2.2 });
 
   addPhotoHouse(scene, -24, -36, 10.2, 6.8);
