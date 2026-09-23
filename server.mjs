@@ -26,7 +26,7 @@ const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_OR
     airport:AIRPORT_DISTRICTS.has(district) ? Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-airport`, x:42, z:-28, radius:8.2, arrivalX:36, arrivalZ:-28 }) : null,
   };
   if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:7,z:-23,radius:7.2,arrivalX:11,arrivalZ:-23 }) })];
-  if (district === 'Ernakulam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-208,maxX:-96,minZ:82,maxZ:178 }), spawn:Object.freeze({ x:-184,z:110.5,rotation:0 }), train:Object.freeze({ id:'ernakulam-rail', x:-190,z:99.5,radius:6.6,arrivalX:-184,arrivalZ:110.5 }), airport:Object.freeze({ id:'ernakulam-airport', x:-112,z:166,radius:8.2,arrivalX:-118,arrivalZ:166 }) })];
+  if (district === 'Ernakulam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:-14,z:6,rotation:0 }), train:Object.freeze({ id:'ernakulam-rail', x:-40,z:-30.5,radius:6.6,arrivalX:-34,arrivalZ:-19.5 }), airport:Object.freeze({ id:'ernakulam-airport', x:38,z:36,radius:8.2,arrivalX:32,arrivalZ:36 }) })];
   return [district, Object.freeze(generic)];
 })));
 function currentWorldDistrict(user) {
@@ -48,7 +48,7 @@ function districtTravelFare(fromDistrict, toDistrict, mode = 'train') {
   const hops = Math.max(1, Math.abs(from - to));
   return mode === 'flight' ? 140 + hops * 12 : 28 + hops * 5;
 }
-const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -160, 153], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
+const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -10, 23], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
 function landmarkDistrictForId(id) {
   if (id === 'bekal') return 'Kasaragod';
   if (id === 'munnar') return 'Idukki';
@@ -86,12 +86,12 @@ const WORLD_SHOPS = Object.freeze({
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
   'ernakulam-market': Object.freeze({
-    id: 'ernakulam-market', label: 'Ernakulam City Market', x: -139, z: 123, radius: 5.5,
+    id: 'ernakulam-market', label: 'Ernakulam City Market', x: 11, z: -7, radius: 5.5,
     openHour: 5.5, closeHour: 22,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
   'broadway-cafe': Object.freeze({
-    id: 'broadway-cafe', label: 'Broadway Cafe', x: -162.5, z: 141, radius: 5.0,
+    id: 'broadway-cafe', label: 'Broadway Cafe', x: -12.5, z: 11, radius: 5.0,
     openHour: 5, closeHour: 23,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
@@ -129,7 +129,7 @@ const NEEDS_REST_ENERGY = 35;
 const NEEDS_REST_COOLDOWN_MS = 30_000;
 const CLINIC_DEFINITIONS = Object.freeze({
   'community-clinic': Object.freeze({ id: 'community-clinic', label: 'Community Clinic', x: 28, z: 28, radius: 6.2, fee: 45, energyRestore: 30, thirstRestore: 10 }),
-  'ernakulam-hospital': Object.freeze({ id: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -162, z: 105, radius: 7.0, fee: 55, energyRestore: 36, thirstRestore: 12 }),
+  'ernakulam-hospital': Object.freeze({ id: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -12, z: -25, radius: 7.0, fee: 55, energyRestore: 36, thirstRestore: 12 }),
 });
 const CLINIC_DEFINITION = CLINIC_DEFINITIONS['community-clinic'];
 const CLINIC_COOLDOWN_MS = 60_000;
@@ -177,16 +177,16 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
     boardingWindowMs: 9_000,
     stops: Object.freeze({
       'ernakulam-station-bus': Object.freeze({
-        id: 'ernakulam-station-bus', label: 'Ernakulam Railway Bus Stop', x: -179, z: 115.5, radius: 6.2,
-        phaseMs: 0, destinationId: 'ernakulam-mg-road', arrivalX: -130, arrivalZ: 138, arrivalRotation: Math.PI / 2,
+        id: 'ernakulam-station-bus', label: 'Ernakulam Railway Bus Stop', x: -29, z: -14.5, radius: 6.2,
+        phaseMs: 0, destinationId: 'ernakulam-mg-road', arrivalX: 20, arrivalZ: 8, arrivalRotation: Math.PI / 2,
       }),
       'ernakulam-mg-road': Object.freeze({
-        id: 'ernakulam-mg-road', label: 'MG Road Bus Stop', x: -132, z: 138, radius: 6.2,
-        phaseMs: 15_000, destinationId: 'ernakulam-marine', arrivalX: -151, arrivalZ: 156, arrivalRotation: 0,
+        id: 'ernakulam-mg-road', label: 'MG Road Bus Stop', x: 18, z: 8, radius: 6.2,
+        phaseMs: 15_000, destinationId: 'ernakulam-marine', arrivalX: -1, arrivalZ: 26, arrivalRotation: 0,
       }),
       'ernakulam-marine': Object.freeze({
-        id: 'ernakulam-marine', label: 'Marine Drive Bus Stop', x: -151, z: 158, radius: 6.2,
-        phaseMs: 30_000, destinationId: 'ernakulam-station-bus', arrivalX: -177, arrivalZ: 115.5, arrivalRotation: -Math.PI / 2,
+        id: 'ernakulam-marine', label: 'Marine Drive Bus Stop', x: -1, z: 28, radius: 6.2,
+        phaseMs: 30_000, destinationId: 'ernakulam-station-bus', arrivalX: -27, arrivalZ: -14.5, arrivalRotation: -Math.PI / 2,
       }),
     }),
   }),
@@ -196,14 +196,14 @@ const DISTRICT_RAIL_ROUTE = Object.freeze({
   label: 'Kottayam ↔ Ernakulam Passenger',
   fare: 35,
   stations: Object.freeze({
-    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -184, arrivalZ: 110.5 }),
-    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -190, z: 99.5, radius: 6.6, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
+    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -34, arrivalZ: -19.5 }),
+    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
   }),
 });
 const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   bekal: Object.freeze({ id:'bekal', label:'Bekal Fort', x:-7, z:60, arrivalX:-7, arrivalZ:56.5 }),
   munnar: Object.freeze({ id:'munnar', label:'Munnar Tea Hills', x:42, z:26, arrivalX:38.8, arrivalZ:26 }),
-  kochi: Object.freeze({ id:'kochi', label:'Mattancherry Palace', x:-160, z:153, arrivalX:-156, arrivalZ:153 }),
+  kochi: Object.freeze({ id:'kochi', label:'Mattancherry Palace', x:-10, z:23, arrivalX:-6, arrivalZ:23 }),
   alappuzha: Object.freeze({ id:'alappuzha', label:'Alappuzha Backwaters', x:-34, z:-13, arrivalX:-30.7, arrivalZ:-13 }),
   kuttanad: Object.freeze({ id:'kuttanad', label:'Kuttanad Fields', x:7, z:-23, arrivalX:10.2, arrivalZ:-23 }),
   temple: Object.freeze({ id:'temple', label:'Padmanabhaswamy Temple', x:13, z:-57, arrivalX:16.2, arrivalZ:-57 }),
@@ -217,10 +217,10 @@ const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   fuel: Object.freeze({ id:'fuel', label:'Kerala Fuel Station', x:11, z:-12, arrivalX:13.8, arrivalZ:-12 }),
   service: Object.freeze({ id:'service', label:'Village Service Garage', x:-36, z:-15, arrivalX:-32.8, arrivalZ:-15 }),
   'village-pond': Object.freeze({ id:'village-pond', label:'Village Pond', x:39, z:-4, arrivalX:35.5, arrivalZ:-4 }),
-  'ernakulam-centre': Object.freeze({ id:'ernakulam-centre', label:'Ernakulam City Centre', x:-145, z:132, arrivalX:-141, arrivalZ:132 }),
-  'ernakulam-market': Object.freeze({ id:'ernakulam-market', label:'Ernakulam City Market', x:-139, z:123, arrivalX:-139, arrivalZ:127 }),
-  'broadway-cafe': Object.freeze({ id:'broadway-cafe', label:'Broadway Cafe', x:-162.5, z:141, arrivalX:-162.5, arrivalZ:145 }),
-  'ernakulam-hospital': Object.freeze({ id:'ernakulam-hospital', label:'Ernakulam City Hospital', x:-162, z:105, arrivalX:-162, arrivalZ:109 }),
+  'ernakulam-centre': Object.freeze({ id:'ernakulam-centre', label:'Ernakulam City Centre', x:5, z:2, arrivalX:9, arrivalZ:2 }),
+  'ernakulam-market': Object.freeze({ id:'ernakulam-market', label:'Ernakulam City Market', x:11, z:-7, arrivalX:11, arrivalZ:-3 }),
+  'broadway-cafe': Object.freeze({ id:'broadway-cafe', label:'Broadway Cafe', x:-12.5, z:11, arrivalX:-12.5, arrivalZ:15 }),
+  'ernakulam-hospital': Object.freeze({ id:'ernakulam-hospital', label:'Ernakulam City Hospital', x:-12, z:-25, arrivalX:-12, arrivalZ:-21 }),
 });
 const PUBLIC_RIDE_SERVICES = Object.freeze({
   auto: Object.freeze({ id:'auto', label:'Auto-rickshaw', baseFare:18, perMeter:.48, maxDistance:72, pickupSeconds:2, speed:10 }),
@@ -256,16 +256,16 @@ const VEHICLE_STATIONS = Object.freeze({
   service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
 });
 const VEHICLE_STATION_OPTIONS = Object.freeze({
-  fuel: Object.freeze([VEHICLE_STATIONS.fuel, Object.freeze({ id: 'ernakulam-fuel', label: 'Ernakulam Fuel Station', x: -119, z: 105, radius: 7 })]),
-  service: Object.freeze([VEHICLE_STATIONS.service, Object.freeze({ id: 'ernakulam-service', label: 'Ernakulam Auto Garage', x: -182, z: 160, radius: 7 })]),
+  fuel: Object.freeze([VEHICLE_STATIONS.fuel, Object.freeze({ id: 'ernakulam-fuel', label: 'Ernakulam Fuel Station', x: 31, z: -25, radius: 7 })]),
+  service: Object.freeze([VEHICLE_STATIONS.service, Object.freeze({ id: 'ernakulam-service', label: 'Ernakulam Auto Garage', x: -32, z: 30, radius: 7 })]),
 });
 function nearestVehicleServiceStation(user, action, x, z) {
   const district = currentWorldDistrict(user);
   let options;
   if (district === 'Ernakulam') {
     options = action === 'fuel'
-      ? [{ id:'ernakulam-fuel', label:'Ernakulam Fuel Station', x:-119, z:105, radius:7 }]
-      : [{ id:'ernakulam-service', label:'Ernakulam Auto Garage', x:-182, z:160, radius:7 }];
+      ? [{ id:'ernakulam-fuel', label:'Ernakulam Fuel Station', x:31, z:-25, radius:7 }, VEHICLE_STATIONS.fuel]
+      : [{ id:'ernakulam-service', label:'Ernakulam Auto Garage', x:-32, z:30, radius:7 }, VEHICLE_STATIONS.service];
   } else if (district === 'Kottayam') {
     options = [VEHICLE_STATIONS[action]];
   } else {
@@ -294,8 +294,8 @@ const REPORT_HISTORY_LIMIT = 80;
 const WORLD_SERVICE_POINTS = Object.freeze({
   police: Object.freeze({ id: 'police', service: 'police', label: 'Kerala Police Station', x: -31, z: 14, radius: 6.2 }),
   fire: Object.freeze({ id: 'fire', service: 'fire', label: 'Fire & Rescue Station', x: -48, z: 8, radius: 6.2 }),
-  'ernakulam-police': Object.freeze({ id: 'ernakulam-police', service: 'police', label: 'Ernakulam City Police', x: -181, z: 141, radius: 6.8 }),
-  'ernakulam-fire': Object.freeze({ id: 'ernakulam-fire', service: 'fire', label: 'Ernakulam Fire & Rescue', x: -116, z: 141, radius: 6.8 }),
+  'ernakulam-police': Object.freeze({ id: 'ernakulam-police', service: 'police', label: 'Ernakulam City Police', x: -31, z: 11, radius: 6.8 }),
+  'ernakulam-fire': Object.freeze({ id: 'ernakulam-fire', service: 'fire', label: 'Ernakulam Fire & Rescue', x: 34, z: 11, radius: 6.8 }),
 });
 const WORLD_SERVICE_HELP_COOLDOWN_MS = 60_000;
 function genericDistrictWorld(user) {
@@ -325,12 +325,12 @@ function worldServicePointForUser(user, pointId) {
   return WORLD_SERVICE_POINTS[pointId] || null;
 }
 function homeDefinitionFor(user) {
-  if (currentWorldDistrict(user) === 'Ernakulam') return { ...HOME_DEFINITION, id:'ernakulam-rental', label:'Ernakulam Rental Home', x:-198, z:170 };
+  if (currentWorldDistrict(user) === 'Ernakulam') return { ...HOME_DEFINITION, id:'ernakulam-rental', label:'Ernakulam Rental Home', x:-48, z:40 };
   if (genericDistrictWorld(user)) return { ...HOME_DEFINITION, id:'district-rental', label:`${currentWorldDistrict(user)} Rental Home` };
   return HOME_DEFINITION;
 }
 function restPointFor(user) {
-  if (currentWorldDistrict(user) === 'Ernakulam') return { ...NEEDS_REST_POINT, id:'ernakulam-rest', label:'Ernakulam Rest Bench', x:-146, z:170 };
+  if (currentWorldDistrict(user) === 'Ernakulam') return { ...NEEDS_REST_POINT, id:'ernakulam-rest', label:'Ernakulam Rest Bench', x:4, z:40 };
   if (genericDistrictWorld(user)) return { ...NEEDS_REST_POINT, id:'district-rest', label:`${currentWorldDistrict(user)} Rest Bench` };
   return NEEDS_REST_POINT;
 }
@@ -1154,7 +1154,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
     return {
       status: home.status,
-      home: homeDefinition,
+      home: HOME_DEFINITION,
+      localHome: homeDefinition,
       rentDueAt,
       utilityDueAt,
       rentOverdue,
@@ -1209,7 +1210,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       energy: Math.round(Number(needs.energy) * 10) / 10,
       movementFactor: factor,
       canRun: factor >= .78 && Number(needs.energy) > 12 && Number(needs.hunger) > 5 && Number(needs.thirst) > 5,
-      restPoint: restPointFor(user),
+      restPoint: NEEDS_REST_POINT,
+      localRestPoint: restPointFor(user),
       restEnergy: NEEDS_REST_ENERGY,
       restReadyAt: Number(needs.lastRestAt || 0) + NEEDS_REST_COOLDOWN_MS,
       updatedAt: Number(needs.updatedAt || now()),
@@ -2786,7 +2788,9 @@ function publicRideDestinationDistrict(destinationId) {
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before sleeping.');
         requireValue(!live.moving, 409, 'Stop moving before sleeping.');
         const homeDefinition = homeDefinitionFor(user);
-        requireValue(Math.hypot(live.x - homeDefinition.x, live.z - homeDefinition.z) <= homeDefinition.radius, 409, `Move closer to your ${homeDefinition.label}.`);
+        const nearLocalHome = Math.hypot(live.x - homeDefinition.x, live.z - homeDefinition.z) <= homeDefinition.radius;
+        const nearLegacyHome = Math.hypot(live.x - HOME_DEFINITION.x, live.z - HOME_DEFINITION.z) <= HOME_DEFINITION.radius;
+        requireValue(nearLocalHome || nearLegacyHome, 409, `Move closer to your ${homeDefinition.label}.`);
         const summary = homeSummary(user);
         requireValue(!summary.accessBlocked, 409, 'Home sleep access is paused. Pay overdue rent or utilities first.');
         const needsBefore = needsSummary(user);
@@ -2868,7 +2872,9 @@ function publicRideDestinationDistrict(destinationId) {
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before resting.');
         const restPoint = restPointFor(user);
-        requireValue(Math.hypot(live.x - restPoint.x, live.z - restPoint.z) <= restPoint.radius, 409, `Move closer to the ${restPoint.label}.`);
+        const nearLocalRest = Math.hypot(live.x - restPoint.x, live.z - restPoint.z) <= restPoint.radius;
+        const nearLegacyRest = Math.hypot(live.x - NEEDS_REST_POINT.x, live.z - NEEDS_REST_POINT.z) <= NEEDS_REST_POINT.radius;
+        requireValue(nearLocalRest || nearLegacyRest, 409, `Move closer to the ${restPoint.label}.`);
         const current = needsSummary(user);
         if (current.energy >= 99) {
           send(response, 200, { rested: false, message: 'Energy is already full.', needs: current }); return;
