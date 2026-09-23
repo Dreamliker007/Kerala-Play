@@ -122,6 +122,28 @@ test('a receiver must accept a follow before text, voice messages or live voice;
   assert.equal((await alice('/api/session')).data.user.following, 0);
 });
 
+test('Village Line serves Town Centre as an authoritative stop', async tt => {
+  const app = await setup(tt), client = app.client();
+  await signup(client, 'BusRoutePlayer');
+
+  const town = await client('/api/travel/bus/status?stopId=town-bus');
+  assert.equal(town.status, 200);
+  assert.equal(town.data.stop.id, 'town-bus');
+  assert.equal(town.data.destination.id, 'town-centre-bus');
+  assert.equal(town.data.destination.label, 'Town Centre Bus Stop');
+
+  const centre = await client('/api/travel/bus/status?stopId=town-centre-bus');
+  assert.equal(centre.status, 200);
+  assert.equal(centre.data.stop.id, 'town-centre-bus');
+  assert.equal(centre.data.destination.id, 'south-bus');
+
+  const south = await client('/api/travel/bus/status?stopId=south-bus');
+  assert.equal(south.status, 200);
+  assert.equal(south.data.destination.id, 'town-bus');
+  assert.equal(Number(town.data.fare), Number(centre.data.fare));
+  assert.equal(Number(centre.data.fare), Number(south.data.fare));
+});
+
 test('player reports validate reasons, prevent rapid duplicates and persist', async t => {
   const app = await setup(t), alice = app.client(), bob = app.client();
   const aliceUser = await signup(alice, 'ReportAlice'), bobUser = await signup(bob, 'ReportBob');
