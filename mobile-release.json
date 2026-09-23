@@ -1,6 +1,6 @@
 {
-  "versionCode": 6,
-  "versionName": "1.0.5",
+  "versionCode": 7,
+  "versionName": "1.0.6",
   "track": "closed-testing",
-  "notes": "V106.0 splits Kerala Play into 14 isolated district worlds with train/flight-only inter-district travel and local city systems"
+  "notes": "V107.0 develops all district worlds with richer city layouts, local bus routes, district landmarks, shops, services, traffic, NPCs and local rides"
 }
