@@ -112,6 +112,15 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
     }),
   }),
 });
+const DISTRICT_RAIL_ROUTE = Object.freeze({
+  id: 'kottayam-ernakulam-rail',
+  label: 'Kottayam ↔ Ernakulam Passenger',
+  fare: 35,
+  stations: Object.freeze({
+    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7, destinationId: 'ernakulam', arrivalX: -22, arrivalZ: 6 }),
+    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -26, z: 6, radius: 7, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
+  }),
+});
 const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   bekal: Object.freeze({ id:'bekal', label:'Bekal Fort', x:-7, z:60, arrivalX:-7, arrivalZ:56.5 }),
   munnar: Object.freeze({ id:'munnar', label:'Munnar Tea Hills', x:42, z:26, arrivalX:38.8, arrivalZ:26 }),
@@ -2382,6 +2391,45 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         }); return;
       }
 
+      if (path === '/api/travel/train/route' && request.method === 'GET') {
+        send(response, 200, {
+          id: DISTRICT_RAIL_ROUTE.id,
+          label: DISTRICT_RAIL_ROUTE.label,
+          fare: DISTRICT_RAIL_ROUTE.fare,
+          stations: Object.values(DISTRICT_RAIL_ROUTE.stations).map(station => ({
+            id: station.id, district: station.district, label: station.label, x: station.x, z: station.z,
+            destinationId: station.destinationId,
+          })),
+        }); return;
+      }
+      if (path === '/api/travel/train/board' && request.method === 'POST') {
+        limited(`train-board:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const station = DISTRICT_RAIL_ROUTE.stations[String(body.stationId || '')];
+        requireValue(station, 404, 'Railway station not found.');
+        const destination = DISTRICT_RAIL_ROUTE.stations[station.destinationId];
+        const stateForTravel = jobStateFor(user);
+        requireValue(!stateForTravel.active, 409, 'Finish your active job before boarding the train.');
+        const personal = stateForTravel.garage.activeVehicleId ? stateForTravel.garage.owned.find(vehicle => vehicle.id === stateForTravel.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before boarding.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before boarding.');
+        requireValue(Math.hypot(live.x - station.x, live.z - station.z) <= station.radius, 409, `Move closer to ${station.label}.`);
+        const transaction = walletTransaction(user, -DISTRICT_RAIL_ROUTE.fare, 'train_fare', `${station.label} → ${destination.label}`);
+        const timestamp = now();
+        live.x = station.arrivalX; live.z = station.arrivalZ; live.rotation = 0; live.moving = false; live.mode = 'walk';
+        live.lastSeen = timestamp; live.movedAt = timestamp; live.movementCredit = 2;
+        user.worldX = live.x; user.worldZ = live.z; user.worldRotation = 0; user.worldUpdatedAt = timestamp;
+        dirty = true; worldDirty = true; profileChanged(user);
+        await persist();
+        send(response, 200, {
+          wallet: walletSummary(user), user: publicUser(user), transaction,
+          travel: { routeId: DISTRICT_RAIL_ROUTE.id, routeLabel: DISTRICT_RAIL_ROUTE.label, fare: DISTRICT_RAIL_ROUTE.fare,
+            from: { id: station.id, district: station.district, label: station.label },
+            to: { id: destination.id, district: destination.district, label: destination.label },
+            x: live.x, z: live.z, rotation: live.rotation },
+        }); return;
+      }
       if (path === '/api/travel/bus/status' && request.method === 'GET') {
         const stopId = String(url.searchParams.get('stopId') || '');
         const status = publicTravelStatus(stopId);

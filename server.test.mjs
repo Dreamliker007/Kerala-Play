@@ -1450,3 +1450,16 @@ test('emergency help cannot farm recognition during cooldown', async t => {
   assert.equal(second.status, 200);
   assert.equal(second.data.emergencyResponses, 2);
 });
+
+
+test('district rail route exposes Kottayam and Ernakulam stations', async t => {
+  const app = await setup(t);
+  const player = app.client();
+  await signup(player, 'RailExplorer');
+  const route = await player('/api/travel/train/route');
+  assert.equal(route.status, 200);
+  assert.equal(route.data.id, 'kottayam-ernakulam-rail');
+  assert.equal(route.data.fare, 35);
+  assert.deepEqual(route.data.stations.map(station => station.district), ['Kottayam', 'Ernakulam']);
+  assert.equal((await player('/api/travel/train/board', { stationId: 'kottayam' })).status, 409);
+});
