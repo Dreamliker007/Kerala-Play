@@ -6,6 +6,7 @@ import { dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { recognitionSummary } from './recognition.mjs';
 import { categoryLeaderboard, leaderboardCategories } from './leaderboards.mjs';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js';
 
 const scrypt = promisify(scryptCallback);
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -63,36 +64,27 @@ const DISTRICT_CITY_PROFILES = Object.freeze({
   Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', neighbourhood:'Palayam', landmark:'Kanakakkunnu Grounds' }),
 });
 function districtCityProfile(district) {
-  return DISTRICT_CITY_PROFILES[district] || {
-    centre:`${district} City Centre`,
-    market:`${district} City Market`,
-    cafe:`${district} Cafe`,
-    secondary:`${district} Town Road`,
-    landmark:`${district} Landmark`,
-    neighbourhood:`${district} Neighbourhood`,
+  const base = DISTRICT_CITY_PROFILES[district] || {
+    centre:district + ' City Centre',
+    market:district + ' City Market',
+    cafe:district + ' Cafe',
+    secondary:district + ' Town Road',
+    neighbourhood:district + ' Neighbourhood',
+    landmark:district + ' Landmark',
+  };
+  const atlas = KERALA_DISTRICT_ATLAS[district];
+  return {
+    ...base,
+    centre:atlas?.city || base.centre,
+    market:atlas?.market || base.market,
+    cafe:atlas?.cafe || base.cafe,
+    secondary:atlas?.secondary || base.secondary,
+    neighbourhood:atlas?.neighbourhood || base.neighbourhood,
+    landmark:atlas?.attractions?.[0]?.name || base.landmark,
+    attractions:atlas?.attractions || [],
   };
 }
-function genericDistrictLandmark(userOrDistrict) {
-  const district = typeof userOrDistrict === 'string' ? userOrDistrict : currentWorldDistrict(userOrDistrict);
-  const profile = DISTRICT_CITY_PROFILES[district];
-  return profile ? {
-    id:`district-landmark:${district}`,
-    label:profile.landmark,
-    district,
-    x:50,
-    z:45,
-    radius:8,
-  } : null;
-}
-const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -10, 23], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
-function landmarkDistrictForId(id) {
-  if (id === 'bekal') return 'Kasaragod';
-  if (id === 'munnar') return 'Idukki';
-  if (id === 'kochi') return 'Ernakulam';
-  if (id === 'alappuzha') return 'Alappuzha';
-  if (id === 'temple') return 'Thiruvananthapuram';
-  return 'Kottayam';
-}
+
 const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250': 75, 'discover-3': 100, 'walk-500': 150, 'discover-5': 200, social: 35 };
 const STARTER_BALANCE = 500;
 const STARTER_JOB_REWARD = 250;
@@ -1658,6 +1650,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   }
 
 function publicRideDestinationDistrict(destinationId) {
+  for (const [district, atlas] of Object.entries(KERALA_DISTRICT_ATLAS)) {
+    if (atlas.attractions.some(spot => spot.landmarkId === destinationId)) return district;
+  }
   if (destinationId === 'bekal') return 'Kasaragod';
   if (destinationId === 'munnar') return 'Idukki';
   if (destinationId === 'kochi' || destinationId.startsWith('ernakulam-') || destinationId === 'broadway-cafe') return 'Ernakulam';
@@ -1692,8 +1687,24 @@ function genericRideDestination(user, destinationId) {
   if (config.airport) destinations['district-airport'] = { id:'district-airport', label:`${district} Airport`, x:config.airport.x, z:config.airport.z, arrivalX:config.airport.arrivalX, arrivalZ:config.airport.arrivalZ };
   return destinations[destinationId] || null;
 }
+function districtAtlasRideDestination(user, destinationId) {
+  const district = currentWorldDistrict(user);
+  const spot = KERALA_DISTRICT_ATLAS[district]?.attractions.find(attraction => attraction.landmarkId === destinationId);
+  if (!spot) return null;
+  return {
+    id:destinationId,
+    label:spot.name,
+    x:spot.x,
+    z:spot.z,
+    arrivalX:spot.x >= 0 ? spot.x - 3.5 : spot.x + 3.5,
+    arrivalZ:spot.z,
+  };
+}
 function publicRideDestinationForUser(user, destinationId) {
-  return genericRideDestination(user, destinationId) || PUBLIC_RIDE_DESTINATIONS[destinationId] || null;
+  return districtAtlasRideDestination(user, destinationId)
+    || genericRideDestination(user, destinationId)
+    || PUBLIC_RIDE_DESTINATIONS[destinationId]
+    || null;
 }
 
   function publicRideQuote(user, destinationId) {
@@ -4014,11 +4025,14 @@ function publicRideDestinationForUser(user, destinationId) {
           dirty = true;
         }
         let discovered = false;
-        for (const [id, x, z] of LANDMARKS) if (landmarkDistrictForId(id) === currentWorldDistrict(user) && Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
-        const districtLandmark = genericDistrictLandmark(user);
-        if (districtLandmark && Math.hypot(districtLandmark.x - state.x, districtLandmark.z - state.z) <= districtLandmark.radius && !user.visitedLandmarks.includes(districtLandmark.id)) {
-          user.visitedLandmarks.push(districtLandmark.id);
-          discovered = true;
+        const activeDistrict = currentWorldDistrict(user);
+        for (const attraction of KERALA_DISTRICT_ATLAS[activeDistrict]?.attractions || []) {
+          const radius = Number(attraction.visitRadius || 8);
+          if (Math.hypot(attraction.x - state.x, attraction.z - state.z) <= radius
+              && !user.visitedLandmarks.includes(attraction.landmarkId)) {
+            user.visitedLandmarks.push(attraction.landmarkId);
+            discovered = true;
+          }
         }
         const turn = Math.abs(Math.atan2(Math.sin(state.rotation - previousRotation), Math.cos(state.rotation - previousRotation)));
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;

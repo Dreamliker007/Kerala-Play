@@ -1,6 +1,7 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=108.0';
-import { createAtmosphere } from './environment.js?v=108.0';
+import { initSocial, api } from './social.js?v=109.0';
+import { createAtmosphere } from './environment.js?v=109.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=109.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -40,6 +41,9 @@ const mapRoute = document.querySelector('#map-route');
 const jobMapMarker = document.querySelector('#job-map-marker');
 const mapStatus = document.querySelector('#map-status');
 const nearbyPlaces = document.querySelector('#nearby-places');
+const districtGuide = document.querySelector('#district-guide');
+const districtGuideHeading = document.querySelector('#district-guide-heading');
+const districtGuideContent = document.querySelector('#district-guide-content');
 const minimap = document.querySelector('#minimap');
 const mapOpen = document.querySelector('#map-open');
 const mapClose = document.querySelector('#map-close');
@@ -133,18 +137,49 @@ const DISTRICT_CITY_PROFILES = Object.freeze({
   Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', neighbourhood:'Palayam', landmark:'Kanakakkunnu Grounds', landmarkKind:'park', environment:'urban-park' }),
 });
 function districtCityProfile(district = currentWorldDistrictName()) {
-  return DISTRICT_CITY_PROFILES[district] || Object.freeze({
-    centre:`${district} City Centre`,
-    market:`${district} City Market`,
-    cafe:`${district} Cafe`,
-    secondary:`${district} Town Road`,
-    landmark:`${district} Landmark`,
+  const base = DISTRICT_CITY_PROFILES[district] || {
+    centre:district + ' City Centre',
+    market:district + ' City Market',
+    cafe:district + ' Cafe',
+    secondary:district + ' Town Road',
+    landmark:district + ' Landmark',
     landmarkKind:'park',
     environment:'urban-park',
-    neighbourhood:`${district} Neighbourhood`,
-  });
+    neighbourhood:district + ' Neighbourhood',
+  };
+  const atlas = KERALA_DISTRICT_ATLAS[district];
+  const primary = atlas?.attractions?.[0];
+  return {
+    ...base,
+    centre:atlas?.city || base.centre,
+    market:atlas?.market || base.market,
+    cafe:atlas?.cafe || base.cafe,
+    secondary:atlas?.secondary || base.secondary,
+    neighbourhood:atlas?.neighbourhood || base.neighbourhood,
+    landmark:primary?.name || base.landmark,
+    landmarkKind:primary?.kind || base.landmarkKind,
+    environment:atlas?.environment || base.environment,
+    landscape:atlas?.landscape || 'Kerala town and countryside',
+    culture:atlas?.culture || null,
+    attractions:atlas?.attractions || [],
+  };
 }
 
+function districtAtlasPlaces(district = currentWorldDistrictName()) {
+  const atlas = KERALA_DISTRICT_ATLAS[district];
+  return (atlas?.attractions || []).map(spot => ({
+    id:spot.landmarkId,
+    name:spot.name,
+    icon:spot.icon,
+    x:spot.x,
+    z:spot.z,
+    kind:'landmark',
+    district,
+    description:spot.description,
+    attractionId:spot.id,
+    visitId:spot.landmarkId,
+  }));
+}
 function currentWorldDistrictName() {
   const district = profile?.worldDistrict || bootWorldDistrict || profile?.district || 'Kottayam';
   return DISTRICT_INSTANCE_CONFIG[district] ? district : 'Kottayam';
@@ -2977,20 +3012,33 @@ function showAssetNotice(message) {
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
 function lerp(a, b, t) { return a + (b - a) * t; }
 
+const DISTRICT_MAP_ANCHORS = Object.freeze({
+  Kasaragod:{ x:25.5, y:29 }, Kannur:{ x:38.5, y:59 }, Wayanad:{ x:59, y:77 }, Kozhikode:{ x:50, y:96 },
+  Malappuram:{ x:59, y:116 }, Palakkad:{ x:73, y:133 }, Thrissur:{ x:66, y:151 }, Ernakulam:{ x:69, y:180 },
+  Idukki:{ x:91, y:193 }, Kottayam:{ x:78, y:207 }, Alappuzha:{ x:70, y:219 }, Pathanamthitta:{ x:86, y:230 },
+  Kollam:{ x:85, y:249 }, Thiruvananthapuram:{ x:88, y:273 },
+});
 function worldToKeralaMap(worldX, worldZ) {
-  // Follow the real Kerala silhouette from north-west Kasaragod to the
-  // south-east Thiruvananthapuram while keeping the game world's local X/Z
-  // coordinates readable inside the district-accurate map.
   const bands = [[.02,18.8,2.16],[.12,30.98,6.77],[.28,52.4,11.04],[.44,67.99,16.2],[.60,79.11,17.28],[.76,84.12,16.51],[.90,88.03,7.95],[.98,92.87,2.26]];
-  const t = clamp((WORLD_LIMIT - worldZ) / (WORLD_LIMIT * 2), .02, .98);
-  let index = 0;
-  while (index < bands.length - 2 && t > bands[index + 1][0]) index++;
-  const [t0, center0, half0] = bands[index];
-  const [t1, center1, half1] = bands[index + 1];
-  const localT = clamp((t - t0) / (t1 - t0), 0, 1);
-  const center = lerp(center0, center1, localT);
-  const usableHalf = Math.max(1.4, lerp(half0, half1, localT) - 1.15);
-  return { x: center + clamp(worldX / WORLD_LIMIT, -1, 1) * usableHalf, y: 8 + t * 284 };
+  const anchor = DISTRICT_MAP_ANCHORS[currentWorldDistrictName()] || { x:60, y:150 };
+  const anchorT = clamp((anchor.y - 8) / 284, .02, .98);
+  const anchorZ = WORLD_LIMIT - anchorT * WORLD_LIMIT * 2;
+  const localT = clamp((WORLD_LIMIT - (anchorZ + worldZ * .11)) / (WORLD_LIMIT * 2), .02, .98);
+  const interpolate = t => {
+    let index = 0;
+    while (index < bands.length - 2 && t > bands[index + 1][0]) index++;
+    const [t0, center0, half0] = bands[index];
+    const [t1, center1, half1] = bands[index + 1];
+    const amount = clamp((t - t0) / (t1 - t0), 0, 1);
+    return { center:lerp(center0, center1, amount), half:Math.max(1.4, lerp(half0, half1, amount) - 1.15) };
+  };
+  const districtCenter = interpolate(anchorT);
+  const mapCenter = interpolate(localT);
+  const districtOffset = anchor.x - districtCenter.center;
+  return {
+    x:mapCenter.center + districtOffset + clamp(worldX * .75 / WORLD_LIMIT, -1, 1) * mapCenter.half,
+    y:8 + localT * 284,
+  };
 }
 
 function applyMapZoom(nextZoom = mapZoom) {
@@ -3033,39 +3081,43 @@ function destinationBusSuggestion(place, player = playerRef) {
 
 function currentNavigationPlaces() {
   const district = currentWorldDistrictName();
-  const existing = navigationPlaces.filter(place => place.district === district || (district === 'Kottayam' && place.district === 'Village'));
-  if (district === 'Kottayam') return existing;
+  const existing = navigationPlaces.filter(place =>
+    (place.district === district || (district === 'Kottayam' && place.district === 'Village'))
+    && place.kind !== 'landmark'
+  );
+  const attractions = districtAtlasPlaces(district);
+  if (district === 'Kottayam') return [...existing, ...attractions];
   if (district === 'Ernakulam') {
     return [
       ...existing,
       { id:'ernakulam-rental', name:'Ernakulam Rental Home', icon:'H', x:-48, z:40, kind:'home', district },
       { id:'ernakulam-rest', name:'Ernakulam Rest Bench', icon:'R', x:4, z:40, kind:'rest', district },
+      ...attractions,
     ];
   }
   const config = currentDistrictInstance();
   const city = districtCityProfile(district);
   return [
     { id:'district-centre', name:city.centre, icon:'C', x:0, z:0, kind:'town', district },
-    { id:'district-rail', name:`${district} Railway Station`, icon:'🚆', x:config.train.x, z:config.train.z, kind:'rail', district },
+    { id:'district-rail', name:district + ' Railway Station', icon:'🚆', x:config.train.x, z:config.train.z, kind:'rail', district },
     { id:'district-market', name:city.market, icon:'S', x:20, z:16, kind:'shop', district },
     { id:'district-cafe', name:city.cafe, icon:'C', x:-44, z:22, kind:'shop', district },
-    { id:'district-hospital', name:`${district} District Hospital`, icon:'+', x:-20, z:16, kind:'health', district },
-    { id:'district-police', name:`${district} District Police`, icon:'P', x:-20, z:-18, kind:'police', district },
-    { id:'district-fire', name:`${district} Fire & Rescue`, icon:'F', x:20, z:-18, kind:'emergency', district },
-    { id:'district-home', name:`${district} Rental Home`, icon:'H', x:-24, z:-36, kind:'home', district },
-    { id:'district-rest', name:`${district} Rest Park`, icon:'R', x:-10, z:-10, kind:'rest', district },
-    { id:'district-fuel', name:`${district} Fuel Station`, icon:'F', x:18, z:-48, kind:'service', district },
-    { id:'district-service', name:`${district} Service Garage`, icon:'G', x:-18, z:-48, kind:'service', district },
-    { id:'district-landmark', name:city.landmark, icon:'L', x:50, z:45, kind:'landmark', district },
+    { id:'district-hospital', name:district + ' District Hospital', icon:'+', x:-20, z:16, kind:'health', district },
+    { id:'district-police', name:district + ' District Police', icon:'P', x:-20, z:-18, kind:'police', district },
+    { id:'district-fire', name:district + ' Fire & Rescue', icon:'F', x:20, z:-18, kind:'emergency', district },
+    { id:'district-home', name:district + ' Rental Home', icon:'H', x:-24, z:-36, kind:'home', district },
+    { id:'district-rest', name:district + ' Rest Park', icon:'R', x:-10, z:-10, kind:'rest', district },
+    { id:'district-fuel', name:district + ' Fuel Station', icon:'F', x:18, z:-48, kind:'service', district },
+    { id:'district-service', name:district + ' Service Garage', icon:'G', x:-18, z:-48, kind:'service', district },
     { id:'district-neighbourhood', name:city.neighbourhood, icon:'N', x:-55, z:-34, kind:'town', district },
-    { id:'district-centre-bus', name:`${city.centre} Bus Stop`, icon:'🚌', x:10, z:8, kind:'bus', district },
-    { id:'district-market-bus', name:`${city.market} Bus Stop`, icon:'🚌', x:28, z:18, kind:'bus', district },
-    { id:'district-rail-bus', name:`${district} Railway Bus Stop`, icon:'🚌', x:-34, z:-6, kind:'bus', district },
-    { id:'district-neighbourhood-bus', name:`${city.neighbourhood} Bus Stop`, icon:'🚌', x:-55, z:-34, kind:'bus', district },
-    ...(config.airport ? [{ id:'district-airport', name:`${district} Airport`, icon:'✈', x:config.airport.x, z:config.airport.z, kind:'airport', district }] : []),
+    { id:'district-centre-bus', name:city.centre + ' Bus Stop', icon:'🚌', x:10, z:8, kind:'bus', district },
+    { id:'district-market-bus', name:city.market + ' Bus Stop', icon:'🚌', x:28, z:18, kind:'bus', district },
+    { id:'district-rail-bus', name:district + ' Railway Bus Stop', icon:'🚌', x:-34, z:-6, kind:'bus', district },
+    { id:'district-neighbourhood-bus', name:city.neighbourhood + ' Bus Stop', icon:'🚌', x:-55, z:-34, kind:'bus', district },
+    ...(config.airport ? [{ id:'district-airport', name:district + ' Airport', icon:'✈', x:config.airport.x, z:config.airport.z, kind:'airport', district }] : []),
+    ...attractions,
   ];
 }
-
 function renderNearbyPlaces() {
   if (!nearbyPlaces || !playerRef) return;
   nearbyPlaces.replaceChildren();
@@ -3078,6 +3130,7 @@ function renderNearbyPlaces() {
     button.type = 'button';
     button.className = `nearby-place${selectedDestination?.id === place.id ? ' selected' : ''}`;
     button.dataset.placeId = place.id;
+    button.title = place.description || place.name;
     const left = document.createElement('span');
     const title = document.createElement('b');
     title.textContent = place.name;
@@ -3092,6 +3145,68 @@ function renderNearbyPlaces() {
   }
 }
 
+function renderDistrictGuide() {
+  if (!districtGuideContent) return;
+  const district = currentWorldDistrictName();
+  const atlas = KERALA_DISTRICT_ATLAS[district];
+  if (!atlas) {
+    districtGuideContent.replaceChildren();
+    return;
+  }
+  if (districtGuideHeading) districtGuideHeading.textContent = district + ' · ' + atlas.landscape;
+  districtGuideContent.replaceChildren();
+
+  const identity = document.createElement('p');
+  identity.className = 'district-guide-identity';
+  identity.textContent = atlas.culture.identity;
+  districtGuideContent.append(identity);
+
+  const sections = [
+    ['Language', 'language'],
+    ['Arts & everyday culture', 'arts'],
+    ['Local food', 'food'],
+    ['Festivals', 'festivals'],
+    ['Crafts & livelihoods', 'crafts'],
+  ];
+  for (const [label, field] of sections) {
+    const section = document.createElement('section');
+    section.className = 'district-guide-section';
+    const heading = document.createElement('strong');
+    heading.textContent = label;
+    const copy = document.createElement('p');
+    copy.textContent = atlas.culture[field];
+    section.append(heading, copy);
+    districtGuideContent.append(section);
+  }
+
+  const spots = document.createElement('div');
+  spots.className = 'district-guide-spots';
+  const spotsHeading = document.createElement('strong');
+  spotsHeading.className = 'district-guide-spots-heading';
+  spotsHeading.textContent = 'Main places · select to set a route';
+  spots.append(spotsHeading);
+  const routes = document.createElement('div');
+  routes.className = 'district-guide-routes';
+  for (const attraction of atlas.attractions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'district-guide-route';
+    button.title = attraction.description;
+    const name = document.createElement('b');
+    name.textContent = attraction.name;
+    const description = document.createElement('small');
+    description.textContent = attraction.description;
+    button.append(name, description);
+    button.addEventListener('click', () => {
+      const place = currentNavigationPlaces().find(item => item.district === district && item.attractionId === attraction.id);
+      if (place) setWaypoint(place);
+    });
+    routes.append(button);
+  }
+  spots.append(routes);
+  districtGuideContent.append(spots);
+}
+
 function renderMapLandmarks() {
   const svgNamespace = 'http://www.w3.org/2000/svg';
   if (districtLabels) districtLabels.style.display = mapLabelsVisible ? 'block' : 'none';
@@ -3103,8 +3218,9 @@ function renderMapLandmarks() {
     if (place.kind !== 'landmark') classes.push('poi-marker', place.kind);
     if (selectedDestination?.id === place.id) classes.push('selected');
     marker.setAttribute('class', classes.join(' '));
-    marker.setAttribute('transform', `translate(${point.x} ${point.y})`);
-    marker.setAttribute('aria-label', `Set destination: ${place.name}`);
+    marker.setAttribute('transform', 'translate(' + point.x + ' ' + point.y + ')');
+    marker.setAttribute('aria-label', place.description ? place.name + ': ' + place.description : 'Set destination: ' + place.name);
+    marker.setAttribute('title', place.description || place.name);
     const pin = document.createElementNS(svgNamespace, 'circle');
     pin.setAttribute('class', 'pin'); pin.setAttribute('r', place.kind === 'landmark' ? '5.8' : '4.6');
     const label = document.createElementNS(svgNamespace, 'text');
@@ -3121,8 +3237,8 @@ function renderMapLandmarks() {
     mapLayer.append(marker);
   });
   renderNearbyPlaces();
+  renderDistrictGuide();
 }
-
 function setWaypoint(place) {
   if (!place || !Number.isFinite(Number(place.x)) || !Number.isFinite(Number(place.z))) return;
   selectedDestination = place;
@@ -3130,6 +3246,7 @@ function setWaypoint(place) {
   lifeLoopAction = 'map';
   missionCard.dataset.lifeAction = 'map';
   missionText.textContent = `Destination: ${place.name}`;
+  mapStatus.title = place.description || place.name;
   const distance = placeDistance(place);
   landmarkStatus.textContent = `${destinationDirection(place)} · ${Math.ceil(distance)} m${destinationBusSuggestion(place)}`;
   window.dispatchEvent(new CustomEvent('kerala-destination-selected', {
@@ -6328,49 +6445,208 @@ function addDistrictAirport(scene, district, x, z) {
   registerFarVisual(board, x, z, 72);
 }
 
-function addDistrictSignatureLandmark(scene, district, profile, x = 50, z = 45) {
-  if (profile.landmarkKind === 'fort') {
-    addFortLandmark(scene, x, z);
-  } else if (profile.landmarkKind === 'hills') {
-    addTeaHills(scene, x, z);
-  } else if (profile.landmarkKind === 'water') {
-    addBackwaterHouseboat(scene, x, z);
-  } else if (profile.landmarkKind === 'dam') {
-    addBoxCollider(x, z, 4.8, 1.1, 'district-dam');
-    const group = new THREE.Group();
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(12, 8), new THREE.MeshStandardMaterial({ color:0x3b879d, roughness:.32, metalness:.05 }));
-    water.rotation.x = -Math.PI / 2;
-    water.position.set(0,.025,2.8);
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(10,4.6,1.3), new THREE.MeshStandardMaterial({ color:0xa9a79e, roughness:.94 }));
-    wall.position.set(0,2.3,0);
-    const crest = new THREE.Mesh(new THREE.BoxGeometry(10.8,.22,1.8), new THREE.MeshStandardMaterial({ color:0xd1cec2, roughness:.9 }));
-    crest.position.set(0,4.7,0);
-    group.add(water,wall,crest);
-    group.position.set(x,0,z);
-    scene.add(group);
-    landmarkBeacon(scene,x,z-2.8,0x76b6d6);
-  } else {
-    const park = new THREE.Group();
-    const lawn = new THREE.Mesh(new THREE.CircleGeometry(7.5,32), new THREE.MeshStandardMaterial({ color:0x5f8a4d, roughness:1 }));
-    lawn.rotation.x = -Math.PI/2;
-    lawn.position.y=.018;
-    park.add(lawn);
-    park.position.set(x,0,z);
-    scene.add(park);
-    addBench(scene,x-2.6,z);
-    addBench(scene,x+2.6,z);
-    addPalm(scene,x-5,z-3,.72);
-    addPalm(scene,x+5,z-3,.72);
-    landmarkBeacon(scene,x,z-3,0x7fc66e);
+function addDistrictAtlasAttractions(scene, district) {
+  const atlas = KERALA_DISTRICT_ATLAS[district];
+  if (!atlas) return;
+  for (const spot of atlas.attractions) {
+    const x = spot.x, z = spot.z;
+    switch (spot.kind) {
+      case 'fort': addFortLandmark(scene, x, z); break;
+      case 'temple': addTempleLandmark(scene, x, z); break;
+      case 'backwater':
+      case 'lake': addBackwaterHouseboat(scene, x, z); break;
+      case 'waterfront': addChineseFishingNetsLandmark(scene, x, z); break;
+      case 'beach':
+      case 'coast': addBeachLandmark(scene, x, z); break;
+      case 'museum':
+      case 'palace':
+      case 'heritage': addPalaceLandmark(scene, x, z); break;
+      case 'hill':
+      case 'peak':
+      case 'tea': addTeaHills(scene, x, z); break;
+      case 'cave': addCaveLandmark(scene, x, z); break;
+      case 'sanctuary':
+      case 'forest': addSanctuaryLandmark(scene, x, z); break;
+      case 'garden':
+      case 'park': addGardenLandmark(scene, x, z); break;
+      case 'waterfall': addWaterfallLandmark(scene, x, z); break;
+      case 'dam': addDamLandmark(scene, x, z); break;
+      case 'shipyard': addShipyardLandmark(scene, x, z); break;
+      case 'market': addMarketLandmark(scene, x, z); break;
+      case 'ricefield': addPaddyFields(scene, x, z); break;
+      case 'lighthouse': addLighthouseLandmark(scene, x, z); break;
+      default: addGardenLandmark(scene, x, z);
+    }
+    const label = createWorldSignMesh({
+      title: spot.name.toUpperCase(),
+      subtitle: district.toUpperCase() + ' · ' + spot.kind.toUpperCase(),
+      background: '#315f78',
+    }, 6.3, 1.04);
+    label.position.set(x, 3.35, z - 5.5);
+    scene.add(label);
+    registerFarVisual(label, x, z - 5.5, 92);
   }
-  const label = createWorldSignMesh({
-    title: profile.landmark.toUpperCase(),
-    subtitle: `${district.toUpperCase()} · LANDMARK`,
-    background: '#315f78',
-  }, 5.0, .92);
-  label.position.set(x,3.4,z-5.4);
-  scene.add(label);
-  registerFarVisual(label,x,z-5.4,90);
+}
+
+function addBeachLandmark(scene, x, z) {
+  addCircleCollider(x, z, 2.2, 'beach');
+  const group = new THREE.Group();
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(14, 9), new THREE.MeshStandardMaterial({ color:0xd4c18d, roughness:1 }));
+  sand.rotation.x = -Math.PI / 2;
+  sand.position.y = .02;
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshStandardMaterial({ color:0x2d8ea4, roughness:.28, metalness:.08 }));
+  water.rotation.x = -Math.PI / 2;
+  water.position.set(5, .03, 0);
+  const foam = new THREE.Mesh(new THREE.PlaneGeometry(.4, 7.5), new THREE.MeshStandardMaterial({ color:0xe4e0c5, roughness:.8 }));
+  foam.rotation.x = -Math.PI / 2;
+  foam.position.set(1, .04, 0);
+  group.add(sand, water, foam);
+  group.position.set(x, 0, z);
+  scene.add(group);
+  landmarkBeacon(scene, x, z - 3.8, 0x55d1dc);
+}
+
+function addCaveLandmark(scene, x, z) {
+  addCircleCollider(x, z, 2.3, 'cave');
+  const rock = new THREE.Mesh(new THREE.SphereGeometry(4.4, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color:0x766f61, roughness:1 }));
+  rock.position.set(x, 0, z);
+  const opening = new THREE.Mesh(new THREE.CircleGeometry(1.45, 24),
+    new THREE.MeshStandardMaterial({ color:0x171a17, roughness:1, side:THREE.DoubleSide }));
+  opening.position.set(x, 1.38, z + 3.55);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(4.7, 28),
+    new THREE.MeshStandardMaterial({ color:0x80765d, roughness:1 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(x, .018, z);
+  scene.add(rock, opening, floor);
+  landmarkBeacon(scene, x, z - 3.3, 0xe9bd56);
+}
+
+function addChineseFishingNetsLandmark(scene, x, z) {
+  addBackwaterHouseboat(scene, x, z + 4);
+  const wood = new THREE.MeshStandardMaterial({ color:0x674d32, roughness:.95 });
+  const rope = new THREE.LineBasicMaterial({ color:0xd7c6a0, transparent:true, opacity:.85 });
+  const frame = new THREE.Group();
+  const posts = [[-3.4,0], [3.4,0], [-2.5,5], [2.5,5]];
+  for (const [px,pz] of posts) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(.075,.11,6.1,7), wood);
+    post.position.set(px,3.05,pz);
+    frame.add(post);
+  }
+  for (const side of [-1,1]) {
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,7.1,7), wood);
+    bar.rotation.z = Math.PI/2;
+    bar.position.set(0,5.8,side * .7);
+    frame.add(bar);
+  }
+  const cablePoints = [new THREE.Vector3(-3.4,5.7,0), new THREE.Vector3(0,2.9,1), new THREE.Vector3(3.4,5.7,0)];
+  const cable = new THREE.Line(new THREE.BufferGeometry().setFromPoints(cablePoints), rope);
+  frame.add(cable);
+  frame.position.set(x,0,z - 4);
+  scene.add(frame);
+  landmarkBeacon(scene,x,z - 6.4,0x49bed0);
+}
+
+function addSanctuaryLandmark(scene, x, z) {
+  addCircleCollider(x, z, 2.4, 'sanctuary');
+  const clearing = new THREE.Mesh(new THREE.CircleGeometry(8.2, 30), new THREE.MeshStandardMaterial({ color:0x657c43, roughness:1 }));
+  clearing.rotation.x = -Math.PI/2;
+  clearing.position.set(x,.018,z);
+  scene.add(clearing);
+  [[-5,-4,.78],[5,-4,.85],[-5,4,.80],[5,4,.76],[0,7,.72]].forEach(([dx,dz,scale]) => addTree(scene,x+dx,z+dz,scale,true));
+  const pond = new THREE.Mesh(new THREE.CircleGeometry(2.2,22), new THREE.MeshStandardMaterial({ color:0x3d8f8e, roughness:.3 }));
+  pond.rotation.x=-Math.PI/2;
+  pond.position.set(x+1,.028,z+1.4);
+  scene.add(pond);
+  landmarkBeacon(scene,x,z-5.6,0x73c76a);
+}
+
+function addGardenLandmark(scene, x, z) {
+  addCircleCollider(x, z, 2.3, 'garden');
+  const lawn = new THREE.Mesh(new THREE.CircleGeometry(8.4,32), new THREE.MeshStandardMaterial({ color:0x638b4c, roughness:1 }));
+  lawn.rotation.x=-Math.PI/2;
+  lawn.position.set(x,.018,z);
+  const path = new THREE.Mesh(new THREE.RingGeometry(4.4,5.0,32), new THREE.MeshStandardMaterial({ color:0xd1c5a8, roughness:1 }));
+  path.rotation.x=-Math.PI/2;
+  path.position.set(x,.03,z);
+  scene.add(lawn,path);
+  addBench(scene,x-2.8,z);
+  addBench(scene,x+2.8,z);
+  landmarkBeacon(scene,x,z-3.4,0x75c76b);
+}
+
+function addWaterfallLandmark(scene, x, z) {
+  addBoxCollider(x,z,3.6,.75,'waterfall-rock');
+  const cliff = new THREE.Mesh(new THREE.BoxGeometry(9,5.8,1.1), new THREE.MeshStandardMaterial({ color:0x615e50, roughness:1 }));
+  cliff.position.set(x,2.8,z);
+  const fall = new THREE.Mesh(new THREE.PlaneGeometry(3.8,4.4), new THREE.MeshStandardMaterial({ color:0x61bfd0, roughness:.24, transparent:true, opacity:.88, side:THREE.DoubleSide }));
+  fall.position.set(x,2.35,z+.6);
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(5.5,28), new THREE.MeshStandardMaterial({ color:0x328ba0, roughness:.32 }));
+  pool.rotation.x=-Math.PI/2;
+  pool.position.set(x,.03,z+3.2);
+  scene.add(cliff,fall,pool);
+  landmarkBeacon(scene,x,z-4.5,0x80d7e6);
+}
+
+function addDamLandmark(scene, x, z) {
+  addBoxCollider(x,z,4.5,.95,'dam');
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(13,8), new THREE.MeshStandardMaterial({ color:0x3b879d, roughness:.32, metalness:.05 }));
+  water.rotation.x=-Math.PI/2;
+  water.position.set(x,.025,z-3.1);
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(10,4.6,1.3), new THREE.MeshStandardMaterial({ color:0xa9a79e, roughness:.94 }));
+  wall.position.set(x,2.3,z);
+  const crest = new THREE.Mesh(new THREE.BoxGeometry(10.8,.22,1.8), new THREE.MeshStandardMaterial({ color:0xd1cec2, roughness:.9 }));
+  crest.position.set(x,4.7,z);
+  scene.add(water,wall,crest);
+  landmarkBeacon(scene,x,z-2.8,0x76b6d6);
+}
+
+function addShipyardLandmark(scene, x, z) {
+  addBoxCollider(x,z,3.6,1.6,'shipyard');
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(13,9), new THREE.MeshStandardMaterial({ color:0x9b8664, roughness:1 }));
+  ground.rotation.x=-Math.PI/2;
+  ground.position.set(x,.02,z);
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(7,.9,2.5), new THREE.MeshStandardMaterial({ color:0x694629, roughness:.9 }));
+  hull.position.set(x,.8,z+1.6);
+  const workshop = new THREE.Mesh(new THREE.BoxGeometry(5,3.2,4.4), new THREE.MeshStandardMaterial({ color:0xe0d2b2, roughness:.94 }));
+  workshop.position.set(x,1.6,z-3.1);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(4.2,1.8,4), new THREE.MeshStandardMaterial({ color:0x824b37, roughness:.94 }));
+  roof.rotation.y=Math.PI/4;
+  roof.position.set(x,4.1,z-3.1);
+  scene.add(ground,hull,workshop,roof);
+  landmarkBeacon(scene,x,z-4,0xd0a05d);
+}
+
+function addMarketLandmark(scene, x, z) {
+  addCircleCollider(x,z,2.2,'market');
+  const paving = new THREE.Mesh(new THREE.PlaneGeometry(13,9), new THREE.MeshStandardMaterial({ color:0xa99878, roughness:1 }));
+  paving.rotation.x=-Math.PI/2;
+  paving.position.set(x,.02,z);
+  scene.add(paving);
+  const colors=[0xb84c39,0x3d806b,0xe0b953];
+  colors.forEach((color,index)=>{
+    const stall=new THREE.Group();
+    const table=new THREE.Mesh(new THREE.BoxGeometry(3.1,1.25,1.4),new THREE.MeshStandardMaterial({ color:0x9a6e43, roughness:.92 }));
+    table.position.y=.72;
+    const awning=new THREE.Mesh(new THREE.BoxGeometry(3.4,.18,2.0),new THREE.MeshStandardMaterial({ color, roughness:.9 }));
+    awning.position.y=2.45;
+    stall.add(table,awning);
+    stall.position.set(x-4.1+index*4.1,0,z+1.8);
+    scene.add(stall);
+  });
+  landmarkBeacon(scene,x,z-3.3,0xe9c45f);
+}
+
+function addLighthouseLandmark(scene, x, z) {
+  addBoxCollider(x,z,1.2,1.2,'lighthouse');
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(.9,1.45,7.2,12), new THREE.MeshStandardMaterial({ color:0xe4d8bd, roughness:.88 }));
+  tower.position.set(x,3.6,z);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(1.12,1.12,.95,12), new THREE.MeshStandardMaterial({ color:0xb5483a, roughness:.9 }));
+  band.position.set(x,4.3,z);
+  const lantern = new THREE.Mesh(new THREE.BoxGeometry(1.65,1.15,1.65), new THREE.MeshStandardMaterial({ color:0x514943, emissive:0xf0c955, emissiveIntensity:.28, roughness:.4 }));
+  lantern.position.set(x,7.7,z);
+  scene.add(tower,band,lantern);
+  landmarkBeacon(scene,x,z-2.5,0xf3d36a);
 }
 
 function addDistrictIdentityEnvironment(scene, district, profile) {
@@ -6510,8 +6786,8 @@ function addGenericDistrictWorld(scene, district) {
   scene.add(districtBoard);
   registerFarVisual(districtBoard,9,8,86);
 
-  addShop(scene, 20, 16, profile.market.toUpperCase(), 'FOOD · GROCERIES · DAILY NEEDS');
-  addShop(scene, -44, 22, profile.cafe.toUpperCase(), 'TEA · MEALS · SNACKS');
+  addShop(scene, 20, 16, profile.market.toUpperCase(), profile.culture?.foodShort || 'FOOD · GROCERIES · DAILY NEEDS');
+  addShop(scene, -44, 22, profile.cafe.toUpperCase(), profile.culture?.foodShort || 'TEA · MEALS · SNACKS');
   addCivicBuilding(scene, -20, 16, { title:'DISTRICT HOSPITAL', subtitle:`${district.toUpperCase()} · HEALTH`, color:0x2d7d63, collider:'district-hospital' });
   addCivicBuilding(scene, -20, -18, { title:'KERALA POLICE', subtitle:`${district.toUpperCase()} DISTRICT`, color:0x315b84, collider:'district-police' });
   addCivicBuilding(scene, 20, -18, { title:'FIRE & RESCUE', subtitle:'EMERGENCY SERVICES', color:0xa84437, collider:'district-fire' });
@@ -6566,7 +6842,6 @@ function addGenericDistrictWorld(scene, district) {
   addRoadVehicle(scene, { kind:'auto', axis:'x', fixed:-36, min:-64, max:12, progress:-18, direction:-1, speed:5.0, color:0x2b773f, flowPhase:7.4 });
 
   addDistrictIdentityEnvironment(scene,district,profile);
-  addDistrictSignatureLandmark(scene,district,profile,50,45);
   if (config.airport) addDistrictAirport(scene, district, config.airport.x, config.airport.z);
 }
 
@@ -6934,10 +7209,8 @@ function buildWorld(scene) {
 }
 
 function buildLandmarkWorld(scene) {
-  const district = currentWorldDistrictName();
-  if (district === 'Ernakulam') addPalaceLandmark(scene, -10, 23);
+  addDistrictAtlasAttractions(scene, currentWorldDistrictName());
 }
-
 function landmarkBeacon(scene, x, z, color) {
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(.045, .06, 2.7, 8), new THREE.MeshStandardMaterial({ color: 0x38443f, roughness: .9 }));
   const marker = new THREE.Mesh(new THREE.SphereGeometry(.18, 10, 8), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .22, roughness: .6 }));

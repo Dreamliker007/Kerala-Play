@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "1.0.7",
+  "versionCode": 9,
+  "versionName": "1.0.8",
   "track": "closed-testing",
-  "notes": "V108.0 adds district identity terrain, named neighbourhoods, four-stop city bus loops and neighbourhood transport across Kerala worlds"
+  "notes": "V109.0 adds four visitable attractions and district culture guides across all 14 Kerala districts"
 }

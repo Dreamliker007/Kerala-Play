@@ -5,6 +5,7 @@ const files = [
   'manifest.webmanifest',
   'boot.js',
   'game.js',
+  'district-atlas.js',
   'environment.js',
   'social.js',
   'game.css',
