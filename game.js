@@ -1628,11 +1628,16 @@ function performWorldActivity(activityId) {
   }
 
   if (spot.kind === 'service') {
-    const message = spot.service === 'clinic'
-      ? 'Community Clinic · reception is open for local health services'
-      : spot.service === 'police'
-        ? 'Kerala Police Station · public help desk is available'
-        : 'Fire & Rescue Station · emergency response crew is on duty';
+    if (spot.service === 'clinic') {
+      api('/api/needs/clinic', { method: 'POST', body: '{}' }).then(result => {
+        if (result?.needs) applyNeedsState(result.needs, { warn: false });
+        showToast(`Clinic care complete · ₹${Number(result?.fee || 0)} · energy restored`, 3600);
+      }).catch(error => showToast(error.message || 'Clinic care unavailable', 3600));
+      return;
+    }
+    const message = spot.service === 'police'
+      ? 'Kerala Police Station · public help desk is available'
+      : 'Fire & Rescue Station · emergency response crew is on duty';
     showToast(message, 3600);
     return;
   }
