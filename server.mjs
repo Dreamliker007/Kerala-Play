@@ -177,6 +177,7 @@ const REPORT_REASONS = Object.freeze(['harassment', 'cheating', 'impersonation',
 const REPORT_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const REPORT_HISTORY_LIMIT = 80;
 const WORLD_SERVICE_POINTS = Object.freeze({ police: Object.freeze({ label: 'Kerala Police Station', x: -31, z: 14, radius: 6.2 }), fire: Object.freeze({ label: 'Fire & Rescue Station', x: -48, z: 8, radius: 6.2 }) });
+const WORLD_SERVICE_HELP_COOLDOWN_MS = 60_000;
 const GROUP_MEMBER_LIMIT = 12;
 const GROUP_MEMBERSHIP_LIMIT = 8;
 const GROUP_MESSAGE_LIMIT = 100;
@@ -2520,9 +2521,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before using the public help desk.');
         requireValue(Math.hypot(live.x - service.x, live.z - service.z) <= service.radius, 409, `Move closer to the ${service.label}.`);
+        if (!user.worldServiceHelp || typeof user.worldServiceHelp !== 'object' || Array.isArray(user.worldServiceHelp)) user.worldServiceHelp = {};
+        const timestamp = now();
+        requireValue(timestamp >= Number(user.worldServiceHelp[body.service] || 0) + WORLD_SERVICE_HELP_COOLDOWN_MS, 409, 'This help desk request is still cooling down.');
+        user.worldServiceHelp[body.service] = timestamp;
         user.emergencyResponses = Math.max(0, Number(user.emergencyResponses) || 0) + 1;
+        dirty = true;
         addNotification(user, {
-          sourceKey: `service-help:${body.service}:${Math.floor(now() / 60000)}`,
+          sourceKey: `service-help:${body.service}:${Math.floor(timestamp / WORLD_SERVICE_HELP_COOLDOWN_MS)}`,
           kind: 'emergency',
           title: `${service.label} · help requested`,
           message: body.service === 'police' ? 'The public help desk has logged your request.' : 'The emergency response desk has logged your request.',
