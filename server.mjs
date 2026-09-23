@@ -2520,6 +2520,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before using the public help desk.');
         requireValue(Math.hypot(live.x - service.x, live.z - service.z) <= service.radius, 409, `Move closer to the ${service.label}.`);
+        user.emergencyResponses = Math.max(0, Number(user.emergencyResponses) || 0) + 1;
         addNotification(user, {
           sourceKey: `service-help:${body.service}:${Math.floor(now() / 60000)}`,
           kind: 'emergency',
@@ -2528,8 +2529,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           severity: 'info',
           target: '',
         });
+        const progression = syncRecognitionNotifications(user);
         await persist();
-        send(response, 200, { accepted: true, service: body.service, label: service.label }); return;
+        send(response, 200, { accepted: true, service: body.service, label: service.label, emergencyResponses: user.emergencyResponses, progression }); return;
       }
       if (path === '/api/needs/clinic' && request.method === 'POST') {
         limited(`needs-clinic:${user.id}`, 20, 60000);
