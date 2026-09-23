@@ -67,6 +67,17 @@
     #minimap.open, #chat-panel.open, #people-panel.open, #task-panel.open, #phone-panel.open, #events-panel.open, #wallet-panel.open, #home-panel.open, #garage-panel.open, #jobs-panel.open, #progression-panel.open, #admin-panel.open, #dm-panel.open { display:block; z-index:7; }
     #world-shop-panel { display:none; position:absolute; z-index:9; right:20px; bottom:calc(env(safe-area-inset-bottom) + 118px); width:min(300px,calc(100vw - 40px)); max-height:min(62dvh,390px); overflow-y:auto; padding:12px; border:1px solid rgba(166,255,202,.42); border-radius:16px; background:rgba(7,28,31,.97); color:#fff; box-shadow:0 14px 38px rgba(0,0,0,.38); pointer-events:auto; touch-action:pan-y; }
     #world-shop-panel.open { display:block; }
+    #district-travel-panel { display:none; position:fixed; z-index:24; inset:0; place-items:center; padding:18px; background:rgba(3,12,18,.66); pointer-events:auto; }
+    #district-travel-panel.open { display:grid; }
+    .district-travel-card { width:min(420px,calc(100vw - 36px)); max-height:min(78dvh,560px); overflow:auto; padding:16px; border:1px solid rgba(152,220,255,.42); border-radius:18px; background:rgba(8,29,38,.98); color:#fff; box-shadow:0 18px 55px rgba(0,0,0,.48); }
+    .district-travel-card h3 { margin:4px 0 5px; font-size:18px; }
+    .district-travel-card p { margin:0 0 12px; color:#bdd4dc; font-size:11px; line-height:1.45; }
+    #district-travel-destinations { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    #district-travel-destinations button { min-height:52px; padding:8px; border:1px solid rgba(255,255,255,.18); border-radius:12px; color:#fff; background:rgba(31,78,91,.72); text-align:left; font:700 11px/1.3 system-ui,sans-serif; }
+    #district-travel-destinations button.selected { border-color:#f1d66f; background:rgba(39,112,83,.95); }
+    #district-travel-confirm { width:100%; margin-top:10px; min-height:46px; border:0; border-radius:12px; color:#08251d; background:#8fe4b8; font-weight:900; }
+    #district-travel-confirm:disabled { opacity:.45; }
+    #district-travel-error { min-height:18px; margin-top:8px; color:#ffb2a9; font-size:10px; }
     .world-shop-name { margin:2px 0 4px; color:#fff; font:900 15px/1.2 system-ui,sans-serif; }
     #world-shop-note { margin:0 0 9px; color:#bcd9cf; font:600 10px/1.4 system-ui,sans-serif; }
     #world-shop-items { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
@@ -1299,6 +1310,16 @@
       <p id="world-shop-note">Choose what you want to buy. You must stay near the shop.</p>
       <div id="world-shop-items"></div>
       <div id="world-shop-error" role="status"></div>
+    </section>
+    <section id="district-travel-panel" aria-label="Inter-district travel" aria-live="polite">
+      <div class="district-travel-card">
+        <div class="panel-heading"><span id="district-travel-heading">District Travel</span><button id="district-travel-close" class="panel-close" type="button" aria-label="Close district travel">×</button></div>
+        <h3 id="district-travel-title">Choose another district</h3>
+        <p id="district-travel-note">Districts are separate worlds. You can only move between them through a railway station or airport.</p>
+        <div id="district-travel-destinations"></div>
+        <button id="district-travel-confirm" type="button" disabled>SELECT A DISTRICT</button>
+        <div id="district-travel-error" role="status"></div>
+      </div>
     </section>
     <section id="wallet-panel" aria-label="Kerala Cash wallet">
       <div class="panel-heading"><span>Kerala Cash</span><button id="wallet-close" class="panel-close" type="button" aria-label="Close wallet">×</button></div>
