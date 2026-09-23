@@ -9,10 +9,11 @@ import { categoryLeaderboard, leaderboardCategories } from './leaderboards.mjs';
 
 const scrypt = promisify(scryptCallback);
 const ROOT = dirname(fileURLToPath(import.meta.url));
+const WORLD_LIMIT = 210;
 const DISTRICTS = {
   Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44],
 };
-const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
+const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -160, 153], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
 const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250': 75, 'discover-3': 100, 'walk-500': 150, 'discover-5': 200, social: 35 };
 const STARTER_BALANCE = 500;
 const STARTER_JOB_REWARD = 250;
@@ -41,10 +42,20 @@ const WORLD_SHOPS = Object.freeze({
     openHour: 6, closeHour: 21,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
+  'ernakulam-market': Object.freeze({
+    id: 'ernakulam-market', label: 'Ernakulam City Market', x: -132, z: 132, radius: 5.5,
+    openHour: 5.5, closeHour: 22,
+    items: Object.freeze(['water', 'tea', 'snack', 'meal']),
+  }),
+  'broadway-cafe': Object.freeze({
+    id: 'broadway-cafe', label: 'Broadway Cafe', x: -151, z: 149, radius: 5.0,
+    openHour: 5, closeHour: 23,
+    items: Object.freeze(['water', 'tea', 'snack', 'meal']),
+  }),
 });
 const WORLD_DAY_LENGTH_MS = 24 * 60 * 1000;
 const NPC_RELATIONSHIP_MAX = 100;
-const NPC_RELATIONSHIP_COUNT = 25;
+const NPC_RELATIONSHIP_COUNT = 40;
 const NPC_RELATIONSHIP_COOLDOWN_MS = 20_000;
 const NPC_FAVOR_COOLDOWN_MS = 2 * 60_000;
 const NPC_FAVOR_EXPIRY_MS = 10 * 60_000;
@@ -73,7 +84,11 @@ const NEEDS_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
 const NEEDS_REST_POINT = Object.freeze({ id: 'village-bench', label: 'Village Rest Bench', x: -10, z: -10, radius: 5.2 });
 const NEEDS_REST_ENERGY = 35;
 const NEEDS_REST_COOLDOWN_MS = 30_000;
-const CLINIC_DEFINITION = Object.freeze({ id: 'community-clinic', label: 'Community Clinic', x: 28, z: 28, radius: 6.2, fee: 45, energyRestore: 30, thirstRestore: 10 });
+const CLINIC_DEFINITIONS = Object.freeze({
+  'community-clinic': Object.freeze({ id: 'community-clinic', label: 'Community Clinic', x: 28, z: 28, radius: 6.2, fee: 45, energyRestore: 30, thirstRestore: 10 }),
+  'ernakulam-hospital': Object.freeze({ id: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -166, z: 116, radius: 7.0, fee: 55, energyRestore: 36, thirstRestore: 12 }),
+});
+const CLINIC_DEFINITION = CLINIC_DEFINITIONS['community-clinic'];
 const CLINIC_COOLDOWN_MS = 60_000;
 const HOME_DEFINITION = Object.freeze({
   id: 'village-rental',
@@ -111,20 +126,41 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
       }),
     }),
   }),
+  'ernakulam-city-line': Object.freeze({
+    id: 'ernakulam-city-line',
+    label: 'Ernakulam City Line',
+    fare: 15,
+    intervalMs: 45_000,
+    boardingWindowMs: 9_000,
+    stops: Object.freeze({
+      'ernakulam-station-bus': Object.freeze({
+        id: 'ernakulam-station-bus', label: 'Ernakulam Railway Bus Stop', x: -145, z: 132, radius: 6.2,
+        phaseMs: 0, destinationId: 'ernakulam-mg-road', arrivalX: -134, arrivalZ: 132, arrivalRotation: Math.PI / 2,
+      }),
+      'ernakulam-mg-road': Object.freeze({
+        id: 'ernakulam-mg-road', label: 'MG Road Bus Stop', x: -132, z: 132, radius: 6.2,
+        phaseMs: 15_000, destinationId: 'ernakulam-marine', arrivalX: -151, arrivalZ: 149, arrivalRotation: 0,
+      }),
+      'ernakulam-marine': Object.freeze({
+        id: 'ernakulam-marine', label: 'Marine Drive Bus Stop', x: -151, z: 149, radius: 6.2,
+        phaseMs: 30_000, destinationId: 'ernakulam-station-bus', arrivalX: -145, arrivalZ: 132, arrivalRotation: -Math.PI / 2,
+      }),
+    }),
+  }),
 });
 const DISTRICT_RAIL_ROUTE = Object.freeze({
   id: 'kottayam-ernakulam-rail',
   label: 'Kottayam ↔ Ernakulam Passenger',
   fare: 35,
   stations: Object.freeze({
-    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -57, arrivalZ: 60 }),
-    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -62, z: 60, radius: 7.2, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
+    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -145, arrivalZ: 130 }),
+    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -150, z: 130, radius: 7.2, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
   }),
 });
 const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   bekal: Object.freeze({ id:'bekal', label:'Bekal Fort', x:-7, z:60, arrivalX:-7, arrivalZ:56.5 }),
   munnar: Object.freeze({ id:'munnar', label:'Munnar Tea Hills', x:42, z:26, arrivalX:38.8, arrivalZ:26 }),
-  kochi: Object.freeze({ id:'kochi', label:'Mattancherry Palace', x:-26, z:6, arrivalX:-22.8, arrivalZ:6 }),
+  kochi: Object.freeze({ id:'kochi', label:'Mattancherry Palace', x:-160, z:153, arrivalX:-156, arrivalZ:153 }),
   alappuzha: Object.freeze({ id:'alappuzha', label:'Alappuzha Backwaters', x:-34, z:-13, arrivalX:-30.7, arrivalZ:-13 }),
   kuttanad: Object.freeze({ id:'kuttanad', label:'Kuttanad Fields', x:7, z:-23, arrivalX:10.2, arrivalZ:-23 }),
   temple: Object.freeze({ id:'temple', label:'Padmanabhaswamy Temple', x:13, z:-57, arrivalX:16.2, arrivalZ:-57 }),
@@ -138,10 +174,14 @@ const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   fuel: Object.freeze({ id:'fuel', label:'Kerala Fuel Station', x:11, z:-12, arrivalX:13.8, arrivalZ:-12 }),
   service: Object.freeze({ id:'service', label:'Village Service Garage', x:-36, z:-15, arrivalX:-32.8, arrivalZ:-15 }),
   'village-pond': Object.freeze({ id:'village-pond', label:'Village Pond', x:39, z:-4, arrivalX:35.5, arrivalZ:-4 }),
+  'ernakulam-centre': Object.freeze({ id:'ernakulam-centre', label:'Ernakulam City Centre', x:-145, z:132, arrivalX:-141, arrivalZ:132 }),
+  'ernakulam-market': Object.freeze({ id:'ernakulam-market', label:'Ernakulam City Market', x:-132, z:132, arrivalX:-136, arrivalZ:132 }),
+  'broadway-cafe': Object.freeze({ id:'broadway-cafe', label:'Broadway Cafe', x:-151, z:149, arrivalX:-147, arrivalZ:149 }),
+  'ernakulam-hospital': Object.freeze({ id:'ernakulam-hospital', label:'Ernakulam City Hospital', x:-166, z:116, arrivalX:-162, arrivalZ:116 }),
 });
 const PUBLIC_RIDE_SERVICES = Object.freeze({
   auto: Object.freeze({ id:'auto', label:'Auto-rickshaw', baseFare:18, perMeter:.48, maxDistance:72, pickupSeconds:2, speed:10 }),
-  taxi: Object.freeze({ id:'taxi', label:'Kerala Taxi', baseFare:32, perMeter:.68, maxDistance:240, pickupSeconds:3, speed:14 }),
+  taxi: Object.freeze({ id:'taxi', label:'Kerala Taxi', baseFare:32, perMeter:.68, maxDistance:360, pickupSeconds:3, speed:14 }),
 });
 const JOB_DEFINITIONS = Object.freeze({
   delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Take the delivery bike, collect a parcel, then ride to the customer.', missionType: 'route', vehicle: 'bike', vehicleLabel: 'Delivery Bike' },
@@ -172,6 +212,17 @@ const VEHICLE_STATIONS = Object.freeze({
   fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 11, z: -12, radius: 7 },
   service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
 });
+const VEHICLE_STATION_OPTIONS = Object.freeze({
+  fuel: Object.freeze([VEHICLE_STATIONS.fuel, Object.freeze({ id: 'ernakulam-fuel', label: 'Ernakulam Fuel Station', x: -126, z: 116, radius: 7 })]),
+  service: Object.freeze([VEHICLE_STATIONS.service, Object.freeze({ id: 'ernakulam-service', label: 'Ernakulam Auto Garage', x: -174, z: 145, radius: 7 })]),
+});
+function nearestVehicleServiceStation(action, x, z) {
+  const options = VEHICLE_STATION_OPTIONS[action] || [];
+  return options.reduce((best, station) => {
+    const distance = Math.hypot(Number(x) - station.x, Number(z) - station.z);
+    return !best || distance < best.distance ? { ...station, distance } : best;
+  }, null);
+}
 const TRAFFIC_CHECKPOINT = Object.freeze({ id: 'main-check', label: 'Kerala Play Traffic Checkpoint', x: 5.4, z: 18, radius: 7 });
 const TRAFFIC_CHALLAN_AMOUNTS = Object.freeze({ insurance_expired: 40, speeding: 25, licence_invalid: 50 });
 const DRIVING_LICENCE_TERMS = Object.freeze({ learner: 14 * 24 * 60 * 60 * 1000, full: 30 * 24 * 60 * 60 * 1000 });
@@ -185,7 +236,12 @@ const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
 const REPORT_REASONS = Object.freeze(['harassment', 'cheating', 'impersonation', 'inappropriate', 'spam', 'other']);
 const REPORT_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const REPORT_HISTORY_LIMIT = 80;
-const WORLD_SERVICE_POINTS = Object.freeze({ police: Object.freeze({ label: 'Kerala Police Station', x: -31, z: 14, radius: 6.2 }), fire: Object.freeze({ label: 'Fire & Rescue Station', x: -48, z: 8, radius: 6.2 }) });
+const WORLD_SERVICE_POINTS = Object.freeze({
+  police: Object.freeze({ id: 'police', service: 'police', label: 'Kerala Police Station', x: -31, z: 14, radius: 6.2 }),
+  fire: Object.freeze({ id: 'fire', service: 'fire', label: 'Fire & Rescue Station', x: -48, z: 8, radius: 6.2 }),
+  'ernakulam-police': Object.freeze({ id: 'ernakulam-police', service: 'police', label: 'Ernakulam City Police', x: -168, z: 140, radius: 6.8 }),
+  'ernakulam-fire': Object.freeze({ id: 'ernakulam-fire', service: 'fire', label: 'Ernakulam Fire & Rescue', x: -122, z: 146, radius: 6.8 }),
+});
 const WORLD_SERVICE_HELP_COOLDOWN_MS = 60_000;
 const GROUP_MEMBER_LIMIT = 12;
 const GROUP_MEMBERSHIP_LIMIT = 8;
@@ -1492,8 +1548,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   }
   function missionCoordinate(value, delta) {
     let next = value + delta;
-    if (next > 104 || next < -104) next = value - delta;
-    return Math.max(-104, Math.min(104, next));
+    if (next > WORLD_LIMIT - 6 || next < -WORLD_LIMIT + 6) next = value - delta;
+    return Math.max(-WORLD_LIMIT + 6, Math.min(WORLD_LIMIT - 6, next));
   }
   function buildJobCheckpoints(user, jobId) {
     const base = jobPosition(user);
@@ -2564,46 +2620,48 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/world/emergency-help' && request.method === 'POST') {
         limited(`world-emergency-help:${user.id}`, 12, 60000);
         const body = await jsonBody(request);
-        const service = typeof body.service === 'string' ? WORLD_SERVICE_POINTS[body.service] : null;
+        const serviceKey = typeof body.pointId === 'string' && WORLD_SERVICE_POINTS[body.pointId] ? body.pointId : body.service;
+        const service = typeof serviceKey === 'string' ? WORLD_SERVICE_POINTS[serviceKey] : null;
         requireValue(service, 400, 'Choose police or fire service.');
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before using the public help desk.');
         requireValue(Math.hypot(live.x - service.x, live.z - service.z) <= service.radius, 409, `Move closer to the ${service.label}.`);
         if (!user.worldServiceHelp || typeof user.worldServiceHelp !== 'object' || Array.isArray(user.worldServiceHelp)) user.worldServiceHelp = {};
         const timestamp = now();
-        requireValue(timestamp >= Number(user.worldServiceHelp[body.service] || 0) + WORLD_SERVICE_HELP_COOLDOWN_MS, 409, 'This help desk request is still cooling down.');
-        user.worldServiceHelp[body.service] = timestamp;
+        requireValue(timestamp >= Number(user.worldServiceHelp[serviceKey] || 0) + WORLD_SERVICE_HELP_COOLDOWN_MS, 409, 'This help desk request is still cooling down.');
+        user.worldServiceHelp[serviceKey] = timestamp;
         user.emergencyResponses = Math.max(0, Number(user.emergencyResponses) || 0) + 1;
         dirty = true;
         addNotification(user, {
-          sourceKey: `service-help:${body.service}:${Math.floor(timestamp / WORLD_SERVICE_HELP_COOLDOWN_MS)}`,
+          sourceKey: `service-help:${serviceKey}:${Math.floor(timestamp / WORLD_SERVICE_HELP_COOLDOWN_MS)}`,
           kind: 'emergency',
           title: `${service.label} · help requested`,
-          message: body.service === 'police' ? 'The public help desk has logged your request.' : 'The emergency response desk has logged your request.',
+          message: service.service === 'police' ? 'The public help desk has logged your request.' : 'The emergency response desk has logged your request.',
           severity: 'info',
           target: '',
         });
         const progression = syncRecognitionNotifications(user);
         await persist();
-        send(response, 200, { accepted: true, service: body.service, label: service.label, emergencyResponses: user.emergencyResponses, progression }); return;
+        send(response, 200, { accepted: true, service: service.service, pointId: serviceKey, label: service.label, emergencyResponses: user.emergencyResponses, progression }); return;
       }
       if (path === '/api/needs/clinic' && request.method === 'POST') {
         limited(`needs-clinic:${user.id}`, 20, 60000);
-        await jsonBody(request);
+        const body = await jsonBody(request);
+        const clinic = CLINIC_DEFINITIONS[String(body.clinicId || 'community-clinic')] || CLINIC_DEFINITION;
         const state = jobStateFor(user);
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before visiting the clinic.');
-        requireValue(Math.hypot(live.x - CLINIC_DEFINITION.x, live.z - CLINIC_DEFINITION.z) <= CLINIC_DEFINITION.radius, 409, 'Move closer to the Community Clinic.');
+        requireValue(Math.hypot(live.x - clinic.x, live.z - clinic.z) <= clinic.radius, 409, `Move closer to the ${clinic.label}.`);
         const timestamp = now();
         requireValue(timestamp >= Number(state.needs.lastClinicAt || 0) + CLINIC_COOLDOWN_MS, 409, 'Clinic care is still cooling down.');
-        const transaction = walletTransaction(user, -CLINIC_DEFINITION.fee, 'clinic_care', CLINIC_DEFINITION.label);
-        state.needs.energy = Math.min(NEEDS_MAX, Number(state.needs.energy) + CLINIC_DEFINITION.energyRestore);
-        state.needs.thirst = Math.min(NEEDS_MAX, Number(state.needs.thirst) + CLINIC_DEFINITION.thirstRestore);
+        const transaction = walletTransaction(user, -clinic.fee, 'clinic_care', clinic.label);
+        state.needs.energy = Math.min(NEEDS_MAX, Number(state.needs.energy) + clinic.energyRestore);
+        state.needs.thirst = Math.min(NEEDS_MAX, Number(state.needs.thirst) + clinic.thirstRestore);
         state.needs.lastClinicAt = timestamp;
         state.needs.updatedAt = timestamp;
         dirty = true;
         await persist();
-        send(response, 200, { treated: true, fee: CLINIC_DEFINITION.fee, wallet: walletSummary(user), needs: needsSummary(user), transaction }); return;
+        send(response, 200, { treated: true, clinic: clinic.id, label: clinic.label, fee: clinic.fee, wallet: walletSummary(user), needs: needsSummary(user), transaction }); return;
       }
       if (path === '/api/needs/rest' && request.method === 'POST') {
         limited(`needs-rest:${user.id}`, 20, 60000);
@@ -2973,8 +3031,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(body.vehicleId === vehicle.id, 409, 'Personal vehicle is out of sync.');
         const live = presence.get(user.id) || place(user);
         requireValue(!live.moving, 409, 'Stop the vehicle before using this service.');
-        const station = body.action === 'refuel' ? VEHICLE_STATIONS.fuel : VEHICLE_STATIONS.service;
-        requireValue(Math.hypot(live.x - station.x, live.z - station.z) <= station.radius, 409, `Move closer to ${station.label}.`);
+        const station = nearestVehicleServiceStation(body.action === 'refuel' ? 'fuel' : 'service', live.x, live.z);
+        requireValue(station && station.distance <= station.radius, 409, `Move closer to ${station?.label || 'the vehicle service point'}.`);
         const model = GARAGE_CATALOG[vehicle.modelId];
         const spec = VEHICLE_SPECS[model.kind];
         let amount, cost, description;
@@ -3109,8 +3167,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(body.action === 'refuel' || body.action === 'repair', 400, 'Choose refuel or repair.');
         const live = presence.get(user.id) || place(user);
         requireValue(!live.moving, 409, 'Stop the vehicle before using this service.');
-        const station = body.action === 'refuel' ? VEHICLE_STATIONS.fuel : VEHICLE_STATIONS.service;
-        requireValue(Math.hypot(live.x - station.x, live.z - station.z) <= station.radius, 409, `Move closer to ${station.label}.`);
+        const station = nearestVehicleServiceStation(body.action === 'refuel' ? 'fuel' : 'service', live.x, live.z);
+        requireValue(station && station.distance <= station.radius, 409, `Move closer to ${station?.label || 'the vehicle service point'}.`);
         const spec = VEHICLE_SPECS[job.vehicle];
         let amount, cost, description;
         if (body.action === 'refuel') {
@@ -3560,7 +3618,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/world/move' && request.method === 'POST') {
         limited(`move:${user.id}`, 20, 1000);
         const body = await jsonBody(request);
-        requireValue(Number.isFinite(body.x) && Number.isFinite(body.z) && Math.abs(body.x) <= 110.01 && Math.abs(body.z) <= 110.01 && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, 'Invalid avatar position.');
+        requireValue(Number.isFinite(body.x) && Number.isFinite(body.z) && Math.abs(body.x) <= WORLD_LIMIT + .01 && Math.abs(body.z) <= WORLD_LIMIT + .01 && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, 'Invalid avatar position.');
         const requestedMode = body.mode === undefined ? 'walk' : body.mode;
         requireValue(Object.hasOwn(MOVEMENT_PROFILES, requestedMode), 400, 'Invalid movement mode.');
         const stateForMove = jobStateFor(user);
