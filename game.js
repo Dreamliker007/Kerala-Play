@@ -8,6 +8,8 @@ const joystickBase = document.querySelector('#joystick-base');
 const joystickKnob = document.querySelector('#joystick-knob');
 const cameraZone = document.querySelector('#camera-zone');
 const runButton = document.querySelector('#run');
+const jumpButton = document.querySelector('#jump');
+const cameraSwitchButton = document.querySelector('#camera-switch');
 const accelerateButton = document.querySelector('#accelerate');
 const worldInteract = document.querySelector('#world-interact');
 const vehicleAction = document.querySelector('#vehicle-action');
@@ -161,6 +163,9 @@ let jobVisualSignature = '';
 let jobVehicleVisual = null;
 let jobVehicleSignature = '';
 let vehicleMode = 'walk';
+let jumpHeight = 0;
+let jumpVelocity = 0;
+let vehicleCameraView = 'chase';
 let driveSpeed = 0;
 const vehicleSafePosition = new THREE.Vector3();
 let vehicleSafeRotation = 0;
@@ -3268,6 +3273,20 @@ try {
   cameraZone.addEventListener('pointercancel', clearLook);
   cameraZone.addEventListener('lostpointercapture', clearLook);
 
+  function triggerJump() {
+    if (vehicleMode !== 'walk' || jumpHeight > .02) return;
+    jumpVelocity = 4.35;
+    jumpButton?.classList.add('active');
+    setTimeout(() => jumpButton?.classList.remove('active'), 180);
+  }
+  jumpButton?.addEventListener('pointerdown', event => { event.preventDefault(); triggerJump(); });
+  cameraSwitchButton?.addEventListener('click', () => {
+    if (vehicleMode === 'walk') return;
+    vehicleCameraView = vehicleCameraView === 'chase' ? 'interior' : 'chase';
+    cameraSwitchButton.textContent = vehicleCameraView === 'interior' ? 'CHASE' : 'CAM';
+    showToast(vehicleCameraView === 'interior' ? 'Interior driving camera' : 'Chase driving camera');
+  });
+
   function setRun(value) {
     runHeld = !!value;
     if (value && vehicleMode === 'walk') runCruiseArmed = true;
@@ -3356,6 +3375,7 @@ try {
       event.preventDefault();
       return;
     }
+    if (vehicleMode === 'walk' && (event.code === 'Space' || key === 'j') && !event.repeat) { triggerJump(); event.preventDefault(); return; }
     keys.add(key);
     if (event.key === 'Shift') setRun(true);
   });
@@ -3500,7 +3520,7 @@ try {
           if (desiredMove.lengthSq() > .0001) desiredMove.normalize();
         }
         const inputCurve = autoRun ? 1 : Math.pow(controlLength, 1.55);
-        const maxWalkSpeed = (runningNow ? 5.4 : 3.05) * needsFactor;
+        const maxWalkSpeed = (runningNow ? 6.25 : 3.05) * needsFactor;
         targetWalkVelocity.copy(desiredMove).multiplyScalar(maxWalkSpeed * inputCurve);
       } else {
         targetWalkVelocity.set(0, 0, 0);
@@ -3600,6 +3620,14 @@ try {
       }
     }
 
+    if (vehicleMode === 'walk') {
+      jumpVelocity -= 11.8 * delta;
+      jumpHeight = Math.max(0, jumpHeight + jumpVelocity * delta);
+      if (jumpHeight <= 0) { jumpHeight = 0; jumpVelocity = 0; }
+      const avatar = player.userData.avatar;
+      if (avatar) avatar.position.y += jumpHeight;
+    } else { jumpHeight = 0; jumpVelocity = 0; }
+
     const drivingCamera = vehicleMode !== 'walk';
     const walkingMotion = !drivingCamera && movingNow ? (playerRunningVisual ? 1 : .62) : 0;
     const walkBob = Math.sin(walkPhase * 2) * (playerRunningVisual ? .040 : .026) * walkingMotion;
@@ -3616,13 +3644,14 @@ try {
     const baseTargetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45;
     cameraTarget.set(
       player.position.x + Math.sin(player.rotation.y) * lookAhead,
-      player.position.y + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
+      player.position.y + jumpHeight + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
       player.position.z + Math.cos(player.rotation.y) * lookAhead
     );
 
-    const baseDistance = vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
+    const interiorCamera = vehicleMode === 'taxi' && vehicleCameraView === 'interior';
+    const baseDistance = interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
     const distance = baseDistance
-      + (drivingCamera ? driveSpeedRatio * 1.35 + cameraDriveImpulse * .72 : 0);
+      + (drivingCamera && !interiorCamera ? driveSpeedRatio * 1.35 + cameraDriveImpulse * .72 : 0);
     const horizontal = Math.cos(cameraPitch) * distance;
     const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
     const stormShake = THREE.MathUtils.smoothstep(rain, .48, 1)
@@ -3636,7 +3665,7 @@ try {
 
     cameraPosition.set(
       player.position.x + Math.sin(cameraYaw) * horizontal + cameraRightX * lateralMotion + rainShakeX,
-      player.position.y + (drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
+      player.position.y + jumpHeight + (interiorCamera ? 1.42 : drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
       player.position.z + Math.cos(cameraYaw) * horizontal + cameraRightZ * lateralMotion
     );
 
