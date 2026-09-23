@@ -2794,6 +2794,16 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     toast(`${result.travel?.routeLabel || 'Village Line'} · arrived at ${result.travel?.to?.label || 'destination'} · ticket ${formatCash(result.travel?.fare || 0)}`, 4200);
   }, walletError));
 
+  window.addEventListener('kerala-train-board', event => run(async () => {
+    const stationId = String(event.detail?.stationId || '');
+    if (!stationId) return;
+    const result = await api('/api/travel/train/board', { stationId });
+    if (result.wallet) renderWallet(result.wallet);
+    if (result.user) setUser(result.user);
+    window.dispatchEvent(new CustomEvent('kerala-public-travel-arrival', { detail: result.travel || null }));
+    toast(`${result.travel?.routeLabel || 'District Train'} · arrived at ${result.travel?.to?.label || 'destination'} · ticket ${formatCash(result.travel?.fare || 0)}`, 4400);
+  }, walletError));
+
   window.addEventListener('kerala-public-ride-complete', event => {
     const result = event.detail || null;
     if (result?.wallet) renderWallet(result.wallet);
