@@ -144,7 +144,7 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'anugraha', kind: 'shop', label: 'Anugraha Stores', x: -14.4, z: 10.7, radius: 3.8, discoverRadius: 7.0, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
   Object.freeze({ id: 'malabar', kind: 'shop', label: 'Malabar Bakery', x: 14.8, z: 41.2, radius: 3.8, discoverRadius: 7.0, openHour: 5.5, closeHour: 20.5, items: ['water', 'tea', 'snack'] }),
   Object.freeze({ id: 'town-bus', kind: 'bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 3.6, discoverRadius: 6.6 }),
-  Object.freeze({ id: 'town-centre-bus', kind: 'bus', label: 'Town Centre Bus Stop', x: 13.0, z: 19.2, radius: 3.6, discoverRadius: 6.6 }),
+  Object.freeze({ id: 'town-centre-bus', kind: 'bus', label: 'Town Centre Bus Stop', x: 13.0, z: 16.0, radius: 4.2, discoverRadius: 7.0 }),
   Object.freeze({ id: 'south-bus', kind: 'bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 3.6, discoverRadius: 6.6 }),
   Object.freeze({ id: 'town-market', kind: 'shop', label: 'Town Market', x: 31, z: 15, radius: 4.2, discoverRadius: 7.2, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
   Object.freeze({ id: 'community-clinic', kind: 'service', service: 'clinic', label: 'Community Clinic', x: 28, z: 28, radius: 4.8, discoverRadius: 8.0 }),
@@ -5784,7 +5784,7 @@ function buildWorld(scene) {
   addCivicBuilding(scene, 28, 28, { title: 'COMMUNITY CLINIC', subtitle: 'HEALTH CENTRE · 24/7', color: 0x2d7d63, collider: 'clinic' });
   addCivicBuilding(scene, -31, 14, { title: 'KERALA POLICE', subtitle: 'POLICE STATION', color: 0x315b84, collider: 'police-station' });
   addCivicBuilding(scene, -48, 8, { title: 'FIRE & RESCUE', subtitle: 'EMERGENCY SERVICES', color: 0xa84437, collider: 'fire-station' });
-  addBusStop(scene, 13.0, 19.2, Math.PI, 'TOWN CENTRE');
+  addBusStop(scene, 13.0, 16.0, Math.PI, 'TOWN CENTRE');
   addTrafficCheckpoint(scene, 5.4, 18);
   addPhotoVillager(scene, -6, -50, 11, .55, 0, .78, { nightHide: true });
   addPhotoVillager(scene, 10, -5, 8, .45, 2, .72);
