@@ -12,6 +12,14 @@ const jumpButton = document.querySelector('#jump');
 const cameraSwitchButton = document.querySelector('#camera-switch');
 const accelerateButton = document.querySelector('#accelerate');
 const worldInteract = document.querySelector('#world-interact');
+const districtTravelPanel = document.querySelector('#district-travel-panel');
+const districtTravelHeading = document.querySelector('#district-travel-heading');
+const districtTravelTitle = document.querySelector('#district-travel-title');
+const districtTravelNote = document.querySelector('#district-travel-note');
+const districtTravelDestinations = document.querySelector('#district-travel-destinations');
+const districtTravelConfirm = document.querySelector('#district-travel-confirm');
+const districtTravelClose = document.querySelector('#district-travel-close');
+const districtTravelError = document.querySelector('#district-travel-error');
 const vehicleAction = document.querySelector('#vehicle-action');
 const driveTools = document.querySelector('#drive-tools');
 const hornAction = document.querySelector('#horn-action');
@@ -83,6 +91,42 @@ document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
 const runtimeIsMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
 const WORLD_LIMIT = 210;
 const ERNAKULAM_CITY = Object.freeze({ x: -150, z: 130 });
+const DISTRICT_INSTANCE_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
+const DISTRICT_AIRPORTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvananthapuram']);
+const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTANCE_ORDER.map((district, index) => {
+  const generic = {
+    district,
+    order: index,
+    bounds: { minX:-78, maxX:78, minZ:-78, maxZ:78 },
+    spawn: { x:12, z:0, rotation:0 },
+    train: { x:-42, z:-6, radius:7.2 },
+    airport: DISTRICT_AIRPORTS.has(district) ? { x:42, z:-28, radius:8.2 } : null,
+  };
+  if (district === 'Kottayam') return [district, { ...generic, spawn:{ x:19,z:-23,rotation:0 }, train:{ x:7,z:-23,radius:7.2 } }];
+  if (district === 'Ernakulam') return [district, {
+    ...generic,
+    bounds:{ minX:-208,maxX:-96,minZ:82,maxZ:178 },
+    spawn:{ x:-184,z:110.5,rotation:0 },
+    train:{ x:-190,z:99.5,radius:6.6 },
+    airport:{ x:-112,z:166,radius:8.2 },
+  }];
+  return [district, generic];
+})));
+function currentWorldDistrictName() {
+  const district = profile?.worldDistrict || profile?.district || 'Kottayam';
+  return DISTRICT_INSTANCE_CONFIG[district] ? district : 'Kottayam';
+}
+function currentDistrictInstance() {
+  return DISTRICT_INSTANCE_CONFIG[currentWorldDistrictName()] || DISTRICT_INSTANCE_CONFIG.Kottayam;
+}
+function clampDistrictX(value, margin = 0) {
+  const bounds = currentDistrictInstance().bounds;
+  return THREE.MathUtils.clamp(value, bounds.minX + margin, bounds.maxX - margin);
+}
+function clampDistrictZ(value, margin = 0) {
+  const bounds = currentDistrictInstance().bounds;
+  return THREE.MathUtils.clamp(value, bounds.minZ + margin, bounds.maxZ - margin);
+}
 const villagers = [];
 const ambientAnimals = [];
 const windVegetation = [];
@@ -164,6 +208,39 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'fire-station', kind: 'service', service: 'fire', label: 'Fire & Rescue Station', x: -48, z: 8, radius: 4.8, discoverRadius: 8.0 }),
   Object.freeze({ id: 'village-pond', kind: 'view', label: 'Village Pond', x: 39, z: -4, radius: 4.2, discoverRadius: 7.2 }),
 ]);
+const ERNAKULAM_ACTIVITY_IDS = new Set(['ernakulam-market','broadway-cafe','ernakulam-hospital','ernakulam-police','ernakulam-fire','ernakulam-station-bus','ernakulam-mg-road','ernakulam-marine','ernakulam-rail']);
+function generatedDistrictTravelSpots() {
+  const district = currentWorldDistrictName();
+  const config = currentDistrictInstance();
+  const generated = [];
+  if (district !== 'Kottayam' && district !== 'Ernakulam') {
+    generated.push(Object.freeze({
+      id: 'district-rail', kind: 'train', stationId: config.train?.id || 'district-rail',
+      label: `${district} Railway Station`, x:config.train.x, z:config.train.z,
+      radius:config.train.radius, discoverRadius:11,
+    }));
+  }
+  if (config.airport) {
+    generated.push(Object.freeze({
+      id: 'district-airport', kind: 'airport', label: `${district} Airport`,
+      x:config.airport.x, z:config.airport.z, radius:config.airport.radius, discoverRadius:12,
+    }));
+  }
+  return generated;
+}
+function activeWorldActivitySpots() {
+  const district = currentWorldDistrictName();
+  const base = WORLD_ACTIVITY_SPOTS.filter(spot => district === 'Ernakulam'
+    ? ERNAKULAM_ACTIVITY_IDS.has(spot.id)
+    : district === 'Kottayam'
+      ? !ERNAKULAM_ACTIVITY_IDS.has(spot.id)
+      : false);
+  return [...base, ...generatedDistrictTravelSpots()];
+}
+function findWorldActivity(id) {
+  return activeWorldActivitySpots().find(item => item.id === id) || null;
+}
+
 let lastWorldActivityAt = 0;
 let lifeLoopAction = 'jobs';
 let busTravelStatus = null;
@@ -257,13 +334,9 @@ const townZones = Object.freeze([
   Object.freeze({ id: 'south-junction', name: 'South Junction', x: 0, z: -22, radius: 14, district: 'Kottayam' }),
   Object.freeze({ id: 'ernakulam-centre', name: 'Ernakulam City Centre', x: -150, z: 130, radius: 42, district: 'Ernakulam' }),
 ]);
-function worldZoneAt(x, z) {
-  const district = Object.entries(districtStarts).reduce((best, [name, point]) => {
-    const distance = Math.hypot(x - point[0], z - point[1]);
-    return !best || distance < best.distance ? { name, distance } : best;
-  }, null)?.name || 'Kottayam';
-  const zone = worldZones.find(item => item.districts.includes(district)) || worldZones[2];
-  return { ...zone, district };
+function worldZoneAt() {
+  const district = currentWorldDistrictName();
+  return { id: district.toLowerCase().replace(/[^a-z]+/g, '-'), name: district, district };
 }
 
 const landmarks = [
@@ -1647,7 +1720,7 @@ function nearestWorldActivity(maxDistance = 7.2) {
   if (!playerRef || vehicleMode !== 'walk') return null;
   let nearest = null;
   let nearestDistance = maxDistance;
-  for (const spot of WORLD_ACTIVITY_SPOTS) {
+  for (const spot of activeWorldActivitySpots()) {
     const distance = Math.hypot(playerRef.position.x - spot.x, playerRef.position.z - spot.z);
     const discoverRadius = Number(spot.discoverRadius || maxDistance);
     if (distance <= discoverRadius && distance < nearestDistance) {
@@ -1659,7 +1732,7 @@ function nearestWorldActivity(maxDistance = 7.2) {
 }
 
 function performWorldActivity(activityId) {
-  const spot = WORLD_ACTIVITY_SPOTS.find(item => item.id === activityId);
+  const spot = findWorldActivity(activityId);
   if (!spot || performance.now() - lastWorldActivityAt < 700) return;
   lastWorldActivityAt = performance.now();
 
@@ -2291,7 +2364,7 @@ function acceptUser(user) {
   if (playerRef) {
     playerRef.visible = !!user;
     if (user && (!previous || previous.gender !== user.gender)) replacePlayerAvatar(user.gender);
-    if (user && (!previous || previous.id !== user.id || previous.district !== user.district)) {
+    if (user && (!previous || previous.id !== user.id || previous.district !== user.district || previous.worldDistrict !== user.worldDistrict)) {
       if (Number.isFinite(user.x) && Number.isFinite(user.z)) playerRef.position.set(user.x, 0, user.z);
       else placePlayerAtDistrict(user.district);
       if (Number.isFinite(user.rotation)) playerRef.rotation.y = user.rotation;
@@ -2408,9 +2481,7 @@ function updateProfileHud() {
     profileDistrict.title = '';
     return;
   }
-  const currentDistrict = playerRef
-    ? worldZoneAt(playerRef.position.x, playerRef.position.z).district
-    : profile.district;
+  const currentDistrict = profile.worldDistrict || profile.district || 'Kottayam';
   profileDistrict.textContent = `${currentDistrict} · ${profile.gender === 'female' ? 'Female' : 'Male'} avatar`;
   profileDistrict.title = profile.district && profile.district !== currentDistrict
     ? `Home district: ${profile.district}`
@@ -2637,8 +2708,9 @@ window.addEventListener('pagehide', flushMovement);
 
 
 function placePlayerAtDistrict(district) {
-  const start = districtStarts[district] || [0, 0];
-  playerRef.position.set(start[0] + 12, 0, start[1]);
+  const config = DISTRICT_INSTANCE_CONFIG[district] || DISTRICT_INSTANCE_CONFIG.Kottayam;
+  playerRef.position.set(config.spawn.x, 0, config.spawn.z);
+  playerRef.rotation.y = config.spawn.rotation || 0;
   updateMapPlayer(playerRef);
 }
 
@@ -2651,8 +2723,8 @@ function recoverBlockedPlayerSpawn(player, force = false) {
   for (const ring of [1.2, 2.1, 3.2, 4.8, 6.8, 9.5, 13, 18, 25]) {
     for (let index = 0; index < 24; index++) {
       const angle = index / 24 * Math.PI * 2;
-      const x = THREE.MathUtils.clamp(originX + Math.sin(angle) * ring, -WORLD_LIMIT + 2, WORLD_LIMIT - 2);
-      const z = THREE.MathUtils.clamp(originZ + Math.cos(angle) * ring, -WORLD_LIMIT + 2, WORLD_LIMIT - 2);
+      const x = clampDistrictX(originX + Math.sin(angle) * ring, 2);
+      const z = clampDistrictZ(originZ + Math.cos(angle) * ring, 2);
       if (!positionBlockedStatic(x, z, .43)) { player.position.set(x, 0, z); return true; }
     }
   }
@@ -2724,10 +2796,22 @@ function destinationBusSuggestion(place, player = playerRef) {
   return '';
 }
 
+function currentNavigationPlaces() {
+  const district = currentWorldDistrictName();
+  const existing = navigationPlaces.filter(place => place.district === district || (district === 'Kottayam' && place.district === 'Village'));
+  if (district === 'Kottayam' || district === 'Ernakulam') return existing;
+  const config = currentDistrictInstance();
+  return [
+    { id:'district-centre', name:`${district} City Centre`, icon:'C', x:0, z:0, kind:'town', district },
+    { id:'district-rail', name:`${district} Railway Station`, icon:'🚆', x:config.train.x, z:config.train.z, kind:'rail', district },
+    ...(config.airport ? [{ id:'district-airport', name:`${district} Airport`, icon:'✈', x:config.airport.x, z:config.airport.z, kind:'airport', district }] : []),
+  ];
+}
+
 function renderNearbyPlaces() {
   if (!nearbyPlaces || !playerRef) return;
   nearbyPlaces.replaceChildren();
-  const entries = navigationPlaces
+  const entries = currentNavigationPlaces()
     .map(place => ({ place, distance: placeDistance(place) }))
     .sort((a, b) => a.distance - b.distance)
     .slice(0, 6);
@@ -2754,7 +2838,7 @@ function renderMapLandmarks() {
   const svgNamespace = 'http://www.w3.org/2000/svg';
   if (districtLabels) districtLabels.style.display = mapLabelsVisible ? 'block' : 'none';
   mapLayer.replaceChildren();
-  navigationPlaces.forEach(place => {
+  currentNavigationPlaces().forEach(place => {
     const point = worldToKeralaMap(place.x, place.z);
     const marker = document.createElementNS(svgNamespace, 'g');
     const classes = ['landmark-marker'];
@@ -4512,11 +4596,11 @@ function moveWithCollision(object, dx, dz, radius) {
   const stepZ = dz / steps;
 
   for (let step = 0; step < steps; step++) {
-    const nextX = THREE.MathUtils.clamp(object.position.x + stepX, -WORLD_LIMIT, WORLD_LIMIT);
+    const nextX = clampDistrictX(object.position.x + stepX);
     if (!positionBlocked(nextX, object.position.z, radius)) object.position.x = nextX;
     else collided = true;
 
-    const nextZ = THREE.MathUtils.clamp(object.position.z + stepZ, -WORLD_LIMIT, WORLD_LIMIT);
+    const nextZ = clampDistrictZ(object.position.z + stepZ);
     if (!positionBlocked(object.position.x, nextZ, radius)) object.position.z = nextZ;
     else collided = true;
   }
@@ -4538,16 +4622,16 @@ function findVehicleRecoveryPoint(object, radius) {
   const backwardsX = -Math.sin(object.rotation.y);
   const backwardsZ = -Math.cos(object.rotation.y);
   for (const distance of [.45, .8, 1.2, 1.7, 2.3]) {
-    const x = THREE.MathUtils.clamp(object.position.x + backwardsX * distance, -WORLD_LIMIT, WORLD_LIMIT);
-    const z = THREE.MathUtils.clamp(object.position.z + backwardsZ * distance, -WORLD_LIMIT, WORLD_LIMIT);
+    const x = clampDistrictX(object.position.x + backwardsX * distance);
+    const z = clampDistrictZ(object.position.z + backwardsZ * distance);
     if (!positionBlockedStatic(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
   }
 
   for (const ring of [1, 1.6, 2.4, 3.2]) {
     for (let index = 0; index < 16; index++) {
       const angle = index / 16 * Math.PI * 2;
-      const x = THREE.MathUtils.clamp(object.position.x + Math.sin(angle) * ring, -WORLD_LIMIT, WORLD_LIMIT);
-      const z = THREE.MathUtils.clamp(object.position.z + Math.cos(angle) * ring, -WORLD_LIMIT, WORLD_LIMIT);
+      const x = clampDistrictX(object.position.x + Math.sin(angle) * ring);
+      const z = clampDistrictZ(object.position.z + Math.cos(angle) * ring);
       if (!positionBlockedStatic(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
     }
   }
