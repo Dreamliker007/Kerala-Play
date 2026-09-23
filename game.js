@@ -144,6 +144,10 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'town-bus', kind: 'bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 3.6, discoverRadius: 6.6 }),
   Object.freeze({ id: 'town-centre-bus', kind: 'bus', label: 'Town Centre Bus Stop', x: 13.0, z: 19.2, radius: 3.6, discoverRadius: 6.6 }),
   Object.freeze({ id: 'south-bus', kind: 'bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 3.6, discoverRadius: 6.6 }),
+  Object.freeze({ id: 'town-market', kind: 'shop', label: 'Town Market', x: 31, z: 15, radius: 4.2, discoverRadius: 7.2, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
+  Object.freeze({ id: 'community-clinic', kind: 'service', service: 'clinic', label: 'Community Clinic', x: 28, z: 28, radius: 4.8, discoverRadius: 8.0 }),
+  Object.freeze({ id: 'police-station', kind: 'service', service: 'police', label: 'Kerala Police Station', x: -31, z: 14, radius: 4.8, discoverRadius: 8.0 }),
+  Object.freeze({ id: 'fire-station', kind: 'service', service: 'fire', label: 'Fire & Rescue Station', x: -48, z: 8, radius: 4.8, discoverRadius: 8.0 }),
   Object.freeze({ id: 'village-pond', kind: 'view', label: 'Village Pond', x: 39, z: -4, radius: 4.2, discoverRadius: 7.2 }),
 ]);
 let lastWorldActivityAt = 0;
@@ -1623,6 +1627,16 @@ function performWorldActivity(activityId) {
     return;
   }
 
+  if (spot.kind === 'service') {
+    const message = spot.service === 'clinic'
+      ? 'Community Clinic · reception is open for local health services'
+      : spot.service === 'police'
+        ? 'Kerala Police Station · public help desk is available'
+        : 'Fire & Rescue Station · emergency response crew is on duty';
+    showToast(message, 3600);
+    return;
+  }
+
   if (spot.kind === 'view') {
     const rain = Number(worldWeatherState.rain || 0);
     showToast(
@@ -1817,6 +1831,13 @@ function updateWorldInteract() {
           : closeEnough
             ? `${spot.label} · suggested: ${item.name}`
             : worldInteract.title;
+      } else if (spot.kind === 'service') {
+        worldInteract.dataset.mode = closeEnough ? 'world-service' : '';
+        worldInteract.dataset.activity = closeEnough ? spot.id : '';
+        worldInteract.disabled = !closeEnough;
+        const action = spot.service === 'clinic' ? 'VISIT CLINIC' : spot.service === 'police' ? 'ASK POLICE HELP' : 'CONTACT FIRE & RESCUE';
+        worldInteract.textContent = closeEnough ? action : `COME CLOSER · ${spot.label.toUpperCase()}`;
+        worldInteract.title = closeEnough ? `${spot.label} · essential public service` : worldInteract.title;
       } else if (spot.kind === 'bus') {
         const status = busTravelStatus?.stop?.id === spot.id ? busTravelStatus : null;
         const serverOffset = Number(status?.serverNow || 0) - Number(status?.receivedAt || 0);
@@ -1938,6 +1959,8 @@ worldInteract?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('kerala-home-sleep'));
   } else if (worldInteract.dataset.mode === 'home-open') {
     window.dispatchEvent(new CustomEvent('kerala-open-home'));
+  } else if (worldInteract.dataset.mode === 'world-service') {
+    performWorldActivity(worldInteract.dataset.activity);
   } else if (worldInteract.dataset.mode === 'world-shop-open') {
     const spot = WORLD_ACTIVITY_SPOTS.find(item => item.id === worldInteract.dataset.shop && item.kind === 'shop');
     if (spot) {
