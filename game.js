@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js';
-import { createAtmosphere } from './environment.js';
+import { initSocial, api } from './social.js?v=103.0';
+import { createAtmosphere } from './environment.js?v=103.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -2374,7 +2374,18 @@ function markLandmarkVisited() {
 
 function updateProfileHud() {
   profileName.textContent = profile?.username || 'Sign in';
-  profileDistrict.textContent = profile?.district ? `${profile.district} · ${profile.gender === 'female' ? 'Female' : 'Male'} avatar` : 'Choose your district';
+  if (!profile) {
+    profileDistrict.textContent = 'Choose your district';
+    profileDistrict.title = '';
+    return;
+  }
+  const currentDistrict = playerRef
+    ? worldZoneAt(playerRef.position.x, playerRef.position.z).district
+    : profile.district;
+  profileDistrict.textContent = `${currentDistrict} · ${profile.gender === 'female' ? 'Female' : 'Male'} avatar`;
+  profileDistrict.title = profile.district && profile.district !== currentDistrict
+    ? `Home district: ${profile.district}`
+    : '';
 }
 
 function disposeObject(object) {
