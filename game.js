@@ -236,6 +236,7 @@ const townZones = Object.freeze([
   Object.freeze({ id: 'town-centre', name: 'Town Centre', x: 0, z: 22, radius: 16, district: 'Kottayam' }),
   Object.freeze({ id: 'market-quarter', name: 'Market Quarter', x: -30, z: 22, radius: 15, district: 'Kottayam' }),
   Object.freeze({ id: 'south-junction', name: 'South Junction', x: 0, z: -22, radius: 14, district: 'Kottayam' }),
+  Object.freeze({ id: 'ernakulam-centre', name: 'Ernakulam Centre', x: -26, z: 6, radius: 13, district: 'Ernakulam' }),
 ]);
 function worldZoneAt(x, z) {
   const district = Object.entries(districtStarts).reduce((best, [name, point]) => {
@@ -5515,6 +5516,61 @@ function addTownStreetDetails(scene) {
   addParkedVehicle(scene, 'auto', 0x2b773f, -57.0, -29.7, Math.PI / 2);
 }
 
+function addErnakulamDistrictFoundation(scene) {
+  // First playable destination outside Kottayam. The district centre is aligned
+  // with the server-owned Ernakulam rail arrival point at roughly (-22, 6).
+  const roadMaterial = new THREE.MeshStandardMaterial({ color: 0xb7bdc0, roughness: .92, metalness: .01 });
+  const eastWest = new THREE.Mesh(new THREE.PlaneGeometry(38, 6.5), roadMaterial);
+  eastWest.rotation.x = -Math.PI / 2;
+  eastWest.position.set(-26, .021, 6);
+  scene.add(eastWest);
+  addRoadEdges(scene, -26, 6, 38, 6.5);
+
+  const stationApproach = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 28), roadMaterial);
+  stationApproach.rotation.x = -Math.PI / 2;
+  stationApproach.position.set(-26, .022, 13);
+  scene.add(stationApproach);
+  addRoadEdges(scene, -26, 13, 6.5, 28);
+
+  addCivicBuilding(scene, -35, 12, {
+    title: 'ERNAKULAM RAILWAY',
+    subtitle: 'KOTTAYAM · DISTRICT TRAINS',
+    color: 0x385f7b,
+    collider: 'ernakulam-railway',
+  });
+  addShop(scene, -16.5, 11.5, 'ERNAKULAM MARKET', 'FOOD · GROCERIES · DAILY NEEDS');
+  addCivicBuilding(scene, -16.5, 1.0, {
+    title: 'CITY CLINIC',
+    subtitle: 'HEALTH SERVICES',
+    color: 0x2d7d63,
+    collider: 'ernakulam-clinic',
+  });
+  addCivicBuilding(scene, -37.5, -1.0, {
+    title: 'ERNAKULAM POLICE',
+    subtitle: 'PUBLIC HELP DESK',
+    color: 0x315b84,
+    collider: 'ernakulam-police',
+  });
+  addBusStop(scene, -23.0, 9.0, Math.PI / 2, 'ERNAKULAM CENTRE');
+
+  const marker = new THREE.Group();
+  const board = createWorldSignMesh({
+    title: 'ERNAKULAM',
+    subtitle: 'RAILWAY · MARKET · SERVICES',
+    background: '#315f78',
+  }, 3.8, .9);
+  board.position.y = 2.25;
+  const post = new THREE.Mesh(new THREE.BoxGeometry(.09, 2.25, .09), new THREE.MeshStandardMaterial({ color: 0x555d5e, roughness: .8 }));
+  post.position.y = 1.12;
+  marker.add(post, board);
+  marker.position.set(-25.5, 0, 2.2);
+  scene.add(marker);
+  registerFarVisual(board, -25.5, 2.2, 70);
+
+  addParkedVehicle(scene, 'auto', 0x2b773f, -29.5, 9.2, Math.PI / 2);
+  addParkedVehicle(scene, 'car', 0x687a86, -20.0, 3.2, Math.PI / 2);
+}
+
 function updateWindWorld(time, delta) {
   windUpdateTimer += delta;
   const windInterval = runtimeIsMobile ? .12 : .08;
@@ -5747,6 +5803,7 @@ function buildWorld(scene) {
   addWeatherRoadDetails(scene);
   addRoadsideLife(scene);
   addTownStreetDetails(scene);
+  addErnakulamDistrictFoundation(scene);
   addKeralaStreetRealism(scene);
   addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737, flowPhase: .4 });
   addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -3.0, min: -76, max: 76, progress: -18, direction: 1, speed: 7.8, color: 0x356f8b, flowPhase: 2.1 });
