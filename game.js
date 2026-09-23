@@ -142,6 +142,7 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'anugraha', kind: 'shop', label: 'Anugraha Stores', x: -14.4, z: 10.7, radius: 3.8, discoverRadius: 7.0, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
   Object.freeze({ id: 'malabar', kind: 'shop', label: 'Malabar Bakery', x: 14.8, z: 41.2, radius: 3.8, discoverRadius: 7.0, openHour: 5.5, closeHour: 20.5, items: ['water', 'tea', 'snack'] }),
   Object.freeze({ id: 'town-bus', kind: 'bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 3.6, discoverRadius: 6.6 }),
+  Object.freeze({ id: 'town-centre-bus', kind: 'bus', label: 'Town Centre Bus Stop', x: 13.0, z: 19.2, radius: 3.6, discoverRadius: 6.6 }),
   Object.freeze({ id: 'south-bus', kind: 'bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 3.6, discoverRadius: 6.6 }),
   Object.freeze({ id: 'village-pond', kind: 'view', label: 'Village Pond', x: 39, z: -4, radius: 4.2, discoverRadius: 7.2 }),
 ]);
@@ -262,6 +263,7 @@ const navigationPlaces = Object.freeze([
   Object.freeze({ id: 'town-police', name: 'Kerala Police Station', icon: 'P', x: -31, z: 14, kind: 'police', district: 'Kottayam' }),
   Object.freeze({ id: 'town-fire', name: 'Fire & Rescue Station', icon: 'F', x: -48, z: 8, kind: 'emergency', district: 'Kottayam' }),
   Object.freeze({ id: 'town-market', name: 'Town Market', icon: 'S', x: 31, z: 15, kind: 'shop', district: 'Kottayam' }),
+  Object.freeze({ id: 'town-centre-bus', name: 'Town Centre Bus Stop', icon: '🚌', x: 13.0, z: 19.2, kind: 'bus', district: 'Kottayam' }),
 ]);
 const taskCatalog = [
   { id: 'open-map', title: 'Open the Kerala map', target: 1, reward: 10 },
@@ -5674,6 +5676,11 @@ function buildWorld(scene) {
   addRoadVehicle(scene, { kind: 'bike', axis: 'x', fixed: -24.4, min: -69, max: 10, progress: -31, direction: 1, speed: 7.2, color: 0x8b3e35, flowPhase: 4.4 });
   // Opposing side-road traffic keeps the junction from feeling one-directional.
   addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: -19.5, min: -69, max: 10, progress: -4, direction: -1, speed: 5.5, color: 0x31734a, flowPhase: 2.9 });
+  // Town-route traffic makes the new Market Road feel connected without changing
+  // the established state-road traffic controller.
+  addRoadVehicle(scene, { kind: 'bus', axis: 'x', fixed: 24.1, min: -15, max: 45, progress: -10, direction: 1, speed: 4.6, color: 0xd7aa2d, flowPhase: 1.7 });
+  addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: 19.9, min: -15, max: 45, progress: 34, direction: -1, speed: 5.1, color: 0x2d7650, flowPhase: 3.3 });
+  addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -40.7, min: -31, max: 19, progress: 12, direction: -1, speed: 5.4, color: 0x6f4a88, flowPhase: 2.2 });
 
   addPhotoHouse(scene, -24, -36, 10.2, 6.8);
   const rentalHomeMarker = new THREE.Group();
