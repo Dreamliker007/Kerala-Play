@@ -904,6 +904,18 @@ function roadZoneAt(x, z) {
     if (Math.abs(z + 6) <= 3.5 && x >= -48 && x <= 0) {
       return { id:'district-station-road', label:'RAILWAY STATION ROAD', displayLimit:25, bikeLimit:4.6, taxiLimit:4.4 };
     }
+    if (Math.abs(z - 22) <= 3.5 && x >= -18 && x <= 58) {
+      return { id:'district-market-road', label:`${districtCityProfile(district).market.toUpperCase()} ROAD`, displayLimit:25, bikeLimit:4.6, taxiLimit:4.4 };
+    }
+    if (Math.abs(z + 36) <= 3.5 && x >= -67 && x <= 19) {
+      return { id:'district-residential-road', label:'RESIDENTIAL ROAD', displayLimit:25, bikeLimit:4.4, taxiLimit:4.2 };
+    }
+    if (Math.abs(z - 45) <= 3.5 && x >= -12 && x <= 62) {
+      return { id:'district-landmark-road', label:`${districtCityProfile(district).landmark.toUpperCase()} ROAD`, displayLimit:25, bikeLimit:4.4, taxiLimit:4.2 };
+    }
+    if (Math.abs(z - 34) <= 3.5 && x >= -67 && x <= -3) {
+      return { id:'district-secondary-road', label:districtCityProfile(district).secondary.toUpperCase(), displayLimit:25, bikeLimit:4.5, taxiLimit:4.3 };
+    }
     if (currentDistrictInstance().airport && Math.abs(z + 28) <= 3.5 && x >= 0 && x <= 44) {
       return { id:'district-airport-road', label:'AIRPORT ROAD', displayLimit:30, bikeLimit:5.0, taxiLimit:4.8 };
     }
@@ -6833,11 +6845,7 @@ function buildWorld(scene) {
 
 function buildLandmarkWorld(scene) {
   const district = currentWorldDistrictName();
-  if (district === 'Kasaragod') addFortLandmark(scene, -7, 60);
-  else if (district === 'Idukki') addTeaHills(scene, 42, 26);
-  else if (district === 'Ernakulam') addPalaceLandmark(scene, -10, 23);
-  else if (district === 'Alappuzha') addBackwaterHouseboat(scene, -34, -13);
-  else if (district === 'Thiruvananthapuram') addTempleLandmark(scene, 13, -57);
+  if (district === 'Ernakulam') addPalaceLandmark(scene, -10, 23);
 }
 
 function landmarkBeacon(scene, x, z, color) {
