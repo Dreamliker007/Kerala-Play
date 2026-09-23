@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=103.0';
-import { createAtmosphere } from './environment.js?v=103.0';
+import { initSocial, api } from './social.js?v=104.0';
+import { createAtmosphere } from './environment.js?v=104.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -5683,8 +5683,8 @@ function addErnakulamDistrictFoundation(scene) {
     color: 0x385f7b,
     collider: 'ernakulam-railway',
   });
-  addShop(scene, -132, 128.8, 'ERNAKULAM CITY MARKET', 'FOOD · GROCERIES · DAILY NEEDS');
-  addShop(scene, -151, 145.8, 'BROADWAY CAFE', 'TEA · MEALS · SNACKS');
+  addShop(scene, -132, 127.5, 'ERNAKULAM CITY MARKET', 'FOOD · GROCERIES · DAILY NEEDS');
+  addShop(scene, -151, 144.5, 'BROADWAY CAFE', 'TEA · MEALS · SNACKS');
   addCivicBuilding(scene, -166, 112.8, { title: 'CITY HOSPITAL', subtitle: 'HEALTH · EMERGENCY', color: 0x2d7d63, collider: 'ernakulam-hospital' });
   addCivicBuilding(scene, -168, 136.8, { title: 'CITY POLICE', subtitle: 'PUBLIC HELP DESK', color: 0x315b84, collider: 'ernakulam-police' });
   addCivicBuilding(scene, -122, 142.8, { title: 'FIRE & RESCUE', subtitle: 'CITY EMERGENCY SERVICES', color: 0xa84437, collider: 'ernakulam-fire' });
