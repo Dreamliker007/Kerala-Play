@@ -3947,6 +3947,7 @@ function publicRideDestinationDistrict(destinationId) {
         if (!['end', 'disabled'].includes(data.type)) {
           const selfState = presence.get(user.id), peerState = presence.get(peer.id);
           requireValue(selfState && peerState && online(user.id) && online(peer.id), 409, 'Both players must be online for nearby voice.');
+          requireValue(currentWorldDistrict(user) === currentWorldDistrict(peer) && user.district === peer.district, 403, 'This player is in another district.');
           requireValue(Math.hypot(selfState.x - peerState.x, selfState.z - peerState.z) <= 28, 403, 'This player is too far away for nearby voice.');
         }
         emit(peer.id, 'proximity-signal', { from: user.id, data });
