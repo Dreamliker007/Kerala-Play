@@ -92,11 +92,15 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
     stops: Object.freeze({
       'town-bus': Object.freeze({
         id: 'town-bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 6.2,
-        phaseMs: 0, destinationId: 'south-bus', arrivalX: 11.7, arrivalZ: 29.4, arrivalRotation: Math.PI,
+        phaseMs: 0, destinationId: 'town-centre-bus', arrivalX: 11.7, arrivalZ: 29.4, arrivalRotation: Math.PI,
+      }),
+      'town-centre-bus': Object.freeze({
+        id: 'town-centre-bus', label: 'Town Centre Bus Stop', x: 13.0, z: 19.2, radius: 6.2,
+        phaseMs: 15_000, destinationId: 'south-bus', arrivalX: 13.0, arrivalZ: 21.1, arrivalRotation: Math.PI,
       }),
       'south-bus': Object.freeze({
         id: 'south-bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 6.2,
-        phaseMs: 22_500, destinationId: 'town-bus', arrivalX: -11.7, arrivalZ: -52.4, arrivalRotation: 0,
+        phaseMs: 30_000, destinationId: 'town-bus', arrivalX: -11.7, arrivalZ: -52.4, arrivalRotation: 0,
       }),
     }),
   }),
@@ -111,6 +115,7 @@ const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   anugraha: Object.freeze({ id:'anugraha', label:'Anugraha Stores', x:-14.4, z:10.7, arrivalX:-14.4, arrivalZ:10.7 }),
   malabar: Object.freeze({ id:'malabar', label:'Malabar Bakery', x:14.8, z:41.2, arrivalX:14.8, arrivalZ:41.2 }),
   'town-bus': Object.freeze({ id:'town-bus', label:'Town Junction Bus Stop', x:11.7, z:27.5, arrivalX:8.7, arrivalZ:27.5 }),
+  'town-centre-bus': Object.freeze({ id:'town-centre-bus', label:'Town Centre Bus Stop', x:13.0, z:19.2, arrivalX:10.0, arrivalZ:19.2 }),
   'south-bus': Object.freeze({ id:'south-bus', label:'South Bus Stop', x:-11.7, z:-50.5, arrivalX:-8.7, arrivalZ:-50.5 }),
   'village-rental': Object.freeze({ id:'village-rental', label:'Village Rental Home', x:-24, z:-30.8, arrivalX:-24, arrivalZ:-30.8 }),
   'village-bench': Object.freeze({ id:'village-bench', label:'Village Rest Bench', x:-10, z:-10, arrivalX:-10, arrivalZ:-10 }),
