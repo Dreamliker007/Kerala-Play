@@ -43,12 +43,12 @@ const WORLD_SHOPS = Object.freeze({
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
   'ernakulam-market': Object.freeze({
-    id: 'ernakulam-market', label: 'Ernakulam City Market', x: -132, z: 123, radius: 5.5,
+    id: 'ernakulam-market', label: 'Ernakulam City Market', x: -139, z: 123, radius: 5.5,
     openHour: 5.5, closeHour: 22,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
   'broadway-cafe': Object.freeze({
-    id: 'broadway-cafe', label: 'Broadway Cafe', x: -151, z: 141, radius: 5.0,
+    id: 'broadway-cafe', label: 'Broadway Cafe', x: -162.5, z: 141, radius: 5.0,
     openHour: 5, closeHour: 23,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
@@ -86,7 +86,7 @@ const NEEDS_REST_ENERGY = 35;
 const NEEDS_REST_COOLDOWN_MS = 30_000;
 const CLINIC_DEFINITIONS = Object.freeze({
   'community-clinic': Object.freeze({ id: 'community-clinic', label: 'Community Clinic', x: 28, z: 28, radius: 6.2, fee: 45, energyRestore: 30, thirstRestore: 10 }),
-  'ernakulam-hospital': Object.freeze({ id: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -166, z: 105, radius: 7.0, fee: 55, energyRestore: 36, thirstRestore: 12 }),
+  'ernakulam-hospital': Object.freeze({ id: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -162, z: 105, radius: 7.0, fee: 55, energyRestore: 36, thirstRestore: 12 }),
 });
 const CLINIC_DEFINITION = CLINIC_DEFINITIONS['community-clinic'];
 const CLINIC_COOLDOWN_MS = 60_000;
@@ -175,9 +175,9 @@ const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   service: Object.freeze({ id:'service', label:'Village Service Garage', x:-36, z:-15, arrivalX:-32.8, arrivalZ:-15 }),
   'village-pond': Object.freeze({ id:'village-pond', label:'Village Pond', x:39, z:-4, arrivalX:35.5, arrivalZ:-4 }),
   'ernakulam-centre': Object.freeze({ id:'ernakulam-centre', label:'Ernakulam City Centre', x:-145, z:132, arrivalX:-141, arrivalZ:132 }),
-  'ernakulam-market': Object.freeze({ id:'ernakulam-market', label:'Ernakulam City Market', x:-132, z:123, arrivalX:-132, arrivalZ:127 }),
-  'broadway-cafe': Object.freeze({ id:'broadway-cafe', label:'Broadway Cafe', x:-151, z:141, arrivalX:-151, arrivalZ:145 }),
-  'ernakulam-hospital': Object.freeze({ id:'ernakulam-hospital', label:'Ernakulam City Hospital', x:-166, z:105, arrivalX:-166, arrivalZ:109 }),
+  'ernakulam-market': Object.freeze({ id:'ernakulam-market', label:'Ernakulam City Market', x:-139, z:123, arrivalX:-139, arrivalZ:127 }),
+  'broadway-cafe': Object.freeze({ id:'broadway-cafe', label:'Broadway Cafe', x:-162.5, z:141, arrivalX:-162.5, arrivalZ:145 }),
+  'ernakulam-hospital': Object.freeze({ id:'ernakulam-hospital', label:'Ernakulam City Hospital', x:-162, z:105, arrivalX:-162, arrivalZ:109 }),
 });
 const PUBLIC_RIDE_SERVICES = Object.freeze({
   auto: Object.freeze({ id:'auto', label:'Auto-rickshaw', baseFare:18, perMeter:.48, maxDistance:72, pickupSeconds:2, speed:10 }),
