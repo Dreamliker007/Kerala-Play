@@ -148,9 +148,9 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'town-bus', kind: 'bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 3.6, discoverRadius: 6.6 }),
   Object.freeze({ id: 'town-centre-bus', kind: 'bus', label: 'Town Centre Bus Stop', x: 13.0, z: 16.0, radius: 4.2, discoverRadius: 7.0 }),
   Object.freeze({ id: 'south-bus', kind: 'bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 3.6, discoverRadius: 6.6 }),
-  Object.freeze({ id: 'ernakulam-market', kind: 'shop', label: 'Ernakulam City Market', x: -132, z: 123, radius: 4.8, discoverRadius: 8.4, openHour: 5.5, closeHour: 22, items: ['water', 'tea', 'snack', 'meal'] }),
-  Object.freeze({ id: 'broadway-cafe', kind: 'shop', label: 'Broadway Cafe', x: -151, z: 141, radius: 4.6, discoverRadius: 8.2, openHour: 5, closeHour: 23, items: ['water', 'tea', 'snack', 'meal'] }),
-  Object.freeze({ id: 'ernakulam-hospital', kind: 'service', service: 'clinic', clinicId: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -166, z: 105, radius: 5.8, discoverRadius: 9.0 }),
+  Object.freeze({ id: 'ernakulam-market', kind: 'shop', label: 'Ernakulam City Market', x: -139, z: 123, radius: 4.8, discoverRadius: 8.4, openHour: 5.5, closeHour: 22, items: ['water', 'tea', 'snack', 'meal'] }),
+  Object.freeze({ id: 'broadway-cafe', kind: 'shop', label: 'Broadway Cafe', x: -162.5, z: 141, radius: 4.6, discoverRadius: 8.2, openHour: 5, closeHour: 23, items: ['water', 'tea', 'snack', 'meal'] }),
+  Object.freeze({ id: 'ernakulam-hospital', kind: 'service', service: 'clinic', clinicId: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -162, z: 105, radius: 5.8, discoverRadius: 9.0 }),
   Object.freeze({ id: 'ernakulam-police', kind: 'service', service: 'police', servicePointId: 'ernakulam-police', label: 'Ernakulam City Police', x: -181, z: 141, radius: 5.8, discoverRadius: 9.0 }),
   Object.freeze({ id: 'ernakulam-fire', kind: 'service', service: 'fire', servicePointId: 'ernakulam-fire', label: 'Ernakulam Fire & Rescue', x: -116, z: 141, radius: 5.8, discoverRadius: 9.0 }),
   Object.freeze({ id: 'ernakulam-station-bus', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Ernakulam Railway Bus Stop', x: -179, z: 115.5, radius: 4.2, discoverRadius: 7.5 }),
@@ -283,9 +283,9 @@ const navigationPlaces = Object.freeze([
   Object.freeze({ id: 'kottayam-rail', name: 'Kottayam Railway Station', icon: '🚆', x: 7, z: -23, kind: 'rail', district: 'Kottayam' }),
   Object.freeze({ id: 'ernakulam-rail', name: 'Ernakulam Railway Station', icon: '🚆', x: -190, z: 99.5, kind: 'rail', district: 'Ernakulam' }),
   Object.freeze({ id: 'ernakulam-centre', name: 'Ernakulam City Centre', icon: 'E', x: -145, z: 132, kind: 'town', district: 'Ernakulam' }),
-  Object.freeze({ id: 'ernakulam-market', name: 'Ernakulam City Market', icon: 'S', x: -132, z: 123, kind: 'shop', district: 'Ernakulam' }),
-  Object.freeze({ id: 'broadway-cafe', name: 'Broadway Cafe', icon: 'C', x: -151, z: 141, kind: 'shop', district: 'Ernakulam' }),
-  Object.freeze({ id: 'ernakulam-hospital', name: 'Ernakulam City Hospital', icon: '+', x: -166, z: 105, kind: 'health', district: 'Ernakulam' }),
+  Object.freeze({ id: 'ernakulam-market', name: 'Ernakulam City Market', icon: 'S', x: -139, z: 123, kind: 'shop', district: 'Ernakulam' }),
+  Object.freeze({ id: 'broadway-cafe', name: 'Broadway Cafe', icon: 'C', x: -162.5, z: 141, kind: 'shop', district: 'Ernakulam' }),
+  Object.freeze({ id: 'ernakulam-hospital', name: 'Ernakulam City Hospital', icon: '+', x: -162, z: 105, kind: 'health', district: 'Ernakulam' }),
   Object.freeze({ id: 'ernakulam-police', name: 'Ernakulam City Police', icon: 'P', x: -181, z: 141, kind: 'police', district: 'Ernakulam' }),
   Object.freeze({ id: 'ernakulam-fire', name: 'Ernakulam Fire & Rescue', icon: 'F', x: -116, z: 141, kind: 'emergency', district: 'Ernakulam' }),
   Object.freeze({ id: 'ernakulam-marine', name: 'Marine Drive Bus Stop', icon: '🚌', x: -151, z: 158, kind: 'bus', district: 'Ernakulam' }),
@@ -5762,9 +5762,9 @@ function addErnakulamDistrictFoundation(scene) {
   addBusStop(scene, -179, 115.5, Math.PI / 2, 'RAILWAY BUS');
 
   // City services sit behind sidewalks instead of occupying the carriageway.
-  addShop(scene, -132, 123, 'ERNAKULAM CITY MARKET', 'FOOD · GROCERIES · DAILY NEEDS');
-  addShop(scene, -151, 141, 'BROADWAY CAFE', 'TEA · MEALS · SNACKS');
-  addCivicBuilding(scene, -166, 105, { title: 'CITY HOSPITAL', subtitle: 'HEALTH · EMERGENCY', color: 0x2d7d63, collider: 'ernakulam-hospital' });
+  addShop(scene, -139, 123, 'ERNAKULAM CITY MARKET', 'FOOD · GROCERIES · DAILY NEEDS');
+  addShop(scene, -162.5, 141, 'BROADWAY CAFE', 'TEA · MEALS · SNACKS');
+  addCivicBuilding(scene, -162, 105, { title: 'CITY HOSPITAL', subtitle: 'HEALTH · EMERGENCY', color: 0x2d7d63, collider: 'ernakulam-hospital' });
   addCivicBuilding(scene, -181, 141, { title: 'CITY POLICE', subtitle: 'PUBLIC HELP DESK', color: 0x315b84, collider: 'ernakulam-police' });
   addCivicBuilding(scene, -116, 141, { title: 'FIRE & RESCUE', subtitle: 'CITY EMERGENCY SERVICES', color: 0xa84437, collider: 'ernakulam-fire' });
   addFuelStation(scene, -119, 105);
@@ -5774,9 +5774,9 @@ function addErnakulamDistrictFoundation(scene) {
   addBusStop(scene, -151, 158, Math.PI, 'MARINE DRIVE');
 
   addCityTower(scene, -139, 102, 10, 8, 14, 0xc7b999, 'CITY RESIDENCY');
-  addCityTower(scene, -151, 100, 11, 9, 18, 0xaeb6ba, 'METRO PLAZA');
-  addCityTower(scene, -184, 126, 9, 8, 15, 0xc9b49a, 'APARTMENTS');
-  addCityTower(scene, -116, 126, 10, 8, 16, 0xb0b9c0, 'CITY OFFICES');
+  addCityTower(scene, -162, 94, 11, 9, 18, 0xaeb6ba, 'METRO PLAZA');
+  addCityTower(scene, -184, 122, 9, 8, 15, 0xc9b49a, 'APARTMENTS');
+  addCityTower(scene, -116, 122, 10, 8, 16, 0xb0b9c0, 'CITY OFFICES');
   addCityTower(scene, -164, 162, 10, 8, 13, 0xbfae91, 'MARINE RESIDENCY');
   addCityTower(scene, -136, 162, 12, 8, 17, 0xaab3b8, 'COMMERCIAL CENTRE');
 
@@ -5791,10 +5791,10 @@ function addErnakulamDistrictFoundation(scene) {
   addParkedVehicle(scene, 'bike', 0x316d58, -158, 124, Math.PI / 2);
 
   // City life stays on pavements/forecourts rather than road centre lines.
-  addPhotoVillager(scene, -134, 126.6, 2.6, .28, .7, .70, { role: 'Shopper', nightHide: true, shelterX: -132, shelterZ: 126.4 });
-  addPhotoVillager(scene, -129.8, 126.5, 0, .23, 2.1, .71, { behavior: 'task', role: 'Market Vendor', facing: Math.PI / 2, shelterX: -132, shelterZ: 126.4 });
-  addPhotoVillager(scene, -149, 144.6, 2.2, .25, 3.4, .70, { role: 'Customer', nightHide: true, shelterX: -151, shelterZ: 144.2 });
-  addPhotoVillager(scene, -164, 108.6, 0, .23, 1.2, .72, { behavior: 'task', role: 'Clinic Staff', facing: Math.PI, shelterX: -166, shelterZ: 108.5 });
+  addPhotoVillager(scene, -137, 126.6, 2.1, .28, .7, .70, { role: 'Shopper', nightHide: true, shelterX: -139, shelterZ: 126.4 });
+  addPhotoVillager(scene, -141, 126.5, 0, .23, 2.1, .71, { behavior: 'task', role: 'Market Vendor', facing: Math.PI / 2, shelterX: -139, shelterZ: 126.4 });
+  addPhotoVillager(scene, -160.5, 144.6, 2.0, .25, 3.4, .70, { role: 'Customer', nightHide: true, shelterX: -162.5, shelterZ: 144.2 });
+  addPhotoVillager(scene, -160, 108.6, 0, .23, 1.2, .72, { behavior: 'task', role: 'Clinic Staff', facing: Math.PI, shelterX: -162, shelterZ: 108.5 });
   addPhotoVillager(scene, -179, 144.6, 2.2, .24, 4.4, .71, { behavior: 'patrol', role: 'Police Patrol', shelterX: -181, shelterZ: 144.4 });
   addPhotoVillager(scene, -118, 144.6, 0, .22, 5.6, .70, { behavior: 'task', role: 'Fire Crew', facing: Math.PI, shelterX: -116, shelterZ: 144.4 });
   addPhotoVillager(scene, -182, 116.8, 0, .24, .2, .69, { behavior: 'idle', role: 'Commuter', facing: Math.PI / 2, shelterX: -179, shelterZ: 115.5 });
