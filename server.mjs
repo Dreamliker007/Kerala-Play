@@ -49,18 +49,18 @@ function districtTravelFare(fromDistrict, toDistrict, mode = 'train') {
   return mode === 'flight' ? 140 + hops * 12 : 28 + hops * 5;
 }
 const DISTRICT_CITY_PROFILES = Object.freeze({
-  Kasaragod: Object.freeze({ centre:'Kasaragod Town', market:'Kasaragod Market', cafe:'Bekal Cafe', secondary:'Bekal Road', landmark:'Bekal Fort' }),
-  Kannur: Object.freeze({ centre:'Kannur Town', market:'Fort Road Market', cafe:'Payyambalam Cafe', secondary:'Payyambalam', landmark:'St. Angelo Fort' }),
-  Wayanad: Object.freeze({ centre:'Kalpetta Town', market:'Kalpetta Market', cafe:'Hill View Cafe', secondary:'Meppadi Road', landmark:'Edakkal Caves' }),
-  Kozhikode: Object.freeze({ centre:'Kozhikode City', market:'SM Street Market', cafe:'Beach Road Cafe', secondary:'Beach Road', landmark:'Kozhikode Beach' }),
-  Malappuram: Object.freeze({ centre:'Malappuram Town', market:'Malappuram Market', cafe:'Malabar Cafe', secondary:'Kottakkunnu Road', landmark:'Kottakkunnu' }),
-  Palakkad: Object.freeze({ centre:'Palakkad Town', market:'Fort Market', cafe:'Fort Gate Cafe', secondary:'Fort Road', landmark:'Palakkad Fort' }),
-  Thrissur: Object.freeze({ centre:'Thrissur Round', market:'Sakthan Market', cafe:'Round Cafe', secondary:'Swaraj Round', landmark:'Thekkinkadu Maidan' }),
-  Idukki: Object.freeze({ centre:'Painavu Town', market:'Hill Market', cafe:'Dam View Cafe', secondary:'Dam Road', landmark:'Idukki Arch Dam' }),
-  Alappuzha: Object.freeze({ centre:'Alappuzha Town', market:'Canal Market', cafe:'Boat Jetty Cafe', secondary:'Canal Road', landmark:'Alappuzha Backwaters' }),
-  Pathanamthitta: Object.freeze({ centre:'Pathanamthitta Town', market:'Central Market', cafe:'River View Cafe', secondary:'Konni Road', landmark:'Konni Eco Point' }),
-  Kollam: Object.freeze({ centre:'Kollam City', market:'Chinnakada Market', cafe:'Lake View Cafe', secondary:'Ashtamudi Road', landmark:'Ashtamudi Lake' }),
-  Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', landmark:'Kanakakkunnu Grounds' }),
+  Kasaragod: Object.freeze({ centre:'Kasaragod Town', market:'Kasaragod Market', cafe:'Bekal Cafe', secondary:'Bekal Road', neighbourhood:'Kanhangad Link', landmark:'Bekal Fort' }),
+  Kannur: Object.freeze({ centre:'Kannur Town', market:'Fort Road Market', cafe:'Payyambalam Cafe', secondary:'Payyambalam', neighbourhood:'Thavakkara', landmark:'St. Angelo Fort' }),
+  Wayanad: Object.freeze({ centre:'Kalpetta Town', market:'Kalpetta Market', cafe:'Hill View Cafe', secondary:'Meppadi Road', neighbourhood:'Meppadi', landmark:'Edakkal Caves' }),
+  Kozhikode: Object.freeze({ centre:'Kozhikode City', market:'SM Street Market', cafe:'Beach Road Cafe', secondary:'Beach Road', neighbourhood:'Mananchira', landmark:'Kozhikode Beach' }),
+  Malappuram: Object.freeze({ centre:'Malappuram Town', market:'Malappuram Market', cafe:'Malabar Cafe', secondary:'Kottakkunnu Road', neighbourhood:'Up Hill', landmark:'Kottakkunnu' }),
+  Palakkad: Object.freeze({ centre:'Palakkad Town', market:'Fort Market', cafe:'Fort Gate Cafe', secondary:'Fort Road', neighbourhood:'Sultanpet', landmark:'Palakkad Fort' }),
+  Thrissur: Object.freeze({ centre:'Thrissur Round', market:'Sakthan Market', cafe:'Round Cafe', secondary:'Swaraj Round', neighbourhood:'East Fort', landmark:'Thekkinkadu Maidan' }),
+  Idukki: Object.freeze({ centre:'Painavu Town', market:'Hill Market', cafe:'Dam View Cafe', secondary:'Dam Road', neighbourhood:'Cheruthoni', landmark:'Idukki Arch Dam' }),
+  Alappuzha: Object.freeze({ centre:'Alappuzha Town', market:'Canal Market', cafe:'Boat Jetty Cafe', secondary:'Canal Road', neighbourhood:'Mullakkal', landmark:'Alappuzha Backwaters' }),
+  Pathanamthitta: Object.freeze({ centre:'Pathanamthitta Town', market:'Central Market', cafe:'River View Cafe', secondary:'Konni Road', neighbourhood:'Central Junction', landmark:'Konni Eco Point' }),
+  Kollam: Object.freeze({ centre:'Kollam City', market:'Chinnakada Market', cafe:'Lake View Cafe', secondary:'Ashtamudi Road', neighbourhood:'Kadappakada', landmark:'Ashtamudi Lake' }),
+  Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', neighbourhood:'Palayam', landmark:'Kanakakkunnu Grounds' }),
 });
 function districtCityProfile(district) {
   return DISTRICT_CITY_PROFILES[district] || {
@@ -69,6 +69,7 @@ function districtCityProfile(district) {
     cafe:`${district} Cafe`,
     secondary:`${district} Town Road`,
     landmark:`${district} Landmark`,
+    neighbourhood:`${district} Neighbourhood`,
   };
 }
 function genericDistrictLandmark(userOrDistrict) {
@@ -1411,11 +1412,15 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         },
         'district-market-bus': {
           id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:18, radius:6.2,
-          phaseMs:15_000, destinationId:'district-rail-bus', arrivalX:-32, arrivalZ:-6, arrivalRotation:-Math.PI/2,
+          phaseMs:11_000, destinationId:'district-rail-bus', arrivalX:-32, arrivalZ:-6, arrivalRotation:-Math.PI/2,
         },
         'district-rail-bus': {
           id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-6, radius:6.2,
-          phaseMs:30_000, destinationId:'district-centre-bus', arrivalX:8, arrivalZ:8, arrivalRotation:0,
+          phaseMs:22_000, destinationId:'district-neighbourhood-bus', arrivalX:-52, arrivalZ:-34, arrivalRotation:Math.PI,
+        },
+        'district-neighbourhood-bus': {
+          id:'district-neighbourhood-bus', label:`${profile.neighbourhood} Bus Stop`, x:-55, z:-34, radius:6.2,
+          phaseMs:33_000, destinationId:'district-centre-bus', arrivalX:8, arrivalZ:8, arrivalRotation:0,
         },
       },
     };
@@ -1678,9 +1683,11 @@ function genericRideDestination(user, destinationId) {
     'district-fuel': { id:'district-fuel', label:`${district} Fuel Station`, x:18, z:-48, arrivalX:14, arrivalZ:-48 },
     'district-service': { id:'district-service', label:`${district} Service Garage`, x:-18, z:-48, arrivalX:-14, arrivalZ:-48 },
     'district-landmark': { id:'district-landmark', label:profile.landmark, x:50, z:45, arrivalX:44, arrivalZ:45 },
+    'district-neighbourhood': { id:'district-neighbourhood', label:profile.neighbourhood, x:-55, z:-34, arrivalX:-51, arrivalZ:-34 },
     'district-centre-bus': { id:'district-centre-bus', label:`${profile.centre} Bus Stop`, x:10, z:8, arrivalX:7, arrivalZ:8 },
     'district-market-bus': { id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:18, arrivalX:25, arrivalZ:18 },
     'district-rail-bus': { id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-6, arrivalX:-31, arrivalZ:-6 },
+    'district-neighbourhood-bus': { id:'district-neighbourhood-bus', label:`${profile.neighbourhood} Bus Stop`, x:-55, z:-34, arrivalX:-52, arrivalZ:-34 },
   };
   if (config.airport) destinations['district-airport'] = { id:'district-airport', label:`${district} Airport`, x:config.airport.x, z:config.airport.z, arrivalX:config.airport.arrivalX, arrivalZ:config.airport.arrivalZ };
   return destinations[destinationId] || null;
@@ -1770,7 +1777,7 @@ function publicRideDestinationForUser(user, destinationId) {
     const city = districtCityProfile(district);
     const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinateFor(user, base.x, dx, 'x'), z: missionCoordinateFor(user, base.z, dz, 'z') });
     if (jobId === 'delivery') return [point(`${district} Parcel Hub`, 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
-    if (jobId === 'taxi') return [point(`${city.centre} Passenger Pickup`, 'Pick up passenger', -7, 5), point(city.secondary, 'Drop off passenger', -20, -7)];
+    if (jobId === 'taxi') return [point(`${city.centre} Passenger Pickup`, 'Pick up passenger', -7, 5), point(city.neighbourhood || city.secondary, 'Drop off passenger', -20, -7)];
     return [point(genericDistrictWorld(user) ? city.market : 'Village Shop', 'Check in for shift', 9, -5)];
   }
   function personalVehicleSummary(user) {
