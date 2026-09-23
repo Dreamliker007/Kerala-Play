@@ -1340,8 +1340,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         if (!Number.isFinite(Number(active.vehicleLastImpactAt))) active.vehicleLastImpactAt = 0;
         if (!Number.isFinite(Number(active.vehicleX)) || !Number.isFinite(Number(active.vehicleZ))) {
           const position = savedPosition(user);
-          active.vehicleX = missionCoordinate(position.x, 2.8);
-          active.vehicleZ = missionCoordinate(position.z, 1.5);
+          active.vehicleX = missionCoordinateFor(user, position.x, 2.8, 'x');
+          active.vehicleZ = missionCoordinateFor(user, position.z, 1.5, 'z');
           dirty = true;
         }
       }
@@ -1656,14 +1656,17 @@ function publicRideDestinationDistrict(destinationId) {
       destination: { id: destination.id, label: destination.label },
     };
   }
-  function missionCoordinate(value, delta) {
+  function missionCoordinateFor(user, value, delta, axis = 'x') {
+    const bounds = districtWorldConfig(user).bounds;
+    const min = (axis === 'z' ? bounds.minZ : bounds.minX) + 6;
+    const max = (axis === 'z' ? bounds.maxZ : bounds.maxX) - 6;
     let next = value + delta;
-    if (next > WORLD_LIMIT - 6 || next < -WORLD_LIMIT + 6) next = value - delta;
-    return Math.max(-WORLD_LIMIT + 6, Math.min(WORLD_LIMIT - 6, next));
+    if (next > max || next < min) next = value - delta;
+    return Math.max(min, Math.min(max, next));
   }
   function buildJobCheckpoints(user, jobId) {
     const base = jobPosition(user);
-    const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinate(base.x, dx), z: missionCoordinate(base.z, dz) });
+    const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinateFor(user, base.x, dx, 'x'), z: missionCoordinateFor(user, base.z, dz, 'z') });
     if (jobId === 'delivery') return [point('Village Parcel Hub', 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
     if (jobId === 'taxi') return [point('Passenger Pickup', 'Pick up passenger', -7, 5), point('Town Junction', 'Drop off passenger', -20, -7)];
     return [point('Village Shop', 'Check in for shift', 9, -5)];
@@ -3167,8 +3170,8 @@ function publicRideDestinationDistrict(destinationId) {
           garage.selectedId = vehicle.id;
           garage.activeVehicleId = vehicle.id;
           vehicle.entered = false;
-          vehicle.parkedX = missionCoordinate(position.x, 2.8);
-          vehicle.parkedZ = missionCoordinate(position.z, 1.5);
+          vehicle.parkedX = missionCoordinateFor(user, position.x, 2.8, 'x');
+          vehicle.parkedZ = missionCoordinateFor(user, position.z, 1.5, 'z');
         } else {
           const vehicle = garage.activeVehicleId ? garage.owned.find(item => item.id === garage.activeVehicleId) : null;
           requireValue(vehicle, 409, 'No personal vehicle is outside the garage.');
@@ -3278,8 +3281,8 @@ function publicRideDestinationDistrict(destinationId) {
           stepIndex: 0,
           checkpoints: buildJobCheckpoints(user, jobId),
           vehicleEntered: false,
-          vehicleX: job.vehicle ? missionCoordinate(position.x, 2.8) : null,
-          vehicleZ: job.vehicle ? missionCoordinate(position.z, 1.5) : null,
+          vehicleX: job.vehicle ? missionCoordinateFor(user, position.x, 2.8, 'x') : null,
+          vehicleZ: job.vehicle ? missionCoordinateFor(user, position.z, 1.5, 'z') : null,
           vehicleFuel: job.vehicle ? VEHICLE_FUEL_MAX : null,
           vehicleCondition: job.vehicle ? VEHICLE_CONDITION_MAX : null,
           vehicleLastImpactAt: 0,
