@@ -108,4 +108,12 @@ export function applySafeDrivingMovement(record = {}, segmentInput = {}) {
   };
 }
 
+export function applySafeDrivingServerMovement(record = {}, serverInput = {}) {
+  const segment = safeDrivingServerSegment(serverInput);
+  return {
+    segment,
+    ...applySafeDrivingMovement(record, segment),
+  };
+}
+
 export const SAFE_DRIVING_METERS_PER_POINT = METERS_PER_POINT;

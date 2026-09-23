@@ -4,6 +4,7 @@ import {
   applySafeDrivingCredit,
   applySafeDrivingMovement,
   applySafeDrivingProgress,
+  applySafeDrivingServerMovement,
   safeDrivingProgressFromRecord,
   safeDrivingProgressPatch,
   safeDrivingSegment,
@@ -125,6 +126,28 @@ test('movement persistence transition is a no-op for ineligible driving', () => 
   assert.deepEqual(result.patch, { safeDrivingPoints: 12, safeDrivingMeters: 4 });
   assert.equal(result.progress.earned, 0);
   assert.equal(result.changed, false);
+});
+
+test('applies raw server movement values directly to the durable player record transition', () => {
+  const result = applySafeDrivingServerMovement(
+    { safeDrivingPoints: 99, safeDrivingMeters: 8 },
+    { distance: 7, elapsed: 1.05, speedLimit: 40, licenceValid: true, insuranceActive: true },
+  );
+  assert.equal(result.segment.speedKmh, 40);
+  assert.equal(result.progress.compliant, true);
+  assert.equal(result.progress.earned, 1);
+  assert.deepEqual(result.patch, { safeDrivingPoints: 100, safeDrivingMeters: 5 });
+  assert.equal(result.changed, true);
+});
+
+test('server movement transition preserves progress when a route safety blocker is present', () => {
+  const result = applySafeDrivingServerMovement(
+    { safeDrivingPoints: 12, safeDrivingMeters: 4 },
+    { distance: 5, elapsed: .75, speedLimit: 40, licenceValid: true, insuranceActive: true, trafficNotice: { kind: 'speeding' } },
+  );
+  assert.equal(result.progress.compliant, false);
+  assert.equal(result.changed, false);
+  assert.deepEqual(result.patch, { safeDrivingPoints: 12, safeDrivingMeters: 4 });
 });
 
 test('never grants credit for malformed or stationary movement', () => {
