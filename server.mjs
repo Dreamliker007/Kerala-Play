@@ -73,6 +73,8 @@ const NEEDS_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
 const NEEDS_REST_POINT = Object.freeze({ id: 'village-bench', label: 'Village Rest Bench', x: -10, z: -10, radius: 5.2 });
 const NEEDS_REST_ENERGY = 35;
 const NEEDS_REST_COOLDOWN_MS = 30_000;
+const CLINIC_DEFINITION = Object.freeze({ id: 'community-clinic', label: 'Community Clinic', x: 28, z: 28, radius: 6.2, fee: 45, energyRestore: 30, thirstRestore: 10 });
+const CLINIC_COOLDOWN_MS = 60_000;
 const HOME_DEFINITION = Object.freeze({
   id: 'village-rental',
   label: 'Village Rental Home',
@@ -178,7 +180,7 @@ const GROUP_MEMBER_LIMIT = 12;
 const GROUP_MEMBERSHIP_LIMIT = 8;
 const GROUP_MESSAGE_LIMIT = 100;
 const GROUP_NAME_MAX = 40;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0, lastClinicAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
 const SESSION_AGE = 365 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -277,7 +279,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) { user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }; migrated = true; }
     if (!Array.isArray(user.jobState.traffic.challans)) { user.jobState.traffic.challans = []; migrated = true; }
     if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) { user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 }; migrated = true; }
-    if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) { user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 }; migrated = true; }
+    if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) { user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0, lastClinicAt: 0 }; migrated = true; }
     if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) { user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }; migrated = true; }
     if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) { user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] }; migrated = true; }
     if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) { user.jobState.notifications = { items: [], read: {} }; migrated = true; }
@@ -2508,6 +2510,24 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           home: homeSummary(user),
           needs: needsSummary(user),
         }); return;
+      }
+      if (path === '/api/needs/clinic' && request.method === 'POST') {
+        limited(`needs-clinic:${user.id}`, 20, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before visiting the clinic.');
+        requireValue(Math.hypot(live.x - CLINIC_DEFINITION.x, live.z - CLINIC_DEFINITION.z) <= CLINIC_DEFINITION.radius, 409, 'Move closer to the Community Clinic.');
+        const timestamp = now();
+        requireValue(timestamp >= Number(state.needs.lastClinicAt || 0) + CLINIC_COOLDOWN_MS, 409, 'Clinic care is still cooling down.');
+        const transaction = walletTransaction(user, -CLINIC_DEFINITION.fee, 'clinic_care', CLINIC_DEFINITION.label);
+        state.needs.energy = Math.min(NEEDS_MAX, Number(state.needs.energy) + CLINIC_DEFINITION.energyRestore);
+        state.needs.thirst = Math.min(NEEDS_MAX, Number(state.needs.thirst) + CLINIC_DEFINITION.thirstRestore);
+        state.needs.lastClinicAt = timestamp;
+        state.needs.updatedAt = timestamp;
+        dirty = true;
+        await persist();
+        send(response, 200, { treated: true, fee: CLINIC_DEFINITION.fee, wallet: walletSummary(user), needs: needsSummary(user), transaction }); return;
       }
       if (path === '/api/needs/rest' && request.method === 'POST') {
         limited(`needs-rest:${user.id}`, 20, 60000);
