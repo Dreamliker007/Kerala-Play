@@ -6560,8 +6560,10 @@ function addGenericDistrictWorld(scene, district) {
   addRoadVehicle(scene, { kind:'car', axis:'z', fixed:-2.6, min:-72, max:72, progress:-42, direction:1, speed:6.6, color:0x496f9f, flowPhase:1.1 });
   addRoadVehicle(scene, { kind:'auto', axis:'z', fixed:2.7, min:-72, max:72, progress:28, direction:-1, speed:5.4, color:0x2b773f, flowPhase:2.7 });
   addRoadVehicle(scene, { kind:'bike', axis:'x', fixed:-2.3, min:-70, max:70, progress:-30, direction:1, speed:7.2, color:0x8b3e35, flowPhase:4.2 });
-  addRoadVehicle(scene, { kind:'bus', axis:'x', fixed:2.4, min:-70, max:70, progress:42, direction:-1, speed:4.8, color:0xd9b32d, flowPhase:3.4, stops:[10,-34] });
+  addRoadVehicle(scene, { kind:'bus', axis:'x', fixed:2.4, min:-70, max:70, progress:42, direction:-1, speed:4.8, color:0xd9b32d, flowPhase:3.4, stops:[10,28] });
   addRoadVehicle(scene, { kind:'car', axis:'x', fixed:22, min:-52, max:54, progress:-20, direction:1, speed:5.8, color:0x687a86, flowPhase:5.1 });
+  addRoadVehicle(scene, { kind:'bus', axis:'x', fixed:-36, min:-64, max:12, progress:-54, direction:1, speed:4.4, color:0xc89e2f, flowPhase:6.2, stops:[-55,-24] });
+  addRoadVehicle(scene, { kind:'auto', axis:'x', fixed:-36, min:-64, max:12, progress:-18, direction:-1, speed:5.0, color:0x2b773f, flowPhase:7.4 });
 
   addDistrictIdentityEnvironment(scene,district,profile);
   addDistrictSignatureLandmark(scene,district,profile,50,45);
