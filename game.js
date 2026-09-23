@@ -1636,7 +1636,10 @@ function performWorldActivity(activityId) {
       return;
     }
     api('/api/world/emergency-help', { method: 'POST', body: JSON.stringify({ service: spot.service }) }).then(result => {
-      showToast(`${result?.label || spot.label} · help request logged`, 3600);
+      if (result?.progression?.recognition) {
+        profile = { ...profile, recognition: result.progression.recognition };
+      }
+      showToast(`${result?.label || spot.label} · help request logged · response #${Number(result?.emergencyResponses || 0)}`, 3600);
     }).catch(error => showToast(error.message || 'Public help desk unavailable', 3600));
     return;
   }
