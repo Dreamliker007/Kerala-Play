@@ -93,6 +93,12 @@ const WORLD_LIMIT = 210;
 const ERNAKULAM_CITY = Object.freeze({ x: -150, z: 130 });
 const DISTRICT_INSTANCE_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
 const DISTRICT_AIRPORTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvananthapuram']);
+const DISTRICT_BOOT_STORAGE_KEY = 'kerala-play-world-district';
+let bootWorldDistrict = (() => {
+  try { return sessionStorage.getItem(DISTRICT_BOOT_STORAGE_KEY) || 'Kottayam'; }
+  catch { return 'Kottayam'; }
+})();
+let renderedWorldDistrict = '';
 const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTANCE_ORDER.map((district, index) => {
   const generic = {
     district,
@@ -113,7 +119,7 @@ const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTA
   return [district, generic];
 })));
 function currentWorldDistrictName() {
-  const district = profile?.worldDistrict || profile?.district || 'Kottayam';
+  const district = profile?.worldDistrict || bootWorldDistrict || profile?.district || 'Kottayam';
   return DISTRICT_INSTANCE_CONFIG[district] ? district : 'Kottayam';
 }
 function currentDistrictInstance() {
@@ -1772,6 +1778,99 @@ function performWorldActivity(activityId) {
   }
 }
 
+let districtTravelMode = 'train';
+let districtTravelSelected = '';
+let districtTravelSnapshot = null;
+
+function closeDistrictTravelPanel() {
+  districtTravelPanel?.classList.remove('open');
+  districtTravelSelected = '';
+  if (districtTravelConfirm) {
+    districtTravelConfirm.disabled = true;
+    districtTravelConfirm.textContent = 'SELECT A DISTRICT';
+  }
+  if (districtTravelError) districtTravelError.textContent = '';
+}
+
+function renderDistrictTravelDestinations() {
+  if (!districtTravelDestinations || !districtTravelSnapshot) return;
+  districtTravelDestinations.replaceChildren();
+  const current = districtTravelSnapshot.currentDistrict;
+  const options = (districtTravelSnapshot.districts || []).filter(item => {
+    if (item.district === current) return false;
+    if (districtTravelMode === 'flight') return !!item.flight?.available && !!districtTravelSnapshot.hubs?.airport;
+    return !!item.train?.available;
+  });
+  for (const item of options) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.district = item.district;
+    button.classList.toggle('selected', districtTravelSelected === item.district);
+    const transport = districtTravelMode === 'flight' ? '✈ Flight' : '🚆 Train';
+    button.textContent = `${item.district}\n${transport}`;
+    button.addEventListener('click', () => {
+      districtTravelSelected = item.district;
+      renderDistrictTravelDestinations();
+      if (districtTravelConfirm) {
+        districtTravelConfirm.disabled = false;
+        districtTravelConfirm.textContent = `${districtTravelMode === 'flight' ? 'FLY' : 'TAKE TRAIN'} → ${item.district.toUpperCase()}`;
+      }
+    });
+    districtTravelDestinations.append(button);
+  }
+  if (!options.length && districtTravelError) {
+    districtTravelError.textContent = districtTravelMode === 'flight'
+      ? 'No direct flight is available from this district. Use the railway station.'
+      : 'No train destinations are available.';
+  }
+}
+
+async function openDistrictTravelPanel(mode = 'train') {
+  districtTravelMode = mode === 'flight' ? 'flight' : 'train';
+  districtTravelSelected = '';
+  if (districtTravelPanel) districtTravelPanel.classList.add('open');
+  if (districtTravelHeading) districtTravelHeading.textContent = districtTravelMode === 'flight' ? 'Kerala Airport' : 'Kerala Railway';
+  if (districtTravelTitle) districtTravelTitle.textContent = `${currentWorldDistrictName()} → choose district`;
+  if (districtTravelNote) districtTravelNote.textContent = districtTravelMode === 'flight'
+    ? 'Flights connect airport districts. District worlds cannot be reached by walking or driving across the map.'
+    : 'All 14 district worlds are isolated. Choose the district you want to enter by train.';
+  if (districtTravelDestinations) districtTravelDestinations.textContent = 'Loading routes…';
+  if (districtTravelError) districtTravelError.textContent = '';
+  if (districtTravelConfirm) districtTravelConfirm.disabled = true;
+  try {
+    districtTravelSnapshot = await api('/api/travel/districts');
+    renderDistrictTravelDestinations();
+  } catch (error) {
+    if (districtTravelDestinations) districtTravelDestinations.replaceChildren();
+    if (districtTravelError) districtTravelError.textContent = error.message || 'Travel routes unavailable.';
+  }
+}
+
+districtTravelClose?.addEventListener('click', closeDistrictTravelPanel);
+districtTravelPanel?.addEventListener('click', event => {
+  if (event.target === districtTravelPanel) closeDistrictTravelPanel();
+});
+districtTravelConfirm?.addEventListener('click', async () => {
+  if (!districtTravelSelected || districtTravelConfirm.disabled) return;
+  districtTravelConfirm.disabled = true;
+  if (districtTravelError) districtTravelError.textContent = '';
+  try {
+    const result = await api('/api/travel/district/board', {
+      mode: districtTravelMode,
+      destinationDistrict: districtTravelSelected,
+    });
+    const district = result?.travel?.district || result?.user?.worldDistrict || districtTravelSelected;
+    try { sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, district); } catch {}
+    bootWorldDistrict = district;
+    closeDistrictTravelPanel();
+    showToast(`${districtTravelMode === 'flight' ? 'Flight' : 'Train'} arrived · ${district}`, 1800);
+    location.reload();
+  } catch (error) {
+    districtTravelConfirm.disabled = false;
+    if (districtTravelError) districtTravelError.textContent = error.message || 'Travel failed.';
+  }
+});
+
 function updateLifeLoopMission() {
   if (!missionText || !landmarkStatus || activeJobMission || activeNpcFavor || selectedDestination) return;
   const hunger = Number(needsSnapshot?.hunger ?? 100);
@@ -1814,6 +1913,7 @@ function updateWorldInteract() {
   worldInteract.dataset.itemId = '';
   worldInteract.dataset.activity = '';
   worldInteract.dataset.station = '';
+  worldInteract.dataset.transport = '';
   worldInteract.title = '';
   if (!profile || !playerRef) return;
   const active = activeJobMission;
@@ -1964,15 +2064,17 @@ function updateWorldInteract() {
         worldInteract.textContent = closeEnough ? action : `COME CLOSER · ${spot.label.toUpperCase()}`;
         worldInteract.title = closeEnough ? `${spot.label} · essential public service` : worldInteract.title;
       } else if (spot.kind === 'train') {
-        worldInteract.dataset.station = closeEnough ? String(spot.stationId || '') : '';
-        worldInteract.dataset.mode = closeEnough ? 'train-board' : '';
+        worldInteract.dataset.mode = closeEnough ? 'district-travel' : '';
+        worldInteract.dataset.transport = closeEnough ? 'train' : '';
         worldInteract.disabled = !closeEnough;
-        worldInteract.textContent = closeEnough
-          ? `BOARD TRAIN → ${String(spot.destinationLabel || '').toUpperCase()} · ₹${Number(spot.fare || 35)}`
-          : `NEARBY · ${spot.label.toUpperCase()}`;
-        worldInteract.title = closeEnough
-          ? `${spot.label} → ${spot.destinationLabel} · district train fare ₹${Number(spot.fare || 35)}`
-          : worldInteract.title;
+        worldInteract.textContent = closeEnough ? 'OPEN TRAIN ROUTES' : `NEARBY · ${spot.label.toUpperCase()}`;
+        worldInteract.title = closeEnough ? `${spot.label} · travel to another district` : worldInteract.title;
+      } else if (spot.kind === 'airport') {
+        worldInteract.dataset.mode = closeEnough ? 'district-travel' : '';
+        worldInteract.dataset.transport = closeEnough ? 'flight' : '';
+        worldInteract.disabled = !closeEnough;
+        worldInteract.textContent = closeEnough ? 'OPEN FLIGHT ROUTES' : `NEARBY · ${spot.label.toUpperCase()}`;
+        worldInteract.title = closeEnough ? `${spot.label} · fly to another airport district` : worldInteract.title;
       } else if (spot.kind === 'bus') {
         const status = busTravelStatus?.stop?.id === spot.id ? busTravelStatus : null;
         const serverOffset = Number(status?.serverNow || 0) - Number(status?.receivedAt || 0);
@@ -2097,7 +2199,7 @@ worldInteract?.addEventListener('click', () => {
   } else if (worldInteract.dataset.mode === 'world-service') {
     performWorldActivity(worldInteract.dataset.activity);
   } else if (worldInteract.dataset.mode === 'world-shop-open') {
-    const spot = WORLD_ACTIVITY_SPOTS.find(item => item.id === worldInteract.dataset.shop && item.kind === 'shop');
+    const spot = activeWorldActivitySpots().find(item => item.id === worldInteract.dataset.shop && item.kind === 'shop');
     if (spot) {
       window.dispatchEvent(new CustomEvent('kerala-world-shop-open', {
         detail: {
@@ -2108,17 +2210,19 @@ worldInteract?.addEventListener('click', () => {
         },
       }));
     }
+  } else if (worldInteract.dataset.mode === 'district-travel') {
+    openDistrictTravelPanel(worldInteract.dataset.transport || 'train');
   } else if (worldInteract.dataset.mode === 'train-board') {
     window.dispatchEvent(new CustomEvent('kerala-train-board', {
       detail: { stationId: worldInteract.dataset.station },
     }));
   } else if (worldInteract.dataset.mode === 'bus-check') {
     window.dispatchEvent(new CustomEvent('kerala-bus-stop-view', {
-      detail: { routeId: WORLD_ACTIVITY_SPOTS.find(item => item.id === worldInteract.dataset.activity)?.routeId || 'village-line', stopId: worldInteract.dataset.activity },
+      detail: { routeId: findWorldActivity(worldInteract.dataset.activity)?.routeId || 'village-line', stopId: worldInteract.dataset.activity },
     }));
   } else if (worldInteract.dataset.mode === 'bus-board') {
     window.dispatchEvent(new CustomEvent('kerala-bus-board', {
-      detail: { routeId: WORLD_ACTIVITY_SPOTS.find(item => item.id === worldInteract.dataset.activity)?.routeId || 'village-line', stopId: worldInteract.dataset.activity },
+      detail: { routeId: findWorldActivity(worldInteract.dataset.activity)?.routeId || 'village-line', stopId: worldInteract.dataset.activity },
     }));
   } else if (worldInteract.dataset.mode === 'world-activity') {
     performWorldActivity(worldInteract.dataset.activity);
@@ -2358,6 +2462,14 @@ onboardingSkip.addEventListener('click', () => finishOnboarding(true));
 function acceptUser(user) {
   const previous = profile;
   profile = user;
+  if (user?.worldDistrict && DISTRICT_INSTANCE_CONFIG[user.worldDistrict]) {
+    bootWorldDistrict = user.worldDistrict;
+    try { sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, user.worldDistrict); } catch {}
+    if (renderedWorldDistrict && renderedWorldDistrict !== user.worldDistrict) {
+      location.reload();
+      return;
+    }
+  }
   progress = user ? { xp: user.points || 0, level: user.level || 1, walkMeters: user.walkMeters || 0,
     visitedLandmarkIds: user.visitedLandmarks || [], completedTaskIds: user.completedTasks || [], followingIds: [] } : newProgress();
   updateProfileHud(); updateProgressHud(); renderTasks();
