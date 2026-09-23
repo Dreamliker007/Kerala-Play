@@ -846,11 +846,30 @@ function updateFootstepEffects(delta, player, moving, running, phase = 0) {
 }
 
 function roadZoneAt(x, z) {
-  for (const road of roadNetwork) {
-    const cross = road.axis === 'z' ? x : z;
-    const along = road.axis === 'z' ? z : x;
-    if (Math.abs(cross - road.center) <= road.halfWidth && along >= road.min && along <= road.max) {
-      return { id: road.id, label: road.name.toUpperCase(), displayLimit: road.displayLimit, bikeLimit: road.bikeLimit, taxiLimit: road.taxiLimit };
+  const district = currentWorldDistrictName();
+  if (district !== 'Kottayam' && district !== 'Ernakulam') {
+    if (Math.abs(x) <= 6 && z >= -68 && z <= 68) {
+      return { id:'district-spine', label:`${district.toUpperCase()} MAIN ROAD`, displayLimit:35, bikeLimit:5.8, taxiLimit:5.6 };
+    }
+    if (Math.abs(z) <= 5 && x >= -68 && x <= 68) {
+      return { id:'district-cross', label:`${district.toUpperCase()} CITY ROAD`, displayLimit:30, bikeLimit:5.2, taxiLimit:5.0 };
+    }
+    if (Math.abs(z + 6) <= 3.5 && x >= -48 && x <= 0) {
+      return { id:'district-station-road', label:'RAILWAY STATION ROAD', displayLimit:25, bikeLimit:4.6, taxiLimit:4.4 };
+    }
+    if (currentDistrictInstance().airport && Math.abs(z + 28) <= 3.5 && x >= 0 && x <= 44) {
+      return { id:'district-airport-road', label:'AIRPORT ROAD', displayLimit:30, bikeLimit:5.0, taxiLimit:4.8 };
+    }
+  } else {
+    const roads = roadNetwork.filter(road => district === 'Ernakulam'
+      ? road.id.startsWith('ernakulam-')
+      : !road.id.startsWith('ernakulam-'));
+    for (const road of roads) {
+      const cross = road.axis === 'z' ? x : z;
+      const along = road.axis === 'z' ? z : x;
+      if (Math.abs(cross - road.center) <= road.halfWidth && along >= road.min && along <= road.max) {
+        return { id: road.id, label: road.name.toUpperCase(), displayLimit: road.displayLimit, bikeLimit: road.bikeLimit, taxiLimit: road.taxiLimit };
+      }
     }
   }
   const zone = worldZoneAt(x, z);
@@ -1991,8 +2010,8 @@ function updateWorldInteract() {
     }
   }
 
-  if (!active && vehicleMode === 'walk' && homeSnapshot?.home) {
-    const home = homeSnapshot.home;
+  if (!active && vehicleMode === 'walk' && (homeSnapshot?.localHome || homeSnapshot?.home)) {
+    const home = homeSnapshot.localHome || homeSnapshot.home;
     const distance = Math.hypot(playerRef.position.x - Number(home.x), playerRef.position.z - Number(home.z));
     if (distance <= Number(home.radius || 5.2) + .3) {
       worldInteract.hidden = false;
@@ -2005,8 +2024,8 @@ function updateWorldInteract() {
     }
   }
 
-  if (!active && vehicleMode === 'walk' && needsSnapshot?.restPoint) {
-    const rest = needsSnapshot.restPoint;
+  if (!active && vehicleMode === 'walk' && (needsSnapshot?.localRestPoint || needsSnapshot?.restPoint)) {
+    const rest = needsSnapshot.localRestPoint || needsSnapshot.restPoint;
     const distance = Math.hypot(playerRef.position.x - Number(rest.x), playerRef.position.z - Number(rest.z));
     if (distance <= Number(rest.radius || 5.2) + .3) {
       const waitMs = Math.max(0, Number(needsSnapshot.restReadyAt || 0) - Date.now());
@@ -2946,7 +2965,14 @@ function destinationBusSuggestion(place, player = playerRef) {
 function currentNavigationPlaces() {
   const district = currentWorldDistrictName();
   const existing = navigationPlaces.filter(place => place.district === district || (district === 'Kottayam' && place.district === 'Village'));
-  if (district === 'Kottayam' || district === 'Ernakulam') return existing;
+  if (district === 'Kottayam') return existing;
+  if (district === 'Ernakulam') {
+    return [
+      ...existing,
+      { id:'ernakulam-rental', name:'Ernakulam Rental Home', icon:'H', x:-48, z:40, kind:'home', district },
+      { id:'ernakulam-rest', name:'Ernakulam Rest Bench', icon:'R', x:4, z:40, kind:'rest', district },
+    ];
+  }
   const config = currentDistrictInstance();
   return [
     { id:'district-centre', name:`${district} City Centre`, icon:'C', x:0, z:0, kind:'town', district },
