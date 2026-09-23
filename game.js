@@ -119,18 +119,18 @@ const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTA
   return [district, generic];
 })));
 const DISTRICT_CITY_PROFILES = Object.freeze({
-  Kasaragod: Object.freeze({ centre:'Kasaragod Town', market:'Kasaragod Market', cafe:'Bekal Cafe', secondary:'Bekal Road', landmark:'Bekal Fort', landmarkKind:'fort' }),
-  Kannur: Object.freeze({ centre:'Kannur Town', market:'Fort Road Market', cafe:'Payyambalam Cafe', secondary:'Payyambalam', landmark:'St. Angelo Fort', landmarkKind:'fort' }),
-  Wayanad: Object.freeze({ centre:'Kalpetta Town', market:'Kalpetta Market', cafe:'Hill View Cafe', secondary:'Meppadi Road', landmark:'Edakkal Caves', landmarkKind:'hills' }),
-  Kozhikode: Object.freeze({ centre:'Kozhikode City', market:'SM Street Market', cafe:'Beach Road Cafe', secondary:'Beach Road', landmark:'Kozhikode Beach', landmarkKind:'water' }),
-  Malappuram: Object.freeze({ centre:'Malappuram Town', market:'Malappuram Market', cafe:'Malabar Cafe', secondary:'Kottakkunnu Road', landmark:'Kottakkunnu', landmarkKind:'hills' }),
-  Palakkad: Object.freeze({ centre:'Palakkad Town', market:'Fort Market', cafe:'Fort Gate Cafe', secondary:'Fort Road', landmark:'Palakkad Fort', landmarkKind:'fort' }),
-  Thrissur: Object.freeze({ centre:'Thrissur Round', market:'Sakthan Market', cafe:'Round Cafe', secondary:'Swaraj Round', landmark:'Thekkinkadu Maidan', landmarkKind:'park' }),
-  Idukki: Object.freeze({ centre:'Painavu Town', market:'Hill Market', cafe:'Dam View Cafe', secondary:'Dam Road', landmark:'Idukki Arch Dam', landmarkKind:'dam' }),
-  Alappuzha: Object.freeze({ centre:'Alappuzha Town', market:'Canal Market', cafe:'Boat Jetty Cafe', secondary:'Canal Road', landmark:'Alappuzha Backwaters', landmarkKind:'water' }),
-  Pathanamthitta: Object.freeze({ centre:'Pathanamthitta Town', market:'Central Market', cafe:'River View Cafe', secondary:'Konni Road', landmark:'Konni Eco Point', landmarkKind:'hills' }),
-  Kollam: Object.freeze({ centre:'Kollam City', market:'Chinnakada Market', cafe:'Lake View Cafe', secondary:'Ashtamudi Road', landmark:'Ashtamudi Lake', landmarkKind:'water' }),
-  Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', landmark:'Kanakakkunnu Grounds', landmarkKind:'park' }),
+  Kasaragod: Object.freeze({ centre:'Kasaragod Town', market:'Kasaragod Market', cafe:'Bekal Cafe', secondary:'Bekal Road', neighbourhood:'Kanhangad Link', landmark:'Bekal Fort', landmarkKind:'fort', environment:'coastal' }),
+  Kannur: Object.freeze({ centre:'Kannur Town', market:'Fort Road Market', cafe:'Payyambalam Cafe', secondary:'Payyambalam', neighbourhood:'Thavakkara', landmark:'St. Angelo Fort', landmarkKind:'fort', environment:'coastal' }),
+  Wayanad: Object.freeze({ centre:'Kalpetta Town', market:'Kalpetta Market', cafe:'Hill View Cafe', secondary:'Meppadi Road', neighbourhood:'Meppadi', landmark:'Edakkal Caves', landmarkKind:'hills', environment:'highland' }),
+  Kozhikode: Object.freeze({ centre:'Kozhikode City', market:'SM Street Market', cafe:'Beach Road Cafe', secondary:'Beach Road', neighbourhood:'Mananchira', landmark:'Kozhikode Beach', landmarkKind:'water', environment:'coastal' }),
+  Malappuram: Object.freeze({ centre:'Malappuram Town', market:'Malappuram Market', cafe:'Malabar Cafe', secondary:'Kottakkunnu Road', neighbourhood:'Up Hill', landmark:'Kottakkunnu', landmarkKind:'hills', environment:'highland' }),
+  Palakkad: Object.freeze({ centre:'Palakkad Town', market:'Fort Market', cafe:'Fort Gate Cafe', secondary:'Fort Road', neighbourhood:'Sultanpet', landmark:'Palakkad Fort', landmarkKind:'fort', environment:'plains' }),
+  Thrissur: Object.freeze({ centre:'Thrissur Round', market:'Sakthan Market', cafe:'Round Cafe', secondary:'Swaraj Round', neighbourhood:'East Fort', landmark:'Thekkinkadu Maidan', landmarkKind:'park', environment:'urban-park' }),
+  Idukki: Object.freeze({ centre:'Painavu Town', market:'Hill Market', cafe:'Dam View Cafe', secondary:'Dam Road', neighbourhood:'Cheruthoni', landmark:'Idukki Arch Dam', landmarkKind:'dam', environment:'highland' }),
+  Alappuzha: Object.freeze({ centre:'Alappuzha Town', market:'Canal Market', cafe:'Boat Jetty Cafe', secondary:'Canal Road', neighbourhood:'Mullakkal', landmark:'Alappuzha Backwaters', landmarkKind:'water', environment:'backwater' }),
+  Pathanamthitta: Object.freeze({ centre:'Pathanamthitta Town', market:'Central Market', cafe:'River View Cafe', secondary:'Konni Road', neighbourhood:'Central Junction', landmark:'Konni Eco Point', landmarkKind:'hills', environment:'highland' }),
+  Kollam: Object.freeze({ centre:'Kollam City', market:'Chinnakada Market', cafe:'Lake View Cafe', secondary:'Ashtamudi Road', neighbourhood:'Kadappakada', landmark:'Ashtamudi Lake', landmarkKind:'water', environment:'backwater' }),
+  Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', neighbourhood:'Palayam', landmark:'Kanakakkunnu Grounds', landmarkKind:'park', environment:'urban-park' }),
 });
 function districtCityProfile(district = currentWorldDistrictName()) {
   return DISTRICT_CITY_PROFILES[district] || Object.freeze({
@@ -140,6 +140,8 @@ function districtCityProfile(district = currentWorldDistrictName()) {
     secondary:`${district} Town Road`,
     landmark:`${district} Landmark`,
     landmarkKind:'park',
+    environment:'urban-park',
+    neighbourhood:`${district} Neighbourhood`,
   });
 }
 
@@ -289,6 +291,14 @@ function generatedDistrictTravelSpots() {
       Object.freeze({
         id:'district-rail-bus', kind:'bus', routeId:'district-city-line', label:`${district} Railway Bus Stop`,
         x:-34, z:-6, radius:4.2, discoverRadius:7.2,
+      }),
+      Object.freeze({
+        id:'district-neighbourhood-bus', kind:'bus', routeId:'district-city-line', label:`${city.neighbourhood} Bus Stop`,
+        x:-55, z:-34, radius:4.2, discoverRadius:7.2,
+      }),
+      Object.freeze({
+        id:'district-neighbourhood', kind:'view', label:city.neighbourhood,
+        x:-55, z:-34, radius:5.0, discoverRadius:9,
       }),
       Object.freeze({
         id:'district-landmark', kind:'view', label:city.landmark,
@@ -3047,9 +3057,11 @@ function currentNavigationPlaces() {
     { id:'district-fuel', name:`${district} Fuel Station`, icon:'F', x:18, z:-48, kind:'service', district },
     { id:'district-service', name:`${district} Service Garage`, icon:'G', x:-18, z:-48, kind:'service', district },
     { id:'district-landmark', name:city.landmark, icon:'L', x:50, z:45, kind:'landmark', district },
+    { id:'district-neighbourhood', name:city.neighbourhood, icon:'N', x:-55, z:-34, kind:'town', district },
     { id:'district-centre-bus', name:`${city.centre} Bus Stop`, icon:'🚌', x:10, z:8, kind:'bus', district },
     { id:'district-market-bus', name:`${city.market} Bus Stop`, icon:'🚌', x:28, z:18, kind:'bus', district },
     { id:'district-rail-bus', name:`${district} Railway Bus Stop`, icon:'🚌', x:-34, z:-6, kind:'bus', district },
+    { id:'district-neighbourhood-bus', name:`${city.neighbourhood} Bus Stop`, icon:'🚌', x:-55, z:-34, kind:'bus', district },
     ...(config.airport ? [{ id:'district-airport', name:`${district} Airport`, icon:'✈', x:config.airport.x, z:config.airport.z, kind:'airport', district }] : []),
   ];
 }
@@ -6006,7 +6018,7 @@ function addCityTower(scene, x, z, width, depth, height, color, title = '') {
     }
   }
   if (title) {
-    const board = createWorldSignMesh({ title, subtitle: 'ERNAKULAM CITY', background: '#315f78' }, Math.min(5.6, width * .72), .74);
+    const board = createWorldSignMesh({ title, subtitle: `${currentWorldDistrictName().toUpperCase()} CITY`, background: '#315f78' }, Math.min(5.6, width * .72), .74);
     board.position.set(0, Math.min(height - .65, 4.4), depth / 2 + .08);
     group.add(board);
     registerFarVisual(board, x, z, 85);
