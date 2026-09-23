@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createGameServer } from './server.mjs';
@@ -1418,4 +1418,35 @@ test('admin warn and mute actions are protected, persisted, and audited', async 
   assert.equal(audit.data.entries[0].action, 'player_mute');
   assert.equal(audit.data.entries[1].action, 'player_warn');
   assert.equal(audit.data.entries[0].targetId, playerUser.id);
+});
+
+
+test('emergency help cannot farm recognition during cooldown', async t => {
+  const app = await setup(t);
+  let player = app.client();
+  const user = await signup(player, 'ResponderAlice');
+
+  const dbPath = join(app.dataDir, 'game.json');
+  const db = JSON.parse(await readFile(dbPath, 'utf8'));
+  const savedUser = db.users.find(item => item.id === user.id);
+  savedUser.worldX = -31;
+  savedUser.worldZ = 14;
+  savedUser.worldRotation = 0;
+  savedUser.worldUpdatedAt = Date.now();
+  await writeFile(dbPath, JSON.stringify(db, null, 2));
+  await app.restart();
+  player = app.client();
+  await player('/api/auth/login', { identifier: 'ResponderAlice', password: 'test-password-2026' });
+
+  const first = await player('/api/world/emergency-help', { service: 'police' });
+  assert.equal(first.status, 200);
+  assert.equal(first.data.emergencyResponses, 1);
+
+  const repeated = await player('/api/world/emergency-help', { service: 'police' });
+  assert.equal(repeated.status, 409);
+
+  app.advance(60_001);
+  const second = await player('/api/world/emergency-help', { service: 'police' });
+  assert.equal(second.status, 200);
+  assert.equal(second.data.emergencyResponses, 2);
 });
