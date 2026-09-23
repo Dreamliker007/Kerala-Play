@@ -1423,8 +1423,20 @@ test('admin warn and mute actions are protected, persisted, and audited', async 
 
 test('emergency help cannot farm recognition during cooldown', async t => {
   const app = await setup(t);
-  const player = app.client();
-  await signup(player, 'ResponderAlice');
+  let player = app.client();
+  const user = await signup(player, 'ResponderAlice');
+
+  const dbPath = join(app.dataDir, 'game.json');
+  const db = JSON.parse(await readFile(dbPath, 'utf8'));
+  const savedUser = db.users.find(item => item.id === user.id);
+  savedUser.worldX = -31;
+  savedUser.worldZ = 14;
+  savedUser.worldRotation = 0;
+  savedUser.worldUpdatedAt = Date.now();
+  await writeFile(dbPath, JSON.stringify(db, null, 2));
+  await app.restart();
+  player = app.client();
+  await player('/api/auth/login', { identifier: 'ResponderAlice', password: 'test-password-2026' });
 
   const first = await player('/api/world/emergency-help', { service: 'police' });
   assert.equal(first.status, 200);
