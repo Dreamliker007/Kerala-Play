@@ -520,9 +520,14 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       clockOutput.textContent = `${icon} ${period}${weatherText} · ${String(Math.floor(hour)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
     }
     if (audioEnabled && !document.hidden) {
-      const mainRoadProximity = Math.max(0, 1 - Math.abs(camera.position.x) / 34);
-      const sideRoadProximity = Math.max(0, 1 - Math.abs(camera.position.z + 22) / 30);
-      const roadProximity = Math.max(mainRoadProximity, sideRoadProximity);
+      // Match the expanded physical road network so traffic ambience follows
+      // State Road, Village Link, Market Road and Station Road.
+      const roadProximity = Math.max(
+        Math.max(0, 1 - Math.abs(camera.position.x) / 34),
+        Math.max(0, 1 - Math.abs(camera.position.z + 22) / 30),
+        camera.position.x >= -18 && camera.position.x <= 48 ? Math.max(0, 1 - Math.abs(camera.position.z - 22) / 22) : 0,
+        camera.position.z >= -34 && camera.position.z <= 22 ? Math.max(0, 1 - Math.abs(camera.position.x + 42) / 22) : 0,
+      );
       const firstShopDistance = Math.hypot(camera.position.x + 14.4, camera.position.z - 7.5);
       const secondShopDistance = Math.hypot(camera.position.x - 14.8, camera.position.z - 38.5);
       const townProximity = Math.max(0, 1 - Math.min(firstShopDistance, secondShopDistance) / 28);
