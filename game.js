@@ -4352,6 +4352,25 @@ function trafficFootprint(config) {
     : { halfWidth: dimensions.halfWidth, halfDepth: dimensions.halfLength };
 }
 
+function trafficHitsStaticWorld(config, progress, padding = .12) {
+  const footprint = trafficFootprint(config);
+  const x = config.axis === 'x' ? Number(progress) : Number(config.fixed);
+  const z = config.axis === 'z' ? Number(progress) : Number(config.fixed);
+  const halfWidth = footprint.halfWidth + padding;
+  const halfDepth = footprint.halfDepth + padding;
+  for (const collider of staticColliders) {
+    if (collider.type === 'circle') {
+      const closestX = THREE.MathUtils.clamp(collider.x, x - halfWidth, x + halfWidth);
+      const closestZ = THREE.MathUtils.clamp(collider.z, z - halfDepth, z + halfDepth);
+      if ((collider.x - closestX) ** 2 + (collider.z - closestZ) ** 2 < (collider.radius + padding) ** 2) return true;
+      continue;
+    }
+    if (Math.abs(x - collider.x) < halfWidth + collider.halfWidth
+      && Math.abs(z - collider.z) < halfDepth + collider.halfDepth) return true;
+  }
+  return false;
+}
+
 function positionBlocked(x, z, radius = .45) {
   for (const collider of staticColliders) {
     if (collider.type === 'circle') {
@@ -6678,6 +6697,18 @@ function updateTraffic(delta) {
     let nextProgress = Number(config.progress) + config.direction * config.currentSpeed * delta;
     if (config.direction > 0 && nextProgress > config.max) nextProgress = config.min;
     if (config.direction < 0 && nextProgress < config.min) nextProgress = config.max;
+
+    if (trafficHitsStaticWorld(config, nextProgress)) {
+      // Ambient traffic must never enter buildings, shelters or other static
+      // world geometry. Hold at the last safe point and reverse along its lane.
+      nextProgress = Number(config.progress);
+      config.currentSpeed = 0;
+      config.direction *= -1;
+      if (config.kind === 'bus') {
+        config.lastBusStop = null;
+        config.stopUntil = 0;
+      }
+    }
 
     if (playerRef?.visible) {
       const footprint = trafficFootprint(config);
