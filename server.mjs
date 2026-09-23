@@ -48,6 +48,41 @@ function districtTravelFare(fromDistrict, toDistrict, mode = 'train') {
   const hops = Math.max(1, Math.abs(from - to));
   return mode === 'flight' ? 140 + hops * 12 : 28 + hops * 5;
 }
+const DISTRICT_CITY_PROFILES = Object.freeze({
+  Kasaragod: Object.freeze({ centre:'Kasaragod Town', market:'Kasaragod Market', cafe:'Bekal Cafe', secondary:'Bekal Road', landmark:'Bekal Fort' }),
+  Kannur: Object.freeze({ centre:'Kannur Town', market:'Fort Road Market', cafe:'Payyambalam Cafe', secondary:'Payyambalam', landmark:'St. Angelo Fort' }),
+  Wayanad: Object.freeze({ centre:'Kalpetta Town', market:'Kalpetta Market', cafe:'Hill View Cafe', secondary:'Meppadi Road', landmark:'Edakkal Caves' }),
+  Kozhikode: Object.freeze({ centre:'Kozhikode City', market:'SM Street Market', cafe:'Beach Road Cafe', secondary:'Beach Road', landmark:'Kozhikode Beach' }),
+  Malappuram: Object.freeze({ centre:'Malappuram Town', market:'Malappuram Market', cafe:'Malabar Cafe', secondary:'Kottakkunnu Road', landmark:'Kottakkunnu' }),
+  Palakkad: Object.freeze({ centre:'Palakkad Town', market:'Fort Market', cafe:'Fort Gate Cafe', secondary:'Fort Road', landmark:'Palakkad Fort' }),
+  Thrissur: Object.freeze({ centre:'Thrissur Round', market:'Sakthan Market', cafe:'Round Cafe', secondary:'Swaraj Round', landmark:'Thekkinkadu Maidan' }),
+  Idukki: Object.freeze({ centre:'Painavu Town', market:'Hill Market', cafe:'Dam View Cafe', secondary:'Dam Road', landmark:'Idukki Arch Dam' }),
+  Alappuzha: Object.freeze({ centre:'Alappuzha Town', market:'Canal Market', cafe:'Boat Jetty Cafe', secondary:'Canal Road', landmark:'Alappuzha Backwaters' }),
+  Pathanamthitta: Object.freeze({ centre:'Pathanamthitta Town', market:'Central Market', cafe:'River View Cafe', secondary:'Konni Road', landmark:'Konni Eco Point' }),
+  Kollam: Object.freeze({ centre:'Kollam City', market:'Chinnakada Market', cafe:'Lake View Cafe', secondary:'Ashtamudi Road', landmark:'Ashtamudi Lake' }),
+  Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', landmark:'Kanakakkunnu Grounds' }),
+});
+function districtCityProfile(district) {
+  return DISTRICT_CITY_PROFILES[district] || {
+    centre:`${district} City Centre`,
+    market:`${district} City Market`,
+    cafe:`${district} Cafe`,
+    secondary:`${district} Town Road`,
+    landmark:`${district} Landmark`,
+  };
+}
+function genericDistrictLandmark(userOrDistrict) {
+  const district = typeof userOrDistrict === 'string' ? userOrDistrict : currentWorldDistrict(userOrDistrict);
+  const profile = DISTRICT_CITY_PROFILES[district];
+  return profile ? {
+    id:`district-landmark:${district}`,
+    label:profile.landmark,
+    district,
+    x:50,
+    z:45,
+    radius:8,
+  } : null;
+}
 const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -10, 23], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
 function landmarkDistrictForId(id) {
   if (id === 'bekal') return 'Kasaragod';
@@ -303,9 +338,11 @@ function genericDistrictWorld(user) {
   return district !== 'Kottayam' && district !== 'Ernakulam' ? district : '';
 }
 function worldShopForUser(user, shopId) {
-  if (shopId === 'district-market' && genericDistrictWorld(user)) {
+  if (genericDistrictWorld(user)) {
     const district = currentWorldDistrict(user);
-    return { id:'district-market', label:`${district} City Market`, x:20, z:16, radius:5.5, openHour:5.5, closeHour:22, items:['water','tea','snack','meal'] };
+    const profile = districtCityProfile(district);
+    if (shopId === 'district-market') return { id:'district-market', label:profile.market, x:20, z:16, radius:5.5, openHour:5.5, closeHour:22, items:['water','tea','snack','meal'] };
+    if (shopId === 'district-cafe') return { id:'district-cafe', label:profile.cafe, x:-44, z:22, radius:5.5, openHour:5, closeHour:23, items:['water','tea','snack','meal'] };
   }
   return WORLD_SHOPS[shopId] || null;
 }
@@ -1357,9 +1394,40 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { x: saved.x, z: saved.z };
   }
 
-  function publicTravelStop(stopId) {
+  function districtCityBusRoute(user) {
+    const district = genericDistrictWorld(user);
+    if (!district) return null;
+    const profile = districtCityProfile(district);
+    return {
+      id:'district-city-line',
+      label:`${district} City Line`,
+      fare:14,
+      intervalMs:45_000,
+      boardingWindowMs:9_000,
+      stops:{
+        'district-centre-bus': {
+          id:'district-centre-bus', label:`${profile.centre} Bus Stop`, x:10, z:8, radius:6.2,
+          phaseMs:0, destinationId:'district-market-bus', arrivalX:26, arrivalZ:18, arrivalRotation:Math.PI/2,
+        },
+        'district-market-bus': {
+          id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:18, radius:6.2,
+          phaseMs:15_000, destinationId:'district-rail-bus', arrivalX:-32, arrivalZ:-6, arrivalRotation:-Math.PI/2,
+        },
+        'district-rail-bus': {
+          id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-6, radius:6.2,
+          phaseMs:30_000, destinationId:'district-centre-bus', arrivalX:8, arrivalZ:8, arrivalRotation:0,
+        },
+      },
+    };
+  }
+  function publicTravelStop(stopId, user = null) {
     for (const route of Object.values(PUBLIC_TRAVEL_ROUTES)) {
       const stop = route.stops[stopId];
+      if (stop) return { route, stop };
+    }
+    if (user) {
+      const route = districtCityBusRoute(user);
+      const stop = route?.stops?.[stopId];
       if (stop) return { route, stop };
     }
     return null;
@@ -1630,8 +1698,8 @@ function publicRideDestinationDistrict(destinationId) {
     };
   }
 
-  function publicTravelStatus(stopId, timestamp = now()) {
-    const found = publicTravelStop(stopId);
+  function publicTravelStatus(stopId, timestamp = now(), user = null) {
+    const found = publicTravelStop(stopId, user);
     if (!found) return null;
     const { route, stop } = found;
     const destination = route.stops[stop.destinationId];
@@ -2683,7 +2751,7 @@ function publicRideDestinationDistrict(destinationId) {
       }
       if (path === '/api/travel/bus/status' && request.method === 'GET') {
         const stopId = String(url.searchParams.get('stopId') || '');
-        const status = publicTravelStatus(stopId);
+        const status = publicTravelStatus(stopId, now(), user);
         requireValue(status, 404, 'Bus stop not found.');
         send(response, 200, status); return;
       }
@@ -2691,7 +2759,7 @@ function publicRideDestinationDistrict(destinationId) {
         limited(`bus-board:${user.id}`, 12, 60000);
         const body = await jsonBody(request);
         const stopId = typeof body.stopId === 'string' ? body.stopId : '';
-        const found = publicTravelStop(stopId);
+        const found = publicTravelStop(stopId, user);
         requireValue(found, 404, 'Bus stop not found.');
         const { route, stop } = found;
         const stateForTravel = jobStateFor(user);
@@ -2707,7 +2775,7 @@ function publicRideDestinationDistrict(destinationId) {
           409,
           `Move closer to ${stop.label}.`
         );
-        const status = publicTravelStatus(stopId);
+        const status = publicTravelStatus(stopId, now(), user);
         requireValue(status?.boarding, 409, `Bus has not arrived yet. Wait ${status?.secondsToArrival || 1}s.`);
         const destination = route.stops[stop.destinationId];
         const transaction = walletTransaction(user, -Number(route.fare), 'bus_fare', `${route.label} · ${stop.label} → ${destination.label}`);
@@ -2742,7 +2810,7 @@ function publicRideDestinationDistrict(destinationId) {
             z: live.z,
             rotation: live.rotation,
           },
-          nextStopStatus: publicTravelStatus(destination.id),
+          nextStopStatus: publicTravelStatus(destination.id, now(), user),
         }); return;
       }
       if (path === '/api/needs' && request.method === 'GET') {
@@ -3907,6 +3975,11 @@ function publicRideDestinationDistrict(destinationId) {
         }
         let discovered = false;
         for (const [id, x, z] of LANDMARKS) if (landmarkDistrictForId(id) === currentWorldDistrict(user) && Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
+        const districtLandmark = genericDistrictLandmark(user);
+        if (districtLandmark && Math.hypot(districtLandmark.x - state.x, districtLandmark.z - state.z) <= districtLandmark.radius && !user.visitedLandmarks.includes(districtLandmark.id)) {
+          user.visitedLandmarks.push(districtLandmark.id);
+          discovered = true;
+        }
         const turn = Math.abs(Math.atan2(Math.sin(state.rotation - previousRotation), Math.cos(state.rotation - previousRotation)));
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
