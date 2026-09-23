@@ -7,6 +7,7 @@ import {
   safeDrivingProgressFromRecord,
   safeDrivingProgressPatch,
   safeDrivingSegment,
+  safeDrivingServerSegment,
 } from './safe-driving.mjs';
 
 test('credits only compliant insured licensed driving under the zone tolerance', () => {
@@ -25,6 +26,41 @@ test('credits only compliant insured licensed driving under the zone tolerance',
     assert.equal(result.compliant, false);
     assert.equal(result.creditedMeters, 0);
   }
+});
+
+test('derives the policy segment from the same authoritative movement values used by the server route', () => {
+  assert.deepEqual(safeDrivingServerSegment({
+    distance: 5,
+    elapsed: .75,
+    speedLimit: 40,
+    licenceValid: true,
+    insuranceActive: true,
+  }), {
+    distance: 5,
+    elapsed: .75,
+    speedKmh: 40,
+    speedLimit: 40,
+    licenceValid: true,
+    insuranceActive: true,
+    impactRecent: false,
+    trafficNotice: null,
+  });
+});
+
+test('server segment preserves safety blockers and cannot manufacture speed from invalid timing', () => {
+  const blocked = safeDrivingServerSegment({
+    distance: 5,
+    elapsed: 0,
+    speedLimit: 40,
+    licenceValid: true,
+    insuranceActive: true,
+    impactRecent: true,
+    trafficNotice: { kind: 'speeding' },
+  });
+  assert.equal(Number.isNaN(blocked.speedKmh), true);
+  assert.equal(blocked.impactRecent, true);
+  assert.deepEqual(blocked.trafficNotice, { kind: 'speeding' });
+  assert.equal(safeDrivingSegment(blocked).compliant, false);
 });
 
 test('converts each ten compliant metres into one durable point and carries remainder', () => {

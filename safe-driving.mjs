@@ -31,6 +31,32 @@ export function safeDrivingSegment({
   };
 }
 
+export function safeDrivingServerSegment({
+  distance,
+  elapsed,
+  speedLimit,
+  licenceValid,
+  insuranceActive,
+  impactRecent = false,
+  trafficNotice = null,
+} = {}) {
+  const meters = Number(distance);
+  const seconds = Number(elapsed);
+  const speedKmh = Number.isFinite(meters) && Number.isFinite(seconds) && seconds > 0
+    ? Math.round((meters / Math.max(.05, seconds)) * 6)
+    : NaN;
+  return {
+    distance: meters,
+    elapsed: seconds,
+    speedKmh,
+    speedLimit: Number(speedLimit),
+    licenceValid: licenceValid === true,
+    insuranceActive: insuranceActive === true,
+    impactRecent: impactRecent === true,
+    trafficNotice: trafficNotice || null,
+  };
+}
+
 export function applySafeDrivingCredit(progress = {}, creditedMeters = 0) {
   const currentPoints = Math.max(0, Math.floor(Number(progress.points) || 0));
   const currentMeters = Math.max(0, Number(progress.meters) || 0);
