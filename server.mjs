@@ -10,9 +10,9 @@ import { categoryLeaderboard, leaderboardCategories } from './leaderboards.mjs';
 const scrypt = promisify(scryptCallback);
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DISTRICTS = {
-  Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44],
+  Alappuzha: [-34, -13], Ernakulam: [-62, 60], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44],
 };
-const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
+const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -58, 54], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
 const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250': 75, 'discover-3': 100, 'walk-500': 150, 'discover-5': 200, social: 35 };
 const STARTER_BALANCE = 500;
 const STARTER_JOB_REWARD = 250;
@@ -117,14 +117,14 @@ const DISTRICT_RAIL_ROUTE = Object.freeze({
   label: 'Kottayam ↔ Ernakulam Passenger',
   fare: 35,
   stations: Object.freeze({
-    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7, destinationId: 'ernakulam', arrivalX: -22, arrivalZ: 6 }),
-    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -26, z: 6, radius: 7, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
+    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -57, arrivalZ: 60 }),
+    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -62, z: 60, radius: 7.2, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
   }),
 });
 const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   bekal: Object.freeze({ id:'bekal', label:'Bekal Fort', x:-7, z:60, arrivalX:-7, arrivalZ:56.5 }),
   munnar: Object.freeze({ id:'munnar', label:'Munnar Tea Hills', x:42, z:26, arrivalX:38.8, arrivalZ:26 }),
-  kochi: Object.freeze({ id:'kochi', label:'Mattancherry Palace', x:-26, z:6, arrivalX:-22.8, arrivalZ:6 }),
+  kochi: Object.freeze({ id:'kochi', label:'Mattancherry Palace', x:-58, z:54, arrivalX:-55.0, arrivalZ:54 }),
   alappuzha: Object.freeze({ id:'alappuzha', label:'Alappuzha Backwaters', x:-34, z:-13, arrivalX:-30.7, arrivalZ:-13 }),
   kuttanad: Object.freeze({ id:'kuttanad', label:'Kuttanad Fields', x:7, z:-23, arrivalX:10.2, arrivalZ:-23 }),
   temple: Object.freeze({ id:'temple', label:'Padmanabhaswamy Temple', x:13, z:-57, arrivalX:16.2, arrivalZ:-57 }),
