@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js';
-import { createAtmosphere } from './environment.js';
+import { initSocial, api } from './social.js?v=103.0';
+import { createAtmosphere } from './environment.js?v=103.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -146,6 +146,8 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'town-bus', kind: 'bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 3.6, discoverRadius: 6.6 }),
   Object.freeze({ id: 'town-centre-bus', kind: 'bus', label: 'Town Centre Bus Stop', x: 13.0, z: 16.0, radius: 4.2, discoverRadius: 7.0 }),
   Object.freeze({ id: 'south-bus', kind: 'bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 3.6, discoverRadius: 6.6 }),
+  Object.freeze({ id: 'kottayam-rail', kind: 'train', stationId: 'kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Ernakulam', fare: 35 }),
+  Object.freeze({ id: 'ernakulam-rail', kind: 'train', stationId: 'ernakulam', label: 'Ernakulam Railway Station', x: -62, z: 60, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Kottayam', fare: 35 }),
   Object.freeze({ id: 'town-market', kind: 'shop', label: 'Town Market', x: 31, z: 15, radius: 4.2, discoverRadius: 7.2, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
   Object.freeze({ id: 'community-clinic', kind: 'service', service: 'clinic', label: 'Community Clinic', x: 28, z: 28, radius: 4.8, discoverRadius: 8.0 }),
   Object.freeze({ id: 'police-station', kind: 'service', service: 'police', label: 'Kerala Police Station', x: -31, z: 14, radius: 4.8, discoverRadius: 8.0 }),
@@ -217,7 +219,7 @@ let onboardingForceRequested = false;
 let onboardingTypeTimer = 0;
 let onboardingTypeToken = 0;
 const districtStarts = {
-  Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
+  Alappuzha: [-34, -13], Ernakulam: [-62, 60], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44]
 };
 const worldZones = Object.freeze([
   Object.freeze({ id: 'north-coast', name: 'North Kerala', districts: ['Kasaragod', 'Kannur', 'Wayanad'], minZ: 38, maxZ: 72 }),
@@ -231,12 +233,14 @@ const roadNetwork = Object.freeze([
   Object.freeze({ id: 'village-link', name: 'Village Link Road', axis: 'x', center: -22, min: -72, max: 16, halfWidth: 5.75, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
   Object.freeze({ id: 'market-link', name: 'Market Road', axis: 'x', center: 22, min: -18, max: 48, halfWidth: 3.4, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
   Object.freeze({ id: 'station-link', name: 'Station Road', axis: 'z', center: -42, min: -34, max: 22, halfWidth: 3.2, displayLimit: 25, bikeLimit: 4.4, taxiLimit: 4.2 }),
+  Object.freeze({ id: 'ernakulam-cross', name: 'Ernakulam City Road', axis: 'x', center: 60, min: -82, max: -43, halfWidth: 3.6, displayLimit: 35, bikeLimit: 5.6, taxiLimit: 5.4 }),
+  Object.freeze({ id: 'ernakulam-station-road', name: 'Ernakulam Station Road', axis: 'z', center: -62, min: 48, max: 78, halfWidth: 3.6, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
 ]);
 const townZones = Object.freeze([
   Object.freeze({ id: 'town-centre', name: 'Town Centre', x: 0, z: 22, radius: 16, district: 'Kottayam' }),
   Object.freeze({ id: 'market-quarter', name: 'Market Quarter', x: -30, z: 22, radius: 15, district: 'Kottayam' }),
   Object.freeze({ id: 'south-junction', name: 'South Junction', x: 0, z: -22, radius: 14, district: 'Kottayam' }),
-  Object.freeze({ id: 'ernakulam-centre', name: 'Ernakulam Centre', x: -26, z: 6, radius: 13, district: 'Ernakulam' }),
+  Object.freeze({ id: 'ernakulam-centre', name: 'Ernakulam Centre', x: -62, z: 60, radius: 18, district: 'Ernakulam' }),
 ]);
 function worldZoneAt(x, z) {
   const district = Object.entries(districtStarts).reduce((best, [name, point]) => {
@@ -250,7 +254,7 @@ function worldZoneAt(x, z) {
 const landmarks = [
   { id: 'bekal', name: 'Bekal Fort', icon: 'F', x: -7, z: 60, district: 'Kasaragod', kind: 'landmark' },
   { id: 'munnar', name: 'Munnar Tea Hills', icon: 'M', x: 42, z: 26, district: 'Idukki', kind: 'landmark' },
-  { id: 'kochi', name: 'Mattancherry Palace', icon: 'P', x: -26, z: 6, district: 'Ernakulam', kind: 'landmark' },
+  { id: 'kochi', name: 'Mattancherry Palace', icon: 'P', x: -58, z: 54, district: 'Ernakulam', kind: 'landmark' },
   { id: 'alappuzha', name: 'Alappuzha Backwaters', icon: 'B', x: -34, z: -13, district: 'Alappuzha', kind: 'landmark' },
   { id: 'kuttanad', name: 'Kuttanad Fields', icon: 'K', x: 7, z: -23, district: 'Kottayam', kind: 'landmark' },
   { id: 'temple', name: 'Padmanabhaswamy Temple', icon: 'T', x: 13, z: -57, district: 'Thiruvananthapuram', kind: 'landmark' }
@@ -261,6 +265,9 @@ const navigationPlaces = Object.freeze([
   Object.freeze({ id: 'malabar', name: 'Malabar Bakery', icon: 'B', x: 14.8, z: 41.2, kind: 'shop', district: 'Village' }),
   Object.freeze({ id: 'town-bus', name: 'Town Junction Bus Stop', icon: '🚌', x: 11.7, z: 27.5, kind: 'bus', district: 'Village' }),
   Object.freeze({ id: 'south-bus', name: 'South Bus Stop', icon: '🚌', x: -11.7, z: -50.5, kind: 'bus', district: 'Village' }),
+  Object.freeze({ id: 'kottayam-rail', name: 'Kottayam Railway Station', icon: '🚆', x: 7, z: -23, kind: 'rail', district: 'Kottayam' }),
+  Object.freeze({ id: 'ernakulam-rail', name: 'Ernakulam Railway Station', icon: '🚆', x: -62, z: 60, kind: 'rail', district: 'Ernakulam' }),
+  Object.freeze({ id: 'ernakulam-centre', name: 'Ernakulam Centre', icon: 'E', x: -62, z: 60, kind: 'town', district: 'Ernakulam' }),
   Object.freeze({ id: 'village-rental', name: 'Village Rental Home', icon: 'H', x: -24, z: -30.8, kind: 'home', district: 'Village' }),
   Object.freeze({ id: 'village-bench', name: 'Village Rest Bench', icon: 'R', x: -10, z: -10, kind: 'rest', district: 'Village' }),
   Object.freeze({ id: 'fuel', name: 'Kerala Fuel Station', icon: 'F', x: 11, z: -12, kind: 'service', district: 'Village' }),
@@ -1704,6 +1711,7 @@ function updateWorldInteract() {
   worldInteract.dataset.shop = '';
   worldInteract.dataset.itemId = '';
   worldInteract.dataset.activity = '';
+  worldInteract.dataset.station = '';
   worldInteract.title = '';
   if (!profile || !playerRef) return;
   const active = activeJobMission;
@@ -1853,6 +1861,16 @@ function updateWorldInteract() {
         const action = spot.service === 'clinic' ? 'VISIT CLINIC' : spot.service === 'police' ? 'ASK POLICE HELP' : 'CONTACT FIRE & RESCUE';
         worldInteract.textContent = closeEnough ? action : `COME CLOSER · ${spot.label.toUpperCase()}`;
         worldInteract.title = closeEnough ? `${spot.label} · essential public service` : worldInteract.title;
+      } else if (spot.kind === 'train') {
+        worldInteract.dataset.station = closeEnough ? String(spot.stationId || '') : '';
+        worldInteract.dataset.mode = closeEnough ? 'train-board' : '';
+        worldInteract.disabled = !closeEnough;
+        worldInteract.textContent = closeEnough
+          ? `BOARD TRAIN → ${String(spot.destinationLabel || '').toUpperCase()} · ₹${Number(spot.fare || 35)}`
+          : `NEARBY · ${spot.label.toUpperCase()}`;
+        worldInteract.title = closeEnough
+          ? `${spot.label} → ${spot.destinationLabel} · district train fare ₹${Number(spot.fare || 35)}`
+          : worldInteract.title;
       } else if (spot.kind === 'bus') {
         const status = busTravelStatus?.stop?.id === spot.id ? busTravelStatus : null;
         const serverOffset = Number(status?.serverNow || 0) - Number(status?.receivedAt || 0);
@@ -1988,6 +2006,10 @@ worldInteract?.addEventListener('click', () => {
         },
       }));
     }
+  } else if (worldInteract.dataset.mode === 'train-board') {
+    window.dispatchEvent(new CustomEvent('kerala-train-board', {
+      detail: { stationId: worldInteract.dataset.station },
+    }));
   } else if (worldInteract.dataset.mode === 'bus-check') {
     window.dispatchEvent(new CustomEvent('kerala-bus-stop-view', {
       detail: { routeId: 'village-line', stopId: worldInteract.dataset.activity },
@@ -2352,7 +2374,18 @@ function markLandmarkVisited() {
 
 function updateProfileHud() {
   profileName.textContent = profile?.username || 'Sign in';
-  profileDistrict.textContent = profile?.district ? `${profile.district} · ${profile.gender === 'female' ? 'Female' : 'Male'} avatar` : 'Choose your district';
+  if (!profile) {
+    profileDistrict.textContent = 'Choose your district';
+    profileDistrict.title = '';
+    return;
+  }
+  const currentDistrict = playerRef
+    ? worldZoneAt(playerRef.position.x, playerRef.position.z).district
+    : profile.district;
+  profileDistrict.textContent = `${currentDistrict} · ${profile.gender === 'female' ? 'Female' : 'Male'} avatar`;
+  profileDistrict.title = profile.district && profile.district !== currentDistrict
+    ? `Home district: ${profile.district}`
+    : '';
 }
 
 function disposeObject(object) {
@@ -3175,6 +3208,7 @@ try {
     driveSpeed = 0;
     player.visible = !!profile;
     player.position.set(Number(detail.x), 0, Number(detail.z));
+    updateProfileHud();
     player.rotation.y = Number.isFinite(Number(detail.rotation)) ? Number(detail.rotation) : player.rotation.y;
     if (positionBlocked(player.position.x, player.position.z, .43)) recoverBlockedPlayerSpawn(player, true);
     walkVelocity.set(0, 0, 0);
@@ -4372,6 +4406,22 @@ function trafficHitsStaticWorld(config, progress, padding = .12) {
   return false;
 }
 
+function nearestSafeTrafficProgress(config, preferred) {
+  const min = Number(config.min);
+  const max = Number(config.max);
+  const start = THREE.MathUtils.clamp(Number(preferred), min, max);
+  if (!trafficHitsStaticWorld(config, start)) return start;
+  const span = Math.max(0, max - min);
+  const step = .65;
+  for (let distance = step; distance <= span + step; distance += step) {
+    const forward = start + distance;
+    if (forward <= max && !trafficHitsStaticWorld(config, forward)) return forward;
+    const backward = start - distance;
+    if (backward >= min && !trafficHitsStaticWorld(config, backward)) return backward;
+  }
+  return start;
+}
+
 function positionBlocked(x, z, radius = .45) {
   for (const collider of staticColliders) {
     if (collider.type === 'circle') {
@@ -5516,59 +5566,102 @@ function addTownStreetDetails(scene) {
   addParkedVehicle(scene, 'auto', 0x2b773f, -57.0, -29.7, Math.PI / 2);
 }
 
+function addRailTracks(scene, x, z, length = 30) {
+  const railMaterial = new THREE.MeshStandardMaterial({ color: 0x4d5355, roughness: .62, metalness: .38 });
+  const sleeperMaterial = new THREE.MeshStandardMaterial({ color: 0x6b513a, roughness: .94 });
+  [-.72, .72].forEach(offset => {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(length, .08, .09), railMaterial);
+    rail.position.set(x, .06, z + offset);
+    scene.add(rail);
+  });
+  for (let offset = -length / 2 + .7; offset <= length / 2 - .7; offset += 1.15) {
+    const sleeper = new THREE.Mesh(new THREE.BoxGeometry(.12, .06, 2.15), sleeperMaterial);
+    sleeper.position.set(x + offset, .025, z);
+    scene.add(sleeper);
+  }
+}
+
+function addKottayamRailwayFoundation(scene) {
+  addRailTracks(scene, 7, -26.5, 31);
+  addCivicBuilding(scene, 14.5, -30.5, {
+    title: 'KOTTAYAM RAILWAY',
+    subtitle: 'ERNAKULAM · DISTRICT TRAINS',
+    color: 0x315f78,
+    collider: 'kottayam-railway',
+  });
+  const board = createWorldSignMesh({
+    title: 'KOTTAYAM STATION',
+    subtitle: 'BOARD HERE · ERNAKULAM ₹35',
+    background: '#315f78',
+  }, 4.2, .92);
+  board.position.set(7, 2.35, -22.3);
+  scene.add(board);
+  registerFarVisual(board, 7, -22.3, 64);
+}
+
 function addErnakulamDistrictFoundation(scene) {
-  // First playable destination outside Kottayam. The district centre is aligned
-  // with the server-owned Ernakulam rail arrival point at roughly (-22, 6).
+  const cx = -62;
+  const cz = 60;
   const roadMaterial = new THREE.MeshStandardMaterial({ color: 0xb7bdc0, roughness: .92, metalness: .01 });
-  const eastWest = new THREE.Mesh(new THREE.PlaneGeometry(38, 6.5), roadMaterial);
+  const eastWest = new THREE.Mesh(new THREE.PlaneGeometry(40, 7), roadMaterial);
   eastWest.rotation.x = -Math.PI / 2;
-  eastWest.position.set(-26, .021, 6);
+  eastWest.position.set(cx, .021, cz);
   scene.add(eastWest);
-  addRoadEdges(scene, -26, 6, 38, 6.5);
+  addRoadEdges(scene, cx, cz, 40, 7);
 
-  const stationApproach = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 28), roadMaterial);
+  const stationApproach = new THREE.Mesh(new THREE.PlaneGeometry(7, 30), roadMaterial);
   stationApproach.rotation.x = -Math.PI / 2;
-  stationApproach.position.set(-26, .022, 13);
+  stationApproach.position.set(cx, .022, cz + 7);
   scene.add(stationApproach);
-  addRoadEdges(scene, -26, 13, 6.5, 28);
+  addRoadEdges(scene, cx, cz + 7, 7, 30);
 
-  addCivicBuilding(scene, -35, 12, {
+  addRailTracks(scene, cx, cz + 3.7, 34);
+  addCivicBuilding(scene, cx - 6.2, cz + 7.0, {
     title: 'ERNAKULAM RAILWAY',
     subtitle: 'KOTTAYAM · DISTRICT TRAINS',
     color: 0x385f7b,
     collider: 'ernakulam-railway',
   });
-  addShop(scene, -16.5, 11.5, 'ERNAKULAM MARKET', 'FOOD · GROCERIES · DAILY NEEDS');
-  addCivicBuilding(scene, -16.5, 1.0, {
+  addShop(scene, cx + 10.5, cz + 5.5, 'ERNAKULAM MARKET', 'FOOD · GROCERIES · DAILY NEEDS');
+  addCivicBuilding(scene, cx + 10.5, cz - 6.5, {
     title: 'CITY CLINIC',
     subtitle: 'HEALTH SERVICES',
     color: 0x2d7d63,
     collider: 'ernakulam-clinic',
   });
-  addCivicBuilding(scene, -37.5, -1.0, {
+  addCivicBuilding(scene, cx - 12.5, cz - 7.0, {
     title: 'ERNAKULAM POLICE',
     subtitle: 'PUBLIC HELP DESK',
     color: 0x315b84,
     collider: 'ernakulam-police',
   });
-  addBusStop(scene, -23.0, 9.0, Math.PI / 2, 'ERNAKULAM CENTRE');
+  addBusStop(scene, cx + 3.0, cz + 8.5, Math.PI / 2, 'ERNAKULAM CENTRE');
 
   const marker = new THREE.Group();
   const board = createWorldSignMesh({
     title: 'ERNAKULAM',
     subtitle: 'RAILWAY · MARKET · SERVICES',
     background: '#315f78',
-  }, 3.8, .9);
-  board.position.y = 2.25;
-  const post = new THREE.Mesh(new THREE.BoxGeometry(.09, 2.25, .09), new THREE.MeshStandardMaterial({ color: 0x555d5e, roughness: .8 }));
-  post.position.y = 1.12;
+  }, 4.2, .95);
+  board.position.y = 2.35;
+  const post = new THREE.Mesh(new THREE.BoxGeometry(.09, 2.35, .09), new THREE.MeshStandardMaterial({ color: 0x555d5e, roughness: .8 }));
+  post.position.y = 1.17;
   marker.add(post, board);
-  marker.position.set(-25.5, 0, 2.2);
+  marker.position.set(cx + .5, 0, cz - 4.3);
   scene.add(marker);
-  registerFarVisual(board, -25.5, 2.2, 70);
+  registerFarVisual(board, cx + .5, cz - 4.3, 80);
 
-  addParkedVehicle(scene, 'auto', 0x2b773f, -29.5, 9.2, Math.PI / 2);
-  addParkedVehicle(scene, 'car', 0x687a86, -20.0, 3.2, Math.PI / 2);
+  const stationBoard = createWorldSignMesh({
+    title: 'ERNAKULAM STATION',
+    subtitle: 'BOARD HERE · KOTTAYAM ₹35',
+    background: '#385f7b',
+  }, 4.1, .9);
+  stationBoard.position.set(cx, 2.3, cz + .2);
+  scene.add(stationBoard);
+  registerFarVisual(stationBoard, cx, cz + .2, 70);
+
+  addParkedVehicle(scene, 'auto', 0x2b773f, cx - 2.8, cz + 9.2, Math.PI / 2);
+  addParkedVehicle(scene, 'car', 0x687a86, cx + 7.2, cz - 3.0, Math.PI / 2);
 }
 
 function updateWindWorld(time, delta) {
@@ -5803,6 +5896,7 @@ function buildWorld(scene) {
   addWeatherRoadDetails(scene);
   addRoadsideLife(scene);
   addTownStreetDetails(scene);
+  addKottayamRailwayFoundation(scene);
   addErnakulamDistrictFoundation(scene);
   addKeralaStreetRealism(scene);
   addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737, flowPhase: .4 });
@@ -6653,13 +6747,15 @@ function addRoadVehicle(scene, config) {
   ambientVehicleLightMaterials.push(...(vehicle.userData.headlightMaterials || []));
   attachTrafficWetEffects(vehicle, config.kind);
   applyDynamicHighQuality(vehicle);
-  vehicle.userData.traffic = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
-  if (config.axis === 'z') {
-    vehicle.position.set(config.fixed, 0, config.progress);
-    vehicle.rotation.y = config.direction > 0 ? 0 : Math.PI;
+  const trafficState = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
+  trafficState.progress = nearestSafeTrafficProgress(trafficState, trafficState.progress);
+  vehicle.userData.traffic = trafficState;
+  if (trafficState.axis === 'z') {
+    vehicle.position.set(trafficState.fixed, 0, trafficState.progress);
+    vehicle.rotation.y = trafficState.direction > 0 ? 0 : Math.PI;
   } else {
-    vehicle.position.set(config.progress, 0, config.fixed);
-    vehicle.rotation.y = config.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+    vehicle.position.set(trafficState.progress, 0, trafficState.fixed);
+    vehicle.rotation.y = trafficState.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
   }
   traffic.push(vehicle);
   scene.add(vehicle);
@@ -6750,6 +6846,13 @@ function updateTraffic(delta) {
     const response = targetSpeed < previousSpeed ? 4.9 : 1.85;
     config.currentSpeed += (targetSpeed - previousSpeed) * Math.min(1, delta * response);
     if (Math.abs(config.currentSpeed) < .03) config.currentSpeed = 0;
+
+    if (trafficHitsStaticWorld(config, Number(config.progress))) {
+      config.progress = nearestSafeTrafficProgress(config, Number(config.progress));
+      config.currentSpeed = 0;
+      if (config.axis === 'z') vehicle.position.z = config.progress;
+      else vehicle.position.x = config.progress;
+    }
 
     let nextProgress = Number(config.progress) + config.direction * config.currentSpeed * delta;
     if (config.direction > 0 && nextProgress > config.max) nextProgress = config.min;

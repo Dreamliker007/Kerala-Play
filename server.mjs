@@ -117,8 +117,8 @@ const DISTRICT_RAIL_ROUTE = Object.freeze({
   label: 'Kottayam ↔ Ernakulam Passenger',
   fare: 35,
   stations: Object.freeze({
-    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7, destinationId: 'ernakulam', arrivalX: -22, arrivalZ: 6 }),
-    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -26, z: 6, radius: 7, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
+    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -57, arrivalZ: 60 }),
+    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -62, z: 60, radius: 7.2, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
   }),
 });
 const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
