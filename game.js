@@ -219,6 +219,13 @@ const worldZones = Object.freeze([
 const roadNetwork = Object.freeze([
   Object.freeze({ id: 'state-spine', name: 'Kerala State Road', axis: 'z', center: 0, min: -72, max: 72, halfWidth: 7.75, displayLimit: 40, bikeLimit: 6.6, taxiLimit: 6.4 }),
   Object.freeze({ id: 'village-link', name: 'Village Link Road', axis: 'x', center: -22, min: -72, max: 16, halfWidth: 5.75, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
+  Object.freeze({ id: 'market-link', name: 'Market Road', axis: 'x', center: 22, min: -18, max: 48, halfWidth: 3.4, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
+  Object.freeze({ id: 'station-link', name: 'Station Road', axis: 'z', center: -42, min: -34, max: 22, halfWidth: 3.2, displayLimit: 25, bikeLimit: 4.4, taxiLimit: 4.2 }),
+]);
+const townZones = Object.freeze([
+  Object.freeze({ id: 'town-centre', name: 'Town Centre', x: 0, z: 22, radius: 16, district: 'Kottayam' }),
+  Object.freeze({ id: 'market-quarter', name: 'Market Quarter', x: -30, z: 22, radius: 15, district: 'Kottayam' }),
+  Object.freeze({ id: 'south-junction', name: 'South Junction', x: 0, z: -22, radius: 14, district: 'Kottayam' }),
 ]);
 function worldZoneAt(x, z) {
   const district = Object.entries(districtStarts).reduce((best, [name, point]) => {
@@ -248,6 +255,9 @@ const navigationPlaces = Object.freeze([
   Object.freeze({ id: 'fuel', name: 'Kerala Fuel Station', icon: 'F', x: 11, z: -12, kind: 'service', district: 'Village' }),
   Object.freeze({ id: 'service', name: 'Village Service Garage', icon: 'G', x: -36, z: -15, kind: 'service', district: 'Village' }),
   Object.freeze({ id: 'village-pond', name: 'Village Pond', icon: 'P', x: 39, z: -4, kind: 'view', district: 'Village' }),
+  Object.freeze({ id: 'town-centre', name: 'Town Centre', icon: 'T', x: 0, z: 22, kind: 'town', district: 'Kottayam' }),
+  Object.freeze({ id: 'market-quarter', name: 'Market Quarter', icon: 'M', x: -30, z: 22, kind: 'town', district: 'Kottayam' }),
+  Object.freeze({ id: 'south-junction', name: 'South Junction', icon: 'J', x: 0, z: -22, kind: 'junction', district: 'Kottayam' }),
 ]);
 const taskCatalog = [
   { id: 'open-map', title: 'Open the Kerala map', target: 1, reward: 10 },
@@ -5580,6 +5590,31 @@ function buildWorld(scene) {
   sideRoad.position.set(-28, .017, -22);
   scene.add(sideRoad);
   addRoadEdges(scene, -28, -22, 88, 12);
+
+  const marketRoad = new THREE.Mesh(new THREE.PlaneGeometry(66, 7), roadMat);
+  marketRoad.rotation.x = -Math.PI / 2;
+  marketRoad.position.set(15, .018, 22);
+  scene.add(marketRoad);
+  addRoadEdges(scene, 15, 22, 66, 7);
+  for (let x = -15; x <= 45; x += 8) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(3.4, .15), lineMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(x, .032, 22);
+    scene.add(line);
+  }
+
+  const stationRoad = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 56), roadMat);
+  stationRoad.rotation.x = -Math.PI / 2;
+  stationRoad.position.set(-42, .019, -6);
+  scene.add(stationRoad);
+  addRoadEdges(scene, -42, -6, 6.5, 56);
+  for (let z = -30; z <= 18; z += 8) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(.15, 3.4), lineMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(-42, .033, z);
+    scene.add(line);
+  }
+
   for (let x = -68; x <= 12; x += 9) {
     const line = new THREE.Mesh(new THREE.PlaneGeometry(4.2, .18), lineMat);
     line.rotation.x = -Math.PI / 2;
@@ -5587,6 +5622,21 @@ function buildWorld(scene) {
     scene.add(line);
   }
   addRoadSurfaceDetails(scene);
+  [
+    { x: 8.8, z: 22, rotation: Math.PI, title: 'TOWN CENTRE', subtitle: 'Market · Bus · Services', background: '#245979' },
+    { x: -34.5, z: 18.2, rotation: Math.PI / 2, title: 'MARKET QUARTER', subtitle: 'Local Shops →', background: '#246b4b' },
+    { x: 8.8, z: -22, rotation: 0, title: 'SOUTH JUNCTION', subtitle: 'Village Link Road', background: '#74572d' },
+  ].forEach(({ x, z, rotation, title, subtitle, background }) => {
+    const marker = new THREE.Group();
+    const board = createWorldSignMesh({ title, subtitle, background }, 3.2, .82);
+    board.position.y = 2.1;
+    const post = new THREE.Mesh(new THREE.BoxGeometry(.08, 2.1, .08), new THREE.MeshStandardMaterial({ color: 0x555d5e, roughness: .76, metalness: .24 }));
+    post.position.y = 1.05;
+    marker.add(post, board);
+    marker.position.set(x, 0, z);
+    marker.rotation.y = rotation;
+    scene.add(marker);
+  });
   addWeatherRoadDetails(scene);
   addRoadsideLife(scene);
   addTownStreetDetails(scene);
