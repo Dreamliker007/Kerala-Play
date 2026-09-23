@@ -1429,8 +1429,11 @@ test('emergency help requires proximity and cannot farm recognition during coold
 
   assert.equal((await player('/api/world/emergency-help', { service: 'police' })).status, 409);
 
-  const move = await player('/api/world/move', { x: -31, z: 14, rotation: 0, moving: false, mode: 'walk' });
+  const move = await player('/api/world/move', { x: -31, z: 14, rotation: 0, moving: true, mode: 'walk' });
   assert.equal(move.status, 200);
+  clock += 1_000;
+  const settle = await player('/api/world/move', { x: -31, z: 14, rotation: 0, moving: false, mode: 'walk' });
+  assert.equal(settle.status, 200);
 
   const first = await player('/api/world/emergency-help', { service: 'police' });
   assert.equal(first.status, 200);
