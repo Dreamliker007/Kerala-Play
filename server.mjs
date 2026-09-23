@@ -36,6 +36,11 @@ const WORLD_SHOPS = Object.freeze({
     openHour: 5.5, closeHour: 20.5,
     items: Object.freeze(['water', 'tea', 'snack']),
   }),
+  'town-market': Object.freeze({
+    id: 'town-market', label: 'Town Market', x: 31, z: 15, radius: 4.8,
+    openHour: 6, closeHour: 21,
+    items: Object.freeze(['water', 'tea', 'snack', 'meal']),
+  }),
 });
 const WORLD_DAY_LENGTH_MS = 24 * 60 * 1000;
 const NPC_RELATIONSHIP_MAX = 100;
