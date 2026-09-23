@@ -4494,8 +4494,8 @@ function resolveCameraCollision(target, desired, clearance = .34) {
     safeT = t;
   }
   if (safeT >= .999) return desired;
-  const minT = Math.min(.18, .72 / Math.max(.72, horizontalDistance));
-  const t = Math.max(minT, safeT - .035);
+  const minT = Math.min(.12, .48 / Math.max(.48, horizontalDistance));
+  const t = safeT > minT ? safeT - .035 : Math.max(0, safeT * .72);
   desired.x = target.x + dx * t;
   desired.z = target.z + dz * t;
   desired.y = THREE.MathUtils.lerp(target.y + .12, desired.y, t);
@@ -4524,14 +4524,14 @@ function moveWithCollision(object, dx, dz, radius) {
 }
 
 function rememberVehicleSafePose(object, radius) {
-  if (!object || positionBlocked(object.position.x, object.position.z, radius + .06)) return;
+  if (!object || positionBlockedStatic(object.position.x, object.position.z, radius + .06)) return;
   vehicleSafePosition.copy(object.position);
   vehicleSafeRotation = object.rotation.y;
   vehicleSafeReady = true;
 }
 
 function findVehicleRecoveryPoint(object, radius) {
-  if (vehicleSafeReady && !positionBlocked(vehicleSafePosition.x, vehicleSafePosition.z, radius + .08)) {
+  if (vehicleSafeReady && !positionBlockedStatic(vehicleSafePosition.x, vehicleSafePosition.z, radius + .08)) {
     return { x: vehicleSafePosition.x, z: vehicleSafePosition.z, rotation: vehicleSafeRotation };
   }
 
@@ -4540,7 +4540,7 @@ function findVehicleRecoveryPoint(object, radius) {
   for (const distance of [.45, .8, 1.2, 1.7, 2.3]) {
     const x = THREE.MathUtils.clamp(object.position.x + backwardsX * distance, -WORLD_LIMIT, WORLD_LIMIT);
     const z = THREE.MathUtils.clamp(object.position.z + backwardsZ * distance, -WORLD_LIMIT, WORLD_LIMIT);
-    if (!positionBlocked(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
+    if (!positionBlockedStatic(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
   }
 
   for (const ring of [1, 1.6, 2.4, 3.2]) {
@@ -4548,14 +4548,14 @@ function findVehicleRecoveryPoint(object, radius) {
       const angle = index / 16 * Math.PI * 2;
       const x = THREE.MathUtils.clamp(object.position.x + Math.sin(angle) * ring, -WORLD_LIMIT, WORLD_LIMIT);
       const z = THREE.MathUtils.clamp(object.position.z + Math.cos(angle) * ring, -WORLD_LIMIT, WORLD_LIMIT);
-      if (!positionBlocked(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
+      if (!positionBlockedStatic(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
     }
   }
   return null;
 }
 
 function recoverVehicleOverlap(object, radius) {
-  if (!object || !positionBlocked(object.position.x, object.position.z, radius)) return false;
+  if (!object || !positionBlockedStatic(object.position.x, object.position.z, radius)) return false;
   const recovery = findVehicleRecoveryPoint(object, radius);
   if (!recovery) return false;
   object.position.set(recovery.x, 0, recovery.z);
