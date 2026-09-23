@@ -118,6 +118,31 @@ const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTA
   }];
   return [district, generic];
 })));
+const DISTRICT_CITY_PROFILES = Object.freeze({
+  Kasaragod: Object.freeze({ centre:'Kasaragod Town', market:'Kasaragod Market', cafe:'Bekal Cafe', secondary:'Bekal Road', landmark:'Bekal Fort', landmarkKind:'fort' }),
+  Kannur: Object.freeze({ centre:'Kannur Town', market:'Fort Road Market', cafe:'Payyambalam Cafe', secondary:'Payyambalam', landmark:'St. Angelo Fort', landmarkKind:'fort' }),
+  Wayanad: Object.freeze({ centre:'Kalpetta Town', market:'Kalpetta Market', cafe:'Hill View Cafe', secondary:'Meppadi Road', landmark:'Edakkal Caves', landmarkKind:'hills' }),
+  Kozhikode: Object.freeze({ centre:'Kozhikode City', market:'SM Street Market', cafe:'Beach Road Cafe', secondary:'Beach Road', landmark:'Kozhikode Beach', landmarkKind:'water' }),
+  Malappuram: Object.freeze({ centre:'Malappuram Town', market:'Malappuram Market', cafe:'Malabar Cafe', secondary:'Kottakkunnu Road', landmark:'Kottakkunnu', landmarkKind:'hills' }),
+  Palakkad: Object.freeze({ centre:'Palakkad Town', market:'Fort Market', cafe:'Fort Gate Cafe', secondary:'Fort Road', landmark:'Palakkad Fort', landmarkKind:'fort' }),
+  Thrissur: Object.freeze({ centre:'Thrissur Round', market:'Sakthan Market', cafe:'Round Cafe', secondary:'Swaraj Round', landmark:'Thekkinkadu Maidan', landmarkKind:'park' }),
+  Idukki: Object.freeze({ centre:'Painavu Town', market:'Hill Market', cafe:'Dam View Cafe', secondary:'Dam Road', landmark:'Idukki Arch Dam', landmarkKind:'dam' }),
+  Alappuzha: Object.freeze({ centre:'Alappuzha Town', market:'Canal Market', cafe:'Boat Jetty Cafe', secondary:'Canal Road', landmark:'Alappuzha Backwaters', landmarkKind:'water' }),
+  Pathanamthitta: Object.freeze({ centre:'Pathanamthitta Town', market:'Central Market', cafe:'River View Cafe', secondary:'Konni Road', landmark:'Konni Eco Point', landmarkKind:'hills' }),
+  Kollam: Object.freeze({ centre:'Kollam City', market:'Chinnakada Market', cafe:'Lake View Cafe', secondary:'Ashtamudi Road', landmark:'Ashtamudi Lake', landmarkKind:'water' }),
+  Thiruvananthapuram: Object.freeze({ centre:'Thiruvananthapuram City', market:'Chalai Market', cafe:'Museum Cafe', secondary:'Kanakakkunnu Road', landmark:'Kanakakkunnu Grounds', landmarkKind:'park' }),
+});
+function districtCityProfile(district = currentWorldDistrictName()) {
+  return DISTRICT_CITY_PROFILES[district] || Object.freeze({
+    centre:`${district} City Centre`,
+    market:`${district} City Market`,
+    cafe:`${district} Cafe`,
+    secondary:`${district} Town Road`,
+    landmark:`${district} Landmark`,
+    landmarkKind:'park',
+  });
+}
+
 function currentWorldDistrictName() {
   const district = profile?.worldDistrict || bootWorldDistrict || profile?.district || 'Kottayam';
   return DISTRICT_INSTANCE_CONFIG[district] ? district : 'Kottayam';
@@ -220,15 +245,21 @@ function generatedDistrictTravelSpots() {
   const config = currentDistrictInstance();
   const generated = [];
   if (district !== 'Kottayam' && district !== 'Ernakulam') {
+    const city = districtCityProfile(district);
     generated.push(
       Object.freeze({
-        id: 'district-rail', kind: 'train', stationId: config.train?.id || 'district-rail',
-        label: `${district} Railway Station`, x:config.train.x, z:config.train.z,
+        id:'district-rail', kind:'train', stationId:config.train?.id || 'district-rail',
+        label:`${district} Railway Station`, x:config.train.x, z:config.train.z,
         radius:config.train.radius, discoverRadius:11,
       }),
       Object.freeze({
-        id:'district-market', kind:'shop', label:`${district} City Market`,
+        id:'district-market', kind:'shop', label:city.market,
         x:20, z:16, radius:4.8, discoverRadius:8.2, openHour:5.5, closeHour:22,
+        items:['water','tea','snack','meal'],
+      }),
+      Object.freeze({
+        id:'district-cafe', kind:'shop', label:city.cafe,
+        x:-44, z:22, radius:4.8, discoverRadius:8.2, openHour:5, closeHour:23,
         items:['water','tea','snack','meal'],
       }),
       Object.freeze({
@@ -244,8 +275,24 @@ function generatedDistrictTravelSpots() {
         label:`${district} Fire & Rescue`, x:20, z:-18, radius:5.8, discoverRadius:9,
       }),
       Object.freeze({
-        id:'district-rest', kind:'rest', label:`${district} Rest Bench`,
+        id:'district-rest', kind:'rest', label:`${district} Rest Park`,
         x:-10, z:-10, radius:4.2, discoverRadius:7.2,
+      }),
+      Object.freeze({
+        id:'district-centre-bus', kind:'bus', routeId:'district-city-line', label:`${city.centre} Bus Stop`,
+        x:10, z:8, radius:4.2, discoverRadius:7.2,
+      }),
+      Object.freeze({
+        id:'district-market-bus', kind:'bus', routeId:'district-city-line', label:`${city.market} Bus Stop`,
+        x:28, z:18, radius:4.2, discoverRadius:7.2,
+      }),
+      Object.freeze({
+        id:'district-rail-bus', kind:'bus', routeId:'district-city-line', label:`${district} Railway Bus Stop`,
+        x:-34, z:-6, radius:4.2, discoverRadius:7.2,
+      }),
+      Object.freeze({
+        id:'district-landmark', kind:'view', label:city.landmark,
+        x:50, z:45, radius:5.2, discoverRadius:10,
       }),
     );
   }
@@ -1820,8 +1867,8 @@ function performWorldActivity(activityId) {
     const rain = Number(worldWeatherState.rain || 0);
     showToast(
       rain > .18
-        ? 'Village Pond · monsoon water is rising softly around the banks'
-        : 'Village Pond · a quiet place to stop and look around',
+        ? `${spot.label} · monsoon atmosphere is active here`
+        : `${spot.label} · district landmark discovered nearby`,
       3600
     );
   }
@@ -2974,13 +3021,23 @@ function currentNavigationPlaces() {
     ];
   }
   const config = currentDistrictInstance();
+  const city = districtCityProfile(district);
   return [
-    { id:'district-centre', name:`${district} City Centre`, icon:'C', x:0, z:0, kind:'town', district },
+    { id:'district-centre', name:city.centre, icon:'C', x:0, z:0, kind:'town', district },
     { id:'district-rail', name:`${district} Railway Station`, icon:'🚆', x:config.train.x, z:config.train.z, kind:'rail', district },
-    { id:'district-market', name:`${district} City Market`, icon:'S', x:20, z:16, kind:'shop', district },
+    { id:'district-market', name:city.market, icon:'S', x:20, z:16, kind:'shop', district },
+    { id:'district-cafe', name:city.cafe, icon:'C', x:-44, z:22, kind:'shop', district },
     { id:'district-hospital', name:`${district} District Hospital`, icon:'+', x:-20, z:16, kind:'health', district },
     { id:'district-police', name:`${district} District Police`, icon:'P', x:-20, z:-18, kind:'police', district },
     { id:'district-fire', name:`${district} Fire & Rescue`, icon:'F', x:20, z:-18, kind:'emergency', district },
+    { id:'district-home', name:`${district} Rental Home`, icon:'H', x:-24, z:-36, kind:'home', district },
+    { id:'district-rest', name:`${district} Rest Park`, icon:'R', x:-10, z:-10, kind:'rest', district },
+    { id:'district-fuel', name:`${district} Fuel Station`, icon:'F', x:18, z:-48, kind:'service', district },
+    { id:'district-service', name:`${district} Service Garage`, icon:'G', x:-18, z:-48, kind:'service', district },
+    { id:'district-landmark', name:city.landmark, icon:'L', x:50, z:45, kind:'landmark', district },
+    { id:'district-centre-bus', name:`${city.centre} Bus Stop`, icon:'🚌', x:10, z:8, kind:'bus', district },
+    { id:'district-market-bus', name:`${city.market} Bus Stop`, icon:'🚌', x:28, z:18, kind:'bus', district },
+    { id:'district-rail-bus', name:`${district} Railway Bus Stop`, icon:'🚌', x:-34, z:-6, kind:'bus', district },
     ...(config.airport ? [{ id:'district-airport', name:`${district} Airport`, icon:'✈', x:config.airport.x, z:config.airport.z, kind:'airport', district }] : []),
   ];
 }
