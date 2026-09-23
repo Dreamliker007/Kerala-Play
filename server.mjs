@@ -15,7 +15,7 @@ const DISTRICTS = {
 };
 const DISTRICT_WORLD_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
 const AIRPORT_DISTRICTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvananthapuram']);
-const GENERIC_WORLD_BOUNDS = Object.freeze({ minX:-78, maxX:78, minZ:-78, maxZ:78 });
+const GENERIC_WORLD_BOUNDS = Object.freeze({ minX:-110, maxX:110, minZ:-110, maxZ:110 });
 const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_ORDER.map((district, index) => {
   const generic = {
     district,
@@ -25,7 +25,7 @@ const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_OR
     train:Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-rail`, x:-42, z:-6, radius:7.2, arrivalX:-37, arrivalZ:-6 }),
     airport:AIRPORT_DISTRICTS.has(district) ? Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-airport`, x:42, z:-28, radius:8.2, arrivalX:36, arrivalZ:-28 }) : null,
   };
-  if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-78,maxX:78,minZ:-78,maxZ:78 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:7,z:-23,radius:7.2,arrivalX:11,arrivalZ:-23 }) })];
+  if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:7,z:-23,radius:7.2,arrivalX:11,arrivalZ:-23 }) })];
   if (district === 'Ernakulam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-208,maxX:-96,minZ:82,maxZ:178 }), spawn:Object.freeze({ x:-184,z:110.5,rotation:0 }), train:Object.freeze({ id:'ernakulam-rail', x:-190,z:99.5,radius:6.6,arrivalX:-184,arrivalZ:110.5 }), airport:Object.freeze({ id:'ernakulam-airport', x:-112,z:166,radius:8.2,arrivalX:-118,arrivalZ:166 }) })];
   return [district, Object.freeze(generic)];
 })));
@@ -49,6 +49,14 @@ function districtTravelFare(fromDistrict, toDistrict, mode = 'train') {
   return mode === 'flight' ? 140 + hops * 12 : 28 + hops * 5;
 }
 const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -160, 153], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
+function landmarkDistrictForId(id) {
+  if (id === 'bekal') return 'Kasaragod';
+  if (id === 'munnar') return 'Idukki';
+  if (id === 'kochi') return 'Ernakulam';
+  if (id === 'alappuzha') return 'Alappuzha';
+  if (id === 'temple') return 'Thiruvananthapuram';
+  return 'Kottayam';
+}
 const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250': 75, 'discover-3': 100, 'walk-500': 150, 'discover-5': 200, social: 35 };
 const STARTER_BALANCE = 500;
 const STARTER_JOB_REWARD = 250;
@@ -1524,9 +1532,19 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${suffix}`;
   }
 
+function publicRideDestinationDistrict(destinationId) {
+  if (destinationId === 'bekal') return 'Kasaragod';
+  if (destinationId === 'munnar') return 'Idukki';
+  if (destinationId === 'kochi' || destinationId.startsWith('ernakulam-') || destinationId === 'broadway-cafe') return 'Ernakulam';
+  if (destinationId === 'alappuzha') return 'Alappuzha';
+  if (destinationId === 'temple') return 'Thiruvananthapuram';
+  return 'Kottayam';
+}
+
   function publicRideQuote(user, destinationId) {
     const destination = PUBLIC_RIDE_DESTINATIONS[destinationId];
     requireValue(destination, 404, 'Ride destination not found.');
+    requireValue(publicRideDestinationDistrict(destinationId) === currentWorldDistrict(user), 409, 'Auto and taxi rides stay inside the current district. Use train or flight for another district.');
     const state = jobStateFor(user);
     requireValue(!state.active, 409, 'Finish your active job before booking a public ride.');
     const personal = state.garage.activeVehicleId
@@ -2593,6 +2611,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(Math.hypot(live.x - station.x, live.z - station.z) <= station.radius, 409, `Move closer to ${station.label}.`);
         const transaction = walletTransaction(user, -DISTRICT_RAIL_ROUTE.fare, 'train_fare', `${station.label} → ${destination.label}`);
         const timestamp = now();
+        user.worldDistrict = destination.district;
+        live.district = destination.district;
         live.x = station.arrivalX; live.z = station.arrivalZ; live.rotation = 0; live.moving = false; live.mode = 'walk';
         live.lastSeen = timestamp; live.movedAt = timestamp; live.movementCredit = 2;
         user.worldX = live.x; user.worldZ = live.z; user.worldRotation = 0; user.worldUpdatedAt = timestamp;
@@ -3823,7 +3843,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           dirty = true;
         }
         let discovered = false;
-        for (const [id, x, z] of LANDMARKS) if (Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
+        for (const [id, x, z] of LANDMARKS) if (landmarkDistrictForId(id) === currentWorldDistrict(user) && Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
         const turn = Math.abs(Math.atan2(Math.sin(state.rotation - previousRotation), Math.cos(state.rotation - previousRotation)));
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
