@@ -234,7 +234,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   const settings = document.createElement('div');
   settings.id = 'world-settings';
   settings.setAttribute('aria-label', 'Game settings');
-  settings.innerHTML = '<div class="world-settings-head"><strong>Settings</strong><button type="button" id="world-settings-close" aria-label="Close settings">×</button></div><label class="world-setting-row"><span>World sound</span><button type="button" id="world-sound" aria-pressed="false">Off</button></label><div class="world-setting-row"><span>Graphics</span><strong id="world-quality-fixed">HIGH QUALITY</strong></div><div class="world-setting-row"><span>Version</span><strong>1.0.5 · V106.0</strong></div><button type="button" id="blocked-accounts" class="settings-fullscreen">Blocked accounts</button><output id="world-audio-status" role="status"></output>';
+  settings.innerHTML = '<div class="world-settings-head"><strong>Settings</strong><button type="button" id="world-settings-close" aria-label="Close settings">×</button></div><label class="world-setting-row"><span>World sound</span><button type="button" id="world-sound" aria-pressed="false">Off</button></label><div class="world-setting-row"><span>Graphics</span><strong id="world-quality-fixed">HIGH QUALITY</strong></div><div class="world-setting-row"><span>Version</span><strong>1.0.6 · V107.0</strong></div><button type="button" id="blocked-accounts" class="settings-fullscreen">Blocked accounts</button><output id="world-audio-status" role="status"></output>';
 
   const quickActions = document.querySelector('#quick-actions');
   const settingsToggle = document.createElement('button');
