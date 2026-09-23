@@ -13,7 +13,7 @@ const WORLD_LIMIT = 210;
 const DISTRICTS = {
   Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44],
 };
-const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -160, 153], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
+const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -160, 153], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
 const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250': 75, 'discover-3': 100, 'walk-500': 150, 'discover-5': 200, social: 35 };
 const STARTER_BALANCE = 500;
 const STARTER_JOB_REWARD = 250;
