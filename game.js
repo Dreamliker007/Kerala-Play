@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=106.0';
-import { createAtmosphere } from './environment.js?v=106.0';
+import { initSocial, api } from './social.js?v=107.0';
+import { createAtmosphere } from './environment.js?v=107.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
