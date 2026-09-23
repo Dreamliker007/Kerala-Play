@@ -6010,6 +6010,14 @@ function addErnakulamDistrictFoundation(scene) {
   addBusStop(scene, -132, 138, -Math.PI / 2, 'MG ROAD');
   addBusStop(scene, -151, 158, Math.PI, 'MARINE DRIVE');
 
+  // Every district instance keeps local daily-life essentials inside its own map.
+  addPhotoHouse(scene, -198, 170, 9.2, 6.2);
+  const ernakulamHomeMarker = new THREE.Group();
+  ernakulamHomeMarker.add(missionTag('Rental Home', '#654b36'));
+  ernakulamHomeMarker.position.set(-198, 0, 166.6);
+  scene.add(ernakulamHomeMarker);
+  addBench(scene, -146, 170);
+
   addCityTower(scene, -139, 102, 10, 8, 14, 0xc7b999, 'CITY RESIDENCY');
   addCityTower(scene, -162, 94, 11, 9, 18, 0xaeb6ba, 'METRO PLAZA');
   addCityTower(scene, -184, 122, 9, 8, 15, 0xc9b49a, 'APARTMENTS');
