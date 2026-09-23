@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.0.4",
+  "versionCode": 6,
+  "versionName": "1.0.5",
   "track": "closed-testing",
-  "notes": "V105.0 camera collision, stable avatar recovery, redesigned Ernakulam railway precinct and safer city roads"
+  "notes": "V106.0 splits Kerala Play into 14 isolated district worlds with train/flight-only inter-district travel and local city systems"
 }

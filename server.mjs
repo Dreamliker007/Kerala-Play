@@ -13,7 +13,50 @@ const WORLD_LIMIT = 210;
 const DISTRICTS = {
   Alappuzha: [-34, -13], Ernakulam: [-26, 6], Idukki: [42, 26], Kannur: [-10, 47], Kasaragod: [-7, 60], Kollam: [5, -45], Kottayam: [7, -23], Kozhikode: [-6, 35], Malappuram: [-16, 23], Palakkad: [28, 10], Pathanamthitta: [14, -34], Thiruvananthapuram: [13, -57], Thrissur: [-4, 14], Wayanad: [-19, 44],
 };
-const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -160, 153], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
+const DISTRICT_WORLD_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
+const AIRPORT_DISTRICTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvananthapuram']);
+const GENERIC_WORLD_BOUNDS = Object.freeze({ minX:-110, maxX:110, minZ:-110, maxZ:110 });
+const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_ORDER.map((district, index) => {
+  const generic = {
+    district,
+    order:index,
+    bounds:GENERIC_WORLD_BOUNDS,
+    spawn:Object.freeze({ x:12, z:0, rotation:0 }),
+    train:Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-rail`, x:-42, z:-6, radius:7.2, arrivalX:-37, arrivalZ:-6 }),
+    airport:AIRPORT_DISTRICTS.has(district) ? Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-airport`, x:42, z:-28, radius:8.2, arrivalX:36, arrivalZ:-28 }) : null,
+  };
+  if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:7,z:-23,radius:7.2,arrivalX:11,arrivalZ:-23 }) })];
+  if (district === 'Ernakulam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:-14,z:6,rotation:0 }), train:Object.freeze({ id:'ernakulam-rail', x:-40,z:-30.5,radius:6.6,arrivalX:-34,arrivalZ:-19.5 }), airport:Object.freeze({ id:'ernakulam-airport', x:38,z:36,radius:8.2,arrivalX:32,arrivalZ:36 }) })];
+  return [district, Object.freeze(generic)];
+})));
+function currentWorldDistrict(user) {
+  const district = typeof user?.worldDistrict === 'string' && DISTRICT_WORLD_CONFIG[user.worldDistrict] ? user.worldDistrict : user?.district;
+  return DISTRICT_WORLD_CONFIG[district] ? district : 'Kottayam';
+}
+function districtWorldConfig(userOrDistrict) {
+  const district = typeof userOrDistrict === 'string' ? userOrDistrict : currentWorldDistrict(userOrDistrict);
+  return DISTRICT_WORLD_CONFIG[district] || DISTRICT_WORLD_CONFIG.Kottayam;
+}
+function insideDistrictWorld(config, x, z, margin = 0) {
+  return Number.isFinite(x) && Number.isFinite(z)
+    && x >= config.bounds.minX + margin && x <= config.bounds.maxX - margin
+    && z >= config.bounds.minZ + margin && z <= config.bounds.maxZ - margin;
+}
+function districtTravelFare(fromDistrict, toDistrict, mode = 'train') {
+  const from = DISTRICT_WORLD_CONFIG[fromDistrict]?.order ?? 0;
+  const to = DISTRICT_WORLD_CONFIG[toDistrict]?.order ?? 0;
+  const hops = Math.max(1, Math.abs(from - to));
+  return mode === 'flight' ? 140 + hops * 12 : 28 + hops * 5;
+}
+const LANDMARKS = [['bekal', -7, 60], ['munnar', 42, 26], ['kochi', -26, 6], ['kochi', -10, 23], ['alappuzha', -34, -13], ['kuttanad', 7, -23], ['temple', 13, -57]];
+function landmarkDistrictForId(id) {
+  if (id === 'bekal') return 'Kasaragod';
+  if (id === 'munnar') return 'Idukki';
+  if (id === 'kochi') return 'Ernakulam';
+  if (id === 'alappuzha') return 'Alappuzha';
+  if (id === 'temple') return 'Thiruvananthapuram';
+  return 'Kottayam';
+}
 const REWARDS = { 'open-map': 10, 'walk-50': 25, 'visit-landmark': 50, 'walk-250': 75, 'discover-3': 100, 'walk-500': 150, 'discover-5': 200, social: 35 };
 const STARTER_BALANCE = 500;
 const STARTER_JOB_REWARD = 250;
@@ -43,12 +86,12 @@ const WORLD_SHOPS = Object.freeze({
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
   'ernakulam-market': Object.freeze({
-    id: 'ernakulam-market', label: 'Ernakulam City Market', x: -139, z: 123, radius: 5.5,
+    id: 'ernakulam-market', label: 'Ernakulam City Market', x: 11, z: -7, radius: 5.5,
     openHour: 5.5, closeHour: 22,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
   'broadway-cafe': Object.freeze({
-    id: 'broadway-cafe', label: 'Broadway Cafe', x: -162.5, z: 141, radius: 5.0,
+    id: 'broadway-cafe', label: 'Broadway Cafe', x: -12.5, z: 11, radius: 5.0,
     openHour: 5, closeHour: 23,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
@@ -86,7 +129,7 @@ const NEEDS_REST_ENERGY = 35;
 const NEEDS_REST_COOLDOWN_MS = 30_000;
 const CLINIC_DEFINITIONS = Object.freeze({
   'community-clinic': Object.freeze({ id: 'community-clinic', label: 'Community Clinic', x: 28, z: 28, radius: 6.2, fee: 45, energyRestore: 30, thirstRestore: 10 }),
-  'ernakulam-hospital': Object.freeze({ id: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -162, z: 105, radius: 7.0, fee: 55, energyRestore: 36, thirstRestore: 12 }),
+  'ernakulam-hospital': Object.freeze({ id: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -12, z: -25, radius: 7.0, fee: 55, energyRestore: 36, thirstRestore: 12 }),
 });
 const CLINIC_DEFINITION = CLINIC_DEFINITIONS['community-clinic'];
 const CLINIC_COOLDOWN_MS = 60_000;
@@ -134,16 +177,16 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
     boardingWindowMs: 9_000,
     stops: Object.freeze({
       'ernakulam-station-bus': Object.freeze({
-        id: 'ernakulam-station-bus', label: 'Ernakulam Railway Bus Stop', x: -179, z: 115.5, radius: 6.2,
-        phaseMs: 0, destinationId: 'ernakulam-mg-road', arrivalX: -130, arrivalZ: 138, arrivalRotation: Math.PI / 2,
+        id: 'ernakulam-station-bus', label: 'Ernakulam Railway Bus Stop', x: -29, z: -14.5, radius: 6.2,
+        phaseMs: 0, destinationId: 'ernakulam-mg-road', arrivalX: 20, arrivalZ: 8, arrivalRotation: Math.PI / 2,
       }),
       'ernakulam-mg-road': Object.freeze({
-        id: 'ernakulam-mg-road', label: 'MG Road Bus Stop', x: -132, z: 138, radius: 6.2,
-        phaseMs: 15_000, destinationId: 'ernakulam-marine', arrivalX: -151, arrivalZ: 156, arrivalRotation: 0,
+        id: 'ernakulam-mg-road', label: 'MG Road Bus Stop', x: 18, z: 8, radius: 6.2,
+        phaseMs: 15_000, destinationId: 'ernakulam-marine', arrivalX: -1, arrivalZ: 26, arrivalRotation: 0,
       }),
       'ernakulam-marine': Object.freeze({
-        id: 'ernakulam-marine', label: 'Marine Drive Bus Stop', x: -151, z: 158, radius: 6.2,
-        phaseMs: 30_000, destinationId: 'ernakulam-station-bus', arrivalX: -177, arrivalZ: 115.5, arrivalRotation: -Math.PI / 2,
+        id: 'ernakulam-marine', label: 'Marine Drive Bus Stop', x: -1, z: 28, radius: 6.2,
+        phaseMs: 30_000, destinationId: 'ernakulam-station-bus', arrivalX: -27, arrivalZ: -14.5, arrivalRotation: -Math.PI / 2,
       }),
     }),
   }),
@@ -153,14 +196,14 @@ const DISTRICT_RAIL_ROUTE = Object.freeze({
   label: 'Kottayam ↔ Ernakulam Passenger',
   fare: 35,
   stations: Object.freeze({
-    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -184, arrivalZ: 110.5 }),
-    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -190, z: 99.5, radius: 6.6, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
+    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -34, arrivalZ: -19.5 }),
+    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
   }),
 });
 const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   bekal: Object.freeze({ id:'bekal', label:'Bekal Fort', x:-7, z:60, arrivalX:-7, arrivalZ:56.5 }),
   munnar: Object.freeze({ id:'munnar', label:'Munnar Tea Hills', x:42, z:26, arrivalX:38.8, arrivalZ:26 }),
-  kochi: Object.freeze({ id:'kochi', label:'Mattancherry Palace', x:-160, z:153, arrivalX:-156, arrivalZ:153 }),
+  kochi: Object.freeze({ id:'kochi', label:'Mattancherry Palace', x:-10, z:23, arrivalX:-6, arrivalZ:23 }),
   alappuzha: Object.freeze({ id:'alappuzha', label:'Alappuzha Backwaters', x:-34, z:-13, arrivalX:-30.7, arrivalZ:-13 }),
   kuttanad: Object.freeze({ id:'kuttanad', label:'Kuttanad Fields', x:7, z:-23, arrivalX:10.2, arrivalZ:-23 }),
   temple: Object.freeze({ id:'temple', label:'Padmanabhaswamy Temple', x:13, z:-57, arrivalX:16.2, arrivalZ:-57 }),
@@ -174,10 +217,10 @@ const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   fuel: Object.freeze({ id:'fuel', label:'Kerala Fuel Station', x:11, z:-12, arrivalX:13.8, arrivalZ:-12 }),
   service: Object.freeze({ id:'service', label:'Village Service Garage', x:-36, z:-15, arrivalX:-32.8, arrivalZ:-15 }),
   'village-pond': Object.freeze({ id:'village-pond', label:'Village Pond', x:39, z:-4, arrivalX:35.5, arrivalZ:-4 }),
-  'ernakulam-centre': Object.freeze({ id:'ernakulam-centre', label:'Ernakulam City Centre', x:-145, z:132, arrivalX:-141, arrivalZ:132 }),
-  'ernakulam-market': Object.freeze({ id:'ernakulam-market', label:'Ernakulam City Market', x:-139, z:123, arrivalX:-139, arrivalZ:127 }),
-  'broadway-cafe': Object.freeze({ id:'broadway-cafe', label:'Broadway Cafe', x:-162.5, z:141, arrivalX:-162.5, arrivalZ:145 }),
-  'ernakulam-hospital': Object.freeze({ id:'ernakulam-hospital', label:'Ernakulam City Hospital', x:-162, z:105, arrivalX:-162, arrivalZ:109 }),
+  'ernakulam-centre': Object.freeze({ id:'ernakulam-centre', label:'Ernakulam City Centre', x:5, z:2, arrivalX:9, arrivalZ:2 }),
+  'ernakulam-market': Object.freeze({ id:'ernakulam-market', label:'Ernakulam City Market', x:11, z:-7, arrivalX:11, arrivalZ:-3 }),
+  'broadway-cafe': Object.freeze({ id:'broadway-cafe', label:'Broadway Cafe', x:-12.5, z:11, arrivalX:-12.5, arrivalZ:15 }),
+  'ernakulam-hospital': Object.freeze({ id:'ernakulam-hospital', label:'Ernakulam City Hospital', x:-12, z:-25, arrivalX:-12, arrivalZ:-21 }),
 });
 const PUBLIC_RIDE_SERVICES = Object.freeze({
   auto: Object.freeze({ id:'auto', label:'Auto-rickshaw', baseFare:18, perMeter:.48, maxDistance:72, pickupSeconds:2, speed:10 }),
@@ -213,12 +256,24 @@ const VEHICLE_STATIONS = Object.freeze({
   service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
 });
 const VEHICLE_STATION_OPTIONS = Object.freeze({
-  fuel: Object.freeze([VEHICLE_STATIONS.fuel, Object.freeze({ id: 'ernakulam-fuel', label: 'Ernakulam Fuel Station', x: -119, z: 105, radius: 7 })]),
-  service: Object.freeze([VEHICLE_STATIONS.service, Object.freeze({ id: 'ernakulam-service', label: 'Ernakulam Auto Garage', x: -182, z: 160, radius: 7 })]),
+  fuel: Object.freeze([VEHICLE_STATIONS.fuel, Object.freeze({ id: 'ernakulam-fuel', label: 'Ernakulam Fuel Station', x: 31, z: -25, radius: 7 })]),
+  service: Object.freeze([VEHICLE_STATIONS.service, Object.freeze({ id: 'ernakulam-service', label: 'Ernakulam Auto Garage', x: -32, z: 30, radius: 7 })]),
 });
-function nearestVehicleServiceStation(action, x, z) {
-  const options = VEHICLE_STATION_OPTIONS[action] || [];
-  return options.reduce((best, station) => {
+function nearestVehicleServiceStation(user, action, x, z) {
+  const district = currentWorldDistrict(user);
+  let options;
+  if (district === 'Ernakulam') {
+    options = action === 'fuel'
+      ? [{ id:'ernakulam-fuel', label:'Ernakulam Fuel Station', x:31, z:-25, radius:7 }, VEHICLE_STATIONS.fuel]
+      : [{ id:'ernakulam-service', label:'Ernakulam Auto Garage', x:-32, z:30, radius:7 }, VEHICLE_STATIONS.service];
+  } else if (district === 'Kottayam') {
+    options = [VEHICLE_STATIONS[action]];
+  } else {
+    options = action === 'fuel'
+      ? [{ id:'district-fuel', label:`${district} Fuel Station`, x:18, z:-48, radius:7 }]
+      : [{ id:'district-service', label:`${district} Service Garage`, x:-18, z:-48, radius:7 }];
+  }
+  return (options || []).filter(Boolean).reduce((best, station) => {
     const distance = Math.hypot(Number(x) - station.x, Number(z) - station.z);
     return !best || distance < best.distance ? { ...station, distance } : best;
   }, null);
@@ -239,10 +294,47 @@ const REPORT_HISTORY_LIMIT = 80;
 const WORLD_SERVICE_POINTS = Object.freeze({
   police: Object.freeze({ id: 'police', service: 'police', label: 'Kerala Police Station', x: -31, z: 14, radius: 6.2 }),
   fire: Object.freeze({ id: 'fire', service: 'fire', label: 'Fire & Rescue Station', x: -48, z: 8, radius: 6.2 }),
-  'ernakulam-police': Object.freeze({ id: 'ernakulam-police', service: 'police', label: 'Ernakulam City Police', x: -181, z: 141, radius: 6.8 }),
-  'ernakulam-fire': Object.freeze({ id: 'ernakulam-fire', service: 'fire', label: 'Ernakulam Fire & Rescue', x: -116, z: 141, radius: 6.8 }),
+  'ernakulam-police': Object.freeze({ id: 'ernakulam-police', service: 'police', label: 'Ernakulam City Police', x: -31, z: 11, radius: 6.8 }),
+  'ernakulam-fire': Object.freeze({ id: 'ernakulam-fire', service: 'fire', label: 'Ernakulam Fire & Rescue', x: 34, z: 11, radius: 6.8 }),
 });
 const WORLD_SERVICE_HELP_COOLDOWN_MS = 60_000;
+function genericDistrictWorld(user) {
+  const district = currentWorldDistrict(user);
+  return district !== 'Kottayam' && district !== 'Ernakulam' ? district : '';
+}
+function worldShopForUser(user, shopId) {
+  if (shopId === 'district-market' && genericDistrictWorld(user)) {
+    const district = currentWorldDistrict(user);
+    return { id:'district-market', label:`${district} City Market`, x:20, z:16, radius:5.5, openHour:5.5, closeHour:22, items:['water','tea','snack','meal'] };
+  }
+  return WORLD_SHOPS[shopId] || null;
+}
+function clinicForUser(user, clinicId) {
+  if (clinicId === 'district-hospital' && genericDistrictWorld(user)) {
+    const district = currentWorldDistrict(user);
+    return { id:'district-hospital', label:`${district} District Hospital`, x:-20, z:16, radius:7, fee:50, energyRestore:34, thirstRestore:10 };
+  }
+  return CLINIC_DEFINITIONS[clinicId] || CLINIC_DEFINITION;
+}
+function worldServicePointForUser(user, pointId) {
+  if (genericDistrictWorld(user)) {
+    const district = currentWorldDistrict(user);
+    if (pointId === 'district-police' || pointId === 'police') return { id:'district-police', service:'police', label:`${district} District Police`, x:-20, z:-18, radius:6.8 };
+    if (pointId === 'district-fire' || pointId === 'fire') return { id:'district-fire', service:'fire', label:`${district} Fire & Rescue`, x:20, z:-18, radius:6.8 };
+  }
+  return WORLD_SERVICE_POINTS[pointId] || null;
+}
+function homeDefinitionFor(user) {
+  if (currentWorldDistrict(user) === 'Ernakulam') return { ...HOME_DEFINITION, id:'ernakulam-rental', label:'Ernakulam Rental Home', x:-48, z:40 };
+  if (genericDistrictWorld(user)) return { ...HOME_DEFINITION, id:'district-rental', label:`${currentWorldDistrict(user)} Rental Home` };
+  return HOME_DEFINITION;
+}
+function restPointFor(user) {
+  if (currentWorldDistrict(user) === 'Ernakulam') return { ...NEEDS_REST_POINT, id:'ernakulam-rest', label:'Ernakulam Rest Bench', x:4, z:40 };
+  if (genericDistrictWorld(user)) return { ...NEEDS_REST_POINT, id:'district-rest', label:`${currentWorldDistrict(user)} Rest Bench` };
+  return NEEDS_REST_POINT;
+}
+
 const GROUP_MEMBER_LIMIT = 12;
 const GROUP_MEMBERSHIP_LIMIT = 8;
 const GROUP_MESSAGE_LIMIT = 100;
@@ -413,21 +505,22 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return 'none';
   }
   function spawnFor(user) {
-    const [landmarkX, z] = DISTRICTS[user.district];
-    return { x: landmarkX + 12, z };
+    const config = districtWorldConfig(user);
+    return { x: config.spawn.x, z: config.spawn.z, rotation: config.spawn.rotation || 0 };
   }
   function savedPosition(user) {
     const spawn = spawnFor(user);
+    const config = districtWorldConfig(user);
     const x = Number(user.worldX), z = Number(user.worldZ), rotation = Number(user.worldRotation);
-    const valid = Number.isFinite(x) && Number.isFinite(z) && Math.abs(x) <= 110.01 && Math.abs(z) <= 110.01;
-    return { x: valid ? x : spawn.x, z: valid ? z : spawn.z, rotation: Number.isFinite(rotation) ? rotation : 0, valid };
+    const valid = insideDistrictWorld(config, x, z, .01);
+    return { x: valid ? x : spawn.x, z: valid ? z : spawn.z, rotation: Number.isFinite(rotation) ? rotation : spawn.rotation || 0, valid };
   }
   function publicUser(user) {
     const position = presence.get(user.id), saved = savedPosition(user);
     let level = 1, remaining = user.points, next = 100;
     while (remaining >= next) { remaining -= next; level++; next = 100 + (level - 1) * 50; }
     const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username);
-    return { id: user.id, username: displayName, name: displayName, displayName, accountUsername: user.username, usernameChangedAt: Number(user.usernameChangedAt || 0), usernameChangeAvailableAt: Number(user.usernameChangedAt || 0) + 10 * 24 * 60 * 60 * 1000, district: user.district, gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
+    return { id: user.id, username: displayName, name: displayName, displayName, accountUsername: user.username, usernameChangedAt: Number(user.usernameChangedAt || 0), usernameChangeAvailableAt: Number(user.usernameChangedAt || 0) + 10 * 24 * 60 * 60 * 1000, district: user.district, worldDistrict: currentWorldDistrict(user), gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
   }
   function progressionStats(user) {
     const jobsCompleted = Object.values(user.jobState?.completed || {}).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
@@ -503,9 +596,15 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   }
   function profileChanged(user) { emit(user.id, 'profile', { user: publicUser(user) }); }
   function worldSnapshot(viewerId) {
-    return { players: [...presence.entries()].filter(([id]) => online(id) && !blocked(viewerId, id)).map(([id, state]) => {
+    const viewer = findUser(viewerId);
+    const viewerDistrict = viewer ? currentWorldDistrict(viewer) : 'Kottayam';
+    return { district: viewerDistrict, players: [...presence.entries()].filter(([id]) => {
+      if (!online(id) || blocked(viewerId, id)) return false;
+      const candidate = findUser(id);
+      return candidate && currentWorldDistrict(candidate) === viewerDistrict;
+    }).map(([id, state]) => {
       const user = findUser(id);
-      return { id, username: user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username), gender: user.gender, district: user.district, x: state.x, z: state.z, rotation: state.rotation, moving: state.moving, mode: state.mode || 'walk' };
+      return { id, username: user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username), gender: user.gender, district: user.district, worldDistrict: currentWorldDistrict(user), x: state.x, z: state.z, rotation: state.rotation, moving: state.moving, mode: state.mode || 'walk' };
     }) };
   }
   function place(user, { reset = false } = {}) {
@@ -519,7 +618,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       user.worldX = x; user.worldZ = z; user.worldRotation = rotation; user.worldUpdatedAt = now();
       dirty = true;
     }
-    const state = { x, z, rotation, moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now(), trafficSpeedStrikes: 0, trafficLastChallanAt: 0, trafficLicenceStrikes: 0, trafficLastLicenceChallanAt: 0 };
+    const state = { x, z, rotation, district: currentWorldDistrict(user), moving: false, mode: 'walk', lastSeen: now(), movedAt: now(), movementCredit: 2, lastProfile: now(), trafficSpeedStrikes: 0, trafficLastChallanAt: 0, trafficLicenceStrikes: 0, trafficLastLicenceChallanAt: 0 };
     presence.set(user.id, state);
     const garage = jobStateFor(user).garage;
     const personal = garage.activeVehicleId ? garage.owned.find(vehicle => vehicle.id === garage.activeVehicleId) : null;
@@ -1046,8 +1145,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const utilityDueAt = Number(home.utilityDueAt);
     const rentOverdue = timestamp > rentDueAt;
     const utilityOverdue = timestamp > utilityDueAt;
-    const rentGraceUntil = rentDueAt + HOME_DEFINITION.graceMs;
-    const utilityGraceUntil = utilityDueAt + HOME_DEFINITION.graceMs;
+    const homeDefinition = homeDefinitionFor(user);
+    const rentGraceUntil = rentDueAt + homeDefinition.graceMs;
+    const utilityGraceUntil = utilityDueAt + homeDefinition.graceMs;
     const accessBlocked = timestamp > rentGraceUntil || timestamp > utilityGraceUntil;
     const reminder = accessBlocked
       ? 'Sleep access paused until overdue home charges are paid.'
@@ -1055,6 +1155,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return {
       status: home.status,
       home: HOME_DEFINITION,
+      localHome: homeDefinition,
       rentDueAt,
       utilityDueAt,
       rentOverdue,
@@ -1110,6 +1211,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       movementFactor: factor,
       canRun: factor >= .78 && Number(needs.energy) > 12 && Number(needs.hunger) > 5 && Number(needs.thirst) > 5,
       restPoint: NEEDS_REST_POINT,
+      localRestPoint: restPointFor(user),
       restEnergy: NEEDS_REST_ENERGY,
       restReadyAt: Number(needs.lastRestAt || 0) + NEEDS_REST_COOLDOWN_MS,
       updatedAt: Number(needs.updatedAt || now()),
@@ -1240,8 +1342,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         if (!Number.isFinite(Number(active.vehicleLastImpactAt))) active.vehicleLastImpactAt = 0;
         if (!Number.isFinite(Number(active.vehicleX)) || !Number.isFinite(Number(active.vehicleZ))) {
           const position = savedPosition(user);
-          active.vehicleX = missionCoordinate(position.x, 2.8);
-          active.vehicleZ = missionCoordinate(position.z, 1.5);
+          active.vehicleX = missionCoordinateFor(user, position.x, 2.8, 'x');
+          active.vehicleZ = missionCoordinateFor(user, position.z, 1.5, 'z');
           dirty = true;
         }
       }
@@ -1482,9 +1584,19 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${suffix}`;
   }
 
+function publicRideDestinationDistrict(destinationId) {
+  if (destinationId === 'bekal') return 'Kasaragod';
+  if (destinationId === 'munnar') return 'Idukki';
+  if (destinationId === 'kochi' || destinationId.startsWith('ernakulam-') || destinationId === 'broadway-cafe') return 'Ernakulam';
+  if (destinationId === 'alappuzha') return 'Alappuzha';
+  if (destinationId === 'temple') return 'Thiruvananthapuram';
+  return 'Kottayam';
+}
+
   function publicRideQuote(user, destinationId) {
     const destination = PUBLIC_RIDE_DESTINATIONS[destinationId];
     requireValue(destination, 404, 'Ride destination not found.');
+    requireValue(publicRideDestinationDistrict(destinationId) === currentWorldDistrict(user), 409, 'Auto and taxi rides stay inside the current district. Use train or flight for another district.');
     const state = jobStateFor(user);
     requireValue(!state.active, 409, 'Finish your active job before booking a public ride.');
     const personal = state.garage.activeVehicleId
@@ -1546,14 +1658,17 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       destination: { id: destination.id, label: destination.label },
     };
   }
-  function missionCoordinate(value, delta) {
+  function missionCoordinateFor(user, value, delta, axis = 'x') {
+    const bounds = districtWorldConfig(user).bounds;
+    const min = (axis === 'z' ? bounds.minZ : bounds.minX) + 6;
+    const max = (axis === 'z' ? bounds.maxZ : bounds.maxX) - 6;
     let next = value + delta;
-    if (next > WORLD_LIMIT - 6 || next < -WORLD_LIMIT + 6) next = value - delta;
-    return Math.max(-WORLD_LIMIT + 6, Math.min(WORLD_LIMIT - 6, next));
+    if (next > max || next < min) next = value - delta;
+    return Math.max(min, Math.min(max, next));
   }
   function buildJobCheckpoints(user, jobId) {
     const base = jobPosition(user);
-    const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinate(base.x, dx), z: missionCoordinate(base.z, dz) });
+    const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinateFor(user, base.x, dx, 'x'), z: missionCoordinateFor(user, base.z, dz, 'z') });
     if (jobId === 'delivery') return [point('Village Parcel Hub', 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
     if (jobId === 'taxi') return [point('Passenger Pickup', 'Pick up passenger', -7, 5), point('Town Junction', 'Drop off passenger', -20, -7)];
     return [point('Village Shop', 'Check in for shift', 9, -5)];
@@ -1784,7 +1899,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
         requireValue(/^[A-Za-z][A-Za-z '-]{1,39}$/.test(firstName), 400, 'Enter a valid first name.');
         const [spawnX, spawnZ] = DISTRICTS[district];
-        const user = { id: randomUUID(), firstName, displayName: firstName, username, usernameChangedAt: 0, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldX: spawnX + 12, worldZ: spawnZ, worldRotation: 0, worldUpdatedAt: now() };
+        const user = { id: randomUUID(), firstName, displayName: firstName, username, usernameChangedAt: 0, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldDistrict: district, worldX: districtWorldConfig(district).spawn.x, worldZ: districtWorldConfig(district).spawn.z, worldRotation: districtWorldConfig(district).spawn.rotation || 0, worldUpdatedAt: now() };
         db.users.push(user); walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash'); await persist(); await startSession(user, response, request); socialChanged();
         send(response, 201, { user: publicUser(user) }); return;
       }
@@ -1864,8 +1979,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
             walletBalance: 0,
             economyActions: [],
             jobState: freshJobState(),
-            worldX: spawnX + 12,
-            worldZ: spawnZ,
+            worldDistrict: 'Ernakulam',
+            worldX: districtWorldConfig('Ernakulam').spawn.x,
+            worldZ: districtWorldConfig('Ernakulam').spawn.z,
             worldRotation: 0,
             worldUpdatedAt: now(),
           };
@@ -2043,11 +2159,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           user.usernameChangedAt = now();
         }
         if (body.displayName !== undefined) { user.displayName = body.displayName.trim(); user.firstName = user.displayName; }
-        const relocate = body.district && body.district !== user.district;
         if (body.district !== undefined) user.district = body.district;
+        if (!user.worldDistrict || !DISTRICT_WORLD_CONFIG[user.worldDistrict]) user.worldDistrict = user.district;
         if (body.gender !== undefined) user.gender = body.gender;
         if (body.bio !== undefined) user.bio = body.bio.trim();
-        if (relocate) place(user, { reset: true });
         await persist(); profileChanged(user); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
       }
@@ -2447,6 +2562,84 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         }); return;
       }
 
+      if (path === '/api/travel/districts' && request.method === 'GET') {
+        const currentDistrict = currentWorldDistrict(user);
+        const current = districtWorldConfig(currentDistrict);
+        send(response, 200, {
+          currentDistrict,
+          districts: DISTRICT_WORLD_ORDER.map(district => {
+            const config = DISTRICT_WORLD_CONFIG[district];
+            return {
+              district,
+              order: config.order,
+              train: { available: true, id: config.train.id },
+              flight: { available: !!config.airport, id: config.airport?.id || null },
+              current: district === currentDistrict,
+            };
+          }),
+          hubs: {
+            train: { ...current.train, district: currentDistrict, label: `${currentDistrict} Railway Station` },
+            airport: current.airport ? { ...current.airport, district: currentDistrict, label: `${currentDistrict} Airport` } : null,
+          },
+        }); return;
+      }
+      if (path === '/api/travel/district/board' && request.method === 'POST') {
+        limited(`district-board:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const mode = body.mode === 'flight' ? 'flight' : 'train';
+        const fromDistrict = currentWorldDistrict(user);
+        const destinationDistrict = String(body.destinationDistrict || '');
+        requireValue(DISTRICT_WORLD_CONFIG[destinationDistrict], 404, 'Destination district not found.');
+        requireValue(destinationDistrict !== fromDistrict, 409, 'You are already in that district.');
+        const fromConfig = districtWorldConfig(fromDistrict);
+        const destinationConfig = districtWorldConfig(destinationDistrict);
+        const hub = mode === 'flight' ? fromConfig.airport : fromConfig.train;
+        const destinationHub = mode === 'flight' ? destinationConfig.airport : destinationConfig.train;
+        requireValue(hub && destinationHub, 409, mode === 'flight' ? 'Flights are only available between airport districts.' : 'Train travel is unavailable for this district.');
+        const stateForTravel = jobStateFor(user);
+        requireValue(!stateForTravel.active, 409, 'Finish your active job before inter-district travel.');
+        const personal = stateForTravel.garage.activeVehicleId ? stateForTravel.garage.owned.find(vehicle => vehicle.id === stateForTravel.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before travelling.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before travelling.');
+        requireValue(Math.hypot(live.x - hub.x, live.z - hub.z) <= hub.radius, 409, `Move closer to the ${mode === 'flight' ? 'airport' : 'railway station'}.`);
+        const fare = districtTravelFare(fromDistrict, destinationDistrict, mode);
+        const transaction = walletTransaction(user, -fare, mode === 'flight' ? 'flight_fare' : 'train_fare', `${fromDistrict} → ${destinationDistrict}`);
+        const timestamp = now();
+        user.worldDistrict = destinationDistrict;
+        live.district = destinationDistrict;
+        live.x = Number(destinationHub.arrivalX);
+        live.z = Number(destinationHub.arrivalZ);
+        live.rotation = 0;
+        live.moving = false;
+        live.mode = 'walk';
+        live.lastSeen = timestamp;
+        live.movedAt = timestamp;
+        live.movementCredit = 2;
+        user.worldX = live.x;
+        user.worldZ = live.z;
+        user.worldRotation = 0;
+        user.worldUpdatedAt = timestamp;
+        dirty = true;
+        worldDirty = true;
+        profileChanged(user);
+        await persist();
+        send(response, 200, {
+          wallet: walletSummary(user),
+          user: publicUser(user),
+          transaction,
+          travel: {
+            mode,
+            fare,
+            from: { district: fromDistrict, hubId: hub.id },
+            to: { district: destinationDistrict, hubId: destinationHub.id },
+            x: live.x,
+            z: live.z,
+            rotation: live.rotation,
+            district: destinationDistrict,
+          },
+        }); return;
+      }
       if (path === '/api/travel/train/route' && request.method === 'GET') {
         send(response, 200, {
           id: DISTRICT_RAIL_ROUTE.id,
@@ -2473,6 +2666,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(Math.hypot(live.x - station.x, live.z - station.z) <= station.radius, 409, `Move closer to ${station.label}.`);
         const transaction = walletTransaction(user, -DISTRICT_RAIL_ROUTE.fare, 'train_fare', `${station.label} → ${destination.label}`);
         const timestamp = now();
+        user.worldDistrict = destination.district;
+        live.district = destination.district;
         live.x = station.arrivalX; live.z = station.arrivalZ; live.rotation = 0; live.moving = false; live.mode = 'walk';
         live.lastSeen = timestamp; live.movedAt = timestamp; live.movementCredit = 2;
         user.worldX = live.x; user.worldZ = live.z; user.worldRotation = 0; user.worldUpdatedAt = timestamp;
@@ -2562,19 +2757,20 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(body.kind === 'rent' || body.kind === 'utilities', 400, 'Choose rent or utilities.');
         const state = jobStateFor(user);
         const home = state.home;
+        const homeDefinition = homeDefinitionFor(user);
         const isRent = body.kind === 'rent';
-        const amount = isRent ? HOME_DEFINITION.rent : HOME_DEFINITION.utilities;
+        const amount = isRent ? homeDefinition.rent : homeDefinition.utilities;
         const transaction = walletTransaction(
           user,
           -amount,
           isRent ? 'home_rent' : 'home_utilities',
-          isRent ? 'Village Rental Home rent' : 'Village Rental Home electricity + water'
+          isRent ? `${homeDefinition.label} rent` : `${homeDefinition.label} electricity + water`
         );
         if (isRent) {
-          home.rentDueAt = Math.max(now(), Number(home.rentDueAt) || 0) + HOME_DEFINITION.periodMs;
+          home.rentDueAt = Math.max(now(), Number(home.rentDueAt) || 0) + homeDefinition.periodMs;
           home.rentPayments = Number(home.rentPayments || 0) + 1;
         } else {
-          home.utilityDueAt = Math.max(now(), Number(home.utilityDueAt) || 0) + HOME_DEFINITION.periodMs;
+          home.utilityDueAt = Math.max(now(), Number(home.utilityDueAt) || 0) + homeDefinition.periodMs;
           home.utilityPayments = Number(home.utilityPayments || 0) + 1;
         }
         dirty = true;
@@ -2591,7 +2787,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before sleeping.');
         requireValue(!live.moving, 409, 'Stop moving before sleeping.');
-        requireValue(Math.hypot(live.x - HOME_DEFINITION.x, live.z - HOME_DEFINITION.z) <= HOME_DEFINITION.radius, 409, 'Move closer to your Village Rental Home.');
+        const homeDefinition = homeDefinitionFor(user);
+        const nearLocalHome = Math.hypot(live.x - homeDefinition.x, live.z - homeDefinition.z) <= homeDefinition.radius;
+        const nearLegacyHome = Math.hypot(live.x - HOME_DEFINITION.x, live.z - HOME_DEFINITION.z) <= HOME_DEFINITION.radius;
+        requireValue(nearLocalHome || nearLegacyHome, 409, `Move closer to your ${homeDefinition.label}.`);
         const summary = homeSummary(user);
         requireValue(!summary.accessBlocked, 409, 'Home sleep access is paused. Pay overdue rent or utilities first.');
         const needsBefore = needsSummary(user);
@@ -2620,8 +2819,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/world/emergency-help' && request.method === 'POST') {
         limited(`world-emergency-help:${user.id}`, 12, 60000);
         const body = await jsonBody(request);
-        const serviceKey = typeof body.pointId === 'string' && WORLD_SERVICE_POINTS[body.pointId] ? body.pointId : body.service;
-        const service = typeof serviceKey === 'string' ? WORLD_SERVICE_POINTS[serviceKey] : null;
+        const requestedServiceKey = typeof body.pointId === 'string' ? body.pointId : body.service;
+        const service = typeof requestedServiceKey === 'string' ? worldServicePointForUser(user, requestedServiceKey) : null;
+        const serviceKey = service?.id || requestedServiceKey;
         requireValue(service, 400, 'Choose police or fire service.');
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before using the public help desk.');
@@ -2647,7 +2847,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/needs/clinic' && request.method === 'POST') {
         limited(`needs-clinic:${user.id}`, 20, 60000);
         const body = await jsonBody(request);
-        const clinic = CLINIC_DEFINITIONS[String(body.clinicId || 'community-clinic')] || CLINIC_DEFINITION;
+        const clinic = clinicForUser(user, String(body.clinicId || 'community-clinic'));
         const state = jobStateFor(user);
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before visiting the clinic.');
@@ -2671,7 +2871,10 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(!state.active?.vehicleEntered && !personal?.entered, 409, 'Park and exit the vehicle before resting.');
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before resting.');
-        requireValue(Math.hypot(live.x - NEEDS_REST_POINT.x, live.z - NEEDS_REST_POINT.z) <= NEEDS_REST_POINT.radius, 409, 'Move closer to the Village Rest Bench.');
+        const restPoint = restPointFor(user);
+        const nearLocalRest = Math.hypot(live.x - restPoint.x, live.z - restPoint.z) <= restPoint.radius;
+        const nearLegacyRest = Math.hypot(live.x - NEEDS_REST_POINT.x, live.z - NEEDS_REST_POINT.z) <= NEEDS_REST_POINT.radius;
+        requireValue(nearLocalRest || nearLegacyRest, 409, `Move closer to the ${restPoint.label}.`);
         const current = needsSummary(user);
         if (current.energy >= 99) {
           send(response, 200, { rested: false, message: 'Energy is already full.', needs: current }); return;
@@ -2973,8 +3176,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           garage.selectedId = vehicle.id;
           garage.activeVehicleId = vehicle.id;
           vehicle.entered = false;
-          vehicle.parkedX = missionCoordinate(position.x, 2.8);
-          vehicle.parkedZ = missionCoordinate(position.z, 1.5);
+          vehicle.parkedX = missionCoordinateFor(user, position.x, 2.8, 'x');
+          vehicle.parkedZ = missionCoordinateFor(user, position.z, 1.5, 'z');
         } else {
           const vehicle = garage.activeVehicleId ? garage.owned.find(item => item.id === garage.activeVehicleId) : null;
           requireValue(vehicle, 409, 'No personal vehicle is outside the garage.');
@@ -3031,7 +3234,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(body.vehicleId === vehicle.id, 409, 'Personal vehicle is out of sync.');
         const live = presence.get(user.id) || place(user);
         requireValue(!live.moving, 409, 'Stop the vehicle before using this service.');
-        const station = nearestVehicleServiceStation(body.action === 'refuel' ? 'fuel' : 'service', live.x, live.z);
+        const station = nearestVehicleServiceStation(user, body.action === 'refuel' ? 'fuel' : 'service', live.x, live.z);
         requireValue(station && station.distance <= station.radius, 409, `Move closer to ${station?.label || 'the vehicle service point'}.`);
         const model = GARAGE_CATALOG[vehicle.modelId];
         const spec = VEHICLE_SPECS[model.kind];
@@ -3084,8 +3287,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           stepIndex: 0,
           checkpoints: buildJobCheckpoints(user, jobId),
           vehicleEntered: false,
-          vehicleX: job.vehicle ? missionCoordinate(position.x, 2.8) : null,
-          vehicleZ: job.vehicle ? missionCoordinate(position.z, 1.5) : null,
+          vehicleX: job.vehicle ? missionCoordinateFor(user, position.x, 2.8, 'x') : null,
+          vehicleZ: job.vehicle ? missionCoordinateFor(user, position.z, 1.5, 'z') : null,
           vehicleFuel: job.vehicle ? VEHICLE_FUEL_MAX : null,
           vehicleCondition: job.vehicle ? VEHICLE_CONDITION_MAX : null,
           vehicleLastImpactAt: 0,
@@ -3167,7 +3370,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(body.action === 'refuel' || body.action === 'repair', 400, 'Choose refuel or repair.');
         const live = presence.get(user.id) || place(user);
         requireValue(!live.moving, 409, 'Stop the vehicle before using this service.');
-        const station = nearestVehicleServiceStation(body.action === 'refuel' ? 'fuel' : 'service', live.x, live.z);
+        const station = nearestVehicleServiceStation(user, body.action === 'refuel' ? 'fuel' : 'service', live.x, live.z);
         requireValue(station && station.distance <= station.radius, 409, `Move closer to ${station?.label || 'the vehicle service point'}.`);
         const spec = VEHICLE_SPECS[job.vehicle];
         let amount, cost, description;
@@ -3270,7 +3473,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/world/shop/purchase' && request.method === 'POST') {
         limited(`world-shop:${user.id}`, 45, 60000);
         const body = await jsonBody(request);
-        const shop = typeof body.shopId === 'string' ? WORLD_SHOPS[body.shopId] : null;
+        const shop = typeof body.shopId === 'string' ? worldShopForUser(user, body.shopId) : null;
         const item = typeof body.itemId === 'string' ? SHOP_ITEMS[body.itemId] : null;
         requireValue(shop, 404, 'World shop not found.');
         requireValue(item && shop.items.includes(body.itemId), 404, 'That item is not sold here.');
@@ -3618,7 +3821,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       if (path === '/api/world/move' && request.method === 'POST') {
         limited(`move:${user.id}`, 20, 1000);
         const body = await jsonBody(request);
-        requireValue(Number.isFinite(body.x) && Number.isFinite(body.z) && Math.abs(body.x) <= WORLD_LIMIT + .01 && Math.abs(body.z) <= WORLD_LIMIT + .01 && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, 'Invalid avatar position.');
+        const movementWorld = districtWorldConfig(user);
+        requireValue(insideDistrictWorld(movementWorld, Number(body.x), Number(body.z), -.01) && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, `You reached the edge of ${currentWorldDistrict(user)}. Use train or flight to travel to another district.`);
         const requestedMode = body.mode === undefined ? 'walk' : body.mode;
         requireValue(Object.hasOwn(MOVEMENT_PROFILES, requestedMode), 400, 'Invalid movement mode.');
         const stateForMove = jobStateFor(user);
@@ -3629,6 +3833,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const expectedMode = active?.vehicleEntered && activeJob?.vehicle ? activeJob.vehicle : (personal?.entered && personalModel ? personalModel.kind : 'walk');
         requireValue(requestedMode === expectedMode, 409, 'Movement mode is out of sync. Re-enter the active vehicle if needed.');
         const state = presence.get(user.id) || place(user);
+        requireValue((state.district || currentWorldDistrict(user)) === currentWorldDistrict(user), 409, 'District world changed. Reload the current district.');
         const movement = MOVEMENT_PROFILES[requestedMode];
         const needsBeforeMove = needsSummary(user);
         const needsFactor = requestedMode === 'walk' ? Number(needsBeforeMove.movementFactor || 1) : 1;
@@ -3701,7 +3906,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           dirty = true;
         }
         let discovered = false;
-        for (const [id, x, z] of LANDMARKS) if (Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
+        for (const [id, x, z] of LANDMARKS) if (landmarkDistrictForId(id) === currentWorldDistrict(user) && Math.hypot(x - state.x, z - state.z) <= 8 && !user.visitedLandmarks.includes(id)) { user.visitedLandmarks.push(id); discovered = true; }
         const turn = Math.abs(Math.atan2(Math.sin(state.rotation - previousRotation), Math.cos(state.rotation - previousRotation)));
         dirty = dirty || distance > 0 || discovered || turn > 0.01; worldDirty = true;
         if (discovered || now() - state.lastProfile >= 2000) { profileChanged(user); state.lastProfile = now(); }
@@ -3742,6 +3947,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         if (!['end', 'disabled'].includes(data.type)) {
           const selfState = presence.get(user.id), peerState = presence.get(peer.id);
           requireValue(selfState && peerState && online(user.id) && online(peer.id), 409, 'Both players must be online for nearby voice.');
+          requireValue(currentWorldDistrict(user) === currentWorldDistrict(peer) && user.district === peer.district, 403, 'This player is in another district.');
           requireValue(Math.hypot(selfState.x - peerState.x, selfState.z - peerState.z) <= 28, 403, 'This player is too far away for nearby voice.');
         }
         emit(peer.id, 'proximity-signal', { from: user.id, data });
