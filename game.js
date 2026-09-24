@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=112.0';
-import { createAtmosphere } from './environment.js?v=112.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=112.0';
+import { initSocial, api } from './social.js?v=113.0';
+import { createAtmosphere } from './environment.js?v=113.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=113.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -27,6 +27,7 @@ const districtJourneyFrom = document.querySelector('#district-journey-from');
 const districtJourneyTo = document.querySelector('#district-journey-to');
 const districtJourneyTicket = document.querySelector('#district-journey-ticket');
 const districtJourneyStatus = document.querySelector('#district-journey-status');
+const districtJourneyCountdown = document.querySelector('#district-journey-countdown');
 const vehicleAction = document.querySelector('#vehicle-action');
 const driveTools = document.querySelector('#drive-tools');
 const hornAction = document.querySelector('#horn-action');
@@ -117,6 +118,7 @@ const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTA
     spawn: { x:12, z:0, rotation:0 },
     train: { x:-42, z:-6, radius:7.2 },
     airport: DISTRICT_AIRPORTS.has(district) ? { x:42, z:-28, radius:8.2 } : null,
+    teleport: { x:78, z:72, radius:7.2 },
   };
   if (district === 'Kottayam') return [district, { ...generic, spawn:{ x:19,z:-23,rotation:0 }, train:{ x:7,z:-23,radius:7.2 } }];
   if (district === 'Ernakulam') return [district, {
@@ -274,8 +276,8 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'ernakulam-station-bus', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Ernakulam Railway Bus Stop', x: -29, z: -14.5, radius: 4.2, discoverRadius: 7.5 }),
   Object.freeze({ id: 'ernakulam-mg-road', kind: 'bus', routeId: 'ernakulam-city-line', label: 'MG Road Bus Stop', x: 18, z: 8, radius: 4.2, discoverRadius: 7.5 }),
   Object.freeze({ id: 'ernakulam-marine', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Marine Drive Bus Stop', x: -1, z: 28, radius: 4.2, discoverRadius: 7.5 }),
-  Object.freeze({ id: 'kottayam-rail', kind: 'train', stationId: 'kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Ernakulam', fare: 35 }),
-  Object.freeze({ id: 'ernakulam-rail', kind: 'train', stationId: 'ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, discoverRadius: 10.5, destinationLabel: 'Kottayam', fare: 35 }),
+  Object.freeze({ id: 'kottayam-rail', kind: 'train', stationId: 'kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Ernakulam', fare: 500 }),
+  Object.freeze({ id: 'ernakulam-rail', kind: 'train', stationId: 'ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, discoverRadius: 10.5, destinationLabel: 'Kottayam', fare: 500 }),
   Object.freeze({ id: 'town-market', kind: 'shop', label: 'Town Market', x: 31, z: 15, radius: 4.2, discoverRadius: 7.2, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
   Object.freeze({ id: 'community-clinic', kind: 'service', service: 'clinic', label: 'Community Clinic', x: 28, z: 28, radius: 4.8, discoverRadius: 8.0 }),
   Object.freeze({ id: 'police-station', kind: 'service', service: 'police', label: 'Kerala Police Station', x: -31, z: 14, radius: 4.8, discoverRadius: 8.0 }),
@@ -353,6 +355,10 @@ function generatedDistrictTravelSpots() {
       x:config.airport.x, z:config.airport.z, radius:config.airport.radius, discoverRadius:12,
     }));
   }
+  if (config.teleport) generated.push(Object.freeze({
+    id:'district-teleport-gate', kind:'teleport', label:`${district} Teleportation Gate`,
+    x:config.teleport.x, z:config.teleport.z, radius:config.teleport.radius, discoverRadius:12,
+  }));
   return generated;
 }
 function activeWorldActivitySpots() {
@@ -1945,6 +1951,8 @@ let districtTravelMode = 'train';
 let districtTravelSelected = '';
 let districtTravelSnapshot = null;
 let districtJourneyTimers = [];
+let districtJourneyInterval = null;
+let districtJourneyResumeUserId = '';
 
 function closeDistrictTravelPanel() {
   districtTravelPanel?.classList.remove('open');
@@ -1963,44 +1971,54 @@ function renderDistrictTravelDestinations() {
   const options = (districtTravelSnapshot.districts || []).filter(item => {
     if (item.district === current) return false;
     if (districtTravelMode === 'flight') return !!item.flight?.available && !!districtTravelSnapshot.hubs?.airport;
+    if (districtTravelMode === 'teleport') return !!item.teleport?.available && !!districtTravelSnapshot.hubs?.teleport;
     return !!item.train?.available;
   });
+  const transport = districtTravelMode === 'flight' ? '✈ Flight' : districtTravelMode === 'teleport' ? '◉ Teleport' : '🚆 Train';
+  const action = districtTravelMode === 'flight' ? 'BOARD FLIGHT · 30 SEC' : districtTravelMode === 'teleport' ? 'OPEN GATE · INSTANT' : 'BOARD TRAIN · 1 MIN';
   for (const item of options) {
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.district = item.district;
     button.classList.toggle('selected', districtTravelSelected === item.district);
-    const transport = districtTravelMode === 'flight' ? '✈ Flight' : '🚆 Train';
-    const fare = Number((districtTravelMode === 'flight' ? item.flight?.fare : item.train?.fare) || 0);
+    const fare = Number((item[districtTravelMode]?.fare) || 0);
+    const fareLabel = fare === 0 ? `FREE · ${Math.max(1, districtTravelSnapshot.freeTripsRemaining || 0)} FREE LEFT` : `₹${fare}`;
     button.textContent = `${item.district}\n${transport}`;
-    button.textContent += '\n₹' + fare;
+    button.textContent += '\n' + fareLabel;
     button.addEventListener('click', () => {
       districtTravelSelected = item.district;
       renderDistrictTravelDestinations();
       if (districtTravelConfirm) {
         districtTravelConfirm.disabled = false;
-        districtTravelConfirm.textContent = (districtTravelMode === 'flight' ? 'BUY TICKET & FLY' : 'BUY TICKET & BOARD TRAIN') + ' · ₹' + fare;
+        districtTravelConfirm.textContent = action + ' · ' + (fare === 0 ? 'FREE' : `₹${fare}`);
       }
-      if (districtTravelNote) districtTravelNote.textContent = current + ' → ' + item.district + ' · ' + (districtTravelMode === 'flight' ? 'flight' : 'train') + ' ticket ₹' + fare + '. Your wallet is charged only after the ' + (districtTravelMode === 'flight' ? 'airport' : 'station') + ' check succeeds.';
+      const modeName = districtTravelMode === 'flight' ? 'Flight' : districtTravelMode === 'teleport' ? 'Teleport' : 'Train';
+      const checkPlace = districtTravelMode === 'flight' ? 'airport' : districtTravelMode === 'teleport' ? 'district gate' : 'railway station';
+      const price = fare === 0 ? `FREE · trip ${Number(districtTravelSnapshot.tripsUsed || 0) + 1} of 3` : `₹${fare}`;
+      if (districtTravelNote) districtTravelNote.textContent = `${current} → ${item.district} · ${modeName} ${price}. Verify your ${checkPlace} before the trip starts.`;
     });
     districtTravelDestinations.append(button);
   }
   if (!options.length && districtTravelError) {
     districtTravelError.textContent = districtTravelMode === 'flight'
-      ? 'No direct flight is available from this district. Use the railway station.'
-      : 'No train destinations are available.';
+      ? 'No direct flight is available from this district. Use the railway station or district gate.'
+      : districtTravelMode === 'teleport'
+        ? 'No district gate is available here.'
+        : 'No train destinations are available.';
   }
 }
 
 async function openDistrictTravelPanel(mode = 'train') {
-  districtTravelMode = mode === 'flight' ? 'flight' : 'train';
+  districtTravelMode = ['train','flight','teleport'].includes(mode) ? mode : 'train';
   districtTravelSelected = '';
   if (districtTravelPanel) districtTravelPanel.classList.add('open');
-  if (districtTravelHeading) districtTravelHeading.textContent = districtTravelMode === 'flight' ? 'Kerala Airport' : 'Kerala Railway';
+  if (districtTravelHeading) districtTravelHeading.textContent = districtTravelMode === 'flight' ? 'Kerala Airport' : districtTravelMode === 'teleport' ? 'District Teleport Gate' : 'Kerala Railway';
   if (districtTravelTitle) districtTravelTitle.textContent = `${currentWorldDistrictName()} → choose district`;
   if (districtTravelNote) districtTravelNote.textContent = districtTravelMode === 'flight'
-    ? 'Flights connect airport districts. District worlds cannot be reached by walking or driving across the map.'
-    : 'Choose a destination and review its ticket fare. You must be at this railway station to board.';
+    ? 'Flights connect airport districts and take 30 seconds. The first 3 district trips are free; then each flight costs ₹1,000.'
+    : districtTravelMode === 'teleport'
+      ? 'Step through the gate for an instant district transfer. The teleport animation takes about 2 seconds; the first 3 district trips are free, then it costs ₹2,000.'
+      : 'Trains connect all district stations and take 1 minute. The first 3 district trips are free; then each train costs ₹500.';
   if (districtTravelDestinations) districtTravelDestinations.textContent = 'Loading routes…';
   if (districtTravelError) districtTravelError.textContent = '';
   if (districtTravelConfirm) districtTravelConfirm.disabled = true;
@@ -2027,13 +2045,11 @@ districtTravelConfirm?.addEventListener('click', async () => {
       mode: districtTravelMode,
       destinationDistrict: districtTravelSelected,
     });
-    const district = result?.travel?.district || result?.user?.worldDistrict || districtTravelSelected;
-    try { sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, district); } catch {}
-    bootWorldDistrict = district;
-    const fromDistrict = result?.travel?.from?.district || currentWorldDistrictName();
-    const fare = Number(result?.travel?.fare || 0);
+    const travel = result?.travel || {};
+    const toDistrict = travel.to?.district || travel.district || districtTravelSelected;
+    const fromDistrict = travel.from?.district || currentWorldDistrictName();
     closeDistrictTravelPanel();
-    showDistrictJourney(districtTravelMode, fromDistrict, district, fare);
+    showDistrictJourney(districtTravelMode, fromDistrict, toDistrict, Number(travel.fare || 0), travel);
   } catch (error) {
     window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));
     districtTravelConfirm.disabled = false;
@@ -2041,43 +2057,136 @@ districtTravelConfirm?.addEventListener('click', async () => {
   }
 });
 
-function showDistrictJourney(mode, fromDistrict, toDistrict, fare) {
-  if (!districtJourneyScreen) {
-    location.reload();
-    return;
-  }
-  const flight = mode === 'flight';
+function formatJourneyClock(milliseconds) {
+  const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+}
+
+function finishDistrictJourney(travel = {}) {
   districtJourneyTimers.forEach(timer => clearTimeout(timer));
   districtJourneyTimers = [];
-  districtJourneyScreen.dataset.mode = flight ? 'flight' : 'train';
-  districtJourneyScreen.setAttribute('aria-label', flight ? 'Flight journey' : 'Train journey');
+  if (districtJourneyInterval) clearInterval(districtJourneyInterval);
+  districtJourneyInterval = null;
+  const district = travel.to?.district || travel.district || '';
+  if (district && DISTRICT_INSTANCE_CONFIG[district]) {
+    bootWorldDistrict = district;
+    try { sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, district); } catch {}
+  }
+  location.reload();
+}
+
+function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) {
+  if (!districtJourneyScreen) {
+    finishDistrictJourney(travel);
+    return;
+  }
+  const train = mode === 'train';
+  const flight = mode === 'flight';
+  const teleport = mode === 'teleport';
+  const durationMs = Math.max(0, Number(travel.durationMs ?? (train ? 60_000 : flight ? 30_000 : 0)));
+  const animationMs = teleport ? 1800 : durationMs;
+  const tripNumber = Math.max(1, Number(travel.tripNumber) || 1);
+  const freeTripsRemaining = Math.max(0, Number(travel.freeTripsRemaining) || 0);
+  let timeOffset = Number(travel.serverNow || Date.now()) - Date.now();
+  let arrivalAt = Number(travel.arrivalAt || Date.now() + durationMs);
+  districtJourneyTimers.forEach(timer => clearTimeout(timer));
+  districtJourneyTimers = [];
+  if (districtJourneyInterval) clearInterval(districtJourneyInterval);
+  districtJourneyScreen.dataset.mode = mode;
+  districtJourneyScreen.style.setProperty('--journey-duration', `${animationMs}ms`);
+  districtJourneyScreen.setAttribute('aria-label', teleport ? 'Teleport journey' : flight ? 'Flight journey' : 'Train journey');
   districtJourneyScreen.classList.add('open');
   districtJourneyScreen.setAttribute('aria-hidden', 'false');
+  const animatedParts = districtJourneyScreen.querySelectorAll('.journey-train,.journey-hill,.journey-tree,.journey-progress i,.journey-flight-plane,.journey-flight-cloud');
+  const initialElapsed = teleport ? 0 : Math.max(0, durationMs - Math.max(0, arrivalAt - (Date.now() + timeOffset)));
+  animatedParts.forEach(element => {
+    element.style.animationDuration = `${animationMs}ms`;
+    element.style.animationDelay = `-${Math.min(animationMs, initialElapsed)}ms`;
+  });
+  if (districtJourneyCountdown) {
+    districtJourneyCountdown.hidden = teleport;
+    districtJourneyCountdown.textContent = teleport ? '' : formatJourneyClock(Math.max(0, arrivalAt - (Date.now() + timeOffset)));
+  }
   const kicker = districtJourneyScreen.querySelector('.journey-kicker');
-  if (kicker) kicker.textContent = flight ? 'KERALA AIRWAYS · DISTRICT FLIGHT' : 'KERALA RAILWAYS · DISTRICT PASSENGER';
-  if (districtJourneyTitle) districtJourneyTitle.textContent = (flight ? 'Flight to ' : 'Train to ') + toDistrict;
-  if (districtJourneyFrom) districtJourneyFrom.textContent = fromDistrict + (flight ? ' Airport' : ' Station');
-  if (districtJourneyTo) districtJourneyTo.textContent = toDistrict + (flight ? ' Airport' : ' Station');
-  if (districtJourneyTicket) districtJourneyTicket.textContent = 'Ticket confirmed · ₹' + fare + ' Kerala Cash · ' + (flight ? 'Gate 01 boarding' : 'Departs now');
-  const phases = flight ? [
+  if (kicker) kicker.textContent = flight ? 'KERALA AIRWAYS · DISTRICT FLIGHT' : teleport ? 'KERALA PLAY · DISTRICT GATE' : 'KERALA RAILWAYS · DISTRICT PASSENGER';
+  if (districtJourneyTitle) districtJourneyTitle.textContent = (flight ? 'Flight to ' : teleport ? 'Gate to ' : 'Train to ') + toDistrict;
+  if (districtJourneyFrom) districtJourneyFrom.textContent = travel.from?.label || (fromDistrict + (flight ? ' Airport' : teleport ? ' Gate' : ' Station'));
+  if (districtJourneyTo) districtJourneyTo.textContent = travel.to?.label || (toDistrict + (flight ? ' Airport' : teleport ? ' Gate' : ' Station'));
+  const fareLabel = fare === 0 ? `FREE · trip ${tripNumber} of 3` : `₹${fare} Kerala Cash`;
+  if (districtJourneyTicket) districtJourneyTicket.textContent = `${fareLabel} · ${freeTripsRemaining} free trip${freeTripsRemaining === 1 ? '' : 's'} left`;
+
+  const phases = teleport ? [
+    [0, 'District gate activating…'],
+    [650, 'Portal open · stepping through…'],
+    [1350, 'Crossing into ' + toDistrict + '…'],
+  ] : flight ? [
     [0, 'Ticket verified · proceed to Gate 01 at ' + fromDistrict + ' Airport…'],
-    [1450, 'Boarding complete · cabin crew closing the doors…'],
-    [3050, 'Take-off · climbing above Kerala’s coast and hills…'],
-    [5350, 'Cruising to ' + toDistrict + ' · district boundary crossed…'],
-    [6800, 'Beginning descent · approaching ' + toDistrict + ' Airport…'],
-    [7650, 'Landed · taxiing to the terminal at ' + toDistrict + '…'],
+    [3000, 'Boarding complete · cabin doors closing…'],
+    [7000, 'Take-off · climbing above Kerala…'],
+    [15000, 'Cruising to ' + toDistrict + ' · district boundary crossed…'],
+    [25000, 'Beginning descent · approaching ' + toDistrict + ' Airport…'],
+    [28500, 'Landing · taxiing to the terminal…'],
   ] : [
     [0, 'Ticket checked · doors closing at ' + fromDistrict + ' Station…'],
-    [1500, 'Departed ' + fromDistrict + ' · train is leaving the platform…'],
-    [3400, 'On the way to ' + toDistrict + ' · district boundary crossed…'],
-    [6100, 'Approaching ' + toDistrict + ' Railway Station…'],
+    [5000, 'Departed ' + fromDistrict + ' · train leaving the platform…'],
+    [20000, 'On the way to ' + toDistrict + ' · district boundary crossed…'],
+    [46000, 'Approaching ' + toDistrict + ' Railway Station…'],
+    [57000, 'Arriving at ' + toDistrict + ' · preparing to stop…'],
   ];
-  for (const [delay, label] of phases) {
-    districtJourneyTimers.push(setTimeout(() => {
-      if (districtJourneyScreen.classList.contains('open') && districtJourneyStatus) districtJourneyStatus.textContent = label;
-    }, delay));
+  const drawJourneyFrame = (elapsed, remaining) => {
+    const phase = [...phases].reverse().find(([at]) => elapsed >= at);
+    if (phase && districtJourneyStatus) districtJourneyStatus.textContent = phase[1];
+    if (districtJourneyCountdown && !teleport) districtJourneyCountdown.textContent = formatJourneyClock(remaining);
+  };
+  drawJourneyFrame(initialElapsed, Math.max(0, arrivalAt - (Date.now() + timeOffset)));
+  if (teleport) {
+    districtJourneyTimers.push(setTimeout(() => finishDistrictJourney(travel), animationMs));
+    return;
   }
-  districtJourneyTimers.push(setTimeout(() => location.reload(), 8100));
+  districtJourneyInterval = setInterval(async () => {
+    const remaining = Math.max(0, arrivalAt - (Date.now() + timeOffset));
+    const elapsed = Math.max(0, durationMs - remaining);
+    drawJourneyFrame(elapsed, remaining);
+    try {
+      const status = await api('/api/travel/district/status');
+      if (status.status === 'arrived') { finishDistrictJourney(status.travel || travel); return; }
+      if (status.status === 'pending' && status.travel) {
+        const serverNow = Number(status.serverNow || Date.now());
+        timeOffset = serverNow - Date.now();
+        arrivalAt = Number(status.travel.arrivalAt || arrivalAt);
+        const updatedRemaining = Math.max(0, Number(status.travel.arrivalAt) - serverNow);
+        drawJourneyFrame(Math.max(0, durationMs - updatedRemaining), updatedRemaining);
+        districtJourneyCountdown && (districtJourneyCountdown.textContent = formatJourneyClock(updatedRemaining));
+      } else if (status.status === 'idle') {
+        finishDistrictJourney({ ...travel, to:{ district:toDistrict } });
+      }
+    } catch { /* Keep the server-based countdown running and retry next second. */ }
+  }, 1000);
+}
+
+window.addEventListener('kerala-district-journey', event => {
+  const travel = event.detail?.travel || event.detail || {};
+  const mode = travel.mode || 'train';
+  window.dispatchEvent(new CustomEvent('kerala-ride-travel-start'));
+  showDistrictJourney(mode, travel.from?.district || currentWorldDistrictName(), travel.to?.district || '', Number(travel.fare || 0), travel);
+});
+
+async function resumeDistrictJourney(userId) {
+  if (!userId || districtJourneyResumeUserId === userId) return;
+  districtJourneyResumeUserId = userId;
+  try {
+    const result = await api('/api/travel/district/status');
+    if (result.status === 'pending' && result.travel) {
+      window.dispatchEvent(new CustomEvent('kerala-ride-travel-start'));
+      const travel = result.travel;
+      showDistrictJourney(travel.mode, travel.from?.district || currentWorldDistrictName(), travel.to?.district || '', Number(travel.fare || 0), travel);
+    } else if (result.status === 'arrived' && result.travel) {
+      finishDistrictJourney(result.travel);
+    }
+  } catch (error) {
+    districtJourneyResumeUserId = '';
+    console.warn('Could not resume district journey:', error);
+  }
 }
 
 function updateLifeLoopMission() {
@@ -2284,6 +2393,12 @@ function updateWorldInteract() {
         worldInteract.disabled = !closeEnough;
         worldInteract.textContent = closeEnough ? 'OPEN FLIGHT ROUTES' : `NEARBY · ${spot.label.toUpperCase()}`;
         worldInteract.title = closeEnough ? `${spot.label} · fly to another airport district` : worldInteract.title;
+      } else if (spot.kind === 'teleport') {
+        worldInteract.dataset.mode = closeEnough ? 'district-travel' : '';
+        worldInteract.dataset.transport = closeEnough ? 'teleport' : '';
+        worldInteract.disabled = !closeEnough;
+        worldInteract.textContent = closeEnough ? 'OPEN DISTRICT GATE' : `NEARBY · ${spot.label.toUpperCase()}`;
+        worldInteract.title = closeEnough ? `${spot.label} · teleport instantly to another district` : worldInteract.title;
       } else if (spot.kind === 'rest') {
         worldInteract.dataset.mode = closeEnough ? 'needs-rest' : '';
         worldInteract.disabled = !closeEnough;
@@ -2698,6 +2813,7 @@ function acceptUser(user) {
     updateNameLabel(playerRef, user?.username || '', user?.id);
   }
   if (!user) {
+    districtJourneyResumeUserId = '';
     applyJobMission(null);
     connectionReady = false;
     lastMovementMoving = false;
@@ -2708,6 +2824,7 @@ function acceptUser(user) {
     document.querySelector('#coconut-keys')?.replaceChildren();
     challengeResult.textContent = '';
   } else {
+    if (!previous || previous.id !== user.id) resumeDistrictJourney(user.id);
     if ((user.followers || 0) + (user.following || 0) > 0) finishTask('social');
     if (!onboardingQueued) {
       onboardingQueued = true;
@@ -6694,6 +6811,42 @@ function addDistrictAirport(scene, district, x, z) {
   registerFarVisual(board, x, z + .2, 78);
 }
 
+function addDistrictTeleportGateway(scene, district, x, z) {
+  const baseMat = new THREE.MeshStandardMaterial({ color:0x252e3d, roughness:.78, metalness:.18 });
+  const glowMat = new THREE.MeshStandardMaterial({ color:0x66d9ff, emissive:0x20a9ff, emissiveIntensity:.72, roughness:.28, metalness:.12 });
+  const portalMat = new THREE.MeshStandardMaterial({ color:0x3c74bd, emissive:0x194db0, emissiveIntensity:.62, transparent:true, opacity:.58, side:THREE.DoubleSide, roughness:.2 });
+  const stoneMat = new THREE.MeshStandardMaterial({ color:0x545d68, roughness:.9 });
+  const gate = new THREE.Group();
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.5, .35, 32), baseMat);
+  plinth.position.y = .18;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(2.35, .18, 10, 36), glowMat);
+  rim.position.y = 2.65;
+  const field = new THREE.Mesh(new THREE.CircleGeometry(2.2, 32), portalMat);
+  field.position.set(0, 2.65, -.04);
+  const leftPillar = new THREE.Mesh(new THREE.BoxGeometry(.42, 4.8, .62), stoneMat);
+  leftPillar.position.set(-2.42, 2.45, 0);
+  const rightPillar = leftPillar.clone();
+  rightPillar.position.x = 2.42;
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(5.2, .42, .7), stoneMat);
+  lintel.position.set(0, 4.86, 0);
+  const crown = new THREE.Mesh(new THREE.SphereGeometry(.28, 12, 10), glowMat);
+  crown.position.set(0, 5.28, 0);
+  gate.add(plinth, rim, field, leftPillar, rightPillar, lintel, crown);
+  gate.position.set(x, 0, z);
+  gate.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+  scene.add(gate);
+
+  const board = createWorldSignMesh({
+    title: 'DISTRICT GATE',
+    subtitle: `${district.toUpperCase()} · TELEPORT TO ANOTHER DISTRICT`,
+    background: '#40345f',
+  }, 6.7, .92);
+  board.position.set(x, 6.3, z + .2);
+  scene.add(board);
+  registerFarVisual(board, x, z + .2, 88);
+  registerFarVisual(rim, x, z, 52);
+}
+
 function addDistrictAtlasAttractions(scene, district) {
   const atlas = KERALA_DISTRICT_ATLAS[district];
   if (!atlas) return;
@@ -7204,6 +7357,7 @@ function addGenericDistrictWorld(scene, district) {
 
   addDistrictIdentityEnvironment(scene,district,profile);
   if (config.airport) addDistrictAirport(scene, district, config.airport.x, config.airport.z);
+  if (config.teleport) addDistrictTeleportGateway(scene, district, config.teleport.x, config.teleport.z);
 }
 
 
@@ -7242,8 +7396,10 @@ function buildWorld(scene) {
   renderedWorldDistrict = currentWorldDistrictName();
   if (renderedWorldDistrict === 'Ernakulam') {
     addErnakulamDistrictFoundation(scene);
-    const airport = currentDistrictInstance().airport;
+    const config = currentDistrictInstance();
+    const airport = config.airport;
     if (airport) addDistrictAirport(scene, renderedWorldDistrict, airport.x, airport.z);
+    if (config.teleport) addDistrictTeleportGateway(scene, renderedWorldDistrict, config.teleport.x, config.teleport.z);
     return;
   }
   if (renderedWorldDistrict !== 'Kottayam') {
@@ -7579,6 +7735,8 @@ function buildWorld(scene) {
   addPhotoVillager(scene, 18.0, -50.0, 6.2, .31, 1.5, .68, {
     role: 'Local', nightHide: true,
   });
+  const teleport = currentDistrictInstance().teleport;
+  if (teleport) addDistrictTeleportGateway(scene, renderedWorldDistrict, teleport.x, teleport.z);
 }
 
 function buildLandmarkWorld(scene) {

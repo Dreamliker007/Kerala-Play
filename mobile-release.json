@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "1.0.11",
+  "versionCode": 13,
+  "versionName": "1.0.12",
   "track": "closed-testing",
-  "notes": "V112.0 adds detailed district airport terminals, runway apron and aircraft visuals, flight boarding and arrival sequencing, and validated airport-to-airport flight routes"
+  "notes": "V113.0 adds train, flight, and teleport district travel with three free trips, fixed fares, timed arrivals, and portal animation"
 }

@@ -16,6 +16,9 @@ const DISTRICTS = {
 };
 const DISTRICT_WORLD_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
 const AIRPORT_DISTRICTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvananthapuram']);
+const DISTRICT_TRAVEL_FREE_TRIPS = 3;
+const DISTRICT_TRAVEL_FARES = Object.freeze({ train:500, flight:1000, teleport:2000 });
+const DISTRICT_TRAVEL_DURATIONS = Object.freeze({ train:60_000, flight:30_000, teleport:0 });
 const GENERIC_WORLD_BOUNDS = Object.freeze({ minX:-110, maxX:110, minZ:-110, maxZ:110 });
 const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_ORDER.map((district, index) => {
   const generic = {
@@ -25,6 +28,7 @@ const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_OR
     spawn:Object.freeze({ x:12, z:0, rotation:0 }),
     train:Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-rail`, x:-42, z:-6, radius:7.2, arrivalX:-37, arrivalZ:-6 }),
     airport:AIRPORT_DISTRICTS.has(district) ? Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-airport`, x:42, z:-28, radius:8.2, arrivalX:36, arrivalZ:-28 }) : null,
+    teleport:Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-district-gate`, x:78, z:72, radius:7.2, arrivalX:75, arrivalZ:72 }),
   };
   if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:7,z:-23,radius:7.2,arrivalX:11,arrivalZ:-23 }) })];
   if (district === 'Ernakulam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:-14,z:6,rotation:0 }), train:Object.freeze({ id:'ernakulam-rail', x:-40,z:-30.5,radius:6.6,arrivalX:-34,arrivalZ:-19.5 }), airport:Object.freeze({ id:'ernakulam-airport', x:38,z:36,radius:8.2,arrivalX:32,arrivalZ:36 }) })];
@@ -43,12 +47,9 @@ function insideDistrictWorld(config, x, z, margin = 0) {
     && x >= config.bounds.minX + margin && x <= config.bounds.maxX - margin
     && z >= config.bounds.minZ + margin && z <= config.bounds.maxZ - margin;
 }
-function districtTravelFare(fromDistrict, toDistrict, mode = 'train') {
-  if (mode === 'train' && ((fromDistrict === 'Kottayam' && toDistrict === 'Ernakulam') || (fromDistrict === 'Ernakulam' && toDistrict === 'Kottayam'))) return 35;
-  const from = DISTRICT_WORLD_CONFIG[fromDistrict]?.order ?? 0;
-  const to = DISTRICT_WORLD_CONFIG[toDistrict]?.order ?? 0;
-  const hops = Math.max(1, Math.abs(from - to));
-  return mode === 'flight' ? 140 + hops * 12 : 28 + hops * 5;
+function districtTravelFare(mode = 'train', tripsUsed = 0) {
+  if (Math.max(0, Number(tripsUsed) || 0) < DISTRICT_TRAVEL_FREE_TRIPS) return 0;
+  return DISTRICT_TRAVEL_FARES[mode] || 0;
 }
 const DISTRICT_CITY_PROFILES = Object.freeze({
   Kasaragod: Object.freeze({ centre:'Kasaragod Town', market:'Kasaragod Market', cafe:'Bekal Cafe', secondary:'Bekal Road', neighbourhood:'Kanhangad Link', landmark:'Bekal Fort' }),
@@ -223,7 +224,7 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
 const DISTRICT_RAIL_ROUTE = Object.freeze({
   id: 'kottayam-ernakulam-rail',
   label: 'Kottayam ↔ Ernakulam Passenger',
-  fare: 35,
+  fare: 500,
   stations: Object.freeze({
     kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -34, arrivalZ: -19.5 }),
     ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
@@ -457,6 +458,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   }
   if (JSON.stringify(normalizedGroups) !== JSON.stringify(db.groups)) { db.groups = normalizedGroups; migrated = true; }
   for (const user of db.users) {
+    if (!Number.isInteger(user.districtTravelCount) || user.districtTravelCount < 0) { user.districtTravelCount = 0; migrated = true; }
     if (!Number.isInteger(user.walletBalance) || user.walletBalance < 0 || user.walletBalance > WALLET_LIMIT) {
       user.walletBalance = STARTER_BALANCE; migrated = true;
     }
@@ -753,6 +755,75 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const transaction = { id: randomUUID(), userId: user.id, type: amount > 0 ? 'credit' : 'debit', amount: Math.abs(amount), balanceAfter, kind, description, createdAt: now() };
     db.transactions.push(transaction); dirty = true;
     return transaction;
+  }
+  function applyDistrictTravelArrival(user, trip, timestamp = now()) {
+    const live = presence.get(user.id) || place(user);
+    live.district = trip.to.district;
+    live.x = Number(trip.x);
+    live.z = Number(trip.z);
+    live.rotation = 0;
+    live.moving = false;
+    live.mode = 'walk';
+    live.lastSeen = timestamp;
+    live.movedAt = timestamp;
+    live.movementCredit = 2;
+    user.worldDistrict = trip.to.district;
+    user.worldX = live.x;
+    user.worldZ = live.z;
+    user.worldRotation = 0;
+    user.worldUpdatedAt = timestamp;
+    delete user.pendingDistrictTravel;
+    dirty = true;
+    worldDirty = true;
+    return live;
+  }
+  function completeDistrictTravel(user, timestamp = now()) {
+    const pending = user.pendingDistrictTravel;
+    if (!pending || Number(pending.arrivalAt) > timestamp) return null;
+    const trip = { ...pending, status:'arrived', remainingMs:0, serverNow:timestamp };
+    applyDistrictTravelArrival(user, trip, timestamp);
+    profileChanged(user);
+    return trip;
+  }
+  async function beginDistrictTravel(user, { mode, fromDistrict, toDistrict, hub, destinationHub, live }) {
+    const timestamp = now();
+    const tripsUsed = Math.max(0, Number(user.districtTravelCount) || 0);
+    const fare = districtTravelFare(mode, tripsUsed);
+    const modeLabel = mode === 'flight' ? 'Flight' : mode === 'teleport' ? 'Teleport' : 'Train';
+    const transaction = fare > 0
+      ? walletTransaction(user, -fare, `${mode}_fare`, `${modeLabel} · ${fromDistrict} → ${toDistrict}`)
+      : null;
+    user.districtTravelCount = tripsUsed + 1;
+    const trip = {
+      id:randomUUID(),
+      mode,
+      status:mode === 'teleport' ? 'arrived' : 'pending',
+      fare,
+      tripNumber:user.districtTravelCount,
+      freeTripsRemaining:Math.max(0, DISTRICT_TRAVEL_FREE_TRIPS - user.districtTravelCount),
+      durationMs:DISTRICT_TRAVEL_DURATIONS[mode],
+      startedAt:timestamp,
+      arrivalAt:timestamp + DISTRICT_TRAVEL_DURATIONS[mode],
+      serverNow:timestamp,
+      from:{ district:fromDistrict, hubId:hub.id, label:hub.label || `${fromDistrict} ${modeLabel}` },
+      to:{ district:toDistrict, hubId:destinationHub.id, label:destinationHub.label || `${toDistrict} ${modeLabel}` },
+      district:toDistrict,
+      x:Number(destinationHub.arrivalX),
+      z:Number(destinationHub.arrivalZ),
+      rotation:0,
+    };
+    if (mode === 'teleport') {
+      applyDistrictTravelArrival(user, trip, timestamp);
+    } else {
+      user.pendingDistrictTravel = trip;
+      live.mode = 'transit';
+      live.moving = false;
+      live.lastSeen = timestamp;
+      dirty = true;
+      worldDirty = true;
+    }
+    await persist();
+    return { wallet:walletSummary(user), user:publicUser(user), transaction, travel:trip };
   }
   function addNotification(user, { sourceKey, kind = 'system', title, message, severity = 'info', target = '' }) {
     const notifications = jobStateFor(user).notifications;
@@ -2018,7 +2089,7 @@ function publicRideDestinationForUser(user, destinationId) {
         const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
         requireValue(/^[A-Za-z][A-Za-z '-]{1,39}$/.test(firstName), 400, 'Enter a valid first name.');
         const [spawnX, spawnZ] = DISTRICTS[district];
-        const user = { id: randomUUID(), firstName, displayName: firstName, username, usernameChangedAt: 0, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldDistrict: district, worldX: districtWorldConfig(district).spawn.x, worldZ: districtWorldConfig(district).spawn.z, worldRotation: districtWorldConfig(district).spawn.rotation || 0, worldUpdatedAt: now() };
+        const user = { id: randomUUID(), firstName, displayName: firstName, username, usernameChangedAt: 0, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], districtTravelCount: 0, createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldDistrict: district, worldX: districtWorldConfig(district).spawn.x, worldZ: districtWorldConfig(district).spawn.z, worldRotation: districtWorldConfig(district).spawn.rotation || 0, worldUpdatedAt: now() };
         db.users.push(user); walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash'); await persist(); await startSession(user, response, request); socialChanged();
         send(response, 201, { user: publicUser(user) }); return;
       }
@@ -2107,6 +2178,7 @@ function publicRideDestinationForUser(user, destinationId) {
             completedTasks: [],
             walkMeters: 0,
             visitedLandmarks: [],
+            districtTravelCount: 0,
             createdAt: now(),
             gameDay: '',
             gameWins: 0,
@@ -2711,86 +2783,81 @@ function publicRideDestinationForUser(user, destinationId) {
       if (path === '/api/travel/districts' && request.method === 'GET') {
         const currentDistrict = currentWorldDistrict(user);
         const current = districtWorldConfig(currentDistrict);
+        const tripsUsed = Math.max(0, Number(user.districtTravelCount) || 0);
         send(response, 200, {
           currentDistrict,
+          tripsUsed,
+          freeTripsRemaining: Math.max(0, DISTRICT_TRAVEL_FREE_TRIPS - tripsUsed),
           districts: DISTRICT_WORLD_ORDER.map(district => {
             const config = DISTRICT_WORLD_CONFIG[district];
             return {
               district,
               order: config.order,
-              train: { available: true, id: config.train.id, fare: district === currentDistrict ? 0 : districtTravelFare(currentDistrict, district, 'train') },
-              flight: { available: !!config.airport && !!current.airport, id: config.airport?.id || null, fare: district === currentDistrict || !config.airport || !current.airport ? 0 : districtTravelFare(currentDistrict, district, 'flight') },
+              train: { available: true, id: config.train.id, fare: district === currentDistrict ? 0 : districtTravelFare('train', tripsUsed) },
+              flight: { available: !!config.airport && !!current.airport, id: config.airport?.id || null, fare: district === currentDistrict || !config.airport || !current.airport ? 0 : districtTravelFare('flight', tripsUsed) },
+              teleport: { available:true, id:config.teleport.id, fare:district === currentDistrict ? 0 : districtTravelFare('teleport', tripsUsed) },
               current: district === currentDistrict,
             };
           }),
           hubs: {
             train: { ...current.train, district: currentDistrict, label: `${currentDistrict} Railway Station` },
             airport: current.airport ? { ...current.airport, district: currentDistrict, label: `${currentDistrict} Airport` } : null,
+            teleport: { ...current.teleport, district:currentDistrict, label:`${currentDistrict} District Gate` },
           },
         }); return;
+      }
+      if (path === '/api/travel/district/status' && request.method === 'GET') {
+        const pending = user.pendingDistrictTravel;
+        if (!pending) { send(response, 200, { status:'idle', serverNow:now() }); return; }
+        const timestamp = now();
+        if (Number(pending.arrivalAt) > timestamp) {
+          send(response, 200, { status:'pending', travel:{ ...pending, remainingMs:Number(pending.arrivalAt) - timestamp, serverNow:timestamp }, serverNow:timestamp }); return;
+        }
+        const travel = completeDistrictTravel(user, timestamp);
+        await persist();
+        send(response, 200, { status:'arrived', travel, user:publicUser(user), serverNow:timestamp }); return;
       }
       if (path === '/api/travel/district/board' && request.method === 'POST') {
         limited(`district-board:${user.id}`, 10, 60000);
         const body = await jsonBody(request);
-        const mode = body.mode === 'flight' ? 'flight' : 'train';
+        const mode = ['train','flight','teleport'].includes(body.mode) ? body.mode : 'train';
+        requireValue(!user.pendingDistrictTravel, 409, 'Your district journey is still in progress.');
         const fromDistrict = currentWorldDistrict(user);
         const destinationDistrict = String(body.destinationDistrict || '');
         requireValue(DISTRICT_WORLD_CONFIG[destinationDistrict], 404, 'Destination district not found.');
         requireValue(destinationDistrict !== fromDistrict, 409, 'You are already in that district.');
         const fromConfig = districtWorldConfig(fromDistrict);
         const destinationConfig = districtWorldConfig(destinationDistrict);
-        const hub = mode === 'flight' ? fromConfig.airport : fromConfig.train;
-        const destinationHub = mode === 'flight' ? destinationConfig.airport : destinationConfig.train;
-        requireValue(hub && destinationHub, 409, mode === 'flight' ? 'Flights are only available between airport districts.' : 'Train travel is unavailable for this district.');
+        const hub = mode === 'flight' ? fromConfig.airport : mode === 'teleport' ? fromConfig.teleport : fromConfig.train;
+        const destinationHub = mode === 'flight' ? destinationConfig.airport : mode === 'teleport' ? destinationConfig.teleport : destinationConfig.train;
+        const hubLabel = mode === 'flight' ? 'airport' : mode === 'teleport' ? 'district gate' : 'railway station';
+        requireValue(hub && destinationHub, 409, mode === 'flight' ? 'Flights are only available between airport districts.' : 'District travel is unavailable for this district.');
         const stateForTravel = jobStateFor(user);
         requireValue(!stateForTravel.active, 409, 'Finish your active job before inter-district travel.');
         const personal = stateForTravel.garage.activeVehicleId ? stateForTravel.garage.owned.find(vehicle => vehicle.id === stateForTravel.garage.activeVehicleId) : null;
         requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before travelling.');
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before travelling.');
-        requireValue(Math.hypot(live.x - hub.x, live.z - hub.z) <= hub.radius, 409, `Move closer to the ${mode === 'flight' ? 'airport' : 'railway station'}.`);
-        const fare = districtTravelFare(fromDistrict, destinationDistrict, mode);
-        const transaction = walletTransaction(user, -fare, mode === 'flight' ? 'flight_fare' : 'train_fare', `${fromDistrict} → ${destinationDistrict}`);
-        const timestamp = now();
-        user.worldDistrict = destinationDistrict;
-        live.district = destinationDistrict;
-        live.x = Number(destinationHub.arrivalX);
-        live.z = Number(destinationHub.arrivalZ);
-        live.rotation = 0;
-        live.moving = false;
-        live.mode = 'walk';
-        live.lastSeen = timestamp;
-        live.movedAt = timestamp;
-        live.movementCredit = 2;
-        user.worldX = live.x;
-        user.worldZ = live.z;
-        user.worldRotation = 0;
-        user.worldUpdatedAt = timestamp;
-        dirty = true;
-        worldDirty = true;
-        profileChanged(user);
-        await persist();
-        send(response, 200, {
-          wallet: walletSummary(user),
-          user: publicUser(user),
-          transaction,
-          travel: {
-            mode,
-            fare,
-            from: { district: fromDistrict, hubId: hub.id },
-            to: { district: destinationDistrict, hubId: destinationHub.id },
-            x: live.x,
-            z: live.z,
-            rotation: live.rotation,
-            district: destinationDistrict,
-          },
-        }); return;
+        requireValue(Math.hypot(live.x - hub.x, live.z - hub.z) <= hub.radius, 409, `Move closer to the ${hubLabel}.`);
+        const modeHubLabel = mode === 'flight' ? 'Airport' : mode === 'teleport' ? 'District Gate' : 'Railway Station';
+        const result = await beginDistrictTravel(user, {
+          mode,
+          fromDistrict,
+          toDistrict:destinationDistrict,
+          hub:{ ...hub, label:`${fromDistrict} ${modeHubLabel}` },
+          destinationHub:{ ...destinationHub, label:`${destinationDistrict} ${modeHubLabel}` },
+          live,
+        });
+        send(response, 200, result); return;
       }
       if (path === '/api/travel/train/route' && request.method === 'GET') {
+        const tripsUsed = Math.max(0, Number(user.districtTravelCount) || 0);
         send(response, 200, {
           id: DISTRICT_RAIL_ROUTE.id,
           label: DISTRICT_RAIL_ROUTE.label,
-          fare: DISTRICT_RAIL_ROUTE.fare,
+          fare: districtTravelFare('train', tripsUsed),
+          tripsUsed,
+          freeTripsRemaining: Math.max(0, DISTRICT_TRAVEL_FREE_TRIPS - tripsUsed),
           stations: Object.values(DISTRICT_RAIL_ROUTE.stations).map(station => ({
             id: station.id, district: station.district, label: station.label, x: station.x, z: station.z,
             destinationId: station.destinationId,
@@ -2803,6 +2870,9 @@ function publicRideDestinationForUser(user, destinationId) {
         const station = DISTRICT_RAIL_ROUTE.stations[String(body.stationId || '')];
         requireValue(station, 404, 'Railway station not found.');
         const destination = DISTRICT_RAIL_ROUTE.stations[station.destinationId];
+        requireValue(!user.pendingDistrictTravel, 409, 'Your district journey is still in progress.');
+        const fromDistrict = currentWorldDistrict(user);
+        requireValue(fromDistrict === station.district, 409, 'Choose the railway station in your current district.');
         const stateForTravel = jobStateFor(user);
         requireValue(!stateForTravel.active, 409, 'Finish your active job before boarding the train.');
         const personal = stateForTravel.garage.activeVehicleId ? stateForTravel.garage.owned.find(vehicle => vehicle.id === stateForTravel.garage.activeVehicleId) : null;
@@ -2810,22 +2880,17 @@ function publicRideDestinationForUser(user, destinationId) {
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before boarding.');
         requireValue(Math.hypot(live.x - station.x, live.z - station.z) <= station.radius, 409, `Move closer to ${station.label}.`);
-        const transaction = walletTransaction(user, -DISTRICT_RAIL_ROUTE.fare, 'train_fare', `${station.label} → ${destination.label}`);
-        const timestamp = now();
-        user.worldDistrict = destination.district;
-        live.district = destination.district;
-        live.x = station.arrivalX; live.z = station.arrivalZ; live.rotation = 0; live.moving = false; live.mode = 'walk';
-        live.lastSeen = timestamp; live.movedAt = timestamp; live.movementCredit = 2;
-        user.worldX = live.x; user.worldZ = live.z; user.worldRotation = 0; user.worldUpdatedAt = timestamp;
-        dirty = true; worldDirty = true; profileChanged(user);
-        await persist();
-        send(response, 200, {
-          wallet: walletSummary(user), user: publicUser(user), transaction,
-          travel: { routeId: DISTRICT_RAIL_ROUTE.id, routeLabel: DISTRICT_RAIL_ROUTE.label, fare: DISTRICT_RAIL_ROUTE.fare,
-            from: { id: station.id, district: station.district, label: station.label },
-            to: { id: destination.id, district: destination.district, label: destination.label },
-            x: live.x, z: live.z, rotation: live.rotation },
-        }); return;
+        const result = await beginDistrictTravel(user, {
+          mode:'train',
+          fromDistrict:station.district,
+          toDistrict:destination.district,
+          hub:{ ...station, label:station.label },
+          destinationHub:{ ...destination, arrivalX:station.arrivalX, arrivalZ:station.arrivalZ, label:destination.label },
+          live,
+        });
+        result.travel.routeId = DISTRICT_RAIL_ROUTE.id;
+        result.travel.routeLabel = DISTRICT_RAIL_ROUTE.label;
+        send(response, 200, result); return;
       }
       if (path === '/api/travel/bus/status' && request.method === 'GET') {
         const stopId = String(url.searchParams.get('stopId') || '');
@@ -3966,6 +4031,7 @@ function publicRideDestinationForUser(user, destinationId) {
       }
       if (path === '/api/world/move' && request.method === 'POST') {
         limited(`move:${user.id}`, 20, 1000);
+        requireValue(!user.pendingDistrictTravel, 409, 'Your train or flight is still in progress.');
         const body = await jsonBody(request);
         const movementWorld = districtWorldConfig(user);
         requireValue(insideDistrictWorld(movementWorld, Number(body.x), Number(body.z), -.01) && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, `You reached the edge of ${currentWorldDistrict(user)}. Use train or flight to travel to another district.`);
