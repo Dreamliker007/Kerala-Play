@@ -1,9 +1,9 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=120.0';
-import { createAtmosphere } from './environment.js?v=120.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=120.0';
-import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, shortenCameraPathForColliders, clampCameraHeightToPitchRange } from './collision-geometry.js?v=120.0';
-import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=120.0';
+import { initSocial, api } from './social.js?v=121.0';
+import { createAtmosphere } from './environment.js?v=121.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=121.0';
+import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, shortenCameraPathForColliders, clampCameraHeightToPitchRange } from './collision-geometry.js?v=121.0';
+import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=121.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
