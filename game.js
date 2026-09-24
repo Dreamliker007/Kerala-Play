@@ -1,9 +1,9 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=115.0';
-import { createAtmosphere } from './environment.js?v=115.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=115.0';
-import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, segmentIntersectsColliders } from './collision-geometry.js?v=115.0';
-import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=115.0';
+import { initSocial, api } from './social.js?v=116.0';
+import { createAtmosphere } from './environment.js?v=116.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=116.0';
+import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, segmentIntersectsColliders } from './collision-geometry.js?v=116.0';
+import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=116.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -4340,7 +4340,7 @@ try {
       jumpHeight = Math.max(0, jumpHeight + jumpVelocity * delta);
       if (jumpHeight <= 0) { jumpHeight = 0; jumpVelocity = 0; }
       const avatar = player.userData.avatar;
-      if (avatar) avatar.position.y += jumpHeight;
+      if (avatar) avatar.position.y = .04 + Number(avatar.userData.walkBob || 0) + jumpHeight;
     } else { jumpHeight = 0; jumpVelocity = 0; }
 
     const drivingCamera = vehicleMode !== 'walk';
@@ -4359,7 +4359,7 @@ try {
     const baseTargetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45;
     cameraTarget.set(
       player.position.x + Math.sin(player.rotation.y) * lookAhead,
-      player.position.y + jumpHeight + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
+      player.position.y + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
       player.position.z + Math.cos(player.rotation.y) * lookAhead
     );
 
@@ -4380,7 +4380,7 @@ try {
 
     cameraPosition.set(
       player.position.x + Math.sin(cameraYaw) * horizontal + cameraRightX * lateralMotion + rainShakeX,
-      player.position.y + jumpHeight + (interiorCamera ? 1.42 : drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
+      player.position.y + (interiorCamera ? 1.42 : drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
       player.position.z + Math.cos(cameraYaw) * horizontal + cameraRightZ * lateralMotion
     );
 
@@ -4719,6 +4719,7 @@ function animatePlayer(player, phase, moving) {
   const bob = amount ? Math.abs(Math.sin(phase * 2)) * .022 * amount : 0;
   const avatar = player.userData.avatar;
   if (!avatar) return;
+  avatar.userData.walkBob = bob;
   avatar.position.y = .04 + bob;
   avatar.rotation.z = amount ? Math.sin(phase * .5) * .008 * amount : 0;
   avatar.rotation.x = amount ? -.012 * amount : 0;

@@ -91,32 +91,42 @@ test('signup starts at zero, hashes passwords, enforces credentials and session 
   assert.ok(!saved.includes('test-password-2026')); assert.match(saved, /passwordHash/);
 });
 
-test('district choice sets avatar home and entry world; no choice defaults to Kottayam', async t => {
+test('signup district stays owned by the avatar and login always enters that district', async t => {
   const app = await setup(t), explorer = app.client();
   const created = await explorer('/api/auth/signup', {
-    firstName: 'DistrictPlayer', username: 'DistrictPlayer', password: 'test-password-2026', gender: 'female'
+    firstName: 'DistrictPlayer', username: 'DistrictPlayer', password: 'test-password-2026', district: 'Ernakulam', gender: 'female'
   });
   assert.equal(created.status, 201, JSON.stringify(created.data));
-  assert.equal(created.data.user.district, 'Kottayam');
-  assert.equal(created.data.user.worldDistrict, 'Kottayam');
-  assert.equal(created.data.user.x, 19);
-  assert.equal(created.data.user.z, -23);
+  assert.equal(created.data.user.district, 'Ernakulam');
+  assert.equal(created.data.user.worldDistrict, 'Ernakulam');
+  assert.equal(created.data.user.x, -14);
+  assert.equal(created.data.user.z, 6);
 
   const selected = await explorer('/api/auth/login', {
     identifier: 'DistrictPlayer', password: 'test-password-2026', district: 'Idukki'
   });
   assert.equal(selected.status, 200, JSON.stringify(selected.data));
-  assert.equal(selected.data.user.district, 'Idukki');
-  assert.equal(selected.data.user.worldDistrict, 'Idukki');
-  assert.equal(selected.data.user.x, 12);
-  assert.equal(selected.data.user.z, 0);
+  assert.equal(selected.data.user.district, 'Ernakulam');
+  assert.equal(selected.data.user.worldDistrict, 'Ernakulam');
+  assert.equal(selected.data.user.x, -14);
+  assert.equal(selected.data.user.z, 6);
 
-  const defaulted = await explorer('/api/auth/login', { identifier: 'DistrictPlayer', password: 'test-password-2026' });
-  assert.equal(defaulted.status, 200, JSON.stringify(defaulted.data));
-  assert.equal(defaulted.data.user.district, 'Kottayam');
-  assert.equal(defaulted.data.user.worldDistrict, 'Kottayam');
-  assert.equal(defaulted.data.user.x, 19);
-  assert.equal(defaulted.data.user.z, -23);
+  const ignoredDistrict = await explorer('/api/auth/login', { identifier: 'DistrictPlayer', password: 'test-password-2026', district: 'Kottayam' });
+  assert.equal(ignoredDistrict.status, 200, JSON.stringify(ignoredDistrict.data));
+  assert.equal(ignoredDistrict.data.user.district, 'Ernakulam');
+  assert.equal(ignoredDistrict.data.user.worldDistrict, 'Ernakulam');
+
+  const defaultKottayam = await explorer('/api/auth/signup', {
+    firstName: 'DefaultPlayer', username: 'DefaultPlayer', password: 'test-password-2026', gender: 'male'
+  });
+  assert.equal(defaultKottayam.status, 201);
+  assert.equal(defaultKottayam.data.user.district, 'Kottayam');
+  const defaultLogin = await explorer('/api/auth/login', {
+    identifier: 'DefaultPlayer', password: 'test-password-2026', district: 'Idukki'
+  });
+  assert.equal(defaultLogin.status, 200);
+  assert.equal(defaultLogin.data.user.district, 'Kottayam');
+  assert.equal(defaultLogin.data.user.worldDistrict, 'Kottayam');
 });
 
 test('a receiver must accept a follow before text, voice messages or live voice; blocks revoke both directions', async t => {
@@ -478,6 +488,7 @@ test('Anson tester account gets server-enforced free purchases, fees and post-fr
   const dbPath = join(app.dataDir, 'game.json');
   const db = JSON.parse(await readFile(dbPath, 'utf8'));
   const savedUser = db.users.find(item => String(item.username).toLowerCase() === 'anson');
+  savedUser.district = 'Kottayam';
   savedUser.walletBalance = 0;
   savedUser.districtTravelCount = 3;
   savedUser.worldDistrict = 'Kottayam';
@@ -1747,6 +1758,7 @@ test('first three district trips are shared across transport modes and the fixed
   const dbPath = join(app.dataDir, 'game.json');
   const db = JSON.parse(await readFile(dbPath, 'utf8'));
   const savedUser = db.users.find(item => item.username === 'TripCounter');
+  savedUser.district = 'Kannur';
   savedUser.districtTravelCount = 3;
   savedUser.walletBalance = 5000;
   savedUser.worldDistrict = 'Kannur';
