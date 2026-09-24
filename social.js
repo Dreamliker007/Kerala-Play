@@ -2809,8 +2809,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     const result = await api('/api/travel/train/board', { stationId });
     if (result.wallet) renderWallet(result.wallet);
     if (result.user) setUser(result.user);
-    window.dispatchEvent(new CustomEvent('kerala-public-travel-arrival', { detail: result.travel || null }));
-    toast(`${result.travel?.routeLabel || 'District Train'} · arrived at ${result.travel?.to?.label || 'destination'} · ticket ${formatCash(result.travel?.fare || 0)}`, 4400);
+    window.dispatchEvent(new CustomEvent('kerala-district-journey', { detail: { travel: result.travel || null } }));
+    toast(`${result.travel?.routeLabel || 'District Train'} · departing for ${result.travel?.to?.label || 'destination'} · ${result.travel?.fare ? `ticket ${formatCash(result.travel.fare)}` : 'first trips free'}`, 4400);
   }, walletError));
 
   window.addEventListener('kerala-public-ride-complete', event => {

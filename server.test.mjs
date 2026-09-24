@@ -1493,7 +1493,8 @@ test('district rail route exposes Kottayam and Ernakulam stations', async t => {
   const route = await player('/api/travel/train/route');
   assert.equal(route.status, 200);
   assert.equal(route.data.id, 'kottayam-ernakulam-rail');
-  assert.equal(route.data.fare, 35);
+  assert.equal(route.data.fare, 0);
+  assert.equal(route.data.freeTripsRemaining, 3);
   assert.deepEqual(route.data.stations.map(station => station.district), ['Kottayam', 'Ernakulam']);
   assert.equal((await player('/api/travel/train/board', { stationId: 'kottayam' })).status, 409);
 });
@@ -1510,20 +1511,37 @@ test('Kottayam station quotes a train ticket and boards into Ernakulam station',
   assert.equal(routes.data.currentDistrict, 'Kottayam');
   const ernakulam = routes.data.districts.find(item => item.district === 'Ernakulam');
   assert.equal(ernakulam.train.available, true);
-  assert.equal(ernakulam.train.fare, 35);
+  assert.equal(ernakulam.train.fare, 0);
+  assert.equal(routes.data.freeTripsRemaining, 3);
 
   app.advance(1500);
   const stationApproach = await player('/api/world/move', { x: 7, z: -23, rotation: 0, moving: true });
   assert.equal(stationApproach.status, 200, JSON.stringify(stationApproach.data));
   const trip = await player('/api/travel/district/board', { mode: 'train', destinationDistrict: 'Ernakulam' });
   assert.equal(trip.status, 200, JSON.stringify(trip.data));
+  assert.equal(trip.data.travel.status, 'pending');
+  assert.equal(trip.data.travel.durationMs, 60_000);
   assert.equal(trip.data.travel.from.district, 'Kottayam');
   assert.equal(trip.data.travel.to.district, 'Ernakulam');
-  assert.equal(trip.data.travel.fare, 35);
-  assert.equal(trip.data.transaction.amount, 35);
-  assert.equal(trip.data.user.worldDistrict, 'Ernakulam');
-  assert.equal(trip.data.user.x, -34);
-  assert.equal(trip.data.user.z, -19.5);
+  assert.equal(trip.data.travel.fare, 0);
+  assert.equal(trip.data.transaction, null);
+  assert.equal(trip.data.travel.freeTripsRemaining, 2);
+  assert.equal(trip.data.user.worldDistrict, 'Kottayam');
+  assert.equal(trip.data.user.x, 7);
+  assert.equal(trip.data.user.z, -23);
+  assert.equal((await player('/api/world/move', { x: 7, z: -23, rotation: 0, moving: false })).status, 409);
+
+  app.advance(59_999);
+  const waiting = await player('/api/travel/district/status');
+  assert.equal(waiting.data.status, 'pending');
+  assert.equal(waiting.data.travel.remainingMs, 1);
+  app.advance(1);
+  const arrived = await player('/api/travel/district/status');
+  assert.equal(arrived.data.status, 'arrived');
+  assert.equal(arrived.data.travel.to.district, 'Ernakulam');
+  assert.equal(arrived.data.user.worldDistrict, 'Ernakulam');
+  assert.equal(arrived.data.user.x, -34);
+  assert.equal(arrived.data.user.z, -19.5);
 });
 
 test('airport routes require an airport at both ends and flight boarding arrives at the destination terminal', async t => {
@@ -1547,7 +1565,8 @@ test('airport routes require an airport at both ends and flight boarding arrives
   assert.equal(routes.data.hubs.airport.id, 'kannur-airport');
   const ernakulam = routes.data.districts.find(item => item.district === 'Ernakulam');
   assert.equal(ernakulam.flight.available, true);
-  assert.equal(ernakulam.flight.fare, 212);
+  assert.equal(ernakulam.flight.fare, 0);
+  assert.equal(routes.data.freeTripsRemaining, 3);
 
   app.advance(1500);
   for (const [x, z] of [[20, -8], [29, -16], [37, -24]]) {
@@ -1557,12 +1576,120 @@ test('airport routes require an airport at both ends and flight boarding arrives
   }
   const trip = await player('/api/travel/district/board', { mode: 'flight', destinationDistrict: 'Ernakulam' });
   assert.equal(trip.status, 200, JSON.stringify(trip.data));
+  assert.equal(trip.data.travel.status, 'pending');
+  assert.equal(trip.data.travel.durationMs, 30_000);
   assert.equal(trip.data.travel.mode, 'flight');
   assert.equal(trip.data.travel.from.district, 'Kannur');
   assert.equal(trip.data.travel.to.district, 'Ernakulam');
-  assert.equal(trip.data.travel.fare, 212);
-  assert.equal(trip.data.transaction.amount, 212);
-  assert.equal(trip.data.user.worldDistrict, 'Ernakulam');
-  assert.equal(trip.data.user.x, 32);
-  assert.equal(trip.data.user.z, 36);
+  assert.equal(trip.data.travel.fare, 0);
+  assert.equal(trip.data.transaction, null);
+  assert.equal(trip.data.user.worldDistrict, 'Kannur');
+  app.advance(30_000);
+  const arrived = await player('/api/travel/district/status');
+  assert.equal(arrived.data.status, 'arrived');
+  assert.equal(arrived.data.travel.to.district, 'Ernakulam');
+  assert.equal(arrived.data.user.worldDistrict, 'Ernakulam');
+  assert.equal(arrived.data.user.x, 32);
+  assert.equal(arrived.data.user.z, 36);
+});
+
+test('first three district trips are shared across transport modes and the fixed post-free fares apply', async t => {
+  const app = await setup(t);
+  const player = app.client();
+  const created = await player('/api/auth/signup', {
+    firstName:'TripCounter', username:'TripCounter', password:'test-password-2026', district:'Kottayam', gender:'female'
+  });
+  assert.equal(created.status, 201);
+
+  async function walkTo(fromX, fromZ, toX, toZ, client = player) {
+    let x = fromX, z = fromZ;
+    while (Math.hypot(toX - x, toZ - z) > .2) {
+      const distance = Math.hypot(toX - x, toZ - z);
+      const step = Math.min(12, distance);
+      x += (toX - x) / distance * step;
+      z += (toZ - z) / distance * step;
+      app.advance(1500);
+      const moved = await client('/api/world/move', { x, z, rotation:0, moving:true });
+      assert.equal(moved.status, 200, JSON.stringify(moved.data));
+    }
+  }
+
+  await walkTo(19, -23, 7, -23);
+  const train = await player('/api/travel/district/board', { mode:'train', destinationDistrict:'Ernakulam' });
+  assert.equal(train.data.travel.fare, 0);
+  assert.equal(train.data.travel.tripNumber, 1);
+  assert.equal(train.data.travel.freeTripsRemaining, 2);
+  app.advance(60_000);
+  assert.equal((await player('/api/travel/district/status')).data.status, 'arrived');
+
+  await walkTo(-34, -19.5, 38, 36);
+  const flight = await player('/api/travel/district/board', { mode:'flight', destinationDistrict:'Kannur' });
+  assert.equal(flight.data.travel.fare, 0);
+  assert.equal(flight.data.travel.tripNumber, 2);
+  assert.equal(flight.data.travel.freeTripsRemaining, 1);
+  app.advance(30_000);
+  assert.equal((await player('/api/travel/district/status')).data.status, 'arrived');
+
+  await walkTo(36, -28, 78, 72);
+  const teleport = await player('/api/travel/district/board', { mode:'teleport', destinationDistrict:'Idukki' });
+  assert.equal(teleport.data.travel.status, 'arrived');
+  assert.equal(teleport.data.travel.durationMs, 0);
+  assert.equal(teleport.data.travel.fare, 0);
+  assert.equal(teleport.data.travel.tripNumber, 3);
+  assert.equal(teleport.data.travel.freeTripsRemaining, 0);
+  assert.equal(teleport.data.user.worldDistrict, 'Idukki');
+
+  const paidRoutes = await player('/api/travel/districts');
+  const alappuzha = paidRoutes.data.districts.find(item => item.district === 'Alappuzha');
+  assert.equal(paidRoutes.data.tripsUsed, 3);
+  assert.equal(paidRoutes.data.freeTripsRemaining, 0);
+  assert.equal(alappuzha.train.fare, 500);
+  assert.equal(alappuzha.teleport.fare, 2000);
+
+  const dbPath = join(app.dataDir, 'game.json');
+  const db = JSON.parse(await readFile(dbPath, 'utf8'));
+  const savedUser = db.users.find(item => item.username === 'TripCounter');
+  savedUser.districtTravelCount = 3;
+  savedUser.walletBalance = 5000;
+  savedUser.worldDistrict = 'Kannur';
+  savedUser.worldX = 36;
+  savedUser.worldZ = -28;
+  savedUser.worldRotation = 0;
+  await writeFile(dbPath, JSON.stringify(db, null, 2));
+  await app.restart();
+  const airportPlayer = app.client();
+  await airportPlayer('/api/auth/login', { identifier:'TripCounter', password:'test-password-2026', district:'Kannur' });
+  const airportRoutes = await airportPlayer('/api/travel/districts');
+  const flightRoute = airportRoutes.data.districts.find(item => item.district === 'Ernakulam');
+  assert.equal(flightRoute.flight.fare, 1000);
+  const paidFlight = await airportPlayer('/api/travel/district/board', { mode:'flight', destinationDistrict:'Ernakulam' });
+  assert.equal(paidFlight.status, 200, JSON.stringify(paidFlight.data));
+  assert.equal(paidFlight.data.travel.fare, 1000);
+  assert.equal(paidFlight.data.transaction.amount, 1000);
+  assert.equal(paidFlight.data.travel.status, 'pending');
+  assert.equal(paidFlight.data.wallet.balance, 4000);
+
+  app.advance(30_000);
+  const paidFlightArrival = await airportPlayer('/api/travel/district/status');
+  assert.equal(paidFlightArrival.data.status, 'arrived');
+  await walkTo(32, 36, -40, -30.5, airportPlayer);
+  const paidTrain = await airportPlayer('/api/travel/district/board', { mode:'train', destinationDistrict:'Kottayam' });
+  assert.equal(paidTrain.status, 200, JSON.stringify(paidTrain.data));
+  assert.equal(paidTrain.data.travel.fare, 500);
+  assert.equal(paidTrain.data.transaction.amount, 500);
+  assert.equal(paidTrain.data.wallet.balance, 3500);
+  assert.equal(paidTrain.data.travel.durationMs, 60_000);
+
+  app.advance(60_000);
+  const paidTrainArrival = await airportPlayer('/api/travel/district/status');
+  assert.equal(paidTrainArrival.data.status, 'arrived');
+  assert.equal(paidTrainArrival.data.user.worldDistrict, 'Kottayam');
+  await walkTo(11, -23, 78, 72, airportPlayer);
+  const paidTeleport = await airportPlayer('/api/travel/district/board', { mode:'teleport', destinationDistrict:'Idukki' });
+  assert.equal(paidTeleport.status, 200, JSON.stringify(paidTeleport.data));
+  assert.equal(paidTeleport.data.travel.fare, 2000);
+  assert.equal(paidTeleport.data.travel.durationMs, 0);
+  assert.equal(paidTeleport.data.transaction.amount, 2000);
+  assert.equal(paidTeleport.data.wallet.balance, 1500);
+  assert.equal(paidTeleport.data.user.worldDistrict, 'Idukki');
 });
