@@ -2116,13 +2116,14 @@ function publicRideDestinationForUser(user, destinationId) {
         limited(`auth:${ip}`, 30, 15 * 60000);
         const body = await jsonBody(request);
         requireValue(typeof body.identifier === 'string' && typeof body.password === 'string' && body.password.length <= 128, 400, 'Enter your username, email, mobile and password.');
-        const district = body.district || 'Kottayam';
-        requireValue(Object.hasOwn(DISTRICT_WORLD_CONFIG, district), 400, 'Choose a valid Kerala district.');
+
+
         const identifier = body.identifier.trim().toLowerCase();
         const user = db.users.find(candidate => candidate.username.toLowerCase() === identifier || candidate.email === identifier || candidate.mobile === body.identifier.trim());
         const comparison = await scrypt(body.password, user?.salt || 'not-an-account-salt', 64);
         const valid = timingSafeEqual(comparison, user ? Buffer.from(user.passwordHash, 'hex') : Buffer.alloc(64));
         requireValue(user && valid, 401, 'Username or password is incorrect.');
+        const district = Object.hasOwn(DISTRICT_WORLD_CONFIG, user.district) ? user.district : 'Kottayam';
         const spawn = districtWorldConfig(district).spawn;
         if (currentWorldDistrict(user) !== district) {
           user.worldX = spawn.x;
@@ -2181,49 +2182,14 @@ function publicRideDestinationForUser(user, destinationId) {
 
           const salt = randomBytes(16).toString('hex');
           const randomPassword = randomBytes(48).toString('hex');
-          const spawn = districtWorldConfig(district).spawn;
-          user = {
-            id: randomUUID(),
-            firstName,
-            username,
-            email,
-            mobile: '',
-            passwordHash: (await scrypt(randomPassword, salt, 64)).toString('hex'),
-            salt,
-            district,
-            gender: 'other',
-            bio: '',
-            points: 0,
-            completedTasks: [],
-            walkMeters: 0,
-            visitedLandmarks: [],
-            districtTravelCount: 0,
-            createdAt: now(),
-            gameDay: '',
-            gameWins: 0,
-            walletBalance: 0,
-            economyActions: [],
-            jobState: freshJobState(),
-            worldDistrict: district,
-            worldX: spawn.x,
-            worldZ: spawn.z,
-            worldRotation: spawn.rotation || 0,
-            worldUpdatedAt: now(),
-          };
-          db.users.push(user);
-          walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash');
-          await persist();
-          created = true;
-        }
-
-        const spawn = districtWorldConfig(district).spawn;
-        if (currentWorldDistrict(user) !== district) {
+          const homeDistrict = Object.hasOwn(DISTRICT_WORLD_CONFIG, user.district) ? user.district : district;
+        const spawn = districtWorldConfig(homeDistrict).spawn;
+        if (currentWorldDistrict(user) !== homeDistrict) {
           user.worldX = spawn.x;
           user.worldZ = spawn.z;
           user.worldRotation = spawn.rotation || 0;
         }
-        user.district = district;
-        user.worldDistrict = district;
+        user.worldDistrict = homeDistrict;
         user.worldUpdatedAt = now();
         presence.delete(user.id);
         dirty = true;
