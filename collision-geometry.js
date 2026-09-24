@@ -127,3 +127,45 @@ export function segmentIntersectsColliders(start, end, radius, colliders, maxSte
   }
   return false;
 }
+
+
+export function shortenCameraPathForColliders(target, desired, clearance, colliders, isBlocked, maxStep = .28) {
+  const dx = desired.x - target.x;
+  const dz = desired.z - target.z;
+  const horizontalDistance = Math.hypot(dx, dz);
+  if (horizontalDistance < .05) return desired;
+  if (!segmentIntersectsColliders(target, desired, clearance, colliders, maxStep)) return desired;
+
+  const steps = Math.max(8, Math.ceil(horizontalDistance / Math.max(.05, maxStep)));
+  let safeT = 0;
+  for (let step = 1; step <= steps; step++) {
+    const t = step / steps;
+    const x = target.x + dx * t;
+    const z = target.z + dz * t;
+    if (isBlocked(x, z, clearance)) break;
+    safeT = t;
+  }
+  if (safeT >= .999) return desired;
+
+  const minT = Math.min(.12, .48 / Math.max(.48, horizontalDistance));
+  const t = safeT > minT ? safeT - .035 : Math.max(0, safeT * .72);
+  desired.x = target.x + dx * t;
+  desired.z = target.z + dz * t;
+  // This sweep only checks horizontal blockers. Preserve Y: callers may sweep
+  // camera-to-camera each frame, so adding height here would accumulate forever.
+  return desired;
+}
+
+export function clampCameraHeightToPitchRange(cameraY, targetY, horizontalDistance, minPitch, maxPitch, minDistance = 2.8, padding = .35) {
+  const safeTargetY = Number.isFinite(targetY) ? targetY : 0;
+  const safeMinPitch = Number.isFinite(minPitch) ? minPitch : 0;
+  const safeMaxPitch = Math.max(safeMinPitch, Number.isFinite(maxPitch) ? maxPitch : safeMinPitch);
+  const aimDistance = Math.max(
+    Math.max(0, Number.isFinite(minDistance) ? minDistance : 0),
+    Math.max(0, Number.isFinite(horizontalDistance) ? horizontalDistance : 0),
+  );
+  const lower = safeTargetY + Math.tan(safeMinPitch) * aimDistance;
+  const upper = safeTargetY + Math.tan(safeMaxPitch) * aimDistance + Math.max(0, Number(padding) || 0);
+  const safeCameraY = Number.isFinite(cameraY) ? cameraY : lower;
+  return Math.max(lower, Math.min(upper, safeCameraY));
+}
