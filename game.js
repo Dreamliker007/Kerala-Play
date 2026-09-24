@@ -3794,9 +3794,10 @@ try {
   let inputX = 0;
   let inputY = 0;
   let cameraYaw = player.rotation.y + Math.PI;
-  const MIN_CAMERA_PITCH = .36;
-  const MIN_CAMERA_GROUND_VIEW_DISTANCE = 2.6;
-  let cameraPitch = .38;
+  const MIN_CAMERA_PITCH = .48;
+  const MAX_CAMERA_PITCH = .78;
+  const MIN_CAMERA_GROUND_VIEW_DISTANCE = 2.8;
+  let cameraPitch = .55;
   let runHeld = false;
   let runPointerId = null;
   let runCruiseArmed = false;
@@ -3973,7 +3974,7 @@ try {
     const lookDeltaX = event.clientX - lastLookX;
     const lookDeltaY = event.clientY - lastLookY;
     cameraYaw -= lookDeltaX * .009;
-    cameraPitch = THREE.MathUtils.clamp(cameraPitch + lookDeltaY * .006, MIN_CAMERA_PITCH, .64);
+    cameraPitch = THREE.MathUtils.clamp(cameraPitch + lookDeltaY * .006, MIN_CAMERA_PITCH, MAX_CAMERA_PITCH);
     if (Math.hypot(lookDeltaX, lookDeltaY) > 4) recordOnboardingAction('camera');
     lastLookX = event.clientX;
     lastLookY = event.clientY;
@@ -4358,7 +4359,7 @@ try {
     const lookAhead = drivingCamera
       ? .75 + driveSpeedRatio * 2.2 + cameraDriveImpulse * 1.35
       : 0;
-    const baseTargetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45;
+    const baseTargetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.18;
     cameraTarget.set(
       player.position.x + Math.sin(player.rotation.y) * lookAhead,
       player.position.y + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
