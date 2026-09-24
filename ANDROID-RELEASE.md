@@ -9,12 +9,12 @@ This repository is prepared for the next Google Play closed-testing update.
 - Version name: `1.0.19`
 - Android version code: `20`
 - Play track: `closed-testing`
-- Production origin: `https://kerala-play-1.onrender.com`
+- Production origin: `https://keralaplay.in`
 - Android orientation: `sensorLandscape`
 - Cleartext HTTP and mixed content: disabled
 - Release notes: V120.0 refreshes the game assets and fixes the mobile camera view.
 
-The release values are stored in `mobile-release.json`. The generated Android project remains ignored by Git, so `npm run mobile:sync` reapplies both the orientation lock and Play version metadata automatically. This update points new Android builds at the live Render service. Existing installed builds remain on their current package and origin until testers install this release.
+The release values are stored in `mobile-release.json`. The generated Android project remains ignored by Git, so `npm run mobile:sync` reapplies both the orientation lock and Play version metadata automatically. Existing installed builds remain on their current package and assets until testers install this release.
 
 ## Prepare the Android project
 
