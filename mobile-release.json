@@ -1,6 +1,6 @@
 {
-  "versionCode": 14,
-  "versionName": "1.0.13",
+  "versionCode": 15,
+  "versionName": "1.0.14",
   "track": "closed-testing",
-  "notes": "V114.0 improves vehicle collision footprints, camera wall clearance, and Kottayam/Ernakulam station layout"
+  "notes": "V115.0 adds free tester access for Anson across Kerala Play purchases, travel, bills, licences, and vehicle services"
 }

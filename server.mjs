@@ -20,6 +20,12 @@ const AIRPORT_DISTRICTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvanant
 const DISTRICT_TRAVEL_FREE_TRIPS = 3;
 const DISTRICT_TRAVEL_FARES = Object.freeze({ train:500, flight:1000, teleport:2000 });
 const DISTRICT_TRAVEL_DURATIONS = Object.freeze({ train:60_000, flight:30_000, teleport:0 });
+function isTesterAccount(user) {
+  return String(user?.username || '').trim().toLowerCase() === 'anson';
+}
+function cashPriceFor(user, amount) {
+  return isTesterAccount(user) ? 0 : amount;
+}
 const GENERIC_WORLD_BOUNDS = Object.freeze({ minX:-110, maxX:110, minZ:-110, maxZ:110 });
 const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_ORDER.map((district, index) => {
   const generic = {
@@ -750,10 +756,16 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   }
   function walletTransaction(user, amount, kind, description) {
     requireValue(Number.isInteger(amount) && amount !== 0, 500, 'Invalid wallet transaction.');
-    const balanceAfter = user.walletBalance + amount;
+    const waived = amount < 0 && isTesterAccount(user) && kind !== 'bank_deposit';
+    const appliedAmount = waived ? 0 : amount;
+    const balanceAfter = user.walletBalance + appliedAmount;
     requireValue(Number.isSafeInteger(balanceAfter) && balanceAfter >= 0 && balanceAfter <= WALLET_LIMIT, amount < 0 ? 409 : 500, amount < 0 ? 'Not enough Kerala Cash.' : 'Wallet limit reached.');
     user.walletBalance = balanceAfter;
-    const transaction = { id: randomUUID(), userId: user.id, type: amount > 0 ? 'credit' : 'debit', amount: Math.abs(amount), balanceAfter, kind, description, createdAt: now() };
+    const transaction = {
+      id: randomUUID(), userId: user.id, type: amount > 0 ? 'credit' : 'debit',
+      amount: waived ? 0 : Math.abs(amount), balanceAfter, kind, description, createdAt: now(),
+      ...(waived ? { waived:true, waivedAmount:Math.abs(amount) } : {}),
+    };
     db.transactions.push(transaction); dirty = true;
     return transaction;
   }
@@ -789,10 +801,11 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   async function beginDistrictTravel(user, { mode, fromDistrict, toDistrict, hub, destinationHub, live }) {
     const timestamp = now();
     const tripsUsed = Math.max(0, Number(user.districtTravelCount) || 0);
-    const fare = districtTravelFare(mode, tripsUsed);
+    const regularFare = districtTravelFare(mode, tripsUsed);
+    const fare = cashPriceFor(user, regularFare);
     const modeLabel = mode === 'flight' ? 'Flight' : mode === 'teleport' ? 'Teleport' : 'Train';
-    const transaction = fare > 0
-      ? walletTransaction(user, -fare, `${mode}_fare`, `${modeLabel} · ${fromDistrict} → ${toDistrict}`)
+    const transaction = regularFare > 0
+      ? walletTransaction(user, -regularFare, `${mode}_fare`, `${modeLabel} · ${fromDistrict} → ${toDistrict}`)
       : null;
     user.districtTravelCount = tripsUsed + 1;
     const trip = {
@@ -1115,7 +1128,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
           registration: vehicle.registration,
           fuel: Math.round(vehicle.fuel * 10) / 10,
           condition: Math.round(vehicle.condition),
-          price: Number(vehicle.salePrice),
+          price: cashPriceFor(viewer, Number(vehicle.salePrice)),
           listedAt: Number(vehicle.listedAt),
           sellerName: owner.displayName || (/^\d+$/.test(owner.username) ? 'Explorer' : owner.username),
           ownListing: owner.id === viewer.id,
@@ -1199,7 +1212,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       sourceKey: `challan:${challan.id}`,
       kind: 'traffic',
       title: 'Traffic challan issued',
-      message: `${challan.description} · ₹${challan.amount}.`,
+      message: isTesterAccount(user) ? `${challan.description} · FREE for tester.` : `${challan.description} · ₹${challan.amount}.`,
       severity: 'warning',
       target: 'garage',
     });
@@ -1211,7 +1224,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const state = jobStateFor(user);
     const challans = [...state.traffic.challans]
       .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
-      .map(challan => ({ ...challan, paid: Number(challan.paidAt) > 0 }));
+      .map(challan => ({ ...challan, amount:cashPriceFor(user, Number(challan.amount) || 0), paid: Number(challan.paidAt) > 0 }));
     const documents = state.garage.owned.map(vehicle => {
       const model = GARAGE_CATALOG[vehicle.modelId];
       return {
@@ -1226,16 +1239,19 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const unpaid = challans.filter(challan => !challan.paid);
     return {
       checkpoint: TRAFFIC_CHECKPOINT,
-      licence: drivingLicenceSummary(user),
+      licence: {
+        ...drivingLicenceSummary(user),
+        costs:Object.fromEntries(Object.entries(DRIVING_LICENCE_COSTS).map(([key, amount]) => [key, cashPriceFor(user, amount)])),
+      },
       documents,
       challans,
       unpaidCount: unpaid.length,
       unpaidTotal: unpaid.reduce((sum, challan) => sum + Number(challan.amount || 0), 0),
       rules: {
         title: 'Kerala Play Traffic Rules',
-        insuranceExpiredFine: TRAFFIC_CHALLAN_AMOUNTS.insurance_expired,
-        speedingFine: TRAFFIC_CHALLAN_AMOUNTS.speeding,
-        licenceInvalidFine: TRAFFIC_CHALLAN_AMOUNTS.licence_invalid,
+        insuranceExpiredFine: cashPriceFor(user, TRAFFIC_CHALLAN_AMOUNTS.insurance_expired),
+        speedingFine: cashPriceFor(user, TRAFFIC_CHALLAN_AMOUNTS.speeding),
+        licenceInvalidFine: cashPriceFor(user, TRAFFIC_CHALLAN_AMOUNTS.licence_invalid),
       },
     };
   }
@@ -1257,8 +1273,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
     return {
       status: home.status,
-      home: HOME_DEFINITION,
-      localHome: homeDefinition,
+      home: { ...HOME_DEFINITION, rent:cashPriceFor(user, HOME_DEFINITION.rent), utilities:cashPriceFor(user, HOME_DEFINITION.utilities) },
+      localHome: { ...homeDefinition, rent:cashPriceFor(user, homeDefinition.rent), utilities:cashPriceFor(user, homeDefinition.utilities) },
       rentDueAt,
       utilityDueAt,
       rentOverdue,
@@ -1798,7 +1814,7 @@ function publicRideDestinationForUser(user, destinationId) {
     requireValue(distance >= 5.5, 409, 'You are already close enough to walk to this destination.');
     const options = Object.values(PUBLIC_RIDE_SERVICES).map(service => {
       const available = distance <= Number(service.maxDistance);
-      const fare = Math.max(
+      const regularFare = Math.max(
         Number(service.baseFare),
         Number(service.baseFare) + Math.ceil(distance * Number(service.perMeter))
       );
@@ -1806,7 +1822,8 @@ function publicRideDestinationForUser(user, destinationId) {
         id: service.id,
         label: service.label,
         available,
-        fare,
+        fare: cashPriceFor(user, regularFare),
+        ...(isTesterAccount(user) ? { waivedAmount:regularFare } : {}),
         pickupSeconds: service.pickupSeconds,
         travelSeconds: Math.max(3, Math.ceil(distance / Number(service.speed))),
       };
@@ -1835,7 +1852,7 @@ function publicRideDestinationForUser(user, destinationId) {
     return {
       routeId: route.id,
       routeLabel: route.label,
-      fare: route.fare,
+      fare: cashPriceFor(user, route.fare),
       intervalMs: interval,
       serverNow: timestamp,
       boarding,
@@ -1910,6 +1927,7 @@ function publicRideDestinationForUser(user, destinationId) {
       activeVehicle: personalVehicleSummary(user),
       catalog: Object.values(GARAGE_CATALOG).map(model => ({
         ...model,
+        price: cashPriceFor(user, model.price),
         owned: garage.owned.some(vehicle => vehicle.modelId === model.id),
       })),
       owned: garage.owned.map(vehicle => {
@@ -1926,7 +1944,7 @@ function publicRideDestinationForUser(user, destinationId) {
           forSale: Number(vehicle.salePrice) > 0,
           salePrice: Number(vehicle.salePrice) || 0,
           ownerChanges: Number(vehicle.ownerChanges) || 0,
-          insuranceRenewalCost: VEHICLE_INSURANCE_COST[model.kind],
+          insuranceRenewalCost: cashPriceFor(user, VEHICLE_INSURANCE_COST[model.kind]),
           ...vehicleInsuranceSummary(vehicle),
           selected: garage.selectedId === vehicle.id,
           active: garage.activeVehicleId === vehicle.id,
@@ -2740,11 +2758,12 @@ function publicRideDestinationForUser(user, destinationId) {
         const quote = publicRideQuote(user, destinationId);
         const option = quote.options.find(item => item.id === serviceId);
         requireValue(option?.available, 409, serviceId === 'auto' ? 'Auto-rickshaw is for shorter local trips. Choose taxi for this destination.' : 'This ride is not available.');
-        requireValue(user.walletBalance >= option.fare, 409, 'Not enough Kerala Cash for this ride.');
+        const regularFare = Number(option.waivedAmount ?? option.fare);
+        requireValue(isTesterAccount(user) || user.walletBalance >= regularFare, 409, 'Not enough Kerala Cash for this ride.');
         const destination = publicRideDestinationForUser(user, destinationId);
         requireValue(destination, 404, 'Ride destination not found.');
         const live = presence.get(user.id) || place(user);
-        const transaction = walletTransaction(user, -option.fare, 'public_ride', `${service.label} · ${destination.label}`);
+        const transaction = walletTransaction(user, -regularFare, 'public_ride', `${service.label} · ${destination.label}`);
         const timestamp = now();
         live.x = Number(destination.arrivalX);
         live.z = Number(destination.arrivalZ);
@@ -2794,9 +2813,9 @@ function publicRideDestinationForUser(user, destinationId) {
             return {
               district,
               order: config.order,
-              train: { available: true, id: config.train.id, fare: district === currentDistrict ? 0 : districtTravelFare('train', tripsUsed) },
-              flight: { available: !!config.airport && !!current.airport, id: config.airport?.id || null, fare: district === currentDistrict || !config.airport || !current.airport ? 0 : districtTravelFare('flight', tripsUsed) },
-              teleport: { available:true, id:config.teleport.id, fare:district === currentDistrict ? 0 : districtTravelFare('teleport', tripsUsed) },
+              train: { available: true, id: config.train.id, fare: district === currentDistrict ? 0 : cashPriceFor(user, districtTravelFare('train', tripsUsed)) },
+              flight: { available: !!config.airport && !!current.airport, id: config.airport?.id || null, fare: district === currentDistrict || !config.airport || !current.airport ? 0 : cashPriceFor(user, districtTravelFare('flight', tripsUsed)) },
+              teleport: { available:true, id:config.teleport.id, fare:district === currentDistrict ? 0 : cashPriceFor(user, districtTravelFare('teleport', tripsUsed)) },
               current: district === currentDistrict,
             };
           }),
@@ -2856,7 +2875,7 @@ function publicRideDestinationForUser(user, destinationId) {
         send(response, 200, {
           id: DISTRICT_RAIL_ROUTE.id,
           label: DISTRICT_RAIL_ROUTE.label,
-          fare: districtTravelFare('train', tripsUsed),
+          fare: cashPriceFor(user, districtTravelFare('train', tripsUsed)),
           tripsUsed,
           freeTripsRemaining: Math.max(0, DISTRICT_TRAVEL_FREE_TRIPS - tripsUsed),
           stations: Object.values(DISTRICT_RAIL_ROUTE.stations).map(station => ({
@@ -2947,7 +2966,7 @@ function publicRideDestinationForUser(user, destinationId) {
           travel: {
             routeId: route.id,
             routeLabel: route.label,
-            fare: route.fare,
+            fare: cashPriceFor(user, route.fare),
             from: { id: stop.id, label: stop.label },
             to: { id: destination.id, label: destination.label },
             x: live.x,
@@ -2987,7 +3006,7 @@ function publicRideDestinationForUser(user, destinationId) {
         }
         dirty = true;
         await persist();
-        send(response, 200, { home: homeSummary(user), wallet: walletSummary(user), payment: { kind: body.kind, amount }, transaction }); return;
+        send(response, 200, { home: homeSummary(user), wallet: walletSummary(user), payment: { kind: body.kind, amount:cashPriceFor(user, amount) }, transaction }); return;
       }
       if (path === '/api/home/sleep' && request.method === 'POST') {
         limited(`home-sleep:${user.id}`, 20, 60000);
@@ -3073,7 +3092,7 @@ function publicRideDestinationForUser(user, destinationId) {
         state.needs.updatedAt = timestamp;
         dirty = true;
         await persist();
-        send(response, 200, { treated: true, clinic: clinic.id, label: clinic.label, fee: clinic.fee, wallet: walletSummary(user), needs: needsSummary(user), transaction }); return;
+        send(response, 200, { treated: true, clinic: clinic.id, label: clinic.label, fee:cashPriceFor(user, clinic.fee), wallet: walletSummary(user), needs: needsSummary(user), transaction }); return;
       }
       if (path === '/api/needs/rest' && request.method === 'POST') {
         limited(`needs-rest:${user.id}`, 20, 60000);
@@ -3159,9 +3178,9 @@ function publicRideDestinationForUser(user, destinationId) {
         send(response, 200, {
           traffic: trafficSummary(user),
           wallet: walletSummary(user),
-          licence: drivingLicenceSummary(user),
+          licence: trafficSummary(user).licence,
           action: body.action,
-          cost,
+          cost:cashPriceFor(user, cost),
           transaction,
         }); return;
       }
@@ -3204,8 +3223,8 @@ function publicRideDestinationForUser(user, destinationId) {
             insuranceActive: insurance.insuranceActive,
             licenceValid,
             licence,
-            challan,
-            challans: issued,
+            challan:challan ? { ...challan, amount:cashPriceFor(user, Number(challan.amount) || 0) } : null,
+            challans:issued.map(item => ({ ...item, amount:cashPriceFor(user, Number(item.amount) || 0) })),
             challanCreated: created,
             checkedAt: vehicle.lastDocumentCheckAt,
           },
@@ -3226,7 +3245,7 @@ function publicRideDestinationForUser(user, destinationId) {
         challan.transactionId = transaction.id;
         dirty = true;
         await persist();
-        send(response, 200, { traffic: trafficSummary(user), wallet: walletSummary(user), challan: { ...challan, paid: true }, transaction }); return;
+        send(response, 200, { traffic: trafficSummary(user), wallet: walletSummary(user), challan: { ...challan, amount:cashPriceFor(user, amount), paid: true }, transaction }); return;
       }
       if (path === '/api/garage/market' && request.method === 'GET') {
         send(response, 200, usedMarketSummary(user)); return;
@@ -3243,7 +3262,7 @@ function publicRideDestinationForUser(user, destinationId) {
         vehicle.insuranceUntil = Math.max(now(), Number(vehicle.insuranceUntil) || 0) + VEHICLE_INSURANCE_TERM;
         dirty = true;
         await persist();
-        send(response, 200, { garage: garageSummary(user), wallet: walletSummary(user), insurance: { vehicleId: vehicle.id, registration: vehicle.registration, cost, insuranceUntil: vehicle.insuranceUntil }, transaction }); return;
+        send(response, 200, { garage: garageSummary(user), wallet: walletSummary(user), insurance: { vehicleId: vehicle.id, registration: vehicle.registration, cost:cashPriceFor(user, cost), insuranceUntil: vehicle.insuranceUntil }, transaction }); return;
       }
       if (path === '/api/garage/market/list' && request.method === 'POST') {
         limited(`garage-market-list:${user.id}`, 20, 60000);
@@ -3291,7 +3310,7 @@ function publicRideDestinationForUser(user, destinationId) {
         requireValue(sellerState.garage.activeVehicleId !== vehicle.id && !vehicle.entered, 409, 'Seller vehicle is not available for transfer.');
         const price = Number(vehicle.salePrice);
         requireValue(Number.isInteger(price) && price > 0, 409, 'Used vehicle price is invalid.');
-        requireValue(user.walletBalance >= price, 409, 'Not enough Kerala Cash.');
+        requireValue(isTesterAccount(user) || user.walletBalance >= price, 409, 'Not enough Kerala Cash.');
         requireValue(seller.walletBalance + price <= WALLET_LIMIT, 409, 'Seller wallet cannot receive this payment right now.');
         const model = GARAGE_CATALOG[vehicle.modelId];
         const buyerTransaction = walletTransaction(user, -price, 'used_vehicle_purchase', `${model.label} used purchase · ${vehicle.registration}`);
@@ -3322,7 +3341,7 @@ function publicRideDestinationForUser(user, destinationId) {
           garage: garageSummary(user),
           market: usedMarketSummary(user),
           wallet: walletSummary(user),
-          purchase: { vehicleId: vehicle.id, label: model.label, registration: vehicle.registration, price, previousOwner: seller.displayName || seller.username },
+          purchase: { vehicleId: vehicle.id, label: model.label, registration: vehicle.registration, price:cashPriceFor(user, price), previousOwner: seller.displayName || seller.username },
           transaction: buyerTransaction,
           sellerTransactionId: sellerTransaction.id,
         }); return;
@@ -3356,7 +3375,7 @@ function publicRideDestinationForUser(user, destinationId) {
         if (!state.garage.selectedId) state.garage.selectedId = vehicle.id;
         dirty = true;
         await persist();
-        send(response, 201, { garage: garageSummary(user), wallet: walletSummary(user), purchase: { modelId: model.id, label: model.label, price: model.price }, transaction }); return;
+        send(response, 201, { garage: garageSummary(user), wallet: walletSummary(user), purchase: { modelId: model.id, label: model.label, price:cashPriceFor(user, model.price) }, transaction }); return;
       }
       if (path === '/api/garage/select' && request.method === 'POST') {
         limited(`garage-select:${user.id}`, 30, 60000);
@@ -3470,7 +3489,7 @@ function publicRideDestinationForUser(user, destinationId) {
         dirty = true;
         await persist();
         const summary = garageSummary(user);
-        send(response, 200, { garage: summary, wallet: walletSummary(user), vehicle: summary.activeVehicle, service: { action: body.action, amount, cost, station: station.label }, transaction }); return;
+        send(response, 200, { garage: summary, wallet: walletSummary(user), vehicle: summary.activeVehicle, service: { action: body.action, amount, cost:cashPriceFor(user, cost), station: station.label }, transaction }); return;
       }
       if (path === '/api/jobs' && request.method === 'GET') {
         send(response, 200, jobsSummary(user)); return;
@@ -3605,7 +3624,7 @@ function publicRideDestinationForUser(user, destinationId) {
         dirty = true;
         await persist();
         const summary = jobsSummary(user);
-        send(response, 200, { jobs: summary, wallet: walletSummary(user), active: summary.active, vehicle: summary.active?.vehicle || null, service: { action: body.action, amount, cost, station: station.label }, transaction }); return;
+        send(response, 200, { jobs: summary, wallet: walletSummary(user), active: summary.active, vehicle: summary.active?.vehicle || null, service: { action: body.action, amount, cost:cashPriceFor(user, cost), station: station.label }, transaction }); return;
       }
 
       const jobCheckpointMatch = path.match(/^\/api\/jobs\/([^/]+)\/checkpoint$/);
@@ -3713,7 +3732,7 @@ function publicRideDestinationForUser(user, destinationId) {
           wallet: walletSummary(user),
           needs,
           shop: { id: shop.id, label: shop.label, openHour: shop.openHour, closeHour: shop.closeHour },
-          purchase: { itemId: body.itemId, name: item.name, price: item.price, needs: item.needs },
+          purchase: { itemId: body.itemId, name: item.name, price:cashPriceFor(user, item.price), needs: item.needs },
           transaction,
         }); return;
       }
@@ -3728,7 +3747,7 @@ function publicRideDestinationForUser(user, destinationId) {
         send(response, 200, {
           wallet: walletSummary(user),
           needs,
-          purchase: { itemId: body.itemId, name: item.name, price: item.price, needs: item.needs },
+          purchase: { itemId: body.itemId, name: item.name, price:cashPriceFor(user, item.price), needs: item.needs },
           transaction,
         }); return;
       }
