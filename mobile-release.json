@@ -1,6 +1,6 @@
 {
-  "versionCode": 9,
-  "versionName": "1.0.8",
+  "versionCode": 10,
+  "versionName": "1.0.9",
   "track": "closed-testing",
-  "notes": "V109.0 adds four visitable attractions and district culture guides across all 14 Kerala districts"
+  "notes": "V110.0 expands all 14 districts to six visitable attractions, adds the Kuttikkanam adventure zone and Idukki hill ranges, and lets login district selection set the avatar's home and entry district"
 }

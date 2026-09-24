@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=109.0';
-import { createAtmosphere } from './environment.js?v=109.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=109.0';
+import { initSocial, api } from './social.js?v=110.0';
+import { createAtmosphere } from './environment.js?v=110.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=110.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -438,6 +438,7 @@ const worldZones = Object.freeze([
 ]);
 const roadNetwork = Object.freeze([
   Object.freeze({ id: 'state-spine', name: 'Kerala State Road', axis: 'z', center: 0, min: -72, max: 72, halfWidth: 7.75, displayLimit: 40, bikeLimit: 6.6, taxiLimit: 6.4 }),
+  Object.freeze({ id: 'outskirts-access-road', name: 'District Outskirts Road', axis: 'x', center: -78, min: -75, max: 75, halfWidth: 4.1, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
   Object.freeze({ id: 'village-link', name: 'Village Link Road', axis: 'x', center: -22, min: -72, max: 16, halfWidth: 5.75, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
   Object.freeze({ id: 'market-link', name: 'Market Road', axis: 'x', center: 22, min: -18, max: 48, halfWidth: 3.4, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
   Object.freeze({ id: 'station-link', name: 'Station Road', axis: 'z', center: -42, min: -34, max: 22, halfWidth: 3.2, displayLimit: 25, bikeLimit: 4.4, taxiLimit: 4.2 }),
@@ -940,6 +941,9 @@ function updateFootstepEffects(delta, player, moving, running, phase = 0) {
 function roadZoneAt(x, z) {
   const district = currentWorldDistrictName();
   if (district !== 'Kottayam' && district !== 'Ernakulam') {
+    if (Math.abs(z + 78) <= 4.5 && x >= -76 && x <= 76) {
+      return { id:'district-outskirts-road', label:`${district.toUpperCase()} OUTSKIRTS ROAD`, displayLimit:30, bikeLimit:5.1, taxiLimit:4.9 };
+    }
     if (Math.abs(x) <= 6 && z >= -68 && z <= 68) {
       return { id:'district-spine', label:`${district.toUpperCase()} MAIN ROAD`, displayLimit:35, bikeLimit:5.8, taxiLimit:5.6 };
     }
@@ -966,7 +970,7 @@ function roadZoneAt(x, z) {
     }
   } else {
     const roads = roadNetwork.filter(road => district === 'Ernakulam'
-      ? road.id.startsWith('ernakulam-')
+      ? road.id.startsWith('ernakulam-') || road.id === 'outskirts-access-road'
       : !road.id.startsWith('ernakulam-'));
     for (const road of roads) {
       const cross = road.axis === 'z' ? x : z;
@@ -5080,17 +5084,17 @@ function createRoadSurfaceTexture() {
   canvas.width = canvas.height = size;
   const context = canvas.getContext('2d');
   const random = visualRandom(1976);
-  context.fillStyle = '#303438';
+  context.fillStyle = '#191b1d';
   context.fillRect(0, 0, size, size);
 
   for (let i = 0; i < 1600; i++) {
-    const value = 38 + Math.floor(random() * 38);
+    const value = 27 + Math.floor(random() * 26);
     context.fillStyle = `rgba(${value},${value + 2},${value + 3},${.08 + random() * .13})`;
     const width = .5 + random() * 2.2;
     context.fillRect(random() * size, random() * size, width, .5 + random() * 1.5);
   }
 
-  context.strokeStyle = 'rgba(15,18,20,.10)';
+  context.strokeStyle = 'rgba(7,9,11,.24)';
   context.lineWidth = 1;
   for (let i = 0; i < 18; i++) {
     const x = random() * size;
@@ -6157,7 +6161,7 @@ function addRailPlatform(scene, x, z, length = 38) {
 }
 
 function addParkingLot(scene, x, z, width, depth) {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x777d80, roughness: .94 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x292c2f, roughness: .98 });
   const line = new THREE.MeshStandardMaterial({ color: 0xe4e0cf, roughness: .82 });
   const lot = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), mat);
   lot.rotation.x = -Math.PI / 2;
@@ -6174,8 +6178,8 @@ function addParkingLot(scene, x, z, width, depth) {
 function addErnakulamDistrictFoundation(scene) {
   const cx = ERNAKULAM_CITY.x;
   const cz = ERNAKULAM_CITY.z;
-  const roadMaterial = new THREE.MeshStandardMaterial({ color: 0xaeb5b8, roughness: .90, metalness: .02 });
-  weatherRoadSurfaces.push({ material: roadMaterial, baseRoughness: .90, baseMetalness: .02, baseColor: roadMaterial.color.clone() });
+  const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x202326, roughness: .98, metalness: 0 });
+  weatherRoadSurfaces.push({ material: roadMaterial, baseRoughness: .98, baseMetalness: 0, baseColor: roadMaterial.color.clone() });
 
   const roads = [
     [cx, cz + 2, 72, 8],
@@ -6186,6 +6190,8 @@ function addErnakulamDistrictFoundation(scene) {
     [cx + 22, cz + 2, 7, 58],
     [-38, -19.5, 24, 7],
     [-29, -17.5, 7, 9],
+    [0, -42, 8, 76],
+    [0, -78, 150, 8],
   ];
   for (const [x, z, width, depth] of roads) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), roadMaterial);
@@ -6193,6 +6199,13 @@ function addErnakulamDistrictFoundation(scene) {
     mesh.position.set(x, .025, z);
     scene.add(mesh);
     addRoadEdges(scene, x, z, width, depth);
+  }
+  const outskirtsLine = new THREE.Mesh(new THREE.PlaneGeometry(4, .16), new THREE.MeshStandardMaterial({ color:0xf1d46d, roughness:.75 }));
+  outskirtsLine.rotation.x = -Math.PI / 2;
+  for (let x = -70; x <= 70; x += 9) {
+    const dash = outskirtsLine.clone();
+    dash.position.set(x, .033, -78);
+    scene.add(dash);
   }
 
   addRailTracks(scene, -40, -26.8, 38);
@@ -6475,6 +6488,7 @@ function addDistrictAtlasAttractions(scene, district) {
       case 'market': addMarketLandmark(scene, x, z); break;
       case 'ricefield': addPaddyFields(scene, x, z); break;
       case 'lighthouse': addLighthouseLandmark(scene, x, z); break;
+      case 'adventure': addAdventureZoneLandmark(scene, x, z); break;
       default: addGardenLandmark(scene, x, z);
     }
     const label = createWorldSignMesh({
@@ -6504,6 +6518,83 @@ function addBeachLandmark(scene, x, z) {
   group.position.set(x, 0, z);
   scene.add(group);
   landmarkBeacon(scene, x, z - 3.8, 0x55d1dc);
+}
+
+function addAdventureZoneLandmark(scene, x, z) {
+  addCircleCollider(x,z,4.8,'adventure-zone');
+  const clearing = new THREE.Mesh(new THREE.CircleGeometry(10,32),new THREE.MeshStandardMaterial({ color:0x637b45, roughness:1 }));
+  clearing.rotation.x = -Math.PI/2;
+  clearing.position.set(x,.022,z);
+  scene.add(clearing);
+  const trail = new THREE.Mesh(new THREE.RingGeometry(6.1,6.8,32),new THREE.MeshStandardMaterial({ color:0xc0a575, roughness:1 }));
+  trail.rotation.x = -Math.PI/2;
+  trail.position.set(x,.03,z);
+  scene.add(trail);
+
+  const timber = new THREE.MeshStandardMaterial({ color:0x765234, roughness:.95 });
+  const ropeMaterial = new THREE.MeshStandardMaterial({ color:0xd0bd97, roughness:.9 });
+  const ropeLine = new THREE.LineBasicMaterial({ color:0xd0bd97, transparent:true, opacity:.92 });
+  const metal = new THREE.MeshStandardMaterial({ color:0x464b47, roughness:.8, metalness:.18 });
+  const platform = new THREE.MeshStandardMaterial({ color:0x98704a, roughness:.94 });
+  const group = new THREE.Group();
+
+  for (const towerX of [-5.1,5.1]) {
+    for (const postZ of [-.95,.95]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(.11,.15,5.4,8),timber);
+      post.position.set(towerX,2.7,postZ);
+      group.add(post);
+    }
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(1.8,.3,2.6),platform);
+    deck.position.set(towerX,2.0,0);
+    group.add(deck);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(1.8,.22,2.5),timber);
+    top.position.set(towerX,5.0,0);
+    group.add(top);
+  }
+  for (let plankX=-4.1;plankX<=4.1;plankX+=1.02) {
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(.88,.13,1.7),platform);
+    plank.position.set(plankX,2.0,0);
+    group.add(plank);
+  }
+  for (const ropeZ of [-.95,.95]) {
+    const cable = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-5.1,3.2,ropeZ),new THREE.Vector3(0,2.8,ropeZ),new THREE.Vector3(5.1,3.2,ropeZ)
+    ]);
+    group.add(new THREE.Line(cable,ropeLine));
+    for (let ropeX=-4.5;ropeX<=4.5;ropeX+=1.5) {
+      const strut = new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.7,6),ropeMaterial);
+      strut.position.set(ropeX,2.65,ropeZ);
+      group.add(strut);
+    }
+  }
+
+  const startPole = new THREE.Mesh(new THREE.CylinderGeometry(.12,.2,6.8,8),metal);
+  startPole.position.set(-1.7,3.4,-7.3);
+  group.add(startPole);
+  const landingPole = new THREE.Mesh(new THREE.CylinderGeometry(.12,.2,4.2,8),metal);
+  landingPole.position.set(2.1,2.1,8);
+  group.add(landingPole);
+  const zipline = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.7,6.55,-7.3),new THREE.Vector3(-.4,5.55,-3.3),new THREE.Vector3(.9,4.55,1.2),new THREE.Vector3(2.1,4.15,8)
+  ]);
+  group.add(new THREE.Line(zipline,ropeLine));
+
+  const climbingWall = new THREE.Mesh(new THREE.BoxGeometry(4.1,4.6,.6),timber);
+  climbingWall.position.set(7.2,2.3,-.2);
+  group.add(climbingWall);
+  const holds = [
+    [-1.2,.6,0xd56c50],[0,.9,0x6bb7a6],[1.15,1.2,0xe1bd62],[-.7,2.0,0x7593c0],
+    [.7,2.5,0xd78355],[-1.15,3.3,0x78a65c],[.1,3.7,0xd6b65e],[1.15,4.1,0x659b92]
+  ];
+  for (const [holdX,holdY,color] of holds) {
+    const hold = new THREE.Mesh(new THREE.SphereGeometry(.18,8,6),new THREE.MeshStandardMaterial({ color, roughness:.8 }));
+    hold.position.set(7.2+holdX,holdY,.17);
+    group.add(hold);
+  }
+
+  group.position.set(x,0,z);
+  scene.add(group);
+  landmarkBeacon(scene,x,z-10,0xffbf58);
 }
 
 function addCaveLandmark(scene, x, z) {
@@ -6676,7 +6767,8 @@ function addDistrictIdentityEnvironment(scene, district, profile) {
     scene.add(bankA);
     [[-72,-52,.76],[-72,-20,.82],[-72,14,.78],[-72,46,.84],[-72,70,.75]].forEach(([x,z,s]) => addPalm(scene,x,z,s));
   } else if (profile.environment === 'highland') {
-    for (const [x,z,r] of [[80,70,6.4],[-82,70,5.6],[82,-70,5.0]]) {
+    if (district === 'Idukki') addIdukkiHighlandRidges(scene);
+    else for (const [x,z,r] of [[80,70,6.4],[-82,70,5.6],[82,-70,5.0]]) {
       const hill = new THREE.Mesh(new THREE.ConeGeometry(r,r*.72,18), new THREE.MeshStandardMaterial({ color:0x4f7c49, roughness:1 }));
       hill.position.set(x,r*.34,z);
       scene.add(hill);
@@ -6723,11 +6815,36 @@ function addDistrictIdentityEnvironment(scene, district, profile) {
   addParkedVehicle(scene,'car',0x7b6d65,-49,-29,Math.PI/2);
 }
 
+function addIdukkiHighlandRidges(scene) {
+  const geometry = new THREE.SphereGeometry(1,20,14);
+  const materials = [0x526f4b,0x5d7c53,0x466847,0x6b845d].map(color => new THREE.MeshStandardMaterial({ color, roughness:1 }));
+  const ridges = [
+    [-128,-128,36,18],[-64,-138,46,23],[0,-147,52,27],[69,-137,43,22],[130,-124,37,18],
+    [-138,-50,40,20],[139,-17,42,21],[-132,45,37,18],[133,78,36,18],
+    [-87,137,38,19],[-18,147,46,23],[62,139,39,20]
+  ];
+  ridges.forEach(([x,z,width,height],index) => {
+    const material = materials[index % materials.length];
+    const main = new THREE.Mesh(geometry,material);
+    main.scale.set(width,height,width*.70);
+    main.position.set(x,height,z);
+    scene.add(main);
+    registerFarVisual(main,x,z,width*2.8);
+    for (const side of [-1,1]) {
+      const shoulder = new THREE.Mesh(geometry,material);
+      shoulder.scale.set(width*.68,height*.76,width*.56);
+      shoulder.position.set(x + side*width*.60,height*.76,z + side*width*.12);
+      scene.add(shoulder);
+      registerFarVisual(shoulder,x + side*width*.60,z + side*width*.12,width*2.3);
+    }
+  });
+}
+
 function addGenericDistrictWorld(scene, district) {
   const config = DISTRICT_INSTANCE_CONFIG[district] || DISTRICT_INSTANCE_CONFIG.Kottayam;
   const profile = districtCityProfile(district);
-  const roadMat = new THREE.MeshStandardMaterial({ color:0xaeb5b8, roughness:.91, metalness:.015 });
-  weatherRoadSurfaces.push({ material:roadMat, baseRoughness:.91, baseMetalness:.015, baseColor:roadMat.color.clone() });
+  const roadMat = new THREE.MeshStandardMaterial({ color:0x202326, roughness:.98, metalness:0 });
+  weatherRoadSurfaces.push({ material:roadMat, baseRoughness:.98, baseMetalness:0, baseColor:roadMat.color.clone() });
   const lineMat = new THREE.MeshStandardMaterial({ color:0xf1d46d, roughness:.75 });
 
   const roads = [
@@ -6738,6 +6855,7 @@ function addGenericDistrictWorld(scene, district) {
     [-24, -36, 86, 7],
     [25, 45, 74, 7],
     [-35, 34, 64, 7],
+    [0, -78, 150, 8],
   ];
   if (config.airport) roads.push([22, -28, 44, 7]);
   for (const [x,z,width,depth] of roads) {
@@ -6757,6 +6875,12 @@ function addGenericDistrictWorld(scene, district) {
     const dash = new THREE.Mesh(new THREE.PlaneGeometry(4,.16), lineMat);
     dash.rotation.x = -Math.PI/2;
     dash.position.set(x,.033,0);
+    scene.add(dash);
+  }
+  for (let x=-70; x<=70; x+=9) {
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(4,.16), lineMat);
+    dash.rotation.x = -Math.PI/2;
+    dash.position.set(x,.033,-78);
     scene.add(dash);
   }
 
@@ -6871,11 +6995,11 @@ function buildWorld(scene) {
   scene.add(ground);
 
   const roadTexture = createRoadSurfaceTexture();
-  const roadMat = new THREE.MeshStandardMaterial({ map: roadTexture, color: 0xb9bec0, roughness: .91, metalness: .015 });
+  const roadMat = new THREE.MeshStandardMaterial({ map: roadTexture, color: 0xffffff, roughness: .98, metalness: 0 });
   weatherRoadSurfaces.push({
     material: roadMat,
-    baseRoughness: .91,
-    baseMetalness: .015,
+    baseRoughness: .98,
+    baseMetalness: 0,
     baseColor: roadMat.color.clone(),
   });
   renderedWorldDistrict = currentWorldDistrictName();
@@ -6936,6 +7060,18 @@ function buildWorld(scene) {
     line.rotation.x = -Math.PI / 2;
     line.position.set(x, .031, -22);
     scene.add(line);
+  }
+
+  const outskirtsRoad = new THREE.Mesh(new THREE.PlaneGeometry(150, 8), roadMat);
+  outskirtsRoad.rotation.x = -Math.PI / 2;
+  outskirtsRoad.position.set(0, .018, -78);
+  scene.add(outskirtsRoad);
+  addRoadEdges(scene, 0, -78, 150, 8);
+  for (let x = -70; x <= 70; x += 9) {
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(4, .16), lineMat);
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(x, .033, -78);
+    scene.add(dash);
   }
   addRoadSurfaceDetails(scene);
   [

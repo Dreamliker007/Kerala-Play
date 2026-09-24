@@ -91,6 +91,34 @@ test('signup starts at zero, hashes passwords, enforces credentials and session 
   assert.ok(!saved.includes('test-password-2026')); assert.match(saved, /passwordHash/);
 });
 
+test('district choice sets avatar home and entry world; no choice defaults to Kottayam', async t => {
+  const app = await setup(t), explorer = app.client();
+  const created = await explorer('/api/auth/signup', {
+    firstName: 'DistrictPlayer', username: 'DistrictPlayer', password: 'test-password-2026', gender: 'female'
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  assert.equal(created.data.user.district, 'Kottayam');
+  assert.equal(created.data.user.worldDistrict, 'Kottayam');
+  assert.equal(created.data.user.x, 19);
+  assert.equal(created.data.user.z, -23);
+
+  const selected = await explorer('/api/auth/login', {
+    identifier: 'DistrictPlayer', password: 'test-password-2026', district: 'Idukki'
+  });
+  assert.equal(selected.status, 200, JSON.stringify(selected.data));
+  assert.equal(selected.data.user.district, 'Idukki');
+  assert.equal(selected.data.user.worldDistrict, 'Idukki');
+  assert.equal(selected.data.user.x, 12);
+  assert.equal(selected.data.user.z, 0);
+
+  const defaulted = await explorer('/api/auth/login', { identifier: 'DistrictPlayer', password: 'test-password-2026' });
+  assert.equal(defaulted.status, 200, JSON.stringify(defaulted.data));
+  assert.equal(defaulted.data.user.district, 'Kottayam');
+  assert.equal(defaulted.data.user.worldDistrict, 'Kottayam');
+  assert.equal(defaulted.data.user.x, 19);
+  assert.equal(defaulted.data.user.z, -23);
+});
+
 test('a receiver must accept a follow before text, voice messages or live voice; blocks revoke both directions', async t => {
   const app = await setup(t), alice = app.client(), bob = app.client();
   const a = await signup(alice, 'Alice'), b = await signup(bob, 'Bob');
@@ -756,7 +784,7 @@ test('traffic checkpoint documents challans payments and speeding stay server co
   assert.equal(traffic.rules.speedingFine, 25);
 
   app.advance(31 * 24 * 60 * 60 * 1000);
-  assert.equal((await alice('/api/auth/login', { identifier: 'TrafficAlice', password: 'test-password-2026' })).status, 200);
+  assert.equal((await alice('/api/auth/login', { identifier: 'TrafficAlice', password: 'test-password-2026', district: 'Ernakulam' })).status, 200);
   traffic = (await alice('/api/traffic')).data;
   assert.equal(traffic.documents[0].insuranceActive, false);
 
@@ -1260,7 +1288,7 @@ test('server-owned world alerts are filtered by time and district and keep read 
   assert.equal(alerts.items.find(item => item.id === rain.id).read, true);
 
   await app.restart();
-  assert.equal((await alice('/api/auth/login', { identifier: 'WorldAlertAlice', password: 'test-password-2026' })).status, 200);
+  assert.equal((await alice('/api/auth/login', { identifier: 'WorldAlertAlice', password: 'test-password-2026', district: 'Ernakulam' })).status, 200);
   alerts = (await alice('/api/notifications')).data;
   assert.equal(alerts.items.find(item => item.id === rain.id).read, true);
 });
@@ -1442,7 +1470,7 @@ test('emergency help cannot farm recognition during cooldown', async t => {
   await writeFile(dbPath, JSON.stringify(db, null, 2));
   await app.restart();
   player = app.client();
-  await player('/api/auth/login', { identifier: 'ResponderAlice', password: 'test-password-2026' });
+  await player('/api/auth/login', { identifier: 'ResponderAlice', password: 'test-password-2026', district: 'Ernakulam' });
 
   const first = await player('/api/world/emergency-help', { service: 'police' });
   assert.equal(first.status, 200);
