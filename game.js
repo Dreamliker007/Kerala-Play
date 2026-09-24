@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=110.0';
-import { createAtmosphere } from './environment.js?v=110.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=110.0';
+import { initSocial, api } from './social.js?v=111.0';
+import { createAtmosphere } from './environment.js?v=111.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=111.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -21,6 +21,12 @@ const districtTravelDestinations = document.querySelector('#district-travel-dest
 const districtTravelConfirm = document.querySelector('#district-travel-confirm');
 const districtTravelClose = document.querySelector('#district-travel-close');
 const districtTravelError = document.querySelector('#district-travel-error');
+const districtJourneyScreen = document.querySelector('#district-journey-screen');
+const districtJourneyTitle = document.querySelector('#district-journey-title');
+const districtJourneyFrom = document.querySelector('#district-journey-from');
+const districtJourneyTo = document.querySelector('#district-journey-to');
+const districtJourneyTicket = document.querySelector('#district-journey-ticket');
+const districtJourneyStatus = document.querySelector('#district-journey-status');
 const vehicleAction = document.querySelector('#vehicle-action');
 const driveTools = document.querySelector('#drive-tools');
 const hornAction = document.querySelector('#horn-action');
@@ -1938,6 +1944,7 @@ function performWorldActivity(activityId) {
 let districtTravelMode = 'train';
 let districtTravelSelected = '';
 let districtTravelSnapshot = null;
+let districtJourneyTimers = [];
 
 function closeDistrictTravelPanel() {
   districtTravelPanel?.classList.remove('open');
@@ -1964,14 +1971,17 @@ function renderDistrictTravelDestinations() {
     button.dataset.district = item.district;
     button.classList.toggle('selected', districtTravelSelected === item.district);
     const transport = districtTravelMode === 'flight' ? '✈ Flight' : '🚆 Train';
+    const fare = Number((districtTravelMode === 'flight' ? item.flight?.fare : item.train?.fare) || 0);
     button.textContent = `${item.district}\n${transport}`;
+    button.textContent += '\n₹' + fare;
     button.addEventListener('click', () => {
       districtTravelSelected = item.district;
       renderDistrictTravelDestinations();
       if (districtTravelConfirm) {
         districtTravelConfirm.disabled = false;
-        districtTravelConfirm.textContent = `${districtTravelMode === 'flight' ? 'FLY' : 'TAKE TRAIN'} → ${item.district.toUpperCase()}`;
+        districtTravelConfirm.textContent = (districtTravelMode === 'flight' ? 'BUY TICKET & FLY' : 'BUY TICKET & BOARD TRAIN') + ' · ₹' + fare;
       }
+      if (districtTravelNote) districtTravelNote.textContent = current + ' → ' + item.district + ' · ' + (districtTravelMode === 'flight' ? 'flight' : 'train') + ' ticket ₹' + fare + '. Your wallet is charged only after the station check succeeds.';
     });
     districtTravelDestinations.append(button);
   }
@@ -1990,7 +2000,7 @@ async function openDistrictTravelPanel(mode = 'train') {
   if (districtTravelTitle) districtTravelTitle.textContent = `${currentWorldDistrictName()} → choose district`;
   if (districtTravelNote) districtTravelNote.textContent = districtTravelMode === 'flight'
     ? 'Flights connect airport districts. District worlds cannot be reached by walking or driving across the map.'
-    : 'All 14 district worlds are isolated. Choose the district you want to enter by train.';
+    : 'Choose a destination and review its ticket fare. You must be at this railway station to board.';
   if (districtTravelDestinations) districtTravelDestinations.textContent = 'Loading routes…';
   if (districtTravelError) districtTravelError.textContent = '';
   if (districtTravelConfirm) districtTravelConfirm.disabled = true;
@@ -2011,6 +2021,7 @@ districtTravelConfirm?.addEventListener('click', async () => {
   if (!districtTravelSelected || districtTravelConfirm.disabled) return;
   districtTravelConfirm.disabled = true;
   if (districtTravelError) districtTravelError.textContent = '';
+  window.dispatchEvent(new CustomEvent('kerala-ride-travel-start'));
   try {
     const result = await api('/api/travel/district/board', {
       mode: districtTravelMode,
@@ -2019,14 +2030,48 @@ districtTravelConfirm?.addEventListener('click', async () => {
     const district = result?.travel?.district || result?.user?.worldDistrict || districtTravelSelected;
     try { sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, district); } catch {}
     bootWorldDistrict = district;
+    const fromDistrict = result?.travel?.from?.district || currentWorldDistrictName();
+    const fare = Number(result?.travel?.fare || 0);
     closeDistrictTravelPanel();
-    showToast(`${districtTravelMode === 'flight' ? 'Flight' : 'Train'} arrived · ${district}`, 1800);
-    location.reload();
+    if (districtTravelMode === 'train') {
+      showDistrictTrainJourney(fromDistrict, district, fare);
+    } else {
+      showToast('Flight arrived · ' + district, 1800);
+      location.reload();
+    }
   } catch (error) {
+    window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));
     districtTravelConfirm.disabled = false;
     if (districtTravelError) districtTravelError.textContent = error.message || 'Travel failed.';
   }
 });
+
+function showDistrictTrainJourney(fromDistrict, toDistrict, fare) {
+  if (!districtJourneyScreen) {
+    location.reload();
+    return;
+  }
+  districtJourneyTimers.forEach(timer => clearTimeout(timer));
+  districtJourneyTimers = [];
+  districtJourneyScreen.classList.add('open');
+  districtJourneyScreen.setAttribute('aria-hidden', 'false');
+  if (districtJourneyTitle) districtJourneyTitle.textContent = 'Train to ' + toDistrict;
+  if (districtJourneyFrom) districtJourneyFrom.textContent = fromDistrict + ' Station';
+  if (districtJourneyTo) districtJourneyTo.textContent = toDistrict + ' Station';
+  if (districtJourneyTicket) districtJourneyTicket.textContent = 'Ticket confirmed · ₹' + fare + ' Kerala Cash · Departs now';
+  const phases = [
+    [0, 'Ticket checked · doors closing at ' + fromDistrict + ' Station…'],
+    [1500, 'Departed ' + fromDistrict + ' · train is leaving the platform…'],
+    [3400, 'On the way to ' + toDistrict + ' · district boundary crossed…'],
+    [6100, 'Approaching ' + toDistrict + ' Railway Station…'],
+  ];
+  for (const [delay, label] of phases) {
+    districtJourneyTimers.push(setTimeout(() => {
+      if (districtJourneyScreen.classList.contains('open') && districtJourneyStatus) districtJourneyStatus.textContent = label;
+    }, delay));
+  }
+  districtJourneyTimers.push(setTimeout(() => location.reload(), 8100));
+}
 
 function updateLifeLoopMission() {
   if (!missionText || !landmarkStatus || activeJobMission || activeNpcFavor || selectedDestination) return;
@@ -6104,8 +6149,91 @@ function addRailTracks(scene, x, z, length = 30) {
   }
 }
 
+function addPassengerTrain(scene, x, z, centerOffset = 0) {
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xd9ded5, roughness: .72, metalness: .08 });
+  const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x475a60, roughness: .7, metalness: .18 });
+  const blueMaterial = new THREE.MeshStandardMaterial({ color: 0x21637a, roughness: .58, metalness: .12 });
+  const redMaterial = new THREE.MeshStandardMaterial({ color: 0xb83d34, roughness: .62 });
+  const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x183743, roughness: .25, metalness: .08, emissive: 0x0e2831, emissiveIntensity: .16 });
+  const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x24292a, roughness: .86, metalness: .12 });
+  const train = new THREE.Group();
+  const carCenters = [-5.4, 0, 5.4];
+
+  carCenters.forEach((carX, index) => {
+    const locomotive = index === carCenters.length - 1;
+    const car = new THREE.Group();
+    const length = locomotive ? 5.45 : 5.15;
+    const width = locomotive ? 2.15 : 2.08;
+    const shell = new THREE.Mesh(new THREE.BoxGeometry(length, locomotive ? 1.78 : 1.7, width), bodyMaterial);
+    shell.position.y = 1.48;
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(length + .14, .2, width + .12), roofMaterial);
+    roof.position.y = 2.43;
+    const sideStripe = new THREE.Mesh(new THREE.BoxGeometry(length - .18, .16, .035), blueMaterial);
+    sideStripe.position.y = 1.06;
+    const lowerStripe = new THREE.Mesh(new THREE.BoxGeometry(length - .2, .075, .04), redMaterial);
+    lowerStripe.position.y = .91;
+    car.add(shell, roof);
+
+    for (const side of [-1, 1]) {
+      const stripe = sideStripe.clone();
+      stripe.position.z = side * (width / 2 + .018);
+      const lower = lowerStripe.clone();
+      lower.position.z = side * (width / 2 + .025);
+      car.add(stripe, lower);
+      for (const windowX of [-1.8, -.6, .6, 1.8]) {
+        if (locomotive && windowX > 1.1) continue;
+        const window = new THREE.Mesh(new THREE.BoxGeometry(.62, .48, .045), windowMaterial);
+        window.position.set(windowX, 1.82, side * (width / 2 + .03));
+        car.add(window);
+      }
+      if (!locomotive) {
+        for (const doorX of [-2.28, 2.28]) {
+          const door = new THREE.Mesh(new THREE.BoxGeometry(.46, 1.22, .055), blueMaterial);
+          door.position.set(doorX, 1.33, side * (width / 2 + .035));
+          car.add(door);
+        }
+      }
+      for (const wheelX of [-1.8, 1.8]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(.32, .32, .16, 12), wheelMaterial);
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(wheelX, .38, side * .95);
+        car.add(wheel);
+      }
+    }
+
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(length - .28, .32, 1.7), roofMaterial);
+    chassis.position.y = .68;
+    car.add(chassis);
+    if (locomotive) {
+      const frontGlass = new THREE.Mesh(new THREE.BoxGeometry(.055, .56, 1.05), windowMaterial);
+      frontGlass.position.set(length / 2 + .035, 1.82, 0);
+      const nose = new THREE.Mesh(new THREE.BoxGeometry(.42, .6, 1.88), blueMaterial);
+      nose.position.set(length / 2 - .06, 1.18, 0);
+      const lampMaterial = new THREE.MeshStandardMaterial({ color: 0xffedb3, emissive: 0xffd46b, emissiveIntensity: .75 });
+      const lamps = [-.54, .54].map(lampZ => {
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(.095, 8, 8), lampMaterial);
+        lamp.position.set(length / 2 + .16, 1.32, lampZ);
+        return lamp;
+      });
+      car.add(frontGlass, nose, ...lamps);
+    }
+    car.position.x = carX;
+    car.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+    train.add(car);
+  });
+
+  train.position.set(x + centerOffset, 0, z);
+  scene.add(train);
+  for (const carX of carCenters) {
+    addBoxCollider(x + centerOffset + carX, z, 2.78, 1.08, 'passenger-train');
+  }
+  return train;
+}
+
 function addKottayamRailwayFoundation(scene) {
   addRailTracks(scene, 7, -26.5, 31);
+  addRailPlatform(scene, 7, -23, 27);
+  addPassengerTrain(scene, 7, -26.5, -7);
   addCivicBuilding(scene, 14.5, -30.5, {
     title: 'KOTTAYAM RAILWAY',
     subtitle: 'ERNAKULAM · DISTRICT TRAINS',
@@ -6210,6 +6338,7 @@ function addErnakulamDistrictFoundation(scene) {
 
   addRailTracks(scene, -40, -26.8, 38);
   addRailPlatform(scene, -40, -30.1, 38);
+  addPassengerTrain(scene, -40, -26.8);
   addCivicBuilding(scene, -40, -35.8, {
     title: 'ERNAKULAM RAILWAY',
     subtitle: 'KERALA DISTRICT TRAINS',
@@ -6218,7 +6347,7 @@ function addErnakulamDistrictFoundation(scene) {
   });
   const stationBoard = createWorldSignMesh({
     title: 'ERNAKULAM STATION',
-    subtitle: 'DISTRICT TRAVEL',
+    subtitle: 'KOTTAYAM · ₹35 · DISTRICT TRAINS',
     background: '#385f7b',
   }, 4.8, .92);
   stationBoard.position.set(-40, 2.35, -30.7);
@@ -6886,6 +7015,7 @@ function addGenericDistrictWorld(scene, district) {
 
   addRailTracks(scene, config.train.x, -17, 30);
   addRailPlatform(scene, config.train.x, -9.6, 28);
+  addPassengerTrain(scene, config.train.x, -17);
   addCivicBuilding(scene, config.train.x, -12, {
     title: `${district.toUpperCase()} RAILWAY`,
     subtitle: 'KERALA DISTRICT TRAINS',

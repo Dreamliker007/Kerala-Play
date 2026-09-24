@@ -1497,3 +1497,31 @@ test('district rail route exposes Kottayam and Ernakulam stations', async t => {
   assert.deepEqual(route.data.stations.map(station => station.district), ['Kottayam', 'Ernakulam']);
   assert.equal((await player('/api/travel/train/board', { stationId: 'kottayam' })).status, 409);
 });
+
+test('Kottayam station quotes a train ticket and boards into Ernakulam station', async t => {
+  const app = await setup(t);
+  const player = app.client();
+  const created = await player('/api/auth/signup', {
+    firstName: 'RailTraveller', username: 'RailTraveller', password: 'test-password-2026', district: 'Kottayam', gender: 'female'
+  });
+  assert.equal(created.status, 201);
+
+  const routes = await player('/api/travel/districts');
+  assert.equal(routes.data.currentDistrict, 'Kottayam');
+  const ernakulam = routes.data.districts.find(item => item.district === 'Ernakulam');
+  assert.equal(ernakulam.train.available, true);
+  assert.equal(ernakulam.train.fare, 35);
+
+  app.advance(1500);
+  const stationApproach = await player('/api/world/move', { x: 7, z: -23, rotation: 0, moving: true });
+  assert.equal(stationApproach.status, 200, JSON.stringify(stationApproach.data));
+  const trip = await player('/api/travel/district/board', { mode: 'train', destinationDistrict: 'Ernakulam' });
+  assert.equal(trip.status, 200, JSON.stringify(trip.data));
+  assert.equal(trip.data.travel.from.district, 'Kottayam');
+  assert.equal(trip.data.travel.to.district, 'Ernakulam');
+  assert.equal(trip.data.travel.fare, 35);
+  assert.equal(trip.data.transaction.amount, 35);
+  assert.equal(trip.data.user.worldDistrict, 'Ernakulam');
+  assert.equal(trip.data.user.x, -34);
+  assert.equal(trip.data.user.z, -19.5);
+});

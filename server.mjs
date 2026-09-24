@@ -44,6 +44,7 @@ function insideDistrictWorld(config, x, z, margin = 0) {
     && z >= config.bounds.minZ + margin && z <= config.bounds.maxZ - margin;
 }
 function districtTravelFare(fromDistrict, toDistrict, mode = 'train') {
+  if (mode === 'train' && ((fromDistrict === 'Kottayam' && toDistrict === 'Ernakulam') || (fromDistrict === 'Ernakulam' && toDistrict === 'Kottayam'))) return 35;
   const from = DISTRICT_WORLD_CONFIG[fromDistrict]?.order ?? 0;
   const to = DISTRICT_WORLD_CONFIG[toDistrict]?.order ?? 0;
   const hops = Math.max(1, Math.abs(from - to));
@@ -2717,8 +2718,8 @@ function publicRideDestinationForUser(user, destinationId) {
             return {
               district,
               order: config.order,
-              train: { available: true, id: config.train.id },
-              flight: { available: !!config.airport, id: config.airport?.id || null },
+              train: { available: true, id: config.train.id, fare: district === currentDistrict ? 0 : districtTravelFare(currentDistrict, district, 'train') },
+              flight: { available: !!config.airport, id: config.airport?.id || null, fare: district === currentDistrict || !config.airport || !current.airport ? 0 : districtTravelFare(currentDistrict, district, 'flight') },
               current: district === currentDistrict,
             };
           }),
