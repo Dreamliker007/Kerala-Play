@@ -488,6 +488,7 @@ test('Anson tester account gets server-enforced free purchases, fees and post-fr
   const dbPath = join(app.dataDir, 'game.json');
   const db = JSON.parse(await readFile(dbPath, 'utf8'));
   const savedUser = db.users.find(item => String(item.username).toLowerCase() === 'anson');
+  savedUser.district = 'Kottayam';
   savedUser.walletBalance = 0;
   savedUser.districtTravelCount = 3;
   savedUser.worldDistrict = 'Kottayam';
@@ -1757,6 +1758,7 @@ test('first three district trips are shared across transport modes and the fixed
   const dbPath = join(app.dataDir, 'game.json');
   const db = JSON.parse(await readFile(dbPath, 'utf8'));
   const savedUser = db.users.find(item => item.username === 'TripCounter');
+  savedUser.district = 'Kannur';
   savedUser.districtTravelCount = 3;
   savedUser.walletBalance = 5000;
   savedUser.worldDistrict = 'Kannur';
