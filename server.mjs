@@ -2058,14 +2058,9 @@ function publicRideDestinationForUser(user, destinationId) {
         };
         if (resolvedRelative === 'index.html') {
           // Android WebView can otherwise keep an older module graph alive across
-          // app restarts. Clear only the HTTP cache (not cookies/local storage)
-          // once per deployed client cache generation.
-          const cacheMarker = 'kp_cache_v1210=1';
-          const cookie = String(request.headers.cookie || '');
-          if (!cookie.split(';').some(part => part.trim() === cacheMarker)) {
-            freshHeaders['Clear-Site-Data'] = '"cache"';
-            freshHeaders['Set-Cookie'] = `${cacheMarker}; Path=/; Max-Age=31536000; Secure; SameSite=Lax`;
-          }
+          // app restarts. Clear only the HTTP cache; cookies and local storage
+          // remain untouched so signed-in accounts stay signed in.
+          freshHeaders['Clear-Site-Data'] = '"cache"';
         }
         response.writeHead(200, freshHeaders);
         response.end(request.method === 'HEAD' ? undefined : data);
