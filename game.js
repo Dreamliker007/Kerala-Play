@@ -3795,10 +3795,11 @@ try {
   let inputY = 0;
   let cameraYaw = player.rotation.y + Math.PI;
   // Keep vertical camera drags aimed into the world, below the horizon.
-  const MIN_CAMERA_PITCH = .60;
+  // Allow an eye-level view while keeping the camera above the world surface.
+  const MIN_CAMERA_PITCH = .20;
   const MAX_CAMERA_PITCH = .78;
   const MIN_CAMERA_GROUND_VIEW_DISTANCE = 2.8;
-  let cameraPitch = .68;
+  let cameraPitch = .42;
   let runHeld = false;
   let runPointerId = null;
   let runCruiseArmed = false;
