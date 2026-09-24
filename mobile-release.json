@@ -1,6 +1,6 @@
 {
-  "versionCode": 16,
-  "versionName": "1.0.15",
+  "versionCode": 17,
+  "versionName": "1.0.16",
   "track": "closed-testing",
-  "notes": "V116.0 fixes the sky camera jump, clarifies signup email recovery, and keeps login in the avatar's home district"
+  "notes": "V117.0 keeps the world visible after camera drags and camera collisions"
 }

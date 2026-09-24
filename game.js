@@ -1,9 +1,9 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=116.0';
-import { createAtmosphere } from './environment.js?v=116.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=116.0';
-import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, segmentIntersectsColliders } from './collision-geometry.js?v=116.0';
-import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=116.0';
+import { initSocial, api } from './social.js?v=117.0';
+import { createAtmosphere } from './environment.js?v=117.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=117.0';
+import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, segmentIntersectsColliders } from './collision-geometry.js?v=117.0';
+import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=117.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -3794,7 +3794,9 @@ try {
   let inputX = 0;
   let inputY = 0;
   let cameraYaw = player.rotation.y + Math.PI;
-  let cameraPitch = .31;
+  const MIN_CAMERA_PITCH = .36;
+  const MIN_CAMERA_GROUND_VIEW_DISTANCE = 2.6;
+  let cameraPitch = .38;
   let runHeld = false;
   let runPointerId = null;
   let runCruiseArmed = false;
@@ -3971,7 +3973,7 @@ try {
     const lookDeltaX = event.clientX - lastLookX;
     const lookDeltaY = event.clientY - lastLookY;
     cameraYaw -= lookDeltaX * .009;
-    cameraPitch = THREE.MathUtils.clamp(cameraPitch + lookDeltaY * .006, .12, .64);
+    cameraPitch = THREE.MathUtils.clamp(cameraPitch + lookDeltaY * .006, MIN_CAMERA_PITCH, .64);
     if (Math.hypot(lookDeltaX, lookDeltaY) > 4) recordOnboardingAction('camera');
     lastLookX = event.clientX;
     lastLookY = event.clientY;
@@ -4397,6 +4399,17 @@ try {
     const cameraResponse = drivingCamera ? 6.5 + driveSpeedRatio * 1.6 : 8.6;
     const cameraNextPosition = camera.position.clone().lerp(cameraPosition, 1 - Math.exp(-delta * cameraResponse));
     if (!interiorCamera) resolveCameraCollision(camera.position, cameraNextPosition, drivingCamera ? .38 : .30);
+    if (!interiorCamera) {
+      // Collision shortening can pull the camera almost level with its look target.
+      // Preserve a minimum downward viewing angle so the world cannot disappear into the sky.
+      const horizontalAimDistance = Math.hypot(
+        cameraNextPosition.x - cameraTarget.x,
+        cameraNextPosition.z - cameraTarget.z,
+      );
+      const minimumGroundViewHeight = cameraTarget.y
+        + Math.tan(MIN_CAMERA_PITCH) * Math.max(MIN_CAMERA_GROUND_VIEW_DISTANCE, horizontalAimDistance);
+      cameraNextPosition.y = Math.max(cameraNextPosition.y, minimumGroundViewHeight);
+    }
     camera.position.copy(cameraNextPosition);
     camera.lookAt(cameraTarget);
     updateRemotePlayers(delta, camera);
