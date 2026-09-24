@@ -2003,7 +2003,7 @@ function publicRideDestinationForUser(user, destinationId) {
         const password = body.password;
         requireValue(/^(?=.*[A-Za-z])[A-Za-z0-9_]{3,24}$/.test(username), 400, 'Username must be 3–24 characters and include at least one letter.');
         requireValue(typeof password === 'string' && password.length >= 8 && password.length <= 128, 400, 'Use a password with 8–128 characters.');
-        const district = body.district || 'Ernakulam', gender = body.gender || 'male';
+        const district = body.district || 'Kottayam', gender = body.gender || 'male';
         requireValue(Object.hasOwn(DISTRICTS, district) && ['male', 'female', 'other'].includes(gender), 400, 'Choose a valid district and avatar.');
         requireValue(!db.users.some(user => user.username.toLowerCase() === username.toLowerCase()), 409, 'That username is already taken.');
         const salt = randomBytes(16).toString('hex');
@@ -2025,17 +2025,32 @@ function publicRideDestinationForUser(user, destinationId) {
         limited(`auth:${ip}`, 30, 15 * 60000);
         const body = await jsonBody(request);
         requireValue(typeof body.identifier === 'string' && typeof body.password === 'string' && body.password.length <= 128, 400, 'Enter your username, email, mobile and password.');
+        const district = body.district || 'Kottayam';
+        requireValue(Object.hasOwn(DISTRICT_WORLD_CONFIG, district), 400, 'Choose a valid Kerala district.');
         const identifier = body.identifier.trim().toLowerCase();
         const user = db.users.find(candidate => candidate.username.toLowerCase() === identifier || candidate.email === identifier || candidate.mobile === body.identifier.trim());
         const comparison = await scrypt(body.password, user?.salt || 'not-an-account-salt', 64);
         const valid = timingSafeEqual(comparison, user ? Buffer.from(user.passwordHash, 'hex') : Buffer.alloc(64));
         requireValue(user && valid, 401, 'Username or password is incorrect.');
+        const spawn = districtWorldConfig(district).spawn;
+        if (currentWorldDistrict(user) !== district) {
+          user.worldX = spawn.x;
+          user.worldZ = spawn.z;
+          user.worldRotation = spawn.rotation || 0;
+        }
+        user.district = district;
+        user.worldDistrict = district;
+        user.worldUpdatedAt = now();
+        presence.delete(user.id);
+        dirty = true;
         await startSession(user, response, request); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
       }
       if (path === '/api/auth/oauth' && request.method === 'POST') {
         limited(`auth:${ip}`, 30, 15 * 60000);
         const body = await jsonBody(request);
+        const district = body.district || 'Kottayam';
+        requireValue(Object.hasOwn(DISTRICT_WORLD_CONFIG, district), 400, 'Choose a valid Kerala district.');
         requireValue(['google', 'facebook'].includes(body.provider), 400, 'Choose Google or Facebook sign in.');
         requireValue(typeof body.accessToken === 'string' && body.accessToken.length >= 20 && body.accessToken.length <= 8192, 400, 'OAuth session token is missing.');
         const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
@@ -2075,7 +2090,7 @@ function publicRideDestinationForUser(user, destinationId) {
 
           const salt = randomBytes(16).toString('hex');
           const randomPassword = randomBytes(48).toString('hex');
-          const [spawnX, spawnZ] = DISTRICTS.Ernakulam;
+          const spawn = districtWorldConfig(district).spawn;
           user = {
             id: randomUUID(),
             firstName,
@@ -2084,7 +2099,7 @@ function publicRideDestinationForUser(user, destinationId) {
             mobile: '',
             passwordHash: (await scrypt(randomPassword, salt, 64)).toString('hex'),
             salt,
-            district: 'Ernakulam',
+            district,
             gender: 'other',
             bio: '',
             points: 0,
@@ -2097,10 +2112,10 @@ function publicRideDestinationForUser(user, destinationId) {
             walletBalance: 0,
             economyActions: [],
             jobState: freshJobState(),
-            worldDistrict: 'Ernakulam',
-            worldX: districtWorldConfig('Ernakulam').spawn.x,
-            worldZ: districtWorldConfig('Ernakulam').spawn.z,
-            worldRotation: 0,
+            worldDistrict: district,
+            worldX: spawn.x,
+            worldZ: spawn.z,
+            worldRotation: spawn.rotation || 0,
             worldUpdatedAt: now(),
           };
           db.users.push(user);
@@ -2109,6 +2124,17 @@ function publicRideDestinationForUser(user, destinationId) {
           created = true;
         }
 
+        const spawn = districtWorldConfig(district).spawn;
+        if (currentWorldDistrict(user) !== district) {
+          user.worldX = spawn.x;
+          user.worldZ = spawn.z;
+          user.worldRotation = spawn.rotation || 0;
+        }
+        user.district = district;
+        user.worldDistrict = district;
+        user.worldUpdatedAt = now();
+        presence.delete(user.id);
+        dirty = true;
         await startSession(user, response, request);
         socialChanged();
         send(response, created ? 201 : 200, { user: publicUser(user), created, provider: body.provider });

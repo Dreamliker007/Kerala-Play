@@ -26,7 +26,9 @@ const DISTRICT_CONTENT = [
       {id:"bekal-fort",name:"Bekal Fort",kind:"fort",icon:"F",x:50,z:45,description:"Walk the laterite ramparts and look out over the Arabian Sea."},
       {id:"ananthapura-lake-temple",name:"Ananthapura Lake Temple",kind:"temple",icon:"T",x:-78,z:42,description:"A temple on a small island in a lake near Kumbla."},
       {id:"valiyaparamba-backwaters",name:"Valiyaparamba Backwaters",kind:"backwater",icon:"B",x:72,z:12,description:"Explore a quiet backwater network edged by coconut groves and fishing villages."},
-      {id:"madhur-temple",name:"Madhur Temple",kind:"temple",icon:"T",x:-78,z:-36,description:"See the distinctive temple architecture beside the Madhuvahini River."}
+      {id:"madhur-temple",name:"Madhur Temple",kind:"temple",icon:"T",x:-78,z:-36,description:"See the distinctive temple architecture beside the Madhuvahini River."},
+      {id:"ranipuram-hills",name:"Ranipuram Hills",kind:"peak",icon:"H",x:64,z:-90,description:"Walk the shola forest and grassland trails to wide Western Ghats views."},
+      {id:"chandragiri-fort",name:"Chandragiri Fort",kind:"fort",icon:"F",x:-64,z:-90,description:"Explore the riverside fort ruins overlooking the Payaswini estuary."}
     ]
   },
   {
@@ -46,7 +48,9 @@ const DISTRICT_CONTENT = [
       {id:"st-angelo-fort",name:"St. Angelo Fort",kind:"fort",icon:"F",x:50,z:45,description:"Explore the Portuguese-built sea fort and its later colonial layers."},
       {id:"payyambalam-beach",name:"Payyambalam Beach",kind:"beach",icon:"B",x:-78,z:42,description:"A broad city beach used for evening walks and sunset views."},
       {id:"muzhappilangad-beach",name:"Muzhappilangad Drive-in Beach",kind:"beach",icon:"B",x:72,z:12,description:"A long, firm shoreline known for its drive-in beach stretch."},
-      {id:"arakkal-museum",name:"Arakkal Museum",kind:"museum",icon:"M",x:-78,z:-36,description:"Visit the museum in the former palace of Kerala's Arakkal royal family."}
+      {id:"arakkal-museum",name:"Arakkal Museum",kind:"museum",icon:"M",x:-78,z:-36,description:"Visit the museum in the former palace of Kerala's Arakkal royal family."},
+      {id:"aralam-wildlife-sanctuary",name:"Aralam Wildlife Sanctuary",kind:"sanctuary",icon:"W",x:64,z:-90,description:"Follow forest-edge trails through the foothills of the Western Ghats."},
+      {id:"parassinikadavu-muthappan-temple",name:"Parassinikadavu Muthappan Temple",kind:"temple",icon:"T",x:-64,z:-90,description:"Visit the riverside shrine known for its living Muthappan ritual tradition."}
     ]
   },
   {
@@ -66,7 +70,9 @@ const DISTRICT_CONTENT = [
       {id:"edakkal-caves",name:"Edakkal Caves",kind:"cave",icon:"C",x:50,z:45,description:"Follow the rocky ascent to the caves and their prehistoric engravings."},
       {id:"pookode-lake",name:"Pookode Lake",kind:"lake",icon:"L",x:-78,z:42,description:"A forest-fringed freshwater lake near Vythiri."},
       {id:"chembra-peak",name:"Chembra Peak",kind:"peak",icon:"H",x:72,z:12,description:"Reach the highland viewpoint above Meppadi's tea and forest slopes."},
-      {id:"thirunelli-temple",name:"Thirunelli Temple",kind:"temple",icon:"T",x:-78,z:-36,description:"Visit the ancient temple setting in the Brahmagiri hills."}
+      {id:"thirunelli-temple",name:"Thirunelli Temple",kind:"temple",icon:"T",x:-78,z:-36,description:"Visit the ancient temple setting in the Brahmagiri hills."},
+      {id:"banasura-sagar-dam",name:"Banasura Sagar Dam",kind:"dam",icon:"D",x:64,z:-90,description:"Look across the reservoir and its small islands beneath the Banasura hills."},
+      {id:"soochipara-waterfalls",name:"Soochipara Waterfalls",kind:"waterfall",icon:"W",x:-64,z:-90,description:"Walk the forest path to the three-tiered Sentinel Rock waterfall."}
     ]
   },
   {
@@ -86,7 +92,9 @@ const DISTRICT_CONTENT = [
       {id:"kozhikode-beach",name:"Kozhikode Beach",kind:"beach",icon:"B",x:50,z:45,description:"A lively waterfront promenade with views of the Arabian Sea."},
       {id:"beypore-uru-yard",name:"Beypore Uru Yard",kind:"shipyard",icon:"S",x:-78,z:42,description:"See the traditional wooden dhow-building heritage of Beypore."},
       {id:"sm-street",name:"SM Street",kind:"market",icon:"M",x:72,z:12,description:"Walk the busy Sweet Meat Street, known for shops and Kozhikodan halwa."},
-      {id:"kappad-beach",name:"Kappad Beach",kind:"beach",icon:"B",x:-78,z:-36,description:"Visit the calm coastal stretch north of Kozhikode city."}
+      {id:"kappad-beach",name:"Kappad Beach",kind:"beach",icon:"B",x:-78,z:-36,description:"Visit the calm coastal stretch north of Kozhikode city."},
+      {id:"thusharagiri-waterfalls",name:"Thusharagiri Waterfalls",kind:"waterfall",icon:"W",x:64,z:-90,description:"Follow shaded trekking paths beside the cascades in the Western Ghats."},
+      {id:"sarovaram-biopark",name:"Sarovaram Biopark",kind:"park",icon:"P",x:-64,z:-90,description:"Walk the wetland boardwalks and green spaces near Kozhikode city."}
     ]
   },
   {
@@ -106,7 +114,9 @@ const DISTRICT_CONTENT = [
       {id:"kottakkunnu",name:"Kottakkunnu",kind:"hill",icon:"H",x:50,z:45,description:"Take in the hilltop park and town views from Malappuram."},
       {id:"thunchan-parambu",name:"Thunchan Parambu",kind:"heritage",icon:"H",x:-78,z:42,description:"Visit the memorial garden associated with Malayalam poet Thunchath Ezhuthachan."},
       {id:"nilambur-teak-museum",name:"Nilambur Teak Museum",kind:"museum",icon:"M",x:72,z:12,description:"Explore exhibits on teak, forests and the Nilambur region."},
-      {id:"kadalundi-bird-sanctuary",name:"Kadalundi Bird Sanctuary",kind:"sanctuary",icon:"W",x:-78,z:-36,description:"Look across the estuary and mangroves used by resident and migratory birds."}
+      {id:"kadalundi-bird-sanctuary",name:"Kadalundi Bird Sanctuary",kind:"sanctuary",icon:"W",x:-78,z:-36,description:"Look across the estuary and mangroves used by resident and migratory birds."},
+      {id:"keralamkundu-waterfalls",name:"Keralamkundu Waterfalls",kind:"waterfall",icon:"W",x:64,z:-90,description:"Visit the forest-fringed cascade and natural pool in the Nilambur highlands."},
+      {id:"thirunavaya-mamankam-site",name:"Thirunavaya Mamankam Site",kind:"heritage",icon:"H",x:-64,z:-90,description:"Explore the Bharathapuzha riverbank linked with the historic Mamankam festival."}
     ]
   },
   {
@@ -126,7 +136,9 @@ const DISTRICT_CONTENT = [
       {id:"palakkad-fort",name:"Palakkad Fort",kind:"fort",icon:"F",x:50,z:45,description:"Walk around the well-preserved fort moat and ramparts in Palakkad town."},
       {id:"malampuzha-garden",name:"Malampuzha Garden & Dam",kind:"garden",icon:"G",x:-78,z:42,description:"Visit the dam-side gardens and reservoir below the Western Ghats."},
       {id:"kalpathy-heritage-village",name:"Kalpathy Heritage Village",kind:"temple",icon:"H",x:72,z:12,description:"Explore the historic agraharam streets and temple setting."},
-      {id:"nelliyampathy-viewpoint",name:"Nelliyampathy Hills",kind:"peak",icon:"H",x:-78,z:-36,description:"Climb toward viewpoints over the forested hill ranges and plains."}
+      {id:"nelliyampathy-viewpoint",name:"Nelliyampathy Hills",kind:"peak",icon:"H",x:-78,z:-36,description:"Climb toward viewpoints over the forested hill ranges and plains."},
+      {id:"silent-valley-national-park",name:"Silent Valley National Park",kind:"sanctuary",icon:"W",x:64,z:-90,description:"Discover a protected evergreen forest landscape in the Nilgiri Biosphere Reserve."},
+      {id:"dhoni-waterfalls",name:"Dhoni Waterfalls",kind:"waterfall",icon:"W",x:-64,z:-90,description:"Take the forest trail from the Dhoni foothills to the seasonal falls."}
     ]
   },
   {
@@ -146,7 +158,9 @@ const DISTRICT_CONTENT = [
       {id:"thekkinkadu-maidan",name:"Thekkinkadu Maidan",kind:"park",icon:"P",x:50,z:45,description:"The open green at the centre of Thrissur's temple town and Pooram celebrations."},
       {id:"vadakkunnathan-temple",name:"Vadakkunnathan Temple",kind:"temple",icon:"T",x:-78,z:42,description:"A historic temple complex surrounded by Thekkinkadu Maidan."},
       {id:"shakthan-palace",name:"Shakthan Thampuran Palace",kind:"palace",icon:"P",x:72,z:12,description:"Visit the palace museum associated with the Cochin royal family."},
-      {id:"athirappilly-waterfalls",name:"Athirappilly Waterfalls",kind:"waterfall",icon:"W",x:-78,z:-36,description:"See the wide waterfall on the Chalakudy River in the forested high ranges."}
+      {id:"athirappilly-waterfalls",name:"Athirappilly Waterfalls",kind:"waterfall",icon:"W",x:-78,z:-36,description:"See the wide waterfall on the Chalakudy River in the forested high ranges."},
+      {id:"guruvayur-sree-krishna-temple",name:"Guruvayur Sree Krishna Temple",kind:"temple",icon:"T",x:64,z:-90,description:"Visit the renowned Krishna temple and the busy pilgrimage town around it."},
+      {id:"kerala-kalamandalam",name:"Kerala Kalamandalam",kind:"heritage",icon:"H",x:-64,z:-90,description:"Explore the university and performance traditions of Kerala's classical arts."}
     ]
   },
   {
@@ -166,7 +180,9 @@ const DISTRICT_CONTENT = [
       {id:"mattancherry-palace",name:"Mattancherry Palace",kind:"palace",icon:"P",x:-10,z:23,description:"Explore the palace museum and its Kerala murals in historic Mattancherry."},
       {id:"fort-kochi-waterfront",name:"Fort Kochi & Chinese Fishing Nets",kind:"waterfront",icon:"W",x:-78,z:60,description:"Walk the waterfront past the Chinese fishing nets and colonial-era streets."},
       {id:"cherai-beach",name:"Cherai Beach",kind:"beach",icon:"B",x:78,z:58,description:"Visit the sandy coast on Vypin Island, where backwaters meet the sea."},
-      {id:"kumbalangi-village",name:"Kumbalangi Tourism Village",kind:"backwater",icon:"B",x:-78,z:-65,description:"See a working fishing village among Kochi's backwaters and mangroves."}
+      {id:"kumbalangi-village",name:"Kumbalangi Tourism Village",kind:"backwater",icon:"B",x:-78,z:-65,description:"See a working fishing village among Kochi's backwaters and mangroves."},
+      {id:"bolgatty-palace",name:"Bolgatty Palace",kind:"palace",icon:"P",x:64,z:-90,description:"Visit the historic island palace beside Kochi's harbour and backwaters."},
+      {id:"hill-palace-museum",name:"Hill Palace Museum",kind:"museum",icon:"M",x:-64,z:-90,description:"Explore the former Cochin royal residence and its museum grounds at Tripunithura."}
     ]
   },
   {
@@ -186,7 +202,9 @@ const DISTRICT_CONTENT = [
       {id:"idukki-arch-dam",name:"Idukki Arch Dam",kind:"dam",icon:"D",x:50,z:45,description:"View the arch dam set between the Kuravan and Kurathi hills."},
       {id:"munnar-tea-gardens",name:"Munnar Tea Gardens",kind:"tea",icon:"H",x:-78,z:42,description:"Drive among the rolling tea slopes and plantation roads around Munnar."},
       {id:"eravikulam-national-park",name:"Eravikulam National Park",kind:"sanctuary",icon:"W",x:72,z:12,description:"Explore high-altitude grasslands and shola forest near Rajamalai."},
-      {id:"periyar-lake",name:"Periyar Lake & Tiger Reserve",kind:"lake",icon:"L",x:-78,z:-36,description:"See the forest reservoir and wildlife landscape around Thekkady."}
+      {id:"periyar-lake",name:"Periyar Lake & Tiger Reserve",kind:"lake",icon:"L",x:-78,z:-36,description:"See the forest reservoir and wildlife landscape around Thekkady."},
+      {id:"kuttikkanam-adventure-zone",name:"Kuttikkanam Adventure Zone",kind:"adventure",icon:"A",x:64,z:-90,description:"Try a supervised high-range adventure course with rope elements and trail views."},
+      {id:"ramakkalmedu",name:"Ramakkalmedu Viewpoint",kind:"peak",icon:"H",x:-64,z:-90,description:"Take in the wind-swept hilltop and long views across the Western Ghats."}
     ]
   },
   {
@@ -206,7 +224,9 @@ const DISTRICT_CONTENT = [
       {id:"alappuzha-backwaters",name:"Alappuzha Backwaters",kind:"backwater",icon:"B",x:50,z:45,description:"Follow the canal-side routes through the town's backwater network."},
       {id:"kuttanad-polders",name:"Kuttanad Rice Fields",kind:"ricefield",icon:"R",x:-78,z:42,description:"See low-lying paddy fields and canals in Kerala's rice-bowl region."},
       {id:"punnamada-lake",name:"Punnamada Lake",kind:"lake",icon:"L",x:72,z:12,description:"Visit the lake where the Nehru Trophy Snake Boat Race takes place."},
-      {id:"ambalappuzha-temple",name:"Ambalappuzha Sri Krishna Temple",kind:"temple",icon:"T",x:-78,z:-36,description:"Explore the historic temple known for its Kerala-style architecture and payasam."}
+      {id:"ambalappuzha-temple",name:"Ambalappuzha Sri Krishna Temple",kind:"temple",icon:"T",x:-78,z:-36,description:"Explore the historic temple known for its Kerala-style architecture and payasam."},
+      {id:"marari-beach",name:"Marari Beach",kind:"beach",icon:"B",x:64,z:-90,description:"Walk a quiet sandy shoreline backed by palms and fishing villages."},
+      {id:"pathiramanal-island",name:"Pathiramanal Island",kind:"forest",icon:"W",x:-64,z:-90,description:"Explore the small Vembanad island known for its wetland and birdlife."}
     ]
   },
   {
@@ -226,7 +246,9 @@ const DISTRICT_CONTENT = [
       {id:"kumarakom-bird-sanctuary",name:"Kumarakom Bird Sanctuary",kind:"sanctuary",icon:"W",x:-72,z:42,description:"Walk the wooded shore path beside Vembanad Lake and its bird habitat."},
       {id:"vaikom-mahadeva-temple",name:"Vaikom Mahadeva Temple",kind:"temple",icon:"T",x:72,z:12,description:"Visit one of Kerala's historic Shiva temples and its town surroundings."},
       {id:"illikkal-kallu",name:"Illikkal Kallu",kind:"peak",icon:"H",x:-72,z:-36,description:"Travel into the highland landscape for the rocky Illikkal Kallu viewpoint."},
-      {id:"thirunakkara-temple",name:"Thirunakkara Mahadeva Temple",kind:"temple",icon:"T",x:50,z:45,description:"Explore the central Kottayam temple and its murals and festival setting."}
+      {id:"thirunakkara-temple",name:"Thirunakkara Mahadeva Temple",kind:"temple",icon:"T",x:50,z:45,description:"Explore the central Kottayam temple and its murals and festival setting."},
+      {id:"marmala-waterfalls",name:"Marmala Waterfalls",kind:"waterfall",icon:"W",x:64,z:-90,description:"Follow the forest trail to the cascade and rocky pool near Erattupetta."},
+      {id:"poonjar-palace",name:"Poonjar Palace",kind:"palace",icon:"P",x:-64,z:-90,description:"See the traditional palace and heritage collections at the foothills."}
     ]
   },
   {
@@ -246,7 +268,9 @@ const DISTRICT_CONTENT = [
       {id:"konni-elephant-training-centre",name:"Konni Elephant Training Centre",kind:"sanctuary",icon:"W",x:50,z:45,description:"Visit the forest-edge elephant heritage centre near Konni."},
       {id:"aranmula-temple",name:"Aranmula Parthasarathy Temple",kind:"temple",icon:"T",x:-78,z:42,description:"Explore the river-side temple connected with Aranmula's boat-race tradition."},
       {id:"gavi-eco-tourism",name:"Gavi Eco-tourism",kind:"forest",icon:"W",x:72,z:12,description:"Travel into the forest landscape of Gavi in the Western Ghats."},
-      {id:"perunthenaruvi-falls",name:"Perunthenaruvi Falls",kind:"waterfall",icon:"W",x:-78,z:-36,description:"Follow the forest road to the waterfall on the Pamba River."}
+      {id:"perunthenaruvi-falls",name:"Perunthenaruvi Falls",kind:"waterfall",icon:"W",x:-78,z:-36,description:"Follow the forest road to the waterfall on the Pamba River."},
+      {id:"sabarimala-sannidhanam",name:"Sabarimala Sannidhanam",kind:"temple",icon:"T",x:64,z:-90,description:"Visit the hill shrine setting reached by the seasonal forest pilgrimage route."},
+      {id:"pandalam-palace",name:"Pandalam Palace",kind:"palace",icon:"P",x:-64,z:-90,description:"Explore the palace heritage associated with the Sabarimala pilgrimage tradition."}
     ]
   },
   {
@@ -266,7 +290,9 @@ const DISTRICT_CONTENT = [
       {id:"ashtamudi-lake",name:"Ashtamudi Lake",kind:"backwater",icon:"L",x:50,z:45,description:"Follow the broad lake and its palm-lined waterways near Kollam."},
       {id:"munroe-island",name:"Munroe Island",kind:"backwater",icon:"B",x:-78,z:42,description:"Explore the narrow canals and village islands where Ashtamudi meets the Kallada River."},
       {id:"thangassery-lighthouse",name:"Thangassery Lighthouse",kind:"lighthouse",icon:"L",x:72,z:12,description:"See the coastal lighthouse and historic harbour-side neighbourhood."},
-      {id:"jatayu-earth-centre",name:"Jatayu Earth's Center",kind:"hill",icon:"H",x:-78,z:-36,description:"Reach the hilltop landscape and sculpture park at Chadayamangalam."}
+      {id:"jatayu-earth-centre",name:"Jatayu Earth's Center",kind:"hill",icon:"H",x:-78,z:-36,description:"Reach the hilltop landscape and sculpture park at Chadayamangalam."},
+      {id:"palaruvi-waterfalls",name:"Palaruvi Waterfalls",kind:"waterfall",icon:"W",x:64,z:-90,description:"Walk through the forested Aryankavu hills to the high cascade and pool."},
+      {id:"thenmala-ecotourism",name:"Thenmala Ecotourism",kind:"forest",icon:"W",x:-64,z:-90,description:"Explore the forest paths and reservoir-side ecotourism area at Thenmala."}
     ]
   },
   {
@@ -286,7 +312,9 @@ const DISTRICT_CONTENT = [
       {id:"padmanabhaswamy-temple",name:"Sree Padmanabhaswamy Temple",kind:"temple",icon:"T",x:50,z:45,description:"Visit the historic temple at the heart of the old Travancore capital."},
       {id:"kovalam-beach",name:"Kovalam Beach",kind:"beach",icon:"B",x:-78,z:42,description:"Explore the crescent bays and lighthouse headland south of the city."},
       {id:"napier-museum",name:"Napier Museum",kind:"museum",icon:"M",x:72,z:12,description:"See the museum's distinctive Indo-Saracenic architecture and collections."},
-      {id:"varkala-cliff",name:"Varkala Cliff",kind:"coast",icon:"C",x:-78,z:-36,description:"Walk the laterite cliff above the Arabian Sea at Varkala."}
+      {id:"varkala-cliff",name:"Varkala Cliff",kind:"coast",icon:"C",x:-78,z:-36,description:"Walk the laterite cliff above the Arabian Sea at Varkala."},
+      {id:"ponmudi-hill-station",name:"Ponmudi Hill Station",kind:"peak",icon:"H",x:64,z:-90,description:"Follow the winding hill road to forested viewpoints in the Western Ghats."},
+      {id:"neyyar-dam-wildlife-sanctuary",name:"Neyyar Dam & Wildlife Sanctuary",kind:"dam",icon:"D",x:-64,z:-90,description:"See the reservoir at the edge of the sanctuary and its surrounding hills."}
     ]
   }
 ];
@@ -303,5 +331,4 @@ export const KERALA_DISTRICT_ATLAS = Object.freeze(Object.fromEntries(DISTRICT_C
     attractions
   })];
 })));
-
 

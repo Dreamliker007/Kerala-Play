@@ -8,20 +8,22 @@ const wait = milliseconds => new Promise(resolve => setTimeout(resolve, millisec
 const productionWakeUrl = localHostnames.has(location.hostname) ? '' : 'https://kerala-play-1.onrender.com/api/session';
 const SUPABASE_PROJECT_URL = 'https://rxywllmflxuovhlbkext.supabase.co';
 
-function socialRedirectUrl(provider) {
+function socialRedirectUrl(provider, district = 'Kottayam', mode = 'login') {
   const url = new URL(location.href);
   url.search = '';
   url.hash = '';
   url.searchParams.set('kp_oauth', provider);
+  url.searchParams.set('kp_district', district);
+  url.searchParams.set('kp_auth_mode', mode);
   return url.toString();
 }
 
-function beginProviderSignIn(provider) {
+function beginProviderSignIn(provider, district = 'Kottayam', mode = 'login') {
   if (!['google', 'facebook'].includes(provider)) return;
   wakeProductionBackend();
   const authorize = new URL('/auth/v1/authorize', SUPABASE_PROJECT_URL);
   authorize.searchParams.set('provider', provider);
-  authorize.searchParams.set('redirect_to', socialRedirectUrl(provider));
+  authorize.searchParams.set('redirect_to', socialRedirectUrl(provider, district, mode));
   location.assign(authorize.toString());
 }
 
@@ -505,15 +507,17 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const signupEmail = input('email', { placeholder: 'Email (optional)', autocomplete: 'email' });
   const signupMobile = input('tel', { placeholder: 'Mobile (optional)', autocomplete: 'tel' });
   signupContact.append(field('Email', signupEmail), field('Mobile', signupMobile));
-  const signupDistrict = select(districts, 'Ernakulam');
+  const signupDistrict = select(districts, 'Kottayam');
   const signupGender = select([['male', 'Male'], ['female', 'Female'], ['other', 'Other']], 'male');
-  signupFields.append(field('District', signupDistrict), field('Avatar', signupGender));
+  const districtField = field('Home district · first entry', signupDistrict);
+  const signupAvatarField = field('Avatar', signupGender);
+  signupFields.append(districtField, signupAvatarField);
   const authSubmit = node('button', 'social-button primary', 'Log in');
   authSubmit.type = 'submit';
   const providerDivider = node('div', 'auth-provider-divider', 'or continue with');
   const providerRow = node('div', 'auth-provider-row');
-  const googleAuth = button('Google', () => beginProviderSignIn('google'), 'auth-provider google');
-  const facebookAuth = button('Facebook', () => beginProviderSignIn('facebook'), 'auth-provider facebook');
+  const googleAuth = button('Google', () => beginProviderSignIn('google', signupDistrict.value, authMode), 'auth-provider google');
+  const facebookAuth = button('Facebook', () => beginProviderSignIn('facebook', signupDistrict.value, authMode), 'auth-provider facebook');
   googleAuth.type = 'button';
   facebookAuth.type = 'button';
   googleAuth.setAttribute('aria-label', 'Continue with Google');
@@ -596,7 +600,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     resetForm.hidden = true;
     authTabs.hidden = false;
     authForm.hidden = false;
-    signupFields.hidden = mode !== 'signup';
+    signupFields.hidden = false;
+    signupAvatarField.hidden = mode !== 'signup';
+    districtField.querySelector('span').textContent = mode === 'signup' ? 'Home district · first entry' : 'Enter and own district';
     signupContact.hidden = mode !== 'signup';
     firstName.parentElement.hidden = mode !== 'signup';
     firstName.required = mode === 'signup';
@@ -619,6 +625,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
     const provider = String(query.get('kp_oauth') || '').toLowerCase();
     if (!provider) return false;
+    const selectedDistrict = query.get('kp_district') || 'Kottayam';
+    const returnMode = query.get('kp_auth_mode') === 'signup' ? 'signup' : 'login';
+    if (districts.includes(selectedDistrict)) signupDistrict.value = selectedDistrict;
 
     const errorMessage = hash.get('error_description') || hash.get('error') || query.get('error_description') || query.get('error');
     const accessToken = hash.get('access_token');
@@ -626,20 +635,20 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     history.replaceState({}, document.title, cleanUrl);
 
     if (errorMessage) {
-      renderAuth('login', decodeURIComponent(errorMessage.replace(/\+/g, ' ')));
+      renderAuth(returnMode, decodeURIComponent(errorMessage.replace(/\+/g, ' ')));
       return true;
     }
     if (!accessToken) {
-      renderAuth('login', 'Social sign in did not return a valid session. Please try again.');
+      renderAuth(returnMode, 'Social sign in did not return a valid session. Please try again.');
       return true;
     }
 
     try {
       wakeProductionBackend();
-      const result = await api('/api/auth/oauth', { provider, accessToken });
+      const result = await api('/api/auth/oauth', { provider, accessToken, district: selectedDistrict });
       await beginSession(result.user, !!result.created);
     } catch (error) {
-      renderAuth('login', error?.message || 'Social sign in failed.');
+      renderAuth(returnMode, error?.message || 'Social sign in failed.');
     }
     return true;
   }
@@ -703,7 +712,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     wakeProductionBackend();
     if (authMode === 'login') await wait(1600);
     await run(async () => {
-      const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, ...(authMode === 'signup' ? { email: signupEmail.value, mobile: signupMobile.value, district: signupDistrict.value, gender: signupGender.value } : {}) });
+      const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, district: signupDistrict.value, ...(authMode === 'signup' ? { email: signupEmail.value, mobile: signupMobile.value, gender: signupGender.value } : {}) });
       password.value = '';
       await beginSession(result.user, authMode === 'signup');
     }, authError);
