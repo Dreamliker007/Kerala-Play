@@ -471,6 +471,98 @@ test('Kerala Cash wallet uses server prices, prevents replay/overspend, keeps hi
   assert.equal((await alice('/api/jobs/starter-delivery/complete', {})).status, 409);
 });
 
+test('Anson tester account gets server-enforced free purchases, fees and post-free travel', async t => {
+  const app = await setup(t), bootstrap = app.client();
+  await signup(bootstrap, 'Anson');
+
+  const dbPath = join(app.dataDir, 'game.json');
+  const db = JSON.parse(await readFile(dbPath, 'utf8'));
+  const savedUser = db.users.find(item => String(item.username).toLowerCase() === 'anson');
+  savedUser.walletBalance = 0;
+  savedUser.districtTravelCount = 3;
+  savedUser.worldDistrict = 'Kottayam';
+  savedUser.worldX = 26;
+  savedUser.worldZ = -23;
+  savedUser.worldRotation = 0;
+  await writeFile(dbPath, JSON.stringify(db, null, 2));
+  await app.restart();
+
+  const tester = app.client();
+  const login = await tester('/api/auth/login', { identifier:'anson', password:'test-password-2026' });
+  assert.equal(login.status, 200);
+  assert.equal(login.data.user.username, 'Anson');
+
+  const shopPurchase = await tester('/api/shop/purchase', { itemId:'meal', price:1 });
+  assert.equal(shopPurchase.status, 200, JSON.stringify(shopPurchase.data));
+  assert.equal(shopPurchase.data.purchase.price, 0);
+  assert.equal(shopPurchase.data.transaction.waived, true);
+  assert.equal(shopPurchase.data.transaction.waivedAmount, 80);
+  assert.equal(shopPurchase.data.wallet.balance, 0);
+
+  const garage = await tester('/api/garage');
+  assert.ok(garage.data.catalog.every(item => item.price === 0));
+  const vehiclePurchase = await tester('/api/garage/buy', { modelId:'kerala_compact' });
+  assert.equal(vehiclePurchase.status, 201, JSON.stringify(vehiclePurchase.data));
+  assert.equal(vehiclePurchase.data.purchase.price, 0);
+  assert.equal(vehiclePurchase.data.transaction.waivedAmount, 2200);
+  const insurance = await tester('/api/garage/insurance', { vehicleId:vehiclePurchase.data.garage.owned[0].id });
+  assert.equal(insurance.status, 200);
+  assert.equal(insurance.data.insurance.cost, 0);
+  assert.equal(insurance.data.transaction.waivedAmount, 220);
+
+  const home = await tester('/api/home');
+  assert.equal(home.data.home.rent, 0);
+  assert.equal(home.data.home.utilities, 0);
+  const rent = await tester('/api/home/pay', { kind:'rent' });
+  assert.equal(rent.status, 200);
+  assert.equal(rent.data.payment.amount, 0);
+  assert.equal(rent.data.transaction.waivedAmount, 60);
+
+  const traffic = await tester('/api/traffic');
+  assert.equal(traffic.data.licence.costs.full, 0);
+  assert.equal(traffic.data.rules.speedingFine, 0);
+  await tester('/api/traffic/licence', { action:'learner' });
+  const fullLicence = await tester('/api/traffic/licence', { action:'full' });
+  assert.equal(fullLicence.status, 200);
+  assert.equal(fullLicence.data.cost, 0);
+  assert.equal(fullLicence.data.transaction.waivedAmount, 150);
+
+  const routes = await tester('/api/travel/districts');
+  assert.equal(routes.data.tripsUsed, 3);
+  assert.equal(routes.data.districts.find(item => item.district === 'Ernakulam').train.fare, 0);
+  assert.equal(routes.data.districts.find(item => item.district === 'Ernakulam').teleport.fare, 0);
+  const train = await tester('/api/travel/district/board', { mode:'train', destinationDistrict:'Ernakulam' });
+  assert.equal(train.status, 200, JSON.stringify(train.data));
+  assert.equal(train.data.travel.fare, 0);
+  assert.equal(train.data.transaction.waivedAmount, 500);
+  assert.equal(train.data.wallet.balance, 0);
+  app.advance(60_000);
+  assert.equal((await tester('/api/travel/district/status')).data.status, 'arrived');
+
+  const flightRoutes = await tester('/api/travel/districts');
+  assert.equal(flightRoutes.data.districts.find(item => item.district === 'Kannur').flight.available, true);
+  assert.equal(flightRoutes.data.districts.find(item => item.district === 'Kannur').flight.fare, 0);
+  const bus = await tester('/api/travel/bus/status?stopId=ernakulam-station-bus');
+  assert.equal(bus.status, 200);
+  assert.equal(bus.data.fare, 0);
+  const rideQuote = await tester('/api/travel/ride/quote?destinationId=district-attraction%3AErnakulam%3Amattancherry-palace');
+  assert.equal(rideQuote.status, 200);
+  assert.ok(rideQuote.data.options.filter(option => option.available).every(option => option.fare === 0));
+  const taxi = rideQuote.data.options.find(option => option.id === 'taxi' && option.available);
+  const ride = await tester('/api/travel/ride/book', { destinationId:rideQuote.data.destination.id, serviceId:taxi.id });
+  assert.equal(ride.status, 200, JSON.stringify(ride.data));
+  assert.equal(ride.data.ride.fare, 0);
+  assert.ok(ride.data.transaction.waivedAmount > 0);
+  assert.equal(ride.data.wallet.balance, 0);
+
+  const regular = app.client();
+  await signup(regular, 'RegularPlayer');
+  const regularPurchase = await regular('/api/shop/purchase', { itemId:'water' });
+  assert.equal(regularPurchase.data.purchase.price, 15);
+  assert.equal(regularPurchase.data.transaction.waived, undefined);
+  assert.equal(regularPurchase.data.wallet.balance, 485);
+});
+
 
 test('jobs require job vehicles, real world checkpoints, server salary, cooldowns and persistence', async t => {
   const app = await setup(t), alice = app.client();

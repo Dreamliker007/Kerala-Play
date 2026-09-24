@@ -417,6 +417,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function setUser(next) {
     user = next || null;
+    window.KERALA_PLAY_TESTER_FREE = String(user?.username || '').trim().toLowerCase() === 'anson';
     if ($('profile-name')) $('profile-name').textContent = user?.username || 'Sign in';
     if ($('profile-district')) $('profile-district').textContent = user?.district || 'Your Kerala adventure';
     profileChip?.setAttribute('aria-label', user ? `Open ${user.username}'s profile` : 'Sign in');
@@ -972,6 +973,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function requireUser() { if (user) return true; renderAuth(); return false; }
   function formatCash(value) { return `₹${Number(value || 0).toLocaleString('en-IN')}`; }
+  function formatPrice(value) { return window.KERALA_PLAY_TESTER_FREE ? 'FREE' : formatCash(value); }
   function renderWallet(wallet) {
     if (!wallet) return;
     if (walletBalance) walletBalance.textContent = formatCash(wallet.balance);
@@ -986,7 +988,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       for (const transaction of transactions) {
         const row = node('div', `wallet-transaction ${transaction.type === 'debit' ? 'debit' : 'credit'}`);
         const title = node('strong', '', transaction.description || transaction.kind || 'Transaction');
-        const amount = node('b', '', `${transaction.type === 'debit' ? '−' : '+'}${formatCash(transaction.amount)}`);
+        const amount = node('b', '', transaction.waived ? `FREE · ${formatCash(transaction.waivedAmount)} waived` : `${transaction.type === 'debit' ? '−' : '+'}${formatCash(transaction.amount)}`);
         const created = new Date(transaction.createdAt);
         const detail = node('small', '', `${Number.isNaN(created.getTime()) ? '' : created.toLocaleString()} · Balance ${formatCash(transaction.balanceAfter)}`);
         row.append(title, amount, detail); walletTransactions.append(row);
@@ -1273,8 +1275,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       button.type = 'button';
       button.dataset.worldShopItem = itemId;
       const suggested = itemId === worldShopContext.suggestedItemId;
-      button.innerHTML = `${item.icon} ${item.name} · ${formatCash(item.price)}<small>${item.effect}${suggested ? ' · Suggested for you' : ''}</small>`;
-      if (suggested) button.setAttribute('aria-label', `${item.name}, suggested, ${formatCash(item.price)}`);
+      button.innerHTML = `${item.icon} ${item.name} · ${formatPrice(item.price)}<small>${item.effect}${suggested ? ' · Suggested for you' : ''}</small>`;
+      if (suggested) button.setAttribute('aria-label', `${item.name}, suggested, ${formatPrice(item.price)}`);
       worldShopItems.append(button);
     }
     showPanel(worldShopPanel);
@@ -1299,15 +1301,15 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       if (status) status.textContent = summary.reminder || 'Home payments are up to date.';
     }
     if (homeRentStatus) {
-      homeRentStatus.textContent = `${formatCash(summary.home?.rent || 0)} · ${homeDueText(summary.rentDueAt, summary.rentOverdue)}`;
+      homeRentStatus.textContent = `${formatPrice(summary.home?.rent || 0)} · ${homeDueText(summary.rentDueAt, summary.rentOverdue)}`;
       homeRentStatus.classList.toggle('overdue', !!summary.rentOverdue);
     }
     if (homeUtilityStatus) {
-      homeUtilityStatus.textContent = `${formatCash(summary.home?.utilities || 0)} · ${homeDueText(summary.utilityDueAt, summary.utilityOverdue)}`;
+      homeUtilityStatus.textContent = `${formatPrice(summary.home?.utilities || 0)} · ${homeDueText(summary.utilityDueAt, summary.utilityOverdue)}`;
       homeUtilityStatus.classList.toggle('overdue', !!summary.utilityOverdue);
     }
-    if (homePayRent) homePayRent.textContent = `Pay Rent · ${formatCash(summary.home?.rent || 0)}`;
-    if (homePayUtilities) homePayUtilities.textContent = `Pay Utilities · ${formatCash(summary.home?.utilities || 0)}`;
+    if (homePayRent) homePayRent.textContent = `Pay Rent · ${formatPrice(summary.home?.rent || 0)}`;
+    if (homePayUtilities) homePayUtilities.textContent = `Pay Utilities · ${formatPrice(summary.home?.utilities || 0)}`;
     if (homeSleepNote) {
       homeSleepNote.textContent = summary.accessBlocked
         ? 'Sleep access is paused after the grace period. Pay overdue home charges to restore access.'
@@ -1424,7 +1426,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     for (const listing of listings) {
       const card = node('article', 'market-card');
       const head = node('div', 'garage-card-head');
-      head.append(node('h3', '', listing.label), node('span', 'garage-price', formatCash(listing.price)));
+      head.append(node('h3', '', listing.label), node('span', 'garage-price', formatPrice(listing.price)));
       const registration = node('span', 'garage-registration', listing.registration || 'KL');
       const info = node('p', '', `${listing.sellerName} · ${Math.round(Number(listing.condition || 0))}% condition · Fuel ${Math.round(Number(listing.fuel || 0))}%`);
       const insurance = node('p', listing.insuranceActive ? 'garage-insurance-ok' : 'garage-insurance-expired', insuranceLabel(listing));
@@ -1433,7 +1435,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       buy.type = 'button';
       buy.dataset.marketBuy = listing.vehicleId;
       buy.disabled = !!listing.ownListing;
-      buy.textContent = listing.ownListing ? 'Your listing' : `Buy used · ${formatCash(listing.price)}`;
+      buy.textContent = listing.ownListing ? 'Your listing' : `Buy used · ${formatPrice(listing.price)}`;
       actions.append(buy);
       card.append(head, registration, info, insurance, actions);
       garageMarket.append(card);
@@ -1471,14 +1473,14 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       } else {
         if (licence?.canUpgradeFull) {
           const upgrade = document.createElement('button');
-          upgrade.type = 'button'; upgrade.dataset.licenceAction = 'full'; upgrade.textContent = `Upgrade Full · ${formatCash(licence.costs?.full || 0)}`;
+          upgrade.type = 'button'; upgrade.dataset.licenceAction = 'full'; upgrade.textContent = `Upgrade Full · ${formatPrice(licence.costs?.full || 0)}`;
           licenceActions.append(upgrade);
         }
         if (licence?.canRenew) {
           const renew = document.createElement('button');
           renew.type = 'button'; renew.dataset.licenceAction = 'renew';
           const renewalCost = licence.type === 'full' ? licence.costs?.renew_full : licence.costs?.renew_learner;
-          renew.textContent = `Renew ${licence.type === 'full' ? 'Full' : 'Learner'} · ${formatCash(renewalCost || 0)}`;
+          renew.textContent = `Renew ${licence.type === 'full' ? 'Full' : 'Learner'} · ${formatPrice(renewalCost || 0)}`;
           licenceActions.append(renew);
         }
       }
@@ -1505,14 +1507,14 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       for (const challan of challans.slice(0, 20)) {
         const card = node('article', `traffic-challan-card ${challan.paid ? 'paid' : 'unpaid'}`);
         const row = node('div', 'traffic-challan-row');
-        row.append(node('strong', '', challan.description || 'Traffic challan'), node('span', 'garage-price', formatCash(challan.amount)));
+        row.append(node('strong', '', challan.description || 'Traffic challan'), node('span', 'garage-price', formatPrice(challan.amount)));
         const detail = node('p', '', `${challan.registration || ''} · ${challan.paid ? 'Paid' : 'Unpaid'} · ${new Date(Number(challan.createdAt)).toLocaleString()}`);
         card.append(row, detail);
         if (!challan.paid) {
           const pay = document.createElement('button');
           pay.type = 'button';
           pay.dataset.payChallan = challan.id;
-          pay.textContent = `Pay challan · ${formatCash(challan.amount)}`;
+          pay.textContent = `Pay challan · ${formatPrice(challan.amount)}`;
           card.append(pay);
         }
         trafficChallans.append(card);
@@ -1585,7 +1587,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         }
 
         const ownershipActions = node('div', 'garage-actions');
-        const insurance = button(`Renew insurance · ${formatCash(vehicle.insuranceRenewalCost)}`, async () => {}, 'secondary');
+        const insurance = button(`Renew insurance · ${formatPrice(vehicle.insuranceRenewalCost)}`, async () => {}, 'secondary');
         insurance.dataset.insuranceVehicle = vehicle.id;
         ownershipActions.append(insurance);
         if (!vehicle.forSale) {
@@ -1607,13 +1609,13 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       for (const model of catalog) {
         const card = node('article', 'garage-card');
         const head = node('div', 'garage-card-head');
-        head.append(node('h3', '', model.label), node('span', 'garage-price', formatCash(model.price)));
+        head.append(node('h3', '', model.label), node('span', 'garage-price', formatPrice(model.price)));
         const description = node('p', '', model.description || '');
         const buy = document.createElement('button');
         buy.type = 'button';
         buy.dataset.buyModel = model.id;
         buy.disabled = !!model.owned;
-        buy.textContent = model.owned ? 'Already owned' : `Buy new · ${formatCash(model.price)}`;
+        buy.textContent = model.owned ? 'Already owned' : `Buy new · ${formatPrice(model.price)}`;
         card.append(head, description, buy);
         garageCatalog.append(card);
       }
@@ -1764,8 +1766,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     renderWallet(result.wallet);
     const service = result.service;
     toast(action === 'refuel'
-      ? `Fuel tank full · ${formatCash(service.cost)} paid`
-      : `Vehicle repaired · condition 100% · ${formatCash(service.cost)} paid`);
+      ? `Fuel tank full · ${formatPrice(service.cost)} paid`
+      : `Vehicle repaired · condition 100% · ${formatPrice(service.cost)} paid`);
   }
   window.addEventListener('kerala-vehicle-service', event => run(() => performVehicleService(event.detail?.action, event.detail?.source || 'job')));
 
@@ -2598,7 +2600,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const result = await api('/api/home/pay', { kind, amount: 1 });
       renderHome(result.home);
       renderWallet(result.wallet);
-      toast(`${kind === 'rent' ? 'Home rent' : 'Electricity + water'} paid · ${formatCash(result.payment.amount)}`);
+      toast(`${kind === 'rent' ? 'Home rent' : 'Electricity + water'} paid · ${formatPrice(result.payment.amount)}`);
     }, homeError).finally(() => { if (button) button.disabled = false; });
   };
   homePayRent?.addEventListener('click', () => payHomeCharge(homePayRent, 'rent'));
@@ -2675,7 +2677,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       if (result.needs) renderNeeds(result.needs);
       const effects = result.purchase?.needs || {};
       const restored = [effects.hunger ? `Hunger +${effects.hunger}` : '', effects.thirst ? `Thirst +${effects.thirst}` : '', effects.energy ? `Energy +${effects.energy}` : ''].filter(Boolean).join(' · ');
-      toast(`${result.purchase.name} · ${formatCash(result.purchase.price)}${restored ? ` · ${restored}` : ''}`);
+      toast(`${result.purchase.name} · ${formatPrice(result.purchase.price)}${restored ? ` · ${restored}` : ''}`);
     }, walletError).finally(() => { purchaseButton.disabled = false; });
   });
   garageCatalog?.addEventListener('click', event => {
@@ -2686,7 +2688,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const result = await api('/api/garage/buy', { modelId: buy.dataset.buyModel });
       renderGarage(result.garage);
       renderWallet(result.wallet);
-      toast(`${result.purchase.label} purchased · ${formatCash(result.purchase.price)}`);
+      toast(`${result.purchase.label} purchased · ${formatPrice(result.purchase.price)}`);
     }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshGarage, garageError); });
   });
   garageList?.addEventListener('click', event => {
@@ -2712,7 +2714,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         const result = await api('/api/garage/insurance', { vehicleId: insuranceButton.dataset.insuranceVehicle });
         renderGarage(result.garage);
         renderWallet(result.wallet);
-        toast(`Insurance renewed · ${formatCash(result.insurance.cost)}`);
+        toast(`Insurance renewed · ${formatPrice(result.insurance.cost)}`);
         await refreshGarage();
       }, garageError);
       return;
@@ -2739,8 +2741,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       renderWallet(result.wallet);
       const action = actionButton.dataset.licenceAction;
       if (action === 'learner') toast('Starter Learner Permit issued · bike class active');
-      else if (action === 'full') toast(`Full Licence issued · ${formatCash(result.cost)} paid`);
-      else toast(`Driving licence renewed · ${formatCash(result.cost)} paid`);
+      else if (action === 'full') toast(`Full Licence issued · ${formatPrice(result.cost)} paid`);
+      else toast(`Driving licence renewed · ${formatPrice(result.cost)} paid`);
     }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshTraffic, garageError); });
   });
 
@@ -2752,7 +2754,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const result = await api('/api/traffic/challan/pay', { challanId: pay.dataset.payChallan });
       renderTraffic(result.traffic);
       renderWallet(result.wallet);
-      toast(`Traffic challan paid · ${formatCash(result.transaction.amount)}`);
+      toast(`Traffic challan paid · ${formatPrice(result.transaction.amount)}`);
     }, garageError);
   });
 
@@ -2766,7 +2768,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       const kind = inspection.challan?.kind;
       const label = kind === 'licence_invalid' ? 'Driving licence invalid' : 'Insurance expired';
       toast(inspection.challanCreated
-        ? `${label} · in-game challan ${formatCash(inspection.challan.amount)} issued`
+        ? `${label} · in-game challan ${formatPrice(inspection.challan.amount)} issued`
         : `${label} · unpaid challan already exists`);
     }
   }, garageError));
@@ -2789,7 +2791,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     const timing = status.boarding
       ? `BOARDING NOW · ${status.boardingSecondsRemaining}s left`
       : `next bus in ${status.secondsToArrival}s`;
-    toast(`${status.routeLabel} · ${status.stop.label} → ${status.destination.label} · ${timing} · fare ${formatCash(status.fare)}`, 4200);
+    toast(`${status.routeLabel} · ${status.stop.label} → ${status.destination.label} · ${timing} · fare ${formatPrice(status.fare)}`, 4200);
   }, walletError));
 
   window.addEventListener('kerala-bus-board', event => run(async () => {
@@ -2800,7 +2802,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (result.user) setUser(result.user);
     window.dispatchEvent(new CustomEvent('kerala-bus-status', { detail: null }));
     window.dispatchEvent(new CustomEvent('kerala-public-travel-arrival', { detail: result.travel || null }));
-    toast(`${result.travel?.routeLabel || 'Village Line'} · arrived at ${result.travel?.to?.label || 'destination'} · ticket ${formatCash(result.travel?.fare || 0)}`, 4200);
+    toast(`${result.travel?.routeLabel || 'Village Line'} · arrived at ${result.travel?.to?.label || 'destination'} · ticket ${formatPrice(result.travel?.fare || 0)}`, 4200);
   }, walletError));
 
   window.addEventListener('kerala-train-board', event => run(async () => {
@@ -2810,14 +2812,14 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (result.wallet) renderWallet(result.wallet);
     if (result.user) setUser(result.user);
     window.dispatchEvent(new CustomEvent('kerala-district-journey', { detail: { travel: result.travel || null } }));
-    toast(`${result.travel?.routeLabel || 'District Train'} · departing for ${result.travel?.to?.label || 'destination'} · ${result.travel?.fare ? `ticket ${formatCash(result.travel.fare)}` : 'first trips free'}`, 4400);
+    toast(`${result.travel?.routeLabel || 'District Train'} · departing for ${result.travel?.to?.label || 'destination'} · ${result.travel?.fare ? `ticket ${formatPrice(result.travel.fare)}` : (window.KERALA_PLAY_TESTER_FREE ? 'FREE' : 'first trips free')}`, 4400);
   }, walletError));
 
   window.addEventListener('kerala-public-ride-complete', event => {
     const result = event.detail || null;
     if (result?.wallet) renderWallet(result.wallet);
     if (result?.ride) {
-      toast(`${result.ride.serviceLabel || 'Ride'} · arrived at ${result.ride.to?.label || 'destination'} · fare ${formatCash(result.ride.fare || 0)}`, 4200);
+      toast(`${result.ride.serviceLabel || 'Ride'} · arrived at ${result.ride.to?.label || 'destination'} · fare ${formatPrice(result.ride.fare || 0)}`, 4200);
     }
   });
 
@@ -2919,7 +2921,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         effects.thirst ? `Thirst +${effects.thirst}` : '',
         effects.energy ? `Energy +${effects.energy}` : '',
       ].filter(Boolean).join(' · ');
-      toast(`${result.shop?.label || worldShopContext.label} · ${result.purchase?.name || 'Purchase'} · ${formatCash(result.purchase?.price || 0)}${restored ? ` · ${restored}` : ''}`);
+      toast(`${result.shop?.label || worldShopContext.label} · ${result.purchase?.name || 'Purchase'} · ${formatPrice(result.purchase?.price || 0)}${restored ? ` · ${restored}` : ''}`);
       if (worldShopNote) worldShopNote.textContent = `Purchase complete · ${lifeLoopSuggestion()}`;
     }, worldShopError).finally(() => {
       if (button.isConnected) button.disabled = false;
@@ -2936,7 +2938,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       renderGarage(result.garage);
       renderUsedMarket(result.market);
       renderWallet(result.wallet);
-      toast(`${result.purchase.label} transferred · ${result.purchase.registration} · ${formatCash(result.purchase.price)}`);
+      toast(`${result.purchase.label} transferred · ${result.purchase.registration} · ${formatPrice(result.purchase.price)}`);
     }, garageError).finally(() => { if (garagePanel?.classList.contains('open')) run(refreshGarage, garageError); });
   });
 

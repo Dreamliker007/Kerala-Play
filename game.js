@@ -1,9 +1,9 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=114.0';
-import { createAtmosphere } from './environment.js?v=114.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
-import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, segmentIntersectsColliders } from './collision-geometry.js?v=114.0';
-import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=114.0';
+import { initSocial, api } from './social.js?v=115.0';
+import { createAtmosphere } from './environment.js?v=115.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=115.0';
+import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, segmentIntersectsColliders } from './collision-geometry.js?v=115.0';
+import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=115.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -1925,7 +1925,7 @@ function performWorldActivity(activityId) {
     if (spot.service === 'clinic') {
       api('/api/needs/clinic', { clinicId: spot.clinicId || 'community-clinic' }).then(result => {
         if (result?.needs) applyNeedsState(result.needs, { warn: false });
-        showToast(`Clinic care complete · ₹${Number(result?.fee || 0)} · energy restored`, 3600);
+        showToast(`Clinic care complete · ${window.KERALA_PLAY_TESTER_FREE ? 'FREE' : `₹${Number(result?.fee || 0)}`} · energy restored`, 3600);
       }).catch(error => showToast(error.message || 'Clinic care unavailable', 3600));
       return;
     }
@@ -1984,7 +1984,7 @@ function renderDistrictTravelDestinations() {
     button.dataset.district = item.district;
     button.classList.toggle('selected', districtTravelSelected === item.district);
     const fare = Number((item[districtTravelMode]?.fare) || 0);
-    const fareLabel = fare === 0 ? `FREE · ${Math.max(1, districtTravelSnapshot.freeTripsRemaining || 0)} FREE LEFT` : `₹${fare}`;
+    const fareLabel = fare === 0 ? (window.KERALA_PLAY_TESTER_FREE ? 'FREE · TESTER PASS' : `FREE · ${Math.max(1, districtTravelSnapshot.freeTripsRemaining || 0)} FREE LEFT`) : `₹${fare}`;
     button.textContent = `${item.district}\n${transport}`;
     button.textContent += '\n' + fareLabel;
     button.addEventListener('click', () => {
@@ -1996,7 +1996,7 @@ function renderDistrictTravelDestinations() {
       }
       const modeName = districtTravelMode === 'flight' ? 'Flight' : districtTravelMode === 'teleport' ? 'Teleport' : 'Train';
       const checkPlace = districtTravelMode === 'flight' ? 'airport' : districtTravelMode === 'teleport' ? 'district gate' : 'railway station';
-      const price = fare === 0 ? `FREE · trip ${Number(districtTravelSnapshot.tripsUsed || 0) + 1} of 3` : `₹${fare}`;
+      const price = fare === 0 ? (window.KERALA_PLAY_TESTER_FREE ? 'FREE · tester pass' : `FREE · trip ${Number(districtTravelSnapshot.tripsUsed || 0) + 1} of 3`) : `₹${fare}`;
       if (districtTravelNote) districtTravelNote.textContent = `${current} → ${item.district} · ${modeName} ${price}. Verify your ${checkPlace} before the trip starts.`;
     });
     districtTravelDestinations.append(button);
@@ -2016,11 +2016,17 @@ async function openDistrictTravelPanel(mode = 'train') {
   if (districtTravelPanel) districtTravelPanel.classList.add('open');
   if (districtTravelHeading) districtTravelHeading.textContent = districtTravelMode === 'flight' ? 'Kerala Airport' : districtTravelMode === 'teleport' ? 'District Teleport Gate' : 'Kerala Railway';
   if (districtTravelTitle) districtTravelTitle.textContent = `${currentWorldDistrictName()} → choose district`;
-  if (districtTravelNote) districtTravelNote.textContent = districtTravelMode === 'flight'
-    ? 'Flights connect airport districts and take 30 seconds. The first 3 district trips are free; then each flight costs ₹1,000.'
-    : districtTravelMode === 'teleport'
-      ? 'Step through the gate for an instant district transfer. The teleport animation takes about 2 seconds; the first 3 district trips are free, then it costs ₹2,000.'
-      : 'Trains connect all district stations and take 1 minute. The first 3 district trips are free; then each train costs ₹500.';
+  if (districtTravelNote) districtTravelNote.textContent = window.KERALA_PLAY_TESTER_FREE
+    ? (districtTravelMode === 'flight'
+      ? 'Flights connect airport districts and take 30 seconds. Tester account travel is free.'
+      : districtTravelMode === 'teleport'
+        ? 'Step through the gate for an instant district transfer. Tester account travel is free.'
+        : 'Trains connect all district stations and take 1 minute. Tester account travel is free.')
+    : districtTravelMode === 'flight'
+      ? 'Flights connect airport districts and take 30 seconds. The first 3 district trips are free; then each flight costs ₹1,000.'
+      : districtTravelMode === 'teleport'
+        ? 'Step through the gate for an instant district transfer. The teleport animation takes about 2 seconds; the first 3 district trips are free, then it costs ₹2,000.'
+        : 'Trains connect all district stations and take 1 minute. The first 3 district trips are free; then each train costs ₹500.';
   if (districtTravelDestinations) districtTravelDestinations.textContent = 'Loading routes…';
   if (districtTravelError) districtTravelError.textContent = '';
   if (districtTravelConfirm) districtTravelConfirm.disabled = true;
@@ -2114,8 +2120,10 @@ function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) 
   if (districtJourneyTitle) districtJourneyTitle.textContent = (flight ? 'Flight to ' : teleport ? 'Gate to ' : 'Train to ') + toDistrict;
   if (districtJourneyFrom) districtJourneyFrom.textContent = travel.from?.label || (fromDistrict + (flight ? ' Airport' : teleport ? ' Gate' : ' Station'));
   if (districtJourneyTo) districtJourneyTo.textContent = travel.to?.label || (toDistrict + (flight ? ' Airport' : teleport ? ' Gate' : ' Station'));
-  const fareLabel = fare === 0 ? `FREE · trip ${tripNumber} of 3` : `₹${fare} Kerala Cash`;
-  if (districtJourneyTicket) districtJourneyTicket.textContent = `${fareLabel} · ${freeTripsRemaining} free trip${freeTripsRemaining === 1 ? '' : 's'} left`;
+  const fareLabel = fare === 0 ? (window.KERALA_PLAY_TESTER_FREE ? 'FREE · tester pass' : `FREE · trip ${tripNumber} of 3`) : `₹${fare} Kerala Cash`;
+  if (districtJourneyTicket) districtJourneyTicket.textContent = window.KERALA_PLAY_TESTER_FREE
+    ? fareLabel
+    : `${fareLabel} · ${freeTripsRemaining} free trip${freeTripsRemaining === 1 ? '' : 's'} left`;
 
   const phases = teleport ? [
     [0, 'District gate activating…'],
@@ -2423,14 +2431,14 @@ function updateWorldInteract() {
         } else if (boarding) {
           worldInteract.dataset.mode = 'bus-board';
           worldInteract.dataset.activity = spot.id;
-          worldInteract.textContent = `BOARD BUS · ₹${Number(status.fare || 0)}`;
+          worldInteract.textContent = `BOARD BUS · ${window.KERALA_PLAY_TESTER_FREE ? 'FREE' : `₹${Number(status.fare || 0)}`}`;
           worldInteract.title = `${status.routeLabel || 'Village Line'} → ${status.destination?.label || 'next stop'} · boarding now`;
         } else if (waiting) {
           const seconds = Math.max(1, Math.ceil((arrivalAt - travelNow) / 1000));
           worldInteract.dataset.mode = 'bus-check';
           worldInteract.dataset.activity = spot.id;
           worldInteract.textContent = `WAIT BUS · ${seconds}s`;
-          worldInteract.title = `${status.routeLabel || 'Village Line'} → ${status.destination?.label || 'next stop'} · fare ₹${Number(status.fare || 0)}`;
+          worldInteract.title = `${status.routeLabel || 'Village Line'} → ${status.destination?.label || 'next stop'} · fare ${window.KERALA_PLAY_TESTER_FREE ? 'FREE' : `₹${Number(status.fare || 0)}`}`;
         } else {
           worldInteract.dataset.mode = 'world-activity';
           worldInteract.dataset.activity = spot.id;
