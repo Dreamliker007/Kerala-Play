@@ -1,9 +1,9 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=120.0';
-import { createAtmosphere } from './environment.js?v=120.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=120.0';
-import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, shortenCameraPathForColliders, clampCameraHeightToPitchRange } from './collision-geometry.js?v=120.0';
-import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=120.0';
+import { initSocial, api } from './social.js?v=121.0';
+import { createAtmosphere } from './environment.js?v=121.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=121.0';
+import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, shortenCameraPathForColliders, clampCameraHeightToPitchRange } from './collision-geometry.js?v=121.0';
+import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=121.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -3794,12 +3794,15 @@ try {
   let inputX = 0;
   let inputY = 0;
   let cameraYaw = player.rotation.y + Math.PI;
-  // Keep vertical camera drags aimed into the world, below the horizon.
-  // Allow an eye-level view while keeping the camera above the world surface.
+  // Mobile should open in a normal third-person view instead of an elevated
+  // ground-focused angle. Desktop keeps the existing framing.
   const MIN_CAMERA_PITCH = .20;
   const MAX_CAMERA_PITCH = .78;
   const MIN_CAMERA_GROUND_VIEW_DISTANCE = 2.8;
-  let cameraPitch = .42;
+  const DEFAULT_CAMERA_PITCH = runtimeIsMobile ? .22 : .42;
+  const WALK_CAMERA_DISTANCE = runtimeIsMobile ? 5.0 : 7.1;
+  const WALK_CAMERA_HEIGHT = runtimeIsMobile ? 1.28 : 1.45;
+  let cameraPitch = DEFAULT_CAMERA_PITCH;
   let runHeld = false;
   let runPointerId = null;
   let runCruiseArmed = false;
@@ -3813,6 +3816,22 @@ try {
   let walkSafeRotation = player.rotation.y;
   let walkSafeReady = !positionBlockedStatic(player.position.x, player.position.z, .48);
   let walkSafeAccumulator = 0;
+
+  function snapCameraToNormalView() {
+    cameraYaw = player.rotation.y + Math.PI;
+    cameraPitch = DEFAULT_CAMERA_PITCH;
+    const horizontal = Math.cos(cameraPitch) * WALK_CAMERA_DISTANCE;
+    cameraTarget.set(player.position.x, player.position.y + 1.18, player.position.z);
+    camera.position.set(
+      player.position.x + Math.sin(cameraYaw) * horizontal,
+      player.position.y + WALK_CAMERA_HEIGHT + Math.sin(cameraPitch) * WALK_CAMERA_DISTANCE,
+      player.position.z + Math.cos(cameraYaw) * horizontal,
+    );
+    camera.lookAt(cameraTarget);
+  }
+
+  // Set the correct framing before the splash screen reveals the 3D world.
+  snapCameraToNormalView();
 
   function clearRidePickupVisual() {
     if (!ridePickupVisual) return;
@@ -4099,7 +4118,15 @@ try {
   });
   document.addEventListener('focusin', event => { if (typingIntoField(event)) clearGameInput(); });
   window.addEventListener('blur', clearGameInput);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) clearGameInput(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      clearGameInput();
+      return;
+    }
+    // Android WebView may resume an existing page instead of reloading it.
+    // Restore the normal walking view when the app becomes visible again.
+    if (runtimeIsMobile && vehicleMode === 'walk') snapCameraToNormalView();
+  });
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -4369,7 +4396,7 @@ try {
     );
 
     const interiorCamera = vehicleMode === 'taxi' && vehicleCameraView === 'interior';
-    const baseDistance = interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : runtimeIsMobile ? 5.8 : 7.1;
+    const baseDistance = interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : WALK_CAMERA_DISTANCE;
     const distance = baseDistance
       + (drivingCamera && !interiorCamera ? driveSpeedRatio * 1.35 + cameraDriveImpulse * .72 : 0);
     const horizontal = Math.cos(cameraPitch) * distance;
@@ -4385,7 +4412,7 @@ try {
 
     cameraPosition.set(
       player.position.x + Math.sin(cameraYaw) * horizontal + cameraRightX * lateralMotion + rainShakeX,
-      player.position.y + (interiorCamera ? 1.42 : drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
+      player.position.y + (interiorCamera ? 1.42 : drivingCamera ? 1.32 : WALK_CAMERA_HEIGHT) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
       player.position.z + Math.cos(cameraYaw) * horizontal + cameraRightZ * lateralMotion
     );
 

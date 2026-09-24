@@ -1,6 +1,6 @@
 {
-  "versionCode": 20,
-  "versionName": "1.0.19",
+  "versionCode": 21,
+  "versionName": "1.0.20",
   "track": "closed-testing",
-  "notes": "V120.0 fixes the mobile camera view and loads the current game assets."
+  "notes": "V121.0 opens Android in a normal third-person camera view and restores it after app resume."
 }
