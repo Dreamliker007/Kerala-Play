@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   footprintIntersectsCollider,
   moveWithCollisionFootprint,
+  shortenCameraPathForColliders,
+  clampCameraHeightToPitchRange,
   segmentIntersectsColliders,
 } from './collision-geometry.js';
 
@@ -37,6 +39,33 @@ test('camera sweep detects a wall between safe endpoints', () => {
   const wall = { type:'box', x:0, z:0, halfWidth:.06, halfDepth:3 };
   assert.equal(segmentIntersectsColliders({ x:-2, z:0 }, { x:2, z:0 }, .3, [wall]), true);
   assert.equal(segmentIntersectsColliders({ x:-2, z:4 }, { x:2, z:4 }, .3, [wall]), false);
+});
+
+test('camera collision shortening preserves height instead of lifting every frame', () => {
+  const wall = { type:'box', x:0, z:0, halfWidth:1.2, halfDepth:1.2 };
+  const target = { x:0, y:3, z:0 };
+  const desired = { x:0, y:3.02, z:-7 };
+  const result = shortenCameraPathForColliders(
+    target,
+    desired,
+    .34,
+    [wall],
+    (x, z, radius) => footprintIntersectsCollider(x, z, radius, wall),
+  );
+  assert.equal(result.y, 3.02);
+  assert.notEqual(result.z, -7);
+});
+
+test('camera height is kept between ground-view pitch limits', () => {
+  const minPitch = .48;
+  const maxPitch = .78;
+  const minDistance = 2.8;
+  const horizontal = 6;
+  const lower = 1.2 + Math.tan(minPitch) * horizontal;
+  const upper = 1.2 + Math.tan(maxPitch) * horizontal + .35;
+  assert.equal(clampCameraHeightToPitchRange(-100, 1.2, horizontal, minPitch, maxPitch, minDistance), lower);
+  assert.equal(clampCameraHeightToPitchRange(1000, 1.2, horizontal, minPitch, maxPitch, minDistance), upper);
+  assert.equal(clampCameraHeightToPitchRange(lower + .2, 1.2, horizontal, minPitch, maxPitch, minDistance), lower + .2);
 });
 
 test('circle obstacles account for the full vehicle footprint', () => {

@@ -1,9 +1,9 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=118.0';
-import { createAtmosphere } from './environment.js?v=118.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=118.0';
-import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, segmentIntersectsColliders } from './collision-geometry.js?v=118.0';
-import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=118.0';
+import { initSocial, api } from './social.js?v=119.0';
+import { createAtmosphere } from './environment.js?v=119.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=119.0';
+import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, shortenCameraPathForColliders, clampCameraHeightToPitchRange } from './collision-geometry.js?v=119.0';
+import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=119.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -4407,9 +4407,14 @@ try {
         cameraNextPosition.x - cameraTarget.x,
         cameraNextPosition.z - cameraTarget.z,
       );
-      const minimumGroundViewHeight = cameraTarget.y
-        + Math.tan(MIN_CAMERA_PITCH) * Math.max(MIN_CAMERA_GROUND_VIEW_DISTANCE, horizontalAimDistance);
-      cameraNextPosition.y = Math.max(cameraNextPosition.y, minimumGroundViewHeight);
+      cameraNextPosition.y = clampCameraHeightToPitchRange(
+        cameraNextPosition.y,
+        cameraTarget.y,
+        horizontalAimDistance,
+        MIN_CAMERA_PITCH,
+        MAX_CAMERA_PITCH,
+        MIN_CAMERA_GROUND_VIEW_DISTANCE,
+      );
     }
     camera.position.copy(cameraNextPosition);
     camera.lookAt(cameraTarget);
@@ -5147,27 +5152,14 @@ function positionBlocked(x, z, playerFootprint = .45) {
 }
 
 function resolveCameraCollision(target, desired, clearance = .34) {
-  const dx = desired.x - target.x;
-  const dz = desired.z - target.z;
-  const horizontalDistance = Math.hypot(dx, dz);
-  if (horizontalDistance < .05) return desired;
-  if (!segmentIntersectsColliders(target, desired, clearance, staticColliders, .28)) return desired;
-  const steps = Math.max(8, Math.ceil(horizontalDistance / .28));
-  let safeT = 0;
-  for (let step = 1; step <= steps; step++) {
-    const t = step / steps;
-    const x = target.x + dx * t;
-    const z = target.z + dz * t;
-    if (positionBlockedStatic(x, z, clearance)) break;
-    safeT = t;
-  }
-  if (safeT >= .999) return desired;
-  const minT = Math.min(.12, .48 / Math.max(.48, horizontalDistance));
-  const t = safeT > minT ? safeT - .035 : Math.max(0, safeT * .72);
-  desired.x = target.x + dx * t;
-  desired.z = target.z + dz * t;
-  desired.y = THREE.MathUtils.lerp(target.y + .12, desired.y, t);
-  return desired;
+  return shortenCameraPathForColliders(
+    target,
+    desired,
+    clearance,
+    staticColliders,
+    (x, z, radius) => positionBlockedStatic(x, z, radius),
+    .28,
+  );
 }
 
 function moveWithCollision(object, dx, dz, footprint) {
