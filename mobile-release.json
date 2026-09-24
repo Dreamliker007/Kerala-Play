@@ -1,6 +1,6 @@
 {
-  "versionCode": 15,
-  "versionName": "1.0.14",
+  "versionCode": 16,
+  "versionName": "1.0.15",
   "track": "closed-testing",
-  "notes": "V115.0 adds free tester access for Anson across Kerala Play purchases, travel, bills, licences, and vehicle services"
+  "notes": "V116.0 fixes the sky camera jump, clarifies signup email recovery, and keeps login in the avatar's home district"
 }
