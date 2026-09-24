@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "1.0.10",
+  "versionCode": 12,
+  "versionName": "1.0.11",
   "track": "closed-testing",
-  "notes": "V111.0 adds a visible passenger train at railway stations, quoted district ticket fares, boarding checks, and a Kottayam–Ernakulam train journey sequence"
+  "notes": "V112.0 adds detailed district airport terminals, runway apron and aircraft visuals, flight boarding and arrival sequencing, and validated airport-to-airport flight routes"
 }

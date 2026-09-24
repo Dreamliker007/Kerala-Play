@@ -101,13 +101,30 @@
     .journey-coach { position:relative; width:47px; height:23px; border-top:4px solid #24647b; border-radius:4px 4px 2px 2px; background:#e5e8dc; }
     .journey-coach::before { content:''; position:absolute; top:4px; left:6px; width:8px; height:7px; background:#34505a; box-shadow:12px 0 #34505a,24px 0 #34505a; }
     .journey-wheel { position:absolute; bottom:-4px; left:8px; width:8px; height:8px; border:2px solid #c9c3aa; border-radius:50%; background:#30383a; box-shadow:25px 0 #30383a; }
+    .journey-flight-sky { display:none; position:absolute; inset:0; overflow:hidden; background:linear-gradient(#397fa4 0%,#92c6cf 55%,#d7dfc9 100%); }
+    .journey-flight-cloud { position:absolute; bottom:20px; left:15%; width:68px; height:18px; border-radius:99px; background:rgba(255,255,255,.87); animation:journey-cloud-drift 7.8s linear infinite; }
+    .journey-flight-cloud::before,.journey-flight-cloud::after { content:''; position:absolute; bottom:6px; border-radius:50%; background:inherit; }
+    .journey-flight-cloud::before { left:12px; width:27px; height:27px; }
+    .journey-flight-cloud::after { left:34px; width:20px; height:20px; }
+    .journey-flight-cloud.two { bottom:55px; left:67%; width:55px; height:14px; opacity:.7; animation-delay:-3.4s; }
+    .journey-flight-plane { position:absolute; z-index:2; left:-58px; bottom:14px; color:#f4f0dc; font:900 44px/1 system-ui,sans-serif; text-shadow:0 3px 5px rgba(21,48,59,.45); transform:rotate(-12deg); animation:journey-plane-ride 7.8s cubic-bezier(.2,.08,.7,.98) forwards; }
+    #district-journey-screen[data-mode="flight"] { background:radial-gradient(ellipse at 50% 35%,rgba(28,105,139,.97),rgba(3,16,29,.99) 76%); }
+    #district-journey-screen[data-mode="flight"] .journey-window { background:#8fc2cc; }
+    #district-journey-screen[data-mode="flight"] .journey-hill,
+    #district-journey-screen[data-mode="flight"] .journey-tree,
+    #district-journey-screen[data-mode="flight"] .journey-rails,
+    #district-journey-screen[data-mode="flight"] .journey-train { display:none; }
+    #district-journey-screen[data-mode="flight"] .journey-flight-sky { display:block; }
+    #district-journey-screen[data-mode="flight"] .journey-progress i { background:linear-gradient(90deg,#67c9ed,#f4d978); }
     #district-journey-status { min-height:16px; margin:0 0 9px; color:#e6f2e9; font:800 10px/1.4 system-ui,sans-serif; }
     .journey-progress { height:4px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.13); }
     .journey-progress i { display:block; width:0; height:100%; border-radius:inherit; background:linear-gradient(90deg,#61d4af,#f0d36e); animation:journey-progress 7.8s linear forwards; }
     @keyframes journey-train-ride { 0% { transform:translateX(0); } 18% { transform:translateX(26vw); } 78% { transform:translateX(77vw); } 100% { transform:translateX(calc(100vw + 180px)); } }
+    @keyframes journey-plane-ride { 0% { transform:translate(0,30px) rotate(-4deg); } 18% { transform:translate(24vw,-7px) rotate(-14deg); } 74% { transform:translate(74vw,-36px) rotate(-7deg); } 100% { transform:translate(calc(100vw + 100px),-15px) rotate(2deg); } }
+    @keyframes journey-cloud-drift { from { translate:0 0; } to { translate:-190px 0; } }
     @keyframes journey-landscape { from { translate:0 0; } to { translate:-270px 0; } }
     @keyframes journey-progress { to { width:100%; } }
-    @media (prefers-reduced-motion:reduce) { .journey-train,.journey-progress i,.journey-hill,.journey-tree { animation-duration:.01ms; animation-iteration-count:1; } }
+    @media (prefers-reduced-motion:reduce) { .journey-train,.journey-progress i,.journey-hill,.journey-tree,.journey-flight-plane,.journey-flight-cloud { animation-duration:.01ms; animation-iteration-count:1; } }
     .world-shop-name { margin:2px 0 4px; color:#fff; font:900 15px/1.2 system-ui,sans-serif; }
     #world-shop-note { margin:0 0 9px; color:#bcd9cf; font:600 10px/1.4 system-ui,sans-serif; }
     #world-shop-items { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
@@ -1213,8 +1230,8 @@
       #kp-splash p { font-size:8px; }
     }
   </style>
-  <link rel="stylesheet" href="./social.css?v=111.0">
-  <link rel="stylesheet" href="./game.css?v=111.0">
+  <link rel="stylesheet" href="./social.css?v=112.0">
+  <link rel="stylesheet" href="./game.css?v=112.0">
 </head>
 <body>
   <div id="kp-splash" role="status" aria-label="Loading Kerala Play">
@@ -1371,13 +1388,14 @@
         <div id="district-travel-error" role="status"></div>
       </div>
     </section>
-    <section id="district-journey-screen" aria-label="Train journey" aria-live="polite" aria-hidden="true">
+    <section id="district-journey-screen" aria-label="District journey" aria-live="polite" aria-hidden="true">
       <div class="district-journey-card">
         <div class="journey-kicker">KERALA RAILWAYS · DISTRICT PASSENGER</div>
         <h2 id="district-journey-title">Ticket confirmed</h2>
         <div class="journey-route"><span id="district-journey-from">Kottayam</span><b aria-hidden="true">→</b><span id="district-journey-to">Ernakulam</span></div>
         <p id="district-journey-ticket">Your train is departing.</p>
         <div class="journey-window" aria-hidden="true">
+          <div class="journey-flight-sky"><span class="journey-flight-cloud one"></span><span class="journey-flight-cloud two"></span><span class="journey-flight-plane">✈</span></div>
           <div class="journey-hill one"></div><div class="journey-hill two"></div>
           <div class="journey-tree one"></div><div class="journey-tree two"></div>
           <div class="journey-rails"></div>
@@ -1457,6 +1475,6 @@
     <div id="onboarding-pointer" hidden aria-hidden="true"></div>
   </section>
 
-  <script type="module" src="./boot.js?v=111.0"></script>
+  <script type="module" src="./boot.js?v=112.0"></script>
 </body>
 </html>
