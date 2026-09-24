@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=111.0';
-import { createAtmosphere } from './environment.js?v=111.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=111.0';
+import { initSocial, api } from './social.js?v=112.0';
+import { createAtmosphere } from './environment.js?v=112.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=112.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -1981,7 +1981,7 @@ function renderDistrictTravelDestinations() {
         districtTravelConfirm.disabled = false;
         districtTravelConfirm.textContent = (districtTravelMode === 'flight' ? 'BUY TICKET & FLY' : 'BUY TICKET & BOARD TRAIN') + ' · ₹' + fare;
       }
-      if (districtTravelNote) districtTravelNote.textContent = current + ' → ' + item.district + ' · ' + (districtTravelMode === 'flight' ? 'flight' : 'train') + ' ticket ₹' + fare + '. Your wallet is charged only after the station check succeeds.';
+      if (districtTravelNote) districtTravelNote.textContent = current + ' → ' + item.district + ' · ' + (districtTravelMode === 'flight' ? 'flight' : 'train') + ' ticket ₹' + fare + '. Your wallet is charged only after the ' + (districtTravelMode === 'flight' ? 'airport' : 'station') + ' check succeeds.';
     });
     districtTravelDestinations.append(button);
   }
@@ -2033,12 +2033,7 @@ districtTravelConfirm?.addEventListener('click', async () => {
     const fromDistrict = result?.travel?.from?.district || currentWorldDistrictName();
     const fare = Number(result?.travel?.fare || 0);
     closeDistrictTravelPanel();
-    if (districtTravelMode === 'train') {
-      showDistrictTrainJourney(fromDistrict, district, fare);
-    } else {
-      showToast('Flight arrived · ' + district, 1800);
-      location.reload();
-    }
+    showDistrictJourney(districtTravelMode, fromDistrict, district, fare);
   } catch (error) {
     window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));
     districtTravelConfirm.disabled = false;
@@ -2046,20 +2041,32 @@ districtTravelConfirm?.addEventListener('click', async () => {
   }
 });
 
-function showDistrictTrainJourney(fromDistrict, toDistrict, fare) {
+function showDistrictJourney(mode, fromDistrict, toDistrict, fare) {
   if (!districtJourneyScreen) {
     location.reload();
     return;
   }
+  const flight = mode === 'flight';
   districtJourneyTimers.forEach(timer => clearTimeout(timer));
   districtJourneyTimers = [];
+  districtJourneyScreen.dataset.mode = flight ? 'flight' : 'train';
+  districtJourneyScreen.setAttribute('aria-label', flight ? 'Flight journey' : 'Train journey');
   districtJourneyScreen.classList.add('open');
   districtJourneyScreen.setAttribute('aria-hidden', 'false');
-  if (districtJourneyTitle) districtJourneyTitle.textContent = 'Train to ' + toDistrict;
-  if (districtJourneyFrom) districtJourneyFrom.textContent = fromDistrict + ' Station';
-  if (districtJourneyTo) districtJourneyTo.textContent = toDistrict + ' Station';
-  if (districtJourneyTicket) districtJourneyTicket.textContent = 'Ticket confirmed · ₹' + fare + ' Kerala Cash · Departs now';
-  const phases = [
+  const kicker = districtJourneyScreen.querySelector('.journey-kicker');
+  if (kicker) kicker.textContent = flight ? 'KERALA AIRWAYS · DISTRICT FLIGHT' : 'KERALA RAILWAYS · DISTRICT PASSENGER';
+  if (districtJourneyTitle) districtJourneyTitle.textContent = (flight ? 'Flight to ' : 'Train to ') + toDistrict;
+  if (districtJourneyFrom) districtJourneyFrom.textContent = fromDistrict + (flight ? ' Airport' : ' Station');
+  if (districtJourneyTo) districtJourneyTo.textContent = toDistrict + (flight ? ' Airport' : ' Station');
+  if (districtJourneyTicket) districtJourneyTicket.textContent = 'Ticket confirmed · ₹' + fare + ' Kerala Cash · ' + (flight ? 'Gate 01 boarding' : 'Departs now');
+  const phases = flight ? [
+    [0, 'Ticket verified · proceed to Gate 01 at ' + fromDistrict + ' Airport…'],
+    [1450, 'Boarding complete · cabin crew closing the doors…'],
+    [3050, 'Take-off · climbing above Kerala’s coast and hills…'],
+    [5350, 'Cruising to ' + toDistrict + ' · district boundary crossed…'],
+    [6800, 'Beginning descent · approaching ' + toDistrict + ' Airport…'],
+    [7650, 'Landed · taxiing to the terminal at ' + toDistrict + '…'],
+  ] : [
     [0, 'Ticket checked · doors closing at ' + fromDistrict + ' Station…'],
     [1500, 'Departed ' + fromDistrict + ' · train is leaving the platform…'],
     [3400, 'On the way to ' + toDistrict + ' · district boundary crossed…'],
@@ -6554,37 +6561,137 @@ function updateMonsoonWaterVisuals(time, delta) {
 }
 
 function addDistrictAirport(scene, district, x, z) {
-  const runwayMat = new THREE.MeshStandardMaterial({ color:0x555c60, roughness:.92 });
+  const runwayMat = new THREE.MeshStandardMaterial({ color:0x454d52, roughness:.95 });
+  const apronMat = new THREE.MeshStandardMaterial({ color:0x777b76, roughness:.98 });
   const lineMat = new THREE.MeshStandardMaterial({ color:0xf2eee0, roughness:.75 });
+  const taxiMat = new THREE.MeshStandardMaterial({ color:0xe6c66d, roughness:.84 });
+  const trimMat = new THREE.MeshStandardMaterial({ color:0x3e6583, roughness:.78 });
+  const glassMat = new THREE.MeshStandardMaterial({ color:0x8bc0c6, roughness:.24, metalness:.08 });
+  const concrete = new THREE.MeshStandardMaterial({ color:0xd9d6c8, roughness:.9 });
   const isErnakulam = district === 'Ernakulam';
-  const runwayLength = isErnakulam ? 32 : 52;
+  const runwayLength = isErnakulam ? 38 : 58;
   const runwayX = isErnakulam ? x - 11 : x - 10;
   const runwayZ = isErnakulam ? z + 4 : z - 17;
-  const runway = new THREE.Mesh(new THREE.PlaneGeometry(runwayLength, 6.5), runwayMat);
+  const runway = new THREE.Mesh(new THREE.PlaneGeometry(runwayLength, 9), runwayMat);
   runway.rotation.x = -Math.PI / 2;
   runway.position.set(runwayX, .026, runwayZ);
   scene.add(runway);
-  for (let offset = -runwayLength / 2 + 4; offset < runwayLength / 2 - 2; offset += 8) {
-    const dash = new THREE.Mesh(new THREE.PlaneGeometry(3.4, .16), lineMat);
+  for (let offset = -runwayLength / 2 + 3; offset < runwayLength / 2 - 2; offset += 8) {
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(3.8, .17), lineMat);
     dash.rotation.x = -Math.PI / 2;
     dash.position.set(runwayX + offset, .04, runwayZ);
     scene.add(dash);
   }
-  const terminalZ = isErnakulam ? z - 5.5 : z - 7;
-  addCivicBuilding(scene, x, terminalZ, {
+  for (const end of [-1, 1]) {
+    for (const side of [-1, 1]) {
+      const light = new THREE.Mesh(new THREE.BoxGeometry(.3, .17, .3), new THREE.MeshStandardMaterial({ color:0xf3e7b2, emissive:0x6c643a, emissiveIntensity:.18 }));
+      light.position.set(runwayX + end * (runwayLength / 2 - 1), .16, runwayZ + side * 5.3);
+      scene.add(light);
+    }
+  }
+
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(23, 14), apronMat);
+  apron.rotation.x = -Math.PI / 2;
+  apron.position.set(x - 4, .024, z - 11);
+  scene.add(apron);
+  const taxiLine = new THREE.Mesh(new THREE.PlaneGeometry(15, .18), taxiMat);
+  taxiLine.rotation.x = -Math.PI / 2;
+  taxiLine.position.set(x - 2, .04, z - 12.5);
+  scene.add(taxiLine);
+
+  const terminalZ = z - 7;
+  const terminal = new THREE.Group();
+  const terminalBody = new THREE.Mesh(new THREE.BoxGeometry(15.2, 5.1, 7), concrete);
+  terminalBody.position.y = 2.55;
+  const terminalRoof = new THREE.Mesh(new THREE.BoxGeometry(15.8, .42, 7.5), trimMat);
+  terminalRoof.position.y = 5.25;
+  const facade = new THREE.Mesh(new THREE.BoxGeometry(12.2, 3.35, .13), glassMat);
+  facade.position.set(0, 2.15, 3.56);
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(16.8, .3, 4.1), trimMat);
+  canopy.position.set(0, 4.05, 5.1);
+  terminal.add(terminalBody, terminalRoof, facade, canopy);
+  for (const postX of [-7.6, -2.55, 2.55, 7.6]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(.22, 3.8, .22), concrete);
+    post.position.set(postX, 2.1, 6.6);
+    terminal.add(post);
+  }
+  const door = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.7, .16), new THREE.MeshStandardMaterial({ color:0x355c68, roughness:.28, metalness:.08 }));
+  door.position.set(0, 1.55, 3.65);
+  terminal.add(door);
+  const terminalSign = createWorldSignMesh({
     title: `${district.toUpperCase()} AIRPORT`,
-    subtitle: 'DISTRICT FLIGHTS · TERMINAL',
-    color: 0x3e6583,
-    collider: 'airport-terminal',
-  });
+    subtitle: 'DOMESTIC · CHECK-IN · GATE 01',
+    background: '#315f78',
+  }, 7.5, .95);
+  terminalSign.position.set(0, 4.65, 3.78);
+  terminal.add(terminalSign);
+  terminal.position.set(x, 0, terminalZ);
+  terminal.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+  scene.add(terminal);
+  registerFarVisual(terminalSign, x, terminalZ + 3.78, 82);
+  addBoxCollider(x, terminalZ, 7.6, 3.5, 'airport-terminal');
+
+  const informationBoard = createWorldSignMesh({
+    title: 'FLIGHT INFORMATION',
+    subtitle: 'KANNUR · KOZHIKODE · ERNAKULAM · TVM',
+    background: '#2b4e5e',
+  }, 5.4, .8);
+  informationBoard.position.set(x + 10.8, 2.3, z - 1.3);
+  scene.add(informationBoard);
+  registerFarVisual(informationBoard, x + 10.8, z - 1.3, 64);
+
+  const aircraft = new THREE.Group();
+  const fuselageMat = new THREE.MeshStandardMaterial({ color:0xe8e9df, roughness:.57, metalness:.08 });
+  const wingMat = new THREE.MeshStandardMaterial({ color:0x32647b, roughness:.68 });
+  const windowMat = new THREE.MeshStandardMaterial({ color:0x294750, roughness:.28, metalness:.08 });
+  const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(.58, .72, 9, 10), fuselageMat);
+  fuselage.rotation.z = Math.PI / 2;
+  fuselage.position.y = 1.2;
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(.62, 1.6, 10), fuselageMat);
+  nose.rotation.z = -Math.PI / 2;
+  nose.position.set(5.15, 1.2, 0);
+  const wings = new THREE.Mesh(new THREE.BoxGeometry(2.2, .14, 9), wingMat);
+  wings.position.set(.3, 1.0, 0);
+  const tailWing = new THREE.Mesh(new THREE.BoxGeometry(1.3, .12, 3.4), wingMat);
+  tailWing.position.set(-3.7, 1.16, 0);
+  const tailFin = new THREE.Mesh(new THREE.BoxGeometry(.18, 1.35, 1.25), wingMat);
+  tailFin.position.set(-3.75, 1.68, 0);
+  aircraft.add(fuselage, nose, wings, tailWing, tailFin);
+  for (const side of [-1, 1]) {
+    for (let windowX = -2.8; windowX <= 2.6; windowX += .8) {
+      const window = new THREE.Mesh(new THREE.BoxGeometry(.38, .18, .055), windowMat);
+      window.position.set(windowX, 1.52, side * .67);
+      aircraft.add(window);
+    }
+    const engine = new THREE.Mesh(new THREE.CylinderGeometry(.34, .42, 2.1, 10), wingMat);
+    engine.rotation.z = Math.PI / 2;
+    engine.position.set(.45, .62, side * 2.25);
+    aircraft.add(engine);
+    const gear = new THREE.Mesh(new THREE.CylinderGeometry(.055, .07, .58, 7), new THREE.MeshStandardMaterial({ color:0x555a59, roughness:.82, metalness:.16 }));
+    gear.position.set(.35, .47, side * 1.58);
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, .14, 9), new THREE.MeshStandardMaterial({ color:0x292d2e, roughness:.92 }));
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(.35, .2, side * 1.58);
+    aircraft.add(gear, wheel);
+  }
+  const noseGear = new THREE.Mesh(new THREE.CylinderGeometry(.045, .055, .46, 7), new THREE.MeshStandardMaterial({ color:0x555a59, roughness:.82, metalness:.16 }));
+  noseGear.position.set(4.05, .42, 0);
+  const noseWheel = new THREE.Mesh(new THREE.CylinderGeometry(.14, .14, .13, 8), new THREE.MeshStandardMaterial({ color:0x292d2e, roughness:.92 }));
+  noseWheel.rotation.x = Math.PI / 2;
+  noseWheel.position.set(4.05, .18, 0);
+  aircraft.add(noseGear, noseWheel);
+  aircraft.position.set(x - 7, .08, z - 13.2);
+  aircraft.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+  scene.add(aircraft);
+
   const board = createWorldSignMesh({
     title: `${district.toUpperCase()} AIRPORT`,
-    subtitle: 'FLIGHT GATE',
+    subtitle: 'TICKETS · CHECK-IN · FLIGHTS',
     background: '#315f78',
   }, 4.8, .86);
-  board.position.set(x, 2.4, z);
+  board.position.set(x, 2.7, z + .2);
   scene.add(board);
-  registerFarVisual(board, x, z, 72);
+  registerFarVisual(board, x, z + .2, 78);
 }
 
 function addDistrictAtlasAttractions(scene, district) {

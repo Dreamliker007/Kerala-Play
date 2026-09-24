@@ -1525,3 +1525,44 @@ test('Kottayam station quotes a train ticket and boards into Ernakulam station',
   assert.equal(trip.data.user.x, -34);
   assert.equal(trip.data.user.z, -19.5);
 });
+
+test('airport routes require an airport at both ends and flight boarding arrives at the destination terminal', async t => {
+  const app = await setup(t);
+  const inland = app.client();
+  const inlandSignup = await inland('/api/auth/signup', {
+    firstName: 'HillWalker', username: 'HillWalker', password: 'test-password-2026', district: 'Wayanad', gender: 'female'
+  });
+  assert.equal(inlandSignup.status, 201);
+  const inlandRoutes = await inland('/api/travel/districts');
+  assert.equal(inlandRoutes.data.hubs.airport, null);
+  assert.equal(inlandRoutes.data.districts.find(item => item.district === 'Ernakulam').flight.available, false);
+
+  const player = app.client();
+  const created = await player('/api/auth/signup', {
+    firstName: 'AirExplorer', username: 'AirExplorer', password: 'test-password-2026', district: 'Kannur', gender: 'female'
+  });
+  assert.equal(created.status, 201);
+  const routes = await player('/api/travel/districts');
+  assert.equal(routes.data.currentDistrict, 'Kannur');
+  assert.equal(routes.data.hubs.airport.id, 'kannur-airport');
+  const ernakulam = routes.data.districts.find(item => item.district === 'Ernakulam');
+  assert.equal(ernakulam.flight.available, true);
+  assert.equal(ernakulam.flight.fare, 212);
+
+  app.advance(1500);
+  for (const [x, z] of [[20, -8], [29, -16], [37, -24]]) {
+    const moved = await player('/api/world/move', { x, z, rotation: 0, moving: true });
+    assert.equal(moved.status, 200, JSON.stringify(moved.data));
+    app.advance(1500);
+  }
+  const trip = await player('/api/travel/district/board', { mode: 'flight', destinationDistrict: 'Ernakulam' });
+  assert.equal(trip.status, 200, JSON.stringify(trip.data));
+  assert.equal(trip.data.travel.mode, 'flight');
+  assert.equal(trip.data.travel.from.district, 'Kannur');
+  assert.equal(trip.data.travel.to.district, 'Ernakulam');
+  assert.equal(trip.data.travel.fare, 212);
+  assert.equal(trip.data.transaction.amount, 212);
+  assert.equal(trip.data.user.worldDistrict, 'Ernakulam');
+  assert.equal(trip.data.user.x, 32);
+  assert.equal(trip.data.user.z, 36);
+});

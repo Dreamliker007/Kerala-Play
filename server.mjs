@@ -2719,7 +2719,7 @@ function publicRideDestinationForUser(user, destinationId) {
               district,
               order: config.order,
               train: { available: true, id: config.train.id, fare: district === currentDistrict ? 0 : districtTravelFare(currentDistrict, district, 'train') },
-              flight: { available: !!config.airport, id: config.airport?.id || null, fare: district === currentDistrict || !config.airport || !current.airport ? 0 : districtTravelFare(currentDistrict, district, 'flight') },
+              flight: { available: !!config.airport && !!current.airport, id: config.airport?.id || null, fare: district === currentDistrict || !config.airport || !current.airport ? 0 : districtTravelFare(currentDistrict, district, 'flight') },
               current: district === currentDistrict,
             };
           }),
