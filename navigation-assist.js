@@ -1,4 +1,4 @@
-const VERSION = 'V119.0';
+const VERSION = 'V120.0';
 window.KERALA_PLAY_VERSION = VERSION;
 
 const style = document.createElement('style');
