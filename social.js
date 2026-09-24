@@ -507,7 +507,12 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const signupContact = node('div', 'social-fields-row');
   const signupEmail = input('email', { placeholder: 'Email (optional)', autocomplete: 'email' });
   const signupMobile = input('tel', { placeholder: 'Mobile (optional)', autocomplete: 'tel' });
-  signupContact.append(field('Email', signupEmail), field('Mobile', signupMobile));
+  const signupEmailField = field('Email', signupEmail);
+  const signupEmailNote = node('small', 'social-muted', 'Optional. Add an email to recover your account if you forget your password.');
+  signupEmailNote.id = 'signup-email-note';
+  signupEmail.setAttribute('aria-describedby', signupEmailNote.id);
+  signupEmailField.append(signupEmailNote);
+  signupContact.append(signupEmailField, field('Mobile', signupMobile));
   const signupDistrict = select(districts, 'Kottayam');
   const signupGender = select([['male', 'Male'], ['female', 'Female'], ['other', 'Other']], 'male');
   const districtField = field('Home district · first entry', signupDistrict);
@@ -601,9 +606,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     resetForm.hidden = true;
     authTabs.hidden = false;
     authForm.hidden = false;
-    signupFields.hidden = false;
+    signupFields.hidden = mode !== 'signup';
     signupAvatarField.hidden = mode !== 'signup';
-    districtField.querySelector('span').textContent = mode === 'signup' ? 'Home district · first entry' : 'Enter and own district';
+
     signupContact.hidden = mode !== 'signup';
     firstName.parentElement.hidden = mode !== 'signup';
     firstName.required = mode === 'signup';
@@ -713,7 +718,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     wakeProductionBackend();
     if (authMode === 'login') await wait(1600);
     await run(async () => {
-      const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, district: signupDistrict.value, ...(authMode === 'signup' ? { email: signupEmail.value, mobile: signupMobile.value, gender: signupGender.value } : {}) });
+      const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, ...(authMode === 'signup' ? { district: signupDistrict.value, email: signupEmail.value, mobile: signupMobile.value, gender: signupGender.value } : {}) });
       password.value = '';
       await beginSession(result.user, authMode === 'signup');
     }, authError);
