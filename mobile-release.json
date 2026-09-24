@@ -1,6 +1,6 @@
 {
-  "versionCode": 18,
-  "versionName": "1.0.17",
+  "versionCode": 19,
+  "versionName": "1.0.18",
   "track": "closed-testing",
-  "notes": "V118.0 uses a ground-focused camera angle to keep the world visible"
+  "notes": "V119.0 stops camera height drift and clamps the ground view"
 }
