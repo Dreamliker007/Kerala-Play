@@ -2049,7 +2049,20 @@ function publicRideDestinationForUser(user, destinationId) {
         const resolvedRelative = targetPath.slice(rootPath.length + 1).replaceAll('\\', '/');
         requireValue(!resolvedRelative.split('/').some(part => part.startsWith('.')) && (resolvedRelative === 'index.html' || /^[a-zA-Z0-9_-]+\.(js|css|png|ico|svg|webmanifest)$/.test(resolvedRelative) || (/^(assets|vendor)\/[a-zA-Z0-9_./-]+$/.test(resolvedRelative) && PUBLIC_EXTENSIONS.has(extname(resolvedRelative).toLowerCase()))), 404, 'File not found.');
         const data = await readFile(targetPath);
-        response.writeHead(200, { 'Content-Type': MIME[extension] || 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'no-cache' });
+        const freshHeaders = {
+          'Content-Type': MIME[extension] || 'application/octet-stream',
+          'Content-Length': data.length,
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          Pragma: 'no-cache',
+          Expires: '0',
+        };
+        if (resolvedRelative === 'index.html') {
+          // Android WebView can otherwise keep an older module graph alive across
+          // app restarts. Clear only the HTTP cache; cookies and local storage
+          // remain untouched so signed-in accounts stay signed in.
+          freshHeaders['Clear-Site-Data'] = '"cache"';
+        }
+        response.writeHead(200, freshHeaders);
         response.end(request.method === 'HEAD' ? undefined : data);
         return;
       }
