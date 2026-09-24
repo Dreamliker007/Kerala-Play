@@ -4359,7 +4359,7 @@ try {
     const baseTargetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45;
     cameraTarget.set(
       player.position.x + Math.sin(player.rotation.y) * lookAhead,
-      player.position.y + jumpHeight + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
+      player.position.y + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
       player.position.z + Math.cos(player.rotation.y) * lookAhead
     );
 
@@ -4380,7 +4380,7 @@ try {
 
     cameraPosition.set(
       player.position.x + Math.sin(cameraYaw) * horizontal + cameraRightX * lateralMotion + rainShakeX,
-      player.position.y + jumpHeight + (interiorCamera ? 1.42 : drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
+      player.position.y + (interiorCamera ? 1.42 : drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
       player.position.z + Math.cos(cameraYaw) * horizontal + cameraRightZ * lateralMotion
     );
 
