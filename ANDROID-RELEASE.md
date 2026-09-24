@@ -6,14 +6,15 @@ This repository is prepared for the next Google Play closed-testing update.
 
 - App name: `Kerala Play`
 - Application ID: `com.dreamliker007.keralaplay`
-- Version name: `1.0.1`
-- Android version code: `2`
+- Version name: `1.0.19`
+- Android version code: `20`
 - Play track: `closed-testing`
 - Production origin: `https://keralaplay.in`
 - Android orientation: `sensorLandscape`
 - Cleartext HTTP and mixed content: disabled
+- Release notes: V120.0 refreshes the game assets and fixes the mobile camera view.
 
-The release values are stored in `mobile-release.json`. The generated Android project remains ignored by Git, so `npm run mobile:sync` reapplies both the orientation lock and Play version metadata automatically.
+The release values are stored in `mobile-release.json`. The generated Android project remains ignored by Git, so `npm run mobile:sync` reapplies both the orientation lock and Play version metadata automatically. Existing installed builds remain on their current package and assets until testers install this release.
 
 ## Prepare the Android project
 
@@ -26,8 +27,8 @@ npm run mobile:open
 
 After `mobile:sync`, the generated Android app should contain:
 
-- `versionCode 2`
-- `versionName "1.0.1"`
+- `versionCode 20`
+- `versionName "1.0.19"`
 - `android:screenOrientation="sensorLandscape"`
 
 ## Build the Play Store update
@@ -45,7 +46,8 @@ Before uploading the AAB, verify on a real phone:
 - app starts in landscape
 - both left-landscape and right-landscape work
 - existing account can log in
-- movement, WALK/RUN and camera controls work
+- movement, WALK/RUN, jump and camera controls work
+- camera can look ahead and upward without drifting into the sky
 - People, Chat, Phone, Jobs and Garage panels open
 - weather/world rendering remains usable
 - background/resume works

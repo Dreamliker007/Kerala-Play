@@ -1,6 +1,6 @@
 {
-  "versionCode": 19,
-  "versionName": "1.0.18",
+  "versionCode": 20,
+  "versionName": "1.0.19",
   "track": "closed-testing",
-  "notes": "V119.0 stops camera height drift and clamps the ground view"
+  "notes": "V120.0 fixes the mobile camera view and loads the current game assets."
 }
