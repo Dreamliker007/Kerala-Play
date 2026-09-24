@@ -3794,10 +3794,11 @@ try {
   let inputX = 0;
   let inputY = 0;
   let cameraYaw = player.rotation.y + Math.PI;
-  const MIN_CAMERA_PITCH = .48;
+  // Keep vertical camera drags aimed into the world, below the horizon.
+  const MIN_CAMERA_PITCH = .60;
   const MAX_CAMERA_PITCH = .78;
   const MIN_CAMERA_GROUND_VIEW_DISTANCE = 2.8;
-  let cameraPitch = .55;
+  let cameraPitch = .68;
   let runHeld = false;
   let runPointerId = null;
   let runCruiseArmed = false;
@@ -4367,7 +4368,7 @@ try {
     );
 
     const interiorCamera = vehicleMode === 'taxi' && vehicleCameraView === 'interior';
-    const baseDistance = interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
+    const baseDistance = interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : runtimeIsMobile ? 5.8 : 7.1;
     const distance = baseDistance
       + (drivingCamera && !interiorCamera ? driveSpeedRatio * 1.35 + cameraDriveImpulse * .72 : 0);
     const horizontal = Math.cos(cameraPitch) * distance;
