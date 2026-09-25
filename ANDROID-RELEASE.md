@@ -6,13 +6,13 @@ This repository is prepared for the next Google Play closed-testing update.
 
 - App name: `Kerala Play`
 - Application ID: `com.dreamliker007.keralaplay`
-- Version name: `1.0.20`
-- Android version code: `21`
+- Version name: `1.0.21`
+- Android version code: `22`
 - Play track: `closed-testing`
 - Production origin: `https://keralaplay.in`
 - Android orientation: `sensorLandscape`
 - Cleartext HTTP and mixed content: disabled
-- Release notes: V121.0 opens Android in a normal third-person camera view and restores it after app resume.
+- Release notes: V122.0 resets the camera to normal third-person view after train, flight and district-gate arrivals.
 
 The release values are stored in `mobile-release.json`. The generated Android project remains ignored by Git, so `npm run mobile:sync` reapplies both the orientation lock and Play version metadata automatically. Existing installed builds remain on their current package and assets until testers install this release.
 
@@ -27,7 +27,7 @@ npm run mobile:open
 
 After `mobile:sync`, the generated Android app should contain:
 
-- `versionCode 21`
+- `versionCode 22`
 - `versionName "1.0.20"
 - `android:screenOrientation="sensorLandscape"`
 
