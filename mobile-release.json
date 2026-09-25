@@ -1,6 +1,6 @@
 {
-  "versionCode": 22,
-  "versionName": "1.0.21",
+  "versionCode": 13,
+  "versionName": "1.0.12",
   "track": "closed-testing",
-  "notes": "V122.0 resets the camera to normal third-person view after train, flight and district-gate arrivals."
+  "notes": "V113.0 adds train, flight, and teleport district travel with three free trips, fixed fares, timed arrivals, and portal animation"
 }

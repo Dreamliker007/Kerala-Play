@@ -1,9 +1,7 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=122.0';
-import { createAtmosphere } from './environment.js?v=122.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=122.0';
-import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, shortenCameraPathForColliders, clampCameraHeightToPitchRange } from './collision-geometry.js?v=122.0';
-import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=122.0';
+import { initSocial, api } from './social.js?v=113.0';
+import { createAtmosphere } from './environment.js?v=113.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=113.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -107,7 +105,6 @@ const ERNAKULAM_CITY = Object.freeze({ x: 0, z: 0 });
 const DISTRICT_INSTANCE_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
 const DISTRICT_AIRPORTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvananthapuram']);
 const DISTRICT_BOOT_STORAGE_KEY = 'kerala-play-world-district';
-const DISTRICT_CAMERA_RESET_KEY = 'kerala-play-district-camera-reset';
 let bootWorldDistrict = (() => {
   try { return sessionStorage.getItem(DISTRICT_BOOT_STORAGE_KEY) || 'Kottayam'; }
   catch { return 'Kottayam'; }
@@ -123,7 +120,7 @@ const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTA
     airport: DISTRICT_AIRPORTS.has(district) ? { x:42, z:-28, radius:8.2 } : null,
     teleport: { x:78, z:72, radius:7.2 },
   };
-  if (district === 'Kottayam') return [district, { ...generic, spawn:{ x:19,z:-23,rotation:0 }, train:KOTTAYAM_RAIL_LAYOUT.station }];
+  if (district === 'Kottayam') return [district, { ...generic, spawn:{ x:19,z:-23,rotation:0 }, train:{ x:7,z:-23,radius:7.2 } }];
   if (district === 'Ernakulam') return [district, {
     ...generic,
     bounds:{ minX:-110,maxX:110,minZ:-110,maxZ:110 },
@@ -276,10 +273,10 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'ernakulam-hospital', kind: 'service', service: 'clinic', clinicId: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -12, z: -25, radius: 5.8, discoverRadius: 9.0 }),
   Object.freeze({ id: 'ernakulam-police', kind: 'service', service: 'police', servicePointId: 'ernakulam-police', label: 'Ernakulam City Police', x: -31, z: 11, radius: 5.8, discoverRadius: 9.0 }),
   Object.freeze({ id: 'ernakulam-fire', kind: 'service', service: 'fire', servicePointId: 'ernakulam-fire', label: 'Ernakulam Fire & Rescue', x: 34, z: 11, radius: 5.8, discoverRadius: 9.0 }),
-  Object.freeze({ id: 'ernakulam-station-bus', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Ernakulam Railway Bus Stop', ...ERNAKULAM_STATION_BUS_LAYOUT, radius: 4.2, discoverRadius: 7.5 }),
+  Object.freeze({ id: 'ernakulam-station-bus', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Ernakulam Railway Bus Stop', x: -29, z: -14.5, radius: 4.2, discoverRadius: 7.5 }),
   Object.freeze({ id: 'ernakulam-mg-road', kind: 'bus', routeId: 'ernakulam-city-line', label: 'MG Road Bus Stop', x: 18, z: 8, radius: 4.2, discoverRadius: 7.5 }),
   Object.freeze({ id: 'ernakulam-marine', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Marine Drive Bus Stop', x: -1, z: 28, radius: 4.2, discoverRadius: 7.5 }),
-  Object.freeze({ id: 'kottayam-rail', kind: 'train', stationId: 'kottayam', label: 'Kottayam Railway Station', ...KOTTAYAM_RAIL_LAYOUT.station, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Ernakulam', fare: 500 }),
+  Object.freeze({ id: 'kottayam-rail', kind: 'train', stationId: 'kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Ernakulam', fare: 500 }),
   Object.freeze({ id: 'ernakulam-rail', kind: 'train', stationId: 'ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, discoverRadius: 10.5, destinationLabel: 'Kottayam', fare: 500 }),
   Object.freeze({ id: 'town-market', kind: 'shop', label: 'Town Market', x: 31, z: 15, radius: 4.2, discoverRadius: 7.2, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
   Object.freeze({ id: 'community-clinic', kind: 'service', service: 'clinic', label: 'Community Clinic', x: 28, z: 28, radius: 4.8, discoverRadius: 8.0 }),
@@ -488,7 +485,7 @@ const navigationPlaces = Object.freeze([
   Object.freeze({ id: 'malabar', name: 'Malabar Bakery', icon: 'B', x: 14.8, z: 41.2, kind: 'shop', district: 'Village' }),
   Object.freeze({ id: 'town-bus', name: 'Town Junction Bus Stop', icon: '🚌', x: 11.7, z: 27.5, kind: 'bus', district: 'Village' }),
   Object.freeze({ id: 'south-bus', name: 'South Bus Stop', icon: '🚌', x: -11.7, z: -50.5, kind: 'bus', district: 'Village' }),
-  Object.freeze({ id: 'kottayam-rail', name: 'Kottayam Railway Station', icon: '🚆', x: KOTTAYAM_RAIL_LAYOUT.station.x, z: KOTTAYAM_RAIL_LAYOUT.station.z, kind: 'rail', district: 'Kottayam' }),
+  Object.freeze({ id: 'kottayam-rail', name: 'Kottayam Railway Station', icon: '🚆', x: 7, z: -23, kind: 'rail', district: 'Kottayam' }),
   Object.freeze({ id: 'ernakulam-rail', name: 'Ernakulam Railway Station', icon: '🚆', x: -40, z: -30.5, kind: 'rail', district: 'Ernakulam' }),
   Object.freeze({ id: 'ernakulam-centre', name: 'Ernakulam City Centre', icon: 'E', x: 5, z: 2, kind: 'town', district: 'Ernakulam' }),
   Object.freeze({ id: 'ernakulam-market', name: 'Ernakulam City Market', icon: 'S', x: 11, z: -7, kind: 'shop', district: 'Ernakulam' }),
@@ -1456,8 +1453,8 @@ function syncJobVehicleVisual() {
     vehicleMode = vehicle.kind;
     driveSpeed = 0;
     vehicleCollisionFrames = 0;
-    const footprint = expandedFootprint(vehicleCollisionFootprint(vehicle.kind, playerRef.rotation.y), .06);
-    vehicleSafeReady = !positionBlocked(playerRef.position.x, playerRef.position.z, footprint);
+    const vehicleRadius = vehicle.kind === 'taxi' ? .92 : .56;
+    vehicleSafeReady = !positionBlocked(playerRef.position.x, playerRef.position.z, vehicleRadius + .06);
     if (vehicleSafeReady) {
       vehicleSafePosition.copy(playerRef.position);
       vehicleSafeRotation = playerRef.rotation.y;
@@ -1926,7 +1923,7 @@ function performWorldActivity(activityId) {
     if (spot.service === 'clinic') {
       api('/api/needs/clinic', { clinicId: spot.clinicId || 'community-clinic' }).then(result => {
         if (result?.needs) applyNeedsState(result.needs, { warn: false });
-        showToast(`Clinic care complete · ${window.KERALA_PLAY_TESTER_FREE ? 'FREE' : `₹${Number(result?.fee || 0)}`} · energy restored`, 3600);
+        showToast(`Clinic care complete · ₹${Number(result?.fee || 0)} · energy restored`, 3600);
       }).catch(error => showToast(error.message || 'Clinic care unavailable', 3600));
       return;
     }
@@ -1985,7 +1982,7 @@ function renderDistrictTravelDestinations() {
     button.dataset.district = item.district;
     button.classList.toggle('selected', districtTravelSelected === item.district);
     const fare = Number((item[districtTravelMode]?.fare) || 0);
-    const fareLabel = fare === 0 ? (window.KERALA_PLAY_TESTER_FREE ? 'FREE · TESTER PASS' : `FREE · ${Math.max(1, districtTravelSnapshot.freeTripsRemaining || 0)} FREE LEFT`) : `₹${fare}`;
+    const fareLabel = fare === 0 ? `FREE · ${Math.max(1, districtTravelSnapshot.freeTripsRemaining || 0)} FREE LEFT` : `₹${fare}`;
     button.textContent = `${item.district}\n${transport}`;
     button.textContent += '\n' + fareLabel;
     button.addEventListener('click', () => {
@@ -1997,7 +1994,7 @@ function renderDistrictTravelDestinations() {
       }
       const modeName = districtTravelMode === 'flight' ? 'Flight' : districtTravelMode === 'teleport' ? 'Teleport' : 'Train';
       const checkPlace = districtTravelMode === 'flight' ? 'airport' : districtTravelMode === 'teleport' ? 'district gate' : 'railway station';
-      const price = fare === 0 ? (window.KERALA_PLAY_TESTER_FREE ? 'FREE · tester pass' : `FREE · trip ${Number(districtTravelSnapshot.tripsUsed || 0) + 1} of 3`) : `₹${fare}`;
+      const price = fare === 0 ? `FREE · trip ${Number(districtTravelSnapshot.tripsUsed || 0) + 1} of 3` : `₹${fare}`;
       if (districtTravelNote) districtTravelNote.textContent = `${current} → ${item.district} · ${modeName} ${price}. Verify your ${checkPlace} before the trip starts.`;
     });
     districtTravelDestinations.append(button);
@@ -2017,17 +2014,11 @@ async function openDistrictTravelPanel(mode = 'train') {
   if (districtTravelPanel) districtTravelPanel.classList.add('open');
   if (districtTravelHeading) districtTravelHeading.textContent = districtTravelMode === 'flight' ? 'Kerala Airport' : districtTravelMode === 'teleport' ? 'District Teleport Gate' : 'Kerala Railway';
   if (districtTravelTitle) districtTravelTitle.textContent = `${currentWorldDistrictName()} → choose district`;
-  if (districtTravelNote) districtTravelNote.textContent = window.KERALA_PLAY_TESTER_FREE
-    ? (districtTravelMode === 'flight'
-      ? 'Flights connect airport districts and take 30 seconds. Tester account travel is free.'
-      : districtTravelMode === 'teleport'
-        ? 'Step through the gate for an instant district transfer. Tester account travel is free.'
-        : 'Trains connect all district stations and take 1 minute. Tester account travel is free.')
-    : districtTravelMode === 'flight'
-      ? 'Flights connect airport districts and take 30 seconds. The first 3 district trips are free; then each flight costs ₹1,000.'
-      : districtTravelMode === 'teleport'
-        ? 'Step through the gate for an instant district transfer. The teleport animation takes about 2 seconds; the first 3 district trips are free, then it costs ₹2,000.'
-        : 'Trains connect all district stations and take 1 minute. The first 3 district trips are free; then each train costs ₹500.';
+  if (districtTravelNote) districtTravelNote.textContent = districtTravelMode === 'flight'
+    ? 'Flights connect airport districts and take 30 seconds. The first 3 district trips are free; then each flight costs ₹1,000.'
+    : districtTravelMode === 'teleport'
+      ? 'Step through the gate for an instant district transfer. The teleport animation takes about 2 seconds; the first 3 district trips are free, then it costs ₹2,000.'
+      : 'Trains connect all district stations and take 1 minute. The first 3 district trips are free; then each train costs ₹500.';
   if (districtTravelDestinations) districtTravelDestinations.textContent = 'Loading routes…';
   if (districtTravelError) districtTravelError.textContent = '';
   if (districtTravelConfirm) districtTravelConfirm.disabled = true;
@@ -2079,10 +2070,7 @@ function finishDistrictJourney(travel = {}) {
   const district = travel.to?.district || travel.district || '';
   if (district && DISTRICT_INSTANCE_CONFIG[district]) {
     bootWorldDistrict = district;
-    try {
-      sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, district);
-      sessionStorage.setItem(DISTRICT_CAMERA_RESET_KEY, district);
-    } catch {}
+    try { sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, district); } catch {}
   }
   location.reload();
 }
@@ -2124,10 +2112,8 @@ function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) 
   if (districtJourneyTitle) districtJourneyTitle.textContent = (flight ? 'Flight to ' : teleport ? 'Gate to ' : 'Train to ') + toDistrict;
   if (districtJourneyFrom) districtJourneyFrom.textContent = travel.from?.label || (fromDistrict + (flight ? ' Airport' : teleport ? ' Gate' : ' Station'));
   if (districtJourneyTo) districtJourneyTo.textContent = travel.to?.label || (toDistrict + (flight ? ' Airport' : teleport ? ' Gate' : ' Station'));
-  const fareLabel = fare === 0 ? (window.KERALA_PLAY_TESTER_FREE ? 'FREE · tester pass' : `FREE · trip ${tripNumber} of 3`) : `₹${fare} Kerala Cash`;
-  if (districtJourneyTicket) districtJourneyTicket.textContent = window.KERALA_PLAY_TESTER_FREE
-    ? fareLabel
-    : `${fareLabel} · ${freeTripsRemaining} free trip${freeTripsRemaining === 1 ? '' : 's'} left`;
+  const fareLabel = fare === 0 ? `FREE · trip ${tripNumber} of 3` : `₹${fare} Kerala Cash`;
+  if (districtJourneyTicket) districtJourneyTicket.textContent = `${fareLabel} · ${freeTripsRemaining} free trip${freeTripsRemaining === 1 ? '' : 's'} left`;
 
   const phases = teleport ? [
     [0, 'District gate activating…'],
@@ -2435,14 +2421,14 @@ function updateWorldInteract() {
         } else if (boarding) {
           worldInteract.dataset.mode = 'bus-board';
           worldInteract.dataset.activity = spot.id;
-          worldInteract.textContent = `BOARD BUS · ${window.KERALA_PLAY_TESTER_FREE ? 'FREE' : `₹${Number(status.fare || 0)}`}`;
+          worldInteract.textContent = `BOARD BUS · ₹${Number(status.fare || 0)}`;
           worldInteract.title = `${status.routeLabel || 'Village Line'} → ${status.destination?.label || 'next stop'} · boarding now`;
         } else if (waiting) {
           const seconds = Math.max(1, Math.ceil((arrivalAt - travelNow) / 1000));
           worldInteract.dataset.mode = 'bus-check';
           worldInteract.dataset.activity = spot.id;
           worldInteract.textContent = `WAIT BUS · ${seconds}s`;
-          worldInteract.title = `${status.routeLabel || 'Village Line'} → ${status.destination?.label || 'next stop'} · fare ${window.KERALA_PLAY_TESTER_FREE ? 'FREE' : `₹${Number(status.fare || 0)}`}`;
+          worldInteract.title = `${status.routeLabel || 'Village Line'} → ${status.destination?.label || 'next stop'} · fare ₹${Number(status.fare || 0)}`;
         } else {
           worldInteract.dataset.mode = 'world-activity';
           worldInteract.dataset.activity = spot.id;
@@ -2809,7 +2795,6 @@ function acceptUser(user) {
     bootWorldDistrict = user.worldDistrict;
     try { sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, user.worldDistrict); } catch {}
     if (renderedWorldDistrict && renderedWorldDistrict !== user.worldDistrict) {
-      try { sessionStorage.setItem(DISTRICT_CAMERA_RESET_KEY, user.worldDistrict); } catch {}
       location.reload();
       return;
     }
@@ -3799,15 +3784,7 @@ try {
   let inputX = 0;
   let inputY = 0;
   let cameraYaw = player.rotation.y + Math.PI;
-  // Mobile should open in a normal third-person view instead of an elevated
-  // ground-focused angle. Desktop keeps the existing framing.
-  const MIN_CAMERA_PITCH = .20;
-  const MAX_CAMERA_PITCH = .78;
-  const MIN_CAMERA_GROUND_VIEW_DISTANCE = 2.8;
-  const DEFAULT_CAMERA_PITCH = runtimeIsMobile ? .22 : .42;
-  const WALK_CAMERA_DISTANCE = runtimeIsMobile ? 5.0 : 7.1;
-  const WALK_CAMERA_HEIGHT = runtimeIsMobile ? 1.28 : 1.45;
-  let cameraPitch = DEFAULT_CAMERA_PITCH;
+  let cameraPitch = .31;
   let runHeld = false;
   let runPointerId = null;
   let runCruiseArmed = false;
@@ -3821,30 +3798,6 @@ try {
   let walkSafeRotation = player.rotation.y;
   let walkSafeReady = !positionBlockedStatic(player.position.x, player.position.z, .48);
   let walkSafeAccumulator = 0;
-  let districtCameraResetFrames = 0;
-  try {
-    if (sessionStorage.getItem(DISTRICT_CAMERA_RESET_KEY) === currentWorldDistrictName()) {
-      sessionStorage.removeItem(DISTRICT_CAMERA_RESET_KEY);
-      districtCameraResetFrames = runtimeIsMobile ? 48 : 24;
-    }
-  } catch {}
-
-  function snapCameraToNormalView() {
-    lookPointerId = null;
-    cameraYaw = player.rotation.y + Math.PI;
-    cameraPitch = DEFAULT_CAMERA_PITCH;
-    const horizontal = Math.cos(cameraPitch) * WALK_CAMERA_DISTANCE;
-    cameraTarget.set(player.position.x, player.position.y + 1.18, player.position.z);
-    camera.position.set(
-      player.position.x + Math.sin(cameraYaw) * horizontal,
-      player.position.y + WALK_CAMERA_HEIGHT + Math.sin(cameraPitch) * WALK_CAMERA_DISTANCE,
-      player.position.z + Math.cos(cameraYaw) * horizontal,
-    );
-    camera.lookAt(cameraTarget);
-  }
-
-  // Set the correct framing before the splash screen reveals the 3D world.
-  snapCameraToNormalView();
 
   function clearRidePickupVisual() {
     if (!ridePickupVisual) return;
@@ -3933,8 +3886,6 @@ try {
     updateMapPlayer(player);
     updateWorldInteract();
     updateLifeLoopMission();
-    districtCameraResetFrames = runtimeIsMobile ? 48 : 24;
-    snapCameraToNormalView();
   });
   let cameraDriveImpulse = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
@@ -4010,7 +3961,7 @@ try {
     const lookDeltaX = event.clientX - lastLookX;
     const lookDeltaY = event.clientY - lastLookY;
     cameraYaw -= lookDeltaX * .009;
-    cameraPitch = THREE.MathUtils.clamp(cameraPitch + lookDeltaY * .006, MIN_CAMERA_PITCH, MAX_CAMERA_PITCH);
+    cameraPitch = THREE.MathUtils.clamp(cameraPitch + lookDeltaY * .006, .12, .64);
     if (Math.hypot(lookDeltaX, lookDeltaY) > 4) recordOnboardingAction('camera');
     lastLookX = event.clientX;
     lastLookY = event.clientY;
@@ -4133,15 +4084,7 @@ try {
   });
   document.addEventListener('focusin', event => { if (typingIntoField(event)) clearGameInput(); });
   window.addEventListener('blur', clearGameInput);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      clearGameInput();
-      return;
-    }
-    // Android WebView may resume an existing page instead of reloading it.
-    // Restore the normal walking view when the app becomes visible again.
-    if (runtimeIsMobile && vehicleMode === 'walk') snapCameraToNormalView();
-  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) clearGameInput(); });
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -4184,12 +4127,12 @@ try {
     if (vehicleMode !== 'walk') {
       walkVelocity.set(0, 0, 0);
       targetWalkVelocity.set(0, 0, 0);
-      let vehicleFootprint = vehicleCollisionFootprint(vehicleMode, player.rotation.y);
+      const vehicleRadius = vehicleMode === 'taxi' ? .92 : .56;
 
-      if (positionBlocked(player.position.x, player.position.z, vehicleFootprint)) {
-        recoverVehicleOverlap(player, vehicleFootprint);
+      if (positionBlocked(player.position.x, player.position.z, vehicleRadius)) {
+        recoverVehicleOverlap(player, vehicleRadius);
       } else {
-        rememberVehicleSafePose(player, vehicleFootprint);
+        rememberVehicleSafePose(player, vehicleRadius);
       }
 
       const rawThrottle = paused ? 0 : (acceleratorHeld ? 1 : THREE.MathUtils.clamp(-controlY, -1, 1));
@@ -4223,19 +4166,13 @@ try {
 
       if (Math.abs(driveSpeed) > .035) {
         const lowSpeedAssist = 1.08 - speedRatio * .20;
-        const previousRotation = player.rotation.y;
         player.rotation.y -= smoothedDriveSteering * delta * (.68 + speedRatio * .72) * lowSpeedAssist * (driveSpeed >= 0 ? 1 : -1);
-        vehicleFootprint = vehicleCollisionFootprint(vehicleMode, player.rotation.y);
-        if (positionBlocked(player.position.x, player.position.z, vehicleFootprint)) {
-          player.rotation.y = previousRotation;
-          vehicleFootprint = vehicleCollisionFootprint(vehicleMode, player.rotation.y);
-        }
         const dx = Math.sin(player.rotation.y) * driveSpeed * delta;
         const dz = Math.cos(player.rotation.y) * driveSpeed * delta;
         const beforeX = player.position.x;
         const beforeZ = player.position.z;
         const impactSpeed = Math.abs(driveSpeed);
-        const collided = moveWithCollision(player, dx, dz, vehicleFootprint);
+        const collided = moveWithCollision(player, dx, dz, vehicleRadius);
         const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
 
         if (collided) {
@@ -4246,12 +4183,11 @@ try {
           vehicleCollisionFrames = 0;
         }
 
-        vehicleFootprint = vehicleCollisionFootprint(vehicleMode, player.rotation.y);
-        if (positionBlocked(player.position.x, player.position.z, vehicleFootprint)) {
-          recoverVehicleOverlap(player, vehicleFootprint);
+        if (positionBlocked(player.position.x, player.position.z, vehicleRadius)) {
+          recoverVehicleOverlap(player, vehicleRadius);
           movingNow = false;
         } else {
-          rememberVehicleSafePose(player, vehicleFootprint);
+          rememberVehicleSafePose(player, vehicleRadius);
           movingNow = movedDistance > .0005;
         }
       }
@@ -4387,7 +4323,7 @@ try {
       jumpHeight = Math.max(0, jumpHeight + jumpVelocity * delta);
       if (jumpHeight <= 0) { jumpHeight = 0; jumpVelocity = 0; }
       const avatar = player.userData.avatar;
-      if (avatar) avatar.position.y = .04 + Number(avatar.userData.walkBob || 0) + jumpHeight;
+      if (avatar) avatar.position.y += jumpHeight;
     } else { jumpHeight = 0; jumpVelocity = 0; }
 
     const drivingCamera = vehicleMode !== 'walk';
@@ -4403,15 +4339,15 @@ try {
     const lookAhead = drivingCamera
       ? .75 + driveSpeedRatio * 2.2 + cameraDriveImpulse * 1.35
       : 0;
-    const baseTargetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.18;
+    const baseTargetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45;
     cameraTarget.set(
       player.position.x + Math.sin(player.rotation.y) * lookAhead,
-      player.position.y + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
+      player.position.y + jumpHeight + baseTargetHeight + walkBob * .42 + cameraDriveImpulse * .10,
       player.position.z + Math.cos(player.rotation.y) * lookAhead
     );
 
     const interiorCamera = vehicleMode === 'taxi' && vehicleCameraView === 'interior';
-    const baseDistance = interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : WALK_CAMERA_DISTANCE;
+    const baseDistance = interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
     const distance = baseDistance
       + (drivingCamera && !interiorCamera ? driveSpeedRatio * 1.35 + cameraDriveImpulse * .72 : 0);
     const horizontal = Math.cos(cameraPitch) * distance;
@@ -4427,7 +4363,7 @@ try {
 
     cameraPosition.set(
       player.position.x + Math.sin(cameraYaw) * horizontal + cameraRightX * lateralMotion + rainShakeX,
-      player.position.y + (interiorCamera ? 1.42 : drivingCamera ? 1.32 : WALK_CAMERA_HEIGHT) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
+      player.position.y + jumpHeight + (interiorCamera ? 1.42 : drivingCamera ? 1.32 : 1.45) + Math.sin(cameraPitch) * distance + walkBob + rainShakeY,
       player.position.z + Math.cos(cameraYaw) * horizontal + cameraRightZ * lateralMotion
     );
 
@@ -4442,33 +4378,11 @@ try {
 
     if (!interiorCamera) resolveCameraCollision(cameraTarget, cameraPosition, drivingCamera ? .42 : .34);
     const cameraResponse = drivingCamera ? 6.5 + driveSpeedRatio * 1.6 : 8.6;
-    const cameraNextPosition = camera.position.clone().lerp(cameraPosition, 1 - Math.exp(-delta * cameraResponse));
-    if (!interiorCamera) resolveCameraCollision(camera.position, cameraNextPosition, drivingCamera ? .38 : .30);
-    if (!interiorCamera) {
-      // Collision shortening can pull the camera almost level with its look target.
-      // Preserve a minimum downward viewing angle so the world cannot disappear into the sky.
-      const horizontalAimDistance = Math.hypot(
-        cameraNextPosition.x - cameraTarget.x,
-        cameraNextPosition.z - cameraTarget.z,
-      );
-      cameraNextPosition.y = clampCameraHeightToPitchRange(
-        cameraNextPosition.y,
-        cameraTarget.y,
-        horizontalAimDistance,
-        MIN_CAMERA_PITCH,
-        MAX_CAMERA_PITCH,
-        MIN_CAMERA_GROUND_VIEW_DISTANCE,
-      );
+    camera.position.lerp(cameraPosition, 1 - Math.exp(-delta * cameraResponse));
+    if (!interiorCamera && positionBlockedStatic(camera.position.x, camera.position.z, drivingCamera ? .38 : .30)) {
+      camera.position.copy(cameraPosition);
     }
-    camera.position.copy(cameraNextPosition);
     camera.lookAt(cameraTarget);
-    if (districtCameraResetFrames > 0 && vehicleMode === 'walk') {
-      // District travel can reload/resume a WebView with a stale elevated camera.
-      // Hold the intended third-person framing for a short settling window so
-      // train/flight/teleport arrivals always enter at ground level.
-      districtCameraResetFrames -= 1;
-      snapCameraToNormalView();
-    }
     updateRemotePlayers(delta, camera);
     updateVehicleAction();
     updateDriveHud();
@@ -4789,7 +4703,6 @@ function animatePlayer(player, phase, moving) {
   const bob = amount ? Math.abs(Math.sin(phase * 2)) * .022 * amount : 0;
   const avatar = player.userData.avatar;
   if (!avatar) return;
-  avatar.userData.walkBob = bob;
   avatar.position.y = .04 + bob;
   avatar.rotation.z = amount ? Math.sin(phase * .5) * .008 * amount : 0;
   avatar.rotation.x = amount ? -.012 * amount : 0;
@@ -5174,62 +5087,83 @@ function nearestSafeTrafficProgress(config, preferred) {
   return start;
 }
 
-function vehicleCollisionFootprint(kind, rotation = 0) {
-  return kind === 'taxi'
-    ? { type:'oriented-box', halfLength:1.92, halfWidth:.98, rotation }
-    : { type:'oriented-box', halfLength:.98, halfWidth:.46, rotation };
-}
-
-function positionBlockedStatic(x, z, footprint = .45) {
+function positionBlockedStatic(x, z, radius = .45) {
   for (const collider of staticColliders) {
-    if (footprintIntersectsCollider(x, z, footprint, collider)) return true;
+    if (collider.type === 'circle') {
+      const limit = collider.radius + radius;
+      if ((x - collider.x) ** 2 + (z - collider.z) ** 2 < limit * limit) return true;
+      continue;
+    }
+    if (circleHitsBox(x, z, radius, collider.x, collider.z, collider.halfWidth, collider.halfDepth)) return true;
   }
   return false;
 }
 
-function positionBlocked(x, z, playerFootprint = .45) {
-  if (positionBlockedStatic(x, z, playerFootprint)) return true;
+function positionBlocked(x, z, radius = .45) {
+  if (positionBlockedStatic(x, z, radius)) return true;
   for (const vehicle of traffic) {
     if (!vehicle?.visible) continue;
     const config = vehicle.userData?.traffic;
     if (!config) continue;
-    const trafficShape = trafficFootprint(config);
-    if (footprintIntersectsCollider(x, z, playerFootprint, {
-      type:'box', x:vehicle.position.x, z:vehicle.position.z,
-      halfWidth:trafficShape.halfWidth, halfDepth:trafficShape.halfDepth,
-    })) return true;
+    const footprint = trafficFootprint(config);
+    if (circleHitsBox(x, z, radius, vehicle.position.x, vehicle.position.z, footprint.halfWidth, footprint.halfDepth)) return true;
   }
   return false;
 }
 
 function resolveCameraCollision(target, desired, clearance = .34) {
-  return shortenCameraPathForColliders(
-    target,
-    desired,
-    clearance,
-    staticColliders,
-    (x, z, radius) => positionBlockedStatic(x, z, radius),
-    .28,
-  );
+  const dx = desired.x - target.x;
+  const dz = desired.z - target.z;
+  const horizontalDistance = Math.hypot(dx, dz);
+  if (horizontalDistance < .05) return desired;
+  const steps = Math.max(8, Math.ceil(horizontalDistance / .28));
+  let safeT = 0;
+  for (let step = 1; step <= steps; step++) {
+    const t = step / steps;
+    const x = target.x + dx * t;
+    const z = target.z + dz * t;
+    if (positionBlockedStatic(x, z, clearance)) break;
+    safeT = t;
+  }
+  if (safeT >= .999) return desired;
+  const minT = Math.min(.12, .48 / Math.max(.48, horizontalDistance));
+  const t = safeT > minT ? safeT - .035 : Math.max(0, safeT * .72);
+  desired.x = target.x + dx * t;
+  desired.z = target.z + dz * t;
+  desired.y = THREE.MathUtils.lerp(target.y + .12, desired.y, t);
+  return desired;
 }
 
-function moveWithCollision(object, dx, dz, footprint) {
-  return moveWithCollisionFootprint(
-    object, dx, dz, footprint,
-    (x, z, shape) => positionBlocked(x, z, shape),
-    clampDistrictX, clampDistrictZ,
-  );
+function moveWithCollision(object, dx, dz, radius) {
+  if (!object || (!dx && !dz)) return false;
+  let collided = false;
+  const distance = Math.hypot(dx, dz);
+  const maxStep = Math.max(.10, Math.min(.28, radius * .38));
+  const steps = Math.max(1, Math.ceil(distance / maxStep));
+  const stepX = dx / steps;
+  const stepZ = dz / steps;
+
+  for (let step = 0; step < steps; step++) {
+    const nextX = clampDistrictX(object.position.x + stepX);
+    if (!positionBlocked(nextX, object.position.z, radius)) object.position.x = nextX;
+    else collided = true;
+
+    const nextZ = clampDistrictZ(object.position.z + stepZ);
+    if (!positionBlocked(object.position.x, nextZ, radius)) object.position.z = nextZ;
+    else collided = true;
+  }
+  return collided;
 }
 
-function rememberVehicleSafePose(object, footprint) {
-  if (!object || positionBlockedStatic(object.position.x, object.position.z, expandedFootprint(footprint, .06))) return;
+function rememberVehicleSafePose(object, radius) {
+  if (!object || positionBlockedStatic(object.position.x, object.position.z, radius + .06)) return;
   vehicleSafePosition.copy(object.position);
   vehicleSafeRotation = object.rotation.y;
   vehicleSafeReady = true;
 }
 
-function findVehicleRecoveryPoint(object, footprint) {
-  if (vehicleSafeReady && !positionBlockedStatic(vehicleSafePosition.x, vehicleSafePosition.z, expandedFootprint({ ...footprint, rotation:vehicleSafeRotation }, .08))) {
+function findVehicleRecoveryPoint(object, radius) {
+  if (vehicleSafeReady && !positionBlockedStatic(vehicleSafePosition.x, vehicleSafePosition.z, radius + .08)) {
     return { x: vehicleSafePosition.x, z: vehicleSafePosition.z, rotation: vehicleSafeRotation };
   }
 
@@ -5238,7 +5172,7 @@ function findVehicleRecoveryPoint(object, footprint) {
   for (const distance of [.45, .8, 1.2, 1.7, 2.3]) {
     const x = clampDistrictX(object.position.x + backwardsX * distance);
     const z = clampDistrictZ(object.position.z + backwardsZ * distance);
-    if (!positionBlockedStatic(x, z, expandedFootprint(footprint, .08))) return { x, z, rotation: object.rotation.y };
+    if (!positionBlockedStatic(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
   }
 
   for (const ring of [1, 1.6, 2.4, 3.2]) {
@@ -5246,15 +5180,15 @@ function findVehicleRecoveryPoint(object, footprint) {
       const angle = index / 16 * Math.PI * 2;
       const x = clampDistrictX(object.position.x + Math.sin(angle) * ring);
       const z = clampDistrictZ(object.position.z + Math.cos(angle) * ring);
-      if (!positionBlockedStatic(x, z, expandedFootprint(footprint, .08))) return { x, z, rotation: object.rotation.y };
+      if (!positionBlockedStatic(x, z, radius + .08)) return { x, z, rotation: object.rotation.y };
     }
   }
   return null;
 }
 
-function recoverVehicleOverlap(object, footprint) {
-  if (!object || !positionBlockedStatic(object.position.x, object.position.z, footprint)) return false;
-  const recovery = findVehicleRecoveryPoint(object, footprint);
+function recoverVehicleOverlap(object, radius) {
+  if (!object || !positionBlockedStatic(object.position.x, object.position.z, radius)) return false;
+  const recovery = findVehicleRecoveryPoint(object, radius);
   if (!recovery) return false;
   object.position.set(recovery.x, 0, recovery.z);
   object.rotation.y = recovery.rotation;
@@ -6421,10 +6355,10 @@ function addPassengerTrain(scene, x, z, centerOffset = 0) {
 }
 
 function addKottayamRailwayFoundation(scene) {
-  addRailTracks(scene, KOTTAYAM_RAIL_LAYOUT.track.x, KOTTAYAM_RAIL_LAYOUT.track.z, KOTTAYAM_RAIL_LAYOUT.track.length);
-  addRailPlatform(scene, KOTTAYAM_RAIL_LAYOUT.platform.x, KOTTAYAM_RAIL_LAYOUT.platform.z, KOTTAYAM_RAIL_LAYOUT.platform.length);
-  addPassengerTrain(scene, KOTTAYAM_RAIL_LAYOUT.train.x, KOTTAYAM_RAIL_LAYOUT.train.z, KOTTAYAM_RAIL_LAYOUT.train.centerOffset);
-  addCivicBuilding(scene, KOTTAYAM_RAIL_LAYOUT.building.x, KOTTAYAM_RAIL_LAYOUT.building.z, {
+  addRailTracks(scene, 7, -26.5, 31);
+  addRailPlatform(scene, 7, -23, 27);
+  addPassengerTrain(scene, 7, -26.5, -7);
+  addCivicBuilding(scene, 14.5, -30.5, {
     title: 'KOTTAYAM RAILWAY',
     subtitle: 'ERNAKULAM · DISTRICT TRAINS',
     color: 0x315f78,
@@ -6432,12 +6366,12 @@ function addKottayamRailwayFoundation(scene) {
   });
   const board = createWorldSignMesh({
     title: 'KOTTAYAM STATION',
-    subtitle: 'FIRST 3 TRIPS FREE · THEN ₹500',
+    subtitle: 'BOARD HERE · ERNAKULAM ₹35',
     background: '#315f78',
   }, 4.2, .92);
-  board.position.set(KOTTAYAM_RAIL_LAYOUT.station.x, 2.35, -22.3);
+  board.position.set(7, 2.35, -22.3);
   scene.add(board);
-  registerFarVisual(board, KOTTAYAM_RAIL_LAYOUT.station.x, -22.3, 64);
+  registerFarVisual(board, 7, -22.3, 64);
 }
 
 function addCityTower(scene, x, z, width, depth, height, color, title = '') {
@@ -6518,17 +6452,6 @@ function addErnakulamDistrictFoundation(scene) {
     scene.add(mesh);
     addRoadEdges(scene, x, z, width, depth);
   }
-  const busBay = new THREE.Mesh(new THREE.PlaneGeometry(5.0, 4.4), roadMaterial);
-  busBay.rotation.x = -Math.PI / 2;
-  busBay.position.set(ERNAKULAM_STATION_BUS_LAYOUT.x, .032, ERNAKULAM_STATION_BUS_LAYOUT.z);
-  scene.add(busBay);
-  const bayMarkMaterial = new THREE.MeshStandardMaterial({ color:0xd7d7cd, roughness:.84 });
-  for (const x of [ERNAKULAM_STATION_BUS_LAYOUT.x - 2.15, ERNAKULAM_STATION_BUS_LAYOUT.x + 2.15]) {
-    const bayMark = new THREE.Mesh(new THREE.PlaneGeometry(.09, 3.8), bayMarkMaterial);
-    bayMark.rotation.x = -Math.PI / 2;
-    bayMark.position.set(x, .045, ERNAKULAM_STATION_BUS_LAYOUT.z);
-    scene.add(bayMark);
-  }
   const outskirtsLine = new THREE.Mesh(new THREE.PlaneGeometry(4, .16), new THREE.MeshStandardMaterial({ color:0xf1d46d, roughness:.75 }));
   outskirtsLine.rotation.x = -Math.PI / 2;
   for (let x = -70; x <= 70; x += 9) {
@@ -6548,7 +6471,7 @@ function addErnakulamDistrictFoundation(scene) {
   });
   const stationBoard = createWorldSignMesh({
     title: 'ERNAKULAM STATION',
-    subtitle: 'FIRST 3 TRIPS FREE · THEN ₹500',
+    subtitle: 'KOTTAYAM · ₹35 · DISTRICT TRAINS',
     background: '#385f7b',
   }, 4.8, .92);
   stationBoard.position.set(-40, 2.35, -30.7);
@@ -6559,7 +6482,7 @@ function addErnakulamDistrictFoundation(scene) {
   addParkedVehicle(scene, 'auto', 0x2b773f, -46, -15.2, Math.PI / 2);
   addParkedVehicle(scene, 'car', 0x687a86, -40, -15.2, Math.PI / 2);
   addParkedVehicle(scene, 'bike', 0x316d58, -34, -15.2, Math.PI / 2);
-  addBusStop(scene, ERNAKULAM_STATION_BUS_LAYOUT.x, ERNAKULAM_STATION_BUS_LAYOUT.z, Math.PI / 2, 'RAILWAY BUS');
+  addBusStop(scene, -29, -14.5, Math.PI / 2, 'RAILWAY BUS');
 
   addShop(scene, 11, -7, 'ERNAKULAM CITY MARKET', 'FOOD · GROCERIES · DAILY NEEDS');
   addShop(scene, -12.5, 11, 'BROADWAY CAFE', 'TEA · MEALS · SNACKS');
@@ -6601,7 +6524,7 @@ function addErnakulamDistrictFoundation(scene) {
   addPhotoVillager(scene, -10, -21.4, 0, .23, 1.2, .72, { behavior: 'task', role: 'Clinic Staff', facing: Math.PI, shelterX: -12, shelterZ: -21.5 });
   addPhotoVillager(scene, -29, 14.6, 2.2, .24, 4.4, .71, { behavior: 'patrol', role: 'Police Patrol', shelterX: -31, shelterZ: 14.4 });
   addPhotoVillager(scene, 32, 14.6, 0, .22, 5.6, .70, { behavior: 'task', role: 'Fire Crew', facing: Math.PI, shelterX: 34, shelterZ: 14.4 });
-  addPhotoVillager(scene, -25.5, -6.8, 0, .24, .2, .69, { behavior: 'idle', role: 'Commuter', facing: Math.PI / 2, shelterX: ERNAKULAM_STATION_BUS_LAYOUT.x, shelterZ: ERNAKULAM_STATION_BUS_LAYOUT.z });
+  addPhotoVillager(scene, -32, -13.2, 0, .24, .2, .69, { behavior: 'idle', role: 'Commuter', facing: Math.PI / 2, shelterX: -29, shelterZ: -14.5 });
   addPhotoVillager(scene, -3, 29.6, 0, .24, 2.8, .69, { behavior: 'idle', role: 'Waiting', facing: 0, shelterX: -1, shelterZ: 28 });
 
   const marker = new THREE.Group();
@@ -8532,12 +8455,10 @@ function updateTraffic(delta) {
 
     if (playerRef?.visible) {
       const footprint = trafficFootprint(config);
+      const playerRadius = vehicleMode === 'taxi' ? .92 : vehicleMode === 'bike' ? .56 : .43;
       const nextX = config.axis === 'x' ? nextProgress : Number(config.fixed);
       const nextZ = config.axis === 'z' ? nextProgress : Number(config.fixed);
-      const playerFootprint = vehicleMode === 'walk' ? .43 : vehicleCollisionFootprint(vehicleMode, playerRef.rotation.y);
-      if (footprintIntersectsCollider(playerRef.position.x, playerRef.position.z, expandedFootprint(playerFootprint, .18), {
-        type:'box', x:nextX, z:nextZ, halfWidth:footprint.halfWidth, halfDepth:footprint.halfDepth,
-      })) {
+      if (circleHitsBox(playerRef.position.x, playerRef.position.z, playerRadius + .18, nextX, nextZ, footprint.halfWidth, footprint.halfDepth)) {
         nextProgress = Number(config.progress);
         config.currentSpeed = 0;
       }
