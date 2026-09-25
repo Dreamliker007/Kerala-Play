@@ -1,6 +1,6 @@
 {
-  "versionCode": 21,
-  "versionName": "1.0.20",
+  "versionCode": 22,
+  "versionName": "1.0.21",
   "track": "closed-testing",
-  "notes": "V121.0 opens Android in a normal third-person camera view and restores it after app resume."
+  "notes": "V122.0 resets the camera to normal third-person view after train, flight and district-gate arrivals."
 }

@@ -1,9 +1,9 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=121.0';
-import { createAtmosphere } from './environment.js?v=121.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=121.0';
-import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, shortenCameraPathForColliders, clampCameraHeightToPitchRange } from './collision-geometry.js?v=121.0';
-import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=121.0';
+import { initSocial, api } from './social.js?v=122.0';
+import { createAtmosphere } from './environment.js?v=122.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=122.0';
+import { footprintIntersectsCollider, expandedFootprint, moveWithCollisionFootprint, shortenCameraPathForColliders, clampCameraHeightToPitchRange } from './collision-geometry.js?v=122.0';
+import { ERNAKULAM_STATION_BUS_LAYOUT, KOTTAYAM_RAIL_LAYOUT } from './transit-layout.js?v=122.0';
 
 const fallback = document.querySelector('#fallback');
 const joystickZone = document.querySelector('#joystick-zone');
@@ -107,6 +107,7 @@ const ERNAKULAM_CITY = Object.freeze({ x: 0, z: 0 });
 const DISTRICT_INSTANCE_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
 const DISTRICT_AIRPORTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvananthapuram']);
 const DISTRICT_BOOT_STORAGE_KEY = 'kerala-play-world-district';
+const DISTRICT_CAMERA_RESET_KEY = 'kerala-play-district-camera-reset';
 let bootWorldDistrict = (() => {
   try { return sessionStorage.getItem(DISTRICT_BOOT_STORAGE_KEY) || 'Kottayam'; }
   catch { return 'Kottayam'; }
@@ -2078,7 +2079,10 @@ function finishDistrictJourney(travel = {}) {
   const district = travel.to?.district || travel.district || '';
   if (district && DISTRICT_INSTANCE_CONFIG[district]) {
     bootWorldDistrict = district;
-    try { sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, district); } catch {}
+    try {
+      sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, district);
+      sessionStorage.setItem(DISTRICT_CAMERA_RESET_KEY, district);
+    } catch {}
   }
   location.reload();
 }
@@ -2805,6 +2809,7 @@ function acceptUser(user) {
     bootWorldDistrict = user.worldDistrict;
     try { sessionStorage.setItem(DISTRICT_BOOT_STORAGE_KEY, user.worldDistrict); } catch {}
     if (renderedWorldDistrict && renderedWorldDistrict !== user.worldDistrict) {
+      try { sessionStorage.setItem(DISTRICT_CAMERA_RESET_KEY, user.worldDistrict); } catch {}
       location.reload();
       return;
     }
@@ -3816,8 +3821,16 @@ try {
   let walkSafeRotation = player.rotation.y;
   let walkSafeReady = !positionBlockedStatic(player.position.x, player.position.z, .48);
   let walkSafeAccumulator = 0;
+  let districtCameraResetFrames = 0;
+  try {
+    if (sessionStorage.getItem(DISTRICT_CAMERA_RESET_KEY) === currentWorldDistrictName()) {
+      sessionStorage.removeItem(DISTRICT_CAMERA_RESET_KEY);
+      districtCameraResetFrames = runtimeIsMobile ? 48 : 24;
+    }
+  } catch {}
 
   function snapCameraToNormalView() {
+    lookPointerId = null;
     cameraYaw = player.rotation.y + Math.PI;
     cameraPitch = DEFAULT_CAMERA_PITCH;
     const horizontal = Math.cos(cameraPitch) * WALK_CAMERA_DISTANCE;
@@ -3920,6 +3933,8 @@ try {
     updateMapPlayer(player);
     updateWorldInteract();
     updateLifeLoopMission();
+    districtCameraResetFrames = runtimeIsMobile ? 48 : 24;
+    snapCameraToNormalView();
   });
   let cameraDriveImpulse = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
@@ -4447,6 +4462,13 @@ try {
     }
     camera.position.copy(cameraNextPosition);
     camera.lookAt(cameraTarget);
+    if (districtCameraResetFrames > 0 && vehicleMode === 'walk') {
+      // District travel can reload/resume a WebView with a stale elevated camera.
+      // Hold the intended third-person framing for a short settling window so
+      // train/flight/teleport arrivals always enter at ground level.
+      districtCameraResetFrames -= 1;
+      snapCameraToNormalView();
+    }
     updateRemotePlayers(delta, camera);
     updateVehicleAction();
     updateDriveHud();
