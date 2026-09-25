@@ -1,0 +1,25 @@
+name: Keep Render service awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake Kerala Play
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://kerala-play-1.onrender.com/api/session"
+          for attempt in 1 2 3; do
+            status="$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" --max-time 60 "$url" || true)"
+            case "$status" in
+              2*|4*) echo "Render responded with HTTP $status"; exit 0 ;;
+            esac
+            echo "Render wake attempt $attempt returned HTTP $status"
+            sleep 15
+          done
+          exit 1
