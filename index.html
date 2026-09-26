@@ -155,6 +155,22 @@
     .panel-heading, .map-header, .chat-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#fff; font-size:13px; font-weight:900; }
     .panel-heading small { color:#abd7c1; font-size:10px; font-weight:600; }
     .panel-close, #map-label-toggle { border:0; border-radius:7px; color:#fff; background:rgba(255,255,255,.13); padding:4px 7px; font:inherit; font-size:12px; cursor:pointer; touch-action:manipulation; }
+    #wardrobe-panel { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:72px; z-index:5; width:min(310px,calc(100vw - 90px)); max-height:min(58dvh,380px); overflow-y:auto; padding:11px; border:1px solid rgba(255,255,255,.3); border-radius:15px; color:#fff; background:rgba(7,24,30,.96); box-shadow:0 9px 26px rgba(0,0,0,.32); touch-action:pan-y; }
+    #wardrobe-panel.open { display:block; z-index:7; }
+    #wardrobe-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 8px; }
+    #wardrobe-options button { min-height:62px; border:1px solid rgba(255,255,255,.2); border-radius:10px; padding:9px; color:#fff; background:rgba(255,255,255,.07); text-align:left; font:800 12px/1.25 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
+    #wardrobe-options button[aria-pressed="true"] { border-color:#69dfa0; background:rgba(42,125,84,.68); box-shadow:0 0 0 1px rgba(105,223,160,.26); }
+    #wardrobe-options button small { display:block; margin-top:4px; color:#c8ded5; font-size:9px; font-weight:650; }
+    #wardrobe-options button:disabled { opacity:.62; cursor:wait; }
+    #avatar-customization { display:grid; gap:7px; margin:10px 0 7px; padding-top:9px; border-top:1px solid rgba(255,255,255,.12); }
+    #avatar-customization > strong { color:#bde7d0; font-size:10px; letter-spacing:.04em; text-transform:uppercase; }
+    #avatar-customization label { display:grid; grid-template-columns:1fr 1.15fr; align-items:center; gap:8px; color:#d7e5e4; font-size:10px; font-weight:700; }
+    #avatar-customization select { width:100%; min-height:32px; border:1px solid rgba(255,255,255,.18); border-radius:8px; padding:5px 7px; color:#fff; background:#142d37; font:700 10px system-ui,sans-serif; }
+    #avatar-customization select:disabled { opacity:.6; }
+    #wardrobe-status { margin:8px 0 4px; color:#bde7d0; font-size:10px; line-height:1.4; }
+    #wardrobe-error { min-height:14px; color:#ffd39b; font-size:10px; }
+    @media (max-width:560px) { #wardrobe-panel { right:58px; width:min(284px,calc(100vw - 78px)); max-height:56dvh; } }
+    @media (orientation:landscape) and (max-height:560px) and (hover:none) and (pointer:coarse) { #wardrobe-panel { top:calc(env(safe-area-inset-top) + 50px); right:calc(env(safe-area-inset-right) + 10px); width:min(286px,46vw); max-height:60dvh; padding:9px; border-radius:12px; } #wardrobe-options button { min-height:50px; padding:7px; font-size:10px; } }
     #map-label-toggle { margin-left:auto; }
     #kerala-map { display:block; width:100%; height:250px; margin-top:6px; overflow:hidden; border-radius:13px; background:radial-gradient(circle at 22% 45%, rgba(37,97,124,.22), rgba(5,24,33,.18) 64%, rgba(4,16,24,.42)); touch-action:manipulation; }
     #district-map { filter:drop-shadow(0 4px 6px rgba(0,0,0,.22)); }
@@ -1249,8 +1265,8 @@
       #kp-splash p { font-size:8px; }
     }
   </style>
-  <link rel="stylesheet" href="./social.css?v=113.0">
-  <link rel="stylesheet" href="./game.css?v=113.0">
+  <link rel="stylesheet" href="./social.css?v=114.0">
+  <link rel="stylesheet" href="./game.css?v=114.0">
 </head>
 <body>
   <div id="kp-splash" role="status" aria-label="Loading Kerala Play">
@@ -1297,6 +1313,7 @@
       <button id="phone-toggle" class="hud-icon" type="button" aria-label="Open Kerala Phone alerts" aria-controls="phone-panel" aria-expanded="false">📱<span>PHONE</span><b id="phone-badge" hidden>0</b></button>
       <button id="events-toggle" class="hud-icon" type="button" aria-label="Open village notice board" aria-controls="events-panel" aria-expanded="false">📌<span>EVENTS</span></button>
       <button id="wallet-toggle" class="hud-icon" type="button" aria-label="Open Kerala Cash wallet" aria-controls="wallet-panel" aria-expanded="false">💰<span>WALLET</span></button>
+      <button id="wardrobe-toggle" class="hud-icon" type="button" aria-label="Open character wardrobe" aria-controls="wardrobe-panel" aria-expanded="false">👕<span>OUTFIT</span></button>
       <button id="home-toggle" class="hud-icon" type="button" aria-label="Open home" aria-controls="home-panel" aria-expanded="false">🏠<span>HOME</span></button>
       <button id="garage-toggle" class="hud-icon" type="button" aria-label="Open personal garage" aria-controls="garage-panel" aria-expanded="false">🚘<span>GARAGE</span></button>
       <button id="jobs-toggle" class="hud-icon" type="button" aria-label="Open jobs" aria-controls="jobs-panel" aria-expanded="false">💼<span>JOBS</span></button>
@@ -1460,6 +1477,14 @@
       <div class="wallet-history-heading"><strong>Home Status</strong><button id="home-refresh" type="button">Refresh</button></div>
       <div id="home-error" class="social-error" role="status"></div>
     </section>
+    <section id="wardrobe-panel" aria-label="Character wardrobe">
+      <div class="panel-heading"><span>Wardrobe</span><button id="wardrobe-close" class="panel-close" type="button" aria-label="Close wardrobe">×</button></div>
+      <p class="panel-note">Choose a Kerala outfit. Your choice stays with your account and appears to nearby players.</p>
+      <div id="wardrobe-options" aria-label="Available outfits"></div>
+      <div id="avatar-customization" aria-label="Avatar appearance options"></div>
+      <p id="wardrobe-status" role="status"></p>
+      <div id="wardrobe-error" role="alert"></div>
+    </section>
     <section id="garage-panel" aria-label="Personal vehicle garage">
       <div class="panel-heading"><span>My Garage</span><button id="garage-close" class="panel-close" type="button" aria-label="Close garage">×</button></div>
       <p class="panel-note">Buy personal vehicles with Kerala Cash. Retrieve one vehicle at a time, then enter it in the world.</p>
@@ -1496,6 +1521,6 @@
     <div id="onboarding-pointer" hidden aria-hidden="true"></div>
   </section>
 
-  <script type="module" src="./boot.js?v=113.0"></script>
+  <script type="module" src="./boot.js?v=114.0"></script>
 </body>
 </html>
