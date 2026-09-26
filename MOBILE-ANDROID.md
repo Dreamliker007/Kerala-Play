@@ -58,7 +58,7 @@ The web/PWA button requests fullscreen first and then asks the Screen Orientatio
 
 ## Closed testing release metadata
 
-The current Play closed-testing update is defined in `mobile-release.json` as version `1.0.1` with `versionCode 2`.
+The V114 Play closed-testing update is defined in `mobile-release.json` as version `1.0.13` with `versionCode 14` and uses the beta server URL recorded there.
 
 `npm run mobile:add` and `npm run mobile:sync` now run `mobile:configure`, which reapplies:
 
@@ -67,3 +67,4 @@ The current Play closed-testing update is defined in `mobile-release.json` as ve
 - the Play `versionName`
 
 This prevents Capacitor regeneration/sync from silently resetting the release metadata before an AAB is generated.
+
