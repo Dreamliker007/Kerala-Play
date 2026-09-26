@@ -1,6 +1,7 @@
 {
-  "versionCode": 13,
-  "versionName": "1.0.12",
+  "versionCode": 14,
+  "versionName": "1.0.13",
   "track": "closed-testing",
-  "notes": "V113.0 adds train, flight, and teleport district travel with three free trips, fixed fares, timed arrivals, and portal animation"
+  "serverUrl": "https://keralaplay.in",
+  "notes": "V114.0 improves Kerala district roads, vegetation, weather and placement of world locations"
 }
