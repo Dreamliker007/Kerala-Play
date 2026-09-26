@@ -1,14 +1,27 @@
 // A shared visual clock and opt-in soundscape. No downloaded audio or visual assets.
 const DAY_LENGTH_MS = 24 * 60 * 1000;
 const PREFERENCE_KEY = 'kerala-play:environment:v1';
+const NIGHT_AMBIENT_FILL = 1.10;
+const DAY_AMBIENT_FILL = 1.20;
+const OVERCAST_AMBIENT_ATTENUATION = .16;
+const NIGHT_MOONLIGHT = .82;
+const OVERCAST_MOONLIGHT_ATTENUATION = .25;
 
 function readPreferences() {
   try { return JSON.parse(localStorage.getItem(PREFERENCE_KEY) || '{}') || {}; }
   catch { return {}; }
 }
 
+export function highlandMistLevel(THREE, climate, hour, rain = 0, overcast = 0) {
+  if (climate !== 'highland') return 0;
+  const dawnMist = THREE.MathUtils.smoothstep(hour, 4.7, 6.1)
+    * (1 - THREE.MathUtils.smoothstep(hour, 8.1, 9.5));
+  return dawnMist * (1 - THREE.MathUtils.clamp(rain, 0, 1))
+    * (.58 + THREE.MathUtils.clamp(overcast, 0, 1) * .18);
+}
+
 /** Environment controller; time is game elapsed time, while the sky uses UTC epoch time. */
-export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) {
+export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, climate = '' }) {
   const preferences = readPreferences();
   const quality = 'high';
   const mobileLike = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
@@ -17,7 +30,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
   let lastHudMinute = -1;
   let lastHudWeather = '';
   let materialTimer = 1;
-  let currentWeather = { daylight: 1, hour: 12, rain: 0, overcast: 0, weather: 'Clear', needsLights: false };
+  let currentWeather = { daylight: 1, hour: 12, rain: 0, overcast: 0, mist: 0, weather: 'Clear', needsLights: false };
   let audioEnabled = false;
   let soundscape = null;
   const disposables = [];
@@ -157,15 +170,16 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     if (!sun.target.parent) scene.add(sun.target);
   }
   const daySky = new THREE.Color(0x97ccee);
-  const nightSky = new THREE.Color(0x172943);
+  const nightSky = new THREE.Color(0x21344a);
   const duskSky = new THREE.Color(0xb98278);
   const daylightColor = new THREE.Color(0xeaf5ff);
   const nightLightColor = new THREE.Color(0xa9c6ef);
   const warmColor = new THREE.Color(0xffc797);
   const whiteColor = new THREE.Color(0xfff2d9);
   const groundDay = new THREE.Color(0x647d42);
-  const groundNight = new THREE.Color(0x3b4b55);
+  const groundNight = new THREE.Color(0x475963);
   const rainSky = new THREE.Color(0x647682);
+  const mistColor = new THREE.Color(0xb7c9c7);
   const stormCloud = new THREE.Color(0x77828a);
   const lightningColor = new THREE.Color(0xe6f3ff);
   const lightDirection = new THREE.Vector3();
@@ -404,7 +418,11 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     const rainFall = 1 - THREE.MathUtils.smoothstep(weatherPhase, .60, .74);
     const rain = THREE.MathUtils.clamp(rainRise * rainFall, 0, 1);
     const overcast = THREE.MathUtils.clamp(Math.max(rain * .95, cloudBuild * .62), 0, 1);
-    const weather = rain > .68 ? 'Heavy rain' : rain > .12 ? 'Rain' : overcast > .30 ? 'Cloudy' : 'Clear';
+    // Cool dawn mist belongs to the highland districts and fades before the
+    // road traffic builds. It uses the existing distance fog, with no particles.
+    const mist = highlandMistLevel(THREE, climate, hour, rain, overcast);
+    const weather = rain > .68 ? 'Heavy rain' : rain > .12 ? 'Light rain'
+      : mist > .25 ? 'Mist' : overcast > .30 ? 'Cloudy' : 'Clear';
     const needsLights = daylight < .38 || overcast > .58;
 
     // Two deterministic strike windows per real minute while the shared
@@ -430,19 +448,20 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
       }
     }
 
-    currentWeather = { daylight, hour, rain, overcast, weather, needsLights, lightning };
+    currentWeather = { daylight, hour, rain, overcast, mist, weather, needsLights, lightning };
 
     // High-quality exposure follows the world state instead of using one fixed
     // value. Nights stay readable while monsoon scenes retain contrast.
-    const nightLift = (1 - daylight) * .10;
+    const nightLift = (1 - daylight) * .14;
     const stormPull = overcast * .055;
     renderer.toneMappingExposure = THREE.MathUtils.clamp(1.18 + nightLift - stormPull + lightning * .10, 1.10, 1.36);
 
     scene.background.copy(nightSky).lerp(daySky, daylight).lerp(duskSky, twilight).lerp(rainSky, overcast * .58);
     if (lightning > 0) scene.background.lerp(lightningColor, lightning * .34);
     scene.fog.color.copy(scene.background);
-    scene.fog.near = 48 + daylight * 14 - overcast * 10;
-    scene.fog.far = 138 + daylight * 34 - overcast * 48;
+    if (mist > 0) scene.fog.color.lerp(mistColor, mist * .56);
+    scene.fog.near = Math.max(16, 48 + daylight * 14 - overcast * 10 - mist * 29);
+    scene.fog.far = Math.max(scene.fog.near + 35, 138 + daylight * 34 - overcast * 48 - mist * 65);
     sky.position.copy(camera.position);
     lightDirection.set(Math.cos(angle) * .84, elevation, Math.cos(angle) * .54).normalize();
     sunDisc.position.copy(lightDirection).multiplyScalar(120);
@@ -488,19 +507,24 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi }) 
     lightningLight.target.position.copy(target);
     if (sun) {
       sun.color.copy(whiteColor).lerp(warmColor, twilight);
-      sun.intensity = (Math.max(0, elevation) * 1.7 + daylight * .28) * (1 - overcast * .62);
+      sun.intensity = (Math.max(0, elevation) * 1.7 + daylight * .28) * (1 - overcast * .62) * (1 - mist * .22);
       sun.position.copy(target).addScaledVector(lightDirection, 75);
       // Keep its shadow camera above ground while the light fades out at the horizon.
       sun.position.y = Math.max(8, sun.position.y);
       sun.target.position.copy(target);
     }
     if (hemi) {
-      hemi.intensity = (.78 + daylight * 1.38) * (1 - overcast * .26) + lightning * .78;
+      // Preserve daylight strength while lifting shadow detail at night. The
+      // existing street and building lights still define the warm focal points.
+      hemi.intensity = (NIGHT_AMBIENT_FILL + daylight * DAY_AMBIENT_FILL)
+        * (1 - overcast * OVERCAST_AMBIENT_ATTENUATION) + lightning * .78;
       hemi.color.copy(nightLightColor).lerp(daylightColor, daylight).lerp(rainSky, overcast * .40);
       if (lightning > 0) hemi.color.lerp(lightningColor, lightning * .62);
       hemi.groundColor.copy(groundNight).lerp(groundDay, daylight);
     }
-    moonLight.intensity = (1 - daylight) * .66 * (1 - overcast * .38) + overcast * (1 - daylight) * .08;
+    moonLight.intensity = (1 - daylight) * NIGHT_MOONLIGHT
+      * (1 - overcast * OVERCAST_MOONLIGHT_ATTENUATION)
+      + overcast * (1 - daylight) * .12;
     moonLight.position.copy(target).addScaledVector(lightDirection, -70);
     moonLight.position.y = Math.max(15, moonLight.position.y);
     moonLight.target.position.copy(target);
