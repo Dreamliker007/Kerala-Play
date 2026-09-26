@@ -3,11 +3,10 @@
   "appName": "Kerala Play",
   "webDir": "www",
   "server": {
-    "url": "https://kerala-play-v114-beta.onrender.com",
+    "url": "https://keralaplay.in",
     "cleartext": false
   },
   "android": {
     "allowMixedContent": false
   }
 }
-
