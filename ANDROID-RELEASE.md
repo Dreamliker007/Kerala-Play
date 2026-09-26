@@ -6,10 +6,10 @@ This repository is prepared for the next Google Play closed-testing update.
 
 - App name: `Kerala Play`
 - Application ID: `com.dreamliker007.keralaplay`
-- Version name: `1.0.1`
-- Android version code: `2`
+- Version name: `1.0.13`
+- Android version code: `14`
 - Play track: `closed-testing`
-- Production origin: `https://keralaplay.in`
+- Closed-test origin: `https://kerala-play-v114-beta.onrender.com`
 - Android orientation: `sensorLandscape`
 - Cleartext HTTP and mixed content: disabled
 
@@ -36,7 +36,7 @@ In Android Studio use **Build > Generate Signed App Bundle or APK > Android App 
 
 Use the same Play app and the same upload signing key used for the existing Kerala Play listing. Do not create a second application ID. Upload the resulting signed `.aab` to the existing **Closed testing** track.
 
-The V80 landscape fix is native Android configuration, so testers need this newly built Play Store update; an already installed older build cannot receive the AndroidManifest orientation change from the hosted website alone.
+V114 serves the revised game from the closed-test origin. Testers need this newly built Play Store update to connect to the beta server; the public `keralaplay.in` website stays on its current release.
 
 ## Closed-testing update checks
 
@@ -56,3 +56,4 @@ Keep the update in the same Play Console closed-testing track and keep existing 
 ## Signing safety
 
 Never commit the upload keystore or signing passwords to this repository. Keep at least one secure backup of the upload key and credentials.
+
