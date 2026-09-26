@@ -2,5 +2,7 @@
   "versionCode": 14,
   "versionName": "1.0.13",
   "track": "closed-testing",
+  "serverUrl": "https://kerala-play-v114-beta.onrender.com",
   "notes": "V114.0 improves Kerala district roads, vegetation, weather and placement of world locations"
 }
+
