@@ -14,8 +14,8 @@ if (!Number.isInteger(Number(release.versionCode)) || Number(release.versionCode
 if (release.track !== 'closed-testing') errors.push(`Expected closed-testing release track, found ${release.track || '(missing)'}.`);
 if (config.appId !== 'com.dreamliker007.keralaplay') errors.push(`Unexpected appId: ${config.appId}`);
 if (config.appName !== 'Kerala Play') errors.push(`Unexpected appName: ${config.appName}`);
-if (!config.server?.url?.startsWith('https://')) errors.push('Android release server.url must use HTTPS.');
-if (config.server?.url !== 'https://keralaplay.in') errors.push(`Unexpected production URL: ${config.server?.url || '(missing)'}`);
+if (!release.serverUrl?.startsWith('https://')) errors.push('mobile-release.json serverUrl must use HTTPS.');
+if (config.server?.url !== release.serverUrl) errors.push(`Capacitor server.url must match mobile-release.json serverUrl (${release.serverUrl || '(missing)'}).`);
 if (config.server?.cleartext !== false) errors.push('server.cleartext must be false for release.');
 if (config.android?.allowMixedContent !== false) errors.push('android.allowMixedContent must be false for release.');
 if (manifest.orientation !== 'landscape') errors.push(`Web app manifest orientation must be landscape, found ${manifest.orientation || '(missing)'}.`);
@@ -33,3 +33,4 @@ console.log(`App: ${config.appName} (${config.appId})`);
 console.log(`Version: ${release.versionName} (versionCode ${release.versionCode})`);
 console.log(`Track: ${release.track}`);
 console.log(`Production URL: ${config.server.url}`);
+
