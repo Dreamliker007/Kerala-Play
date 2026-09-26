@@ -1,6 +1,6 @@
 # Kerala Play Android closed-testing update
 
-This repository is prepared for the next Google Play closed-testing update.
+This repository is prepared for the V114 update to the existing Google Play closed-testing track.
 
 ## Release identity
 
@@ -9,7 +9,7 @@ This repository is prepared for the next Google Play closed-testing update.
 - Version name: `1.0.13`
 - Android version code: `14`
 - Play track: `closed-testing`
-- Closed-test origin: `https://kerala-play-v114-beta.onrender.com`
+- Game origin: `https://keralaplay.in`
 - Android orientation: `sensorLandscape`
 - Cleartext HTTP and mixed content: disabled
 
@@ -26,8 +26,8 @@ npm run mobile:open
 
 After `mobile:sync`, the generated Android app should contain:
 
-- `versionCode 2`
-- `versionName "1.0.1"`
+- `versionCode 14`
+- `versionName "1.0.13"`
 - `android:screenOrientation="sensorLandscape"`
 
 ## Build the Play Store update
@@ -36,7 +36,7 @@ In Android Studio use **Build > Generate Signed App Bundle or APK > Android App 
 
 Use the same Play app and the same upload signing key used for the existing Kerala Play listing. Do not create a second application ID. Upload the resulting signed `.aab` to the existing **Closed testing** track.
 
-V114 serves the revised game from the closed-test origin. Testers need this newly built Play Store update to connect to the beta server; the public `keralaplay.in` website stays on its current release.
+V114 is deployed at `https://keralaplay.in`. Closed-test users receive the Android update only after its signed AAB is uploaded and released in the existing closed-testing track.
 
 ## Closed-testing update checks
 
@@ -56,4 +56,3 @@ Keep the update in the same Play Console closed-testing track and keep existing 
 ## Signing safety
 
 Never commit the upload keystore or signing passwords to this repository. Keep at least one secure backup of the upload key and credentials.
-
