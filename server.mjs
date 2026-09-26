@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { recognitionSummary } from './recognition.mjs';
 import { categoryLeaderboard, leaderboardCategories } from './leaderboards.mjs';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js';
+import { genericDistrictFuelPosition } from './district-layout.js';
 
 const scrypt = promisify(scryptCallback);
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -16,6 +17,41 @@ const DISTRICTS = {
 };
 const DISTRICT_WORLD_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
 const AIRPORT_DISTRICTS = new Set(['Kannur','Kozhikode','Ernakulam','Thiruvananthapuram']);
+const AVATAR_APPEARANCE_PALETTES = Object.freeze({
+  skin: Object.freeze([0xa96d4c, 0x915a40, 0xb97a57, 0x855137, 0x6a4335]),
+  hair: Object.freeze([0x171616, 0x38251e, 0x5c3928, 0x4b443e]),
+  shirt: Object.freeze([0x2a759b, 0x1e8173, 0x9a3046, 0x875d45, 0xc97987, 0x557a54]),
+  trousers: Object.freeze([0x26354a, 0x273253, 0x2e3447, 0x303548, 0x494234]),
+});
+const AVATAR_APPEARANCE_OPTIONS = Object.freeze({
+  faceShape: Object.freeze(['auto', 'oval', 'balanced', 'round', 'angular']),
+  eyeShape: Object.freeze(['almond', 'round']),
+  hairStyleMale: Object.freeze(['auto', 'crop', 'side-part', 'curly', 'swept']),
+  hairStyleFemale: Object.freeze(['auto', 'long', 'shoulder', 'braid', 'bun']),
+  bodyBuild: Object.freeze(['slim', 'average', 'broad']),
+  facialHair: Object.freeze(['auto', 'none', 'moustache', 'goatee', 'beard']),
+  height: Object.freeze([0.9, 1, 1.1]),
+});
+function cleanAvatarCustomization(value, gender = 'male') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const clean = {};
+  for (const [field, input] of Object.entries(value)) {
+    if (Object.hasOwn(AVATAR_APPEARANCE_PALETTES, field)) {
+      if (Number.isInteger(input) && AVATAR_APPEARANCE_PALETTES[field].includes(input)) clean[field] = input;
+      continue;
+    }
+    if (field === 'height') {
+      if (AVATAR_APPEARANCE_OPTIONS.height.includes(input)) clean.height = input;
+      continue;
+    }
+    if (field === 'faceShape' && AVATAR_APPEARANCE_OPTIONS.faceShape.includes(input)) clean.faceShape = input;
+    else if (field === 'eyeShape' && AVATAR_APPEARANCE_OPTIONS.eyeShape.includes(input)) clean.eyeShape = input;
+    else if (field === 'bodyBuild' && AVATAR_APPEARANCE_OPTIONS.bodyBuild.includes(input)) clean.bodyBuild = input;
+    else if (field === 'hairStyle' && (gender === 'female' ? AVATAR_APPEARANCE_OPTIONS.hairStyleFemale : AVATAR_APPEARANCE_OPTIONS.hairStyleMale).includes(input)) clean.hairStyle = input;
+    else if (field === 'facialHair' && (gender === 'female' ? input === 'none' : AVATAR_APPEARANCE_OPTIONS.facialHair.includes(input))) clean.facialHair = input;
+  }
+  return clean;
+}
 const DISTRICT_TRAVEL_FREE_TRIPS = 3;
 const DISTRICT_TRAVEL_FARES = Object.freeze({ train:500, flight:1000, teleport:2000 });
 const DISTRICT_TRAVEL_DURATIONS = Object.freeze({ train:60_000, flight:30_000, teleport:0 });
@@ -101,7 +137,7 @@ const SHOP_ITEMS = Object.freeze({
 });
 const WORLD_SHOPS = Object.freeze({
   anugraha: Object.freeze({
-    id: 'anugraha', label: 'Anugraha Stores', x: -14.4, z: 10.7, radius: 4.8,
+    id: 'anugraha', label: 'Anugraha Stores', x: -14.4, z: 13.7, radius: 4.8,
     openHour: 6, closeHour: 21,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
@@ -111,17 +147,17 @@ const WORLD_SHOPS = Object.freeze({
     items: Object.freeze(['water', 'tea', 'snack']),
   }),
   'town-market': Object.freeze({
-    id: 'town-market', label: 'Town Market', x: 31, z: 15, radius: 4.8,
+    id: 'town-market', label: 'Town Market', x: 31, z: 12.5, radius: 4.8,
     openHour: 6, closeHour: 21,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
   'ernakulam-market': Object.freeze({
-    id: 'ernakulam-market', label: 'Ernakulam City Market', x: 11, z: -7, radius: 5.5,
+    id: 'ernakulam-market', label: 'Ernakulam City Market', x: -49, z: 8.5, radius: 5.5,
     openHour: 5.5, closeHour: 22,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
   'broadway-cafe': Object.freeze({
-    id: 'broadway-cafe', label: 'Broadway Cafe', x: -12.5, z: 11, radius: 5.0,
+    id: 'broadway-cafe', label: 'Broadway Cafe', x: -33, z: 11.5, radius: 5.0,
     openHour: 5, closeHour: 23,
     items: Object.freeze(['water', 'tea', 'snack', 'meal']),
   }),
@@ -158,8 +194,8 @@ const NEEDS_REST_POINT = Object.freeze({ id: 'village-bench', label: 'Village Re
 const NEEDS_REST_ENERGY = 35;
 const NEEDS_REST_COOLDOWN_MS = 30_000;
 const CLINIC_DEFINITIONS = Object.freeze({
-  'community-clinic': Object.freeze({ id: 'community-clinic', label: 'Community Clinic', x: 28, z: 28, radius: 6.2, fee: 45, energyRestore: 30, thirstRestore: 10 }),
-  'ernakulam-hospital': Object.freeze({ id: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -12, z: -25, radius: 7.0, fee: 55, energyRestore: 36, thirstRestore: 12 }),
+  'community-clinic': Object.freeze({ id: 'community-clinic', label: 'Community Clinic', x: 42, z: 31, radius: 6.2, fee: 45, energyRestore: 30, thirstRestore: 10 }),
+  'ernakulam-hospital': Object.freeze({ id: 'ernakulam-hospital', label: 'Ernakulam City Hospital', x: -11, z: -34, radius: 7.0, fee: 55, energyRestore: 36, thirstRestore: 12 }),
 });
 const CLINIC_DEFINITION = CLINIC_DEFINITIONS['community-clinic'];
 const CLINIC_COOLDOWN_MS = 60_000;
@@ -186,16 +222,16 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
     boardingWindowMs: 9_000,
     stops: Object.freeze({
       'town-bus': Object.freeze({
-        id: 'town-bus', label: 'Town Junction Bus Stop', x: 11.7, z: 27.5, radius: 6.2,
-        phaseMs: 0, destinationId: 'town-centre-bus', arrivalX: 11.7, arrivalZ: 29.4, arrivalRotation: Math.PI,
+        id: 'town-bus', label: 'Town Junction Bus Stop', x: 11.7, z: 30, radius: 6.2,
+        phaseMs: 0, destinationId: 'town-centre-bus', arrivalX: 8.7, arrivalZ: 30, arrivalRotation: Math.PI,
       }),
       'town-centre-bus': Object.freeze({
-        id: 'town-centre-bus', label: 'Town Centre Bus Stop', x: 13.0, z: 19.2, radius: 6.2,
-        phaseMs: 15_000, destinationId: 'south-bus', arrivalX: 13.0, arrivalZ: 21.1, arrivalRotation: Math.PI,
+        id: 'town-centre-bus', label: 'Town Centre Bus Stop', x: 13.0, z: 16.0, radius: 6.2,
+        phaseMs: 15_000, destinationId: 'south-bus', arrivalX: 10, arrivalZ: 16, arrivalRotation: Math.PI,
       }),
       'south-bus': Object.freeze({
         id: 'south-bus', label: 'South Bus Stop', x: -11.7, z: -50.5, radius: 6.2,
-        phaseMs: 30_000, destinationId: 'town-bus', arrivalX: -11.7, arrivalZ: -52.4, arrivalRotation: 0,
+        phaseMs: 30_000, destinationId: 'town-bus', arrivalX: -8.7, arrivalZ: -50.5, arrivalRotation: 0,
       }),
     }),
   }),
@@ -207,16 +243,16 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
     boardingWindowMs: 9_000,
     stops: Object.freeze({
       'ernakulam-station-bus': Object.freeze({
-        id: 'ernakulam-station-bus', label: 'Ernakulam Railway Bus Stop', x: -29, z: -14.5, radius: 6.2,
-        phaseMs: 0, destinationId: 'ernakulam-mg-road', arrivalX: 20, arrivalZ: 8, arrivalRotation: Math.PI / 2,
+        id: 'ernakulam-station-bus', label: 'Ernakulam Railway Bus Stop', x: -35, z: -12, radius: 6.2,
+        phaseMs: 0, destinationId: 'ernakulam-mg-road', arrivalX: -33, arrivalZ: -12, arrivalRotation: Math.PI / 2,
       }),
       'ernakulam-mg-road': Object.freeze({
-        id: 'ernakulam-mg-road', label: 'MG Road Bus Stop', x: 18, z: 8, radius: 6.2,
-        phaseMs: 15_000, destinationId: 'ernakulam-marine', arrivalX: -1, arrivalZ: 26, arrivalRotation: 0,
+        id: 'ernakulam-mg-road', label: 'MG Road Bus Stop', x: 16, z: 13.5, radius: 6.2,
+        phaseMs: 15_000, destinationId: 'ernakulam-marine', arrivalX: 16, arrivalZ: 13.5, arrivalRotation: -Math.PI / 2,
       }),
       'ernakulam-marine': Object.freeze({
-        id: 'ernakulam-marine', label: 'Marine Drive Bus Stop', x: -1, z: 28, radius: 6.2,
-        phaseMs: 30_000, destinationId: 'ernakulam-station-bus', arrivalX: -27, arrivalZ: -14.5, arrivalRotation: -Math.PI / 2,
+        id: 'ernakulam-marine', label: 'Marine Drive Bus Stop', x: -3, z: 30.5, radius: 6.2,
+        phaseMs: 30_000, destinationId: 'ernakulam-station-bus', arrivalX: -5, arrivalZ: 30.5, arrivalRotation: 0,
       }),
     }),
   }),
@@ -237,20 +273,20 @@ const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
   alappuzha: Object.freeze({ id:'alappuzha', label:'Alappuzha Backwaters', x:-34, z:-13, arrivalX:-30.7, arrivalZ:-13 }),
   kuttanad: Object.freeze({ id:'kuttanad', label:'Kuttanad Fields', x:7, z:-23, arrivalX:10.2, arrivalZ:-23 }),
   temple: Object.freeze({ id:'temple', label:'Padmanabhaswamy Temple', x:13, z:-57, arrivalX:16.2, arrivalZ:-57 }),
-  anugraha: Object.freeze({ id:'anugraha', label:'Anugraha Stores', x:-14.4, z:10.7, arrivalX:-14.4, arrivalZ:10.7 }),
+  anugraha: Object.freeze({ id:'anugraha', label:'Anugraha Stores', x:-14.4, z:13.7, arrivalX:-14.4, arrivalZ:13.7 }),
   malabar: Object.freeze({ id:'malabar', label:'Malabar Bakery', x:14.8, z:41.2, arrivalX:14.8, arrivalZ:41.2 }),
-  'town-bus': Object.freeze({ id:'town-bus', label:'Town Junction Bus Stop', x:11.7, z:27.5, arrivalX:8.7, arrivalZ:27.5 }),
-  'town-centre-bus': Object.freeze({ id:'town-centre-bus', label:'Town Centre Bus Stop', x:13.0, z:19.2, arrivalX:10.0, arrivalZ:19.2 }),
+  'town-bus': Object.freeze({ id:'town-bus', label:'Town Junction Bus Stop', x:11.7, z:30, arrivalX:8.7, arrivalZ:30 }),
+  'town-centre-bus': Object.freeze({ id:'town-centre-bus', label:'Town Centre Bus Stop', x:13.0, z:16, arrivalX:10, arrivalZ:16 }),
   'south-bus': Object.freeze({ id:'south-bus', label:'South Bus Stop', x:-11.7, z:-50.5, arrivalX:-8.7, arrivalZ:-50.5 }),
-  'village-rental': Object.freeze({ id:'village-rental', label:'Village Rental Home', x:-24, z:-30.8, arrivalX:-24, arrivalZ:-30.8 }),
+  'village-rental': Object.freeze({ id:'village-rental', label:'Village Rental Home', x:-24, z:-29.8, arrivalX:-24, arrivalZ:-29.8 }),
   'village-bench': Object.freeze({ id:'village-bench', label:'Village Rest Bench', x:-10, z:-10, arrivalX:-10, arrivalZ:-10 }),
   fuel: Object.freeze({ id:'fuel', label:'Kerala Fuel Station', x:11, z:-12, arrivalX:13.8, arrivalZ:-12 }),
-  service: Object.freeze({ id:'service', label:'Village Service Garage', x:-36, z:-15, arrivalX:-32.8, arrivalZ:-15 }),
+  service: Object.freeze({ id:'service', label:'Village Service Garage', x:-33, z:-12, arrivalX:-28.8, arrivalZ:-12 }),
   'village-pond': Object.freeze({ id:'village-pond', label:'Village Pond', x:39, z:-4, arrivalX:35.5, arrivalZ:-4 }),
   'ernakulam-centre': Object.freeze({ id:'ernakulam-centre', label:'Ernakulam City Centre', x:5, z:2, arrivalX:9, arrivalZ:2 }),
-  'ernakulam-market': Object.freeze({ id:'ernakulam-market', label:'Ernakulam City Market', x:11, z:-7, arrivalX:11, arrivalZ:-3 }),
-  'broadway-cafe': Object.freeze({ id:'broadway-cafe', label:'Broadway Cafe', x:-12.5, z:11, arrivalX:-12.5, arrivalZ:15 }),
-  'ernakulam-hospital': Object.freeze({ id:'ernakulam-hospital', label:'Ernakulam City Hospital', x:-12, z:-25, arrivalX:-12, arrivalZ:-21 }),
+  'ernakulam-market': Object.freeze({ id:'ernakulam-market', label:'Ernakulam City Market', x:-49, z:8.5, arrivalX:-49, arrivalZ:12.5 }),
+  'broadway-cafe': Object.freeze({ id:'broadway-cafe', label:'Broadway Cafe', x:-33, z:11.5, arrivalX:-33, arrivalZ:15.5 }),
+  'ernakulam-hospital': Object.freeze({ id:'ernakulam-hospital', label:'Ernakulam City Hospital', x:-11, z:-34, arrivalX:-11, arrivalZ:-30 }),
 });
 const PUBLIC_RIDE_SERVICES = Object.freeze({
   auto: Object.freeze({ id:'auto', label:'Auto-rickshaw', baseFare:18, perMeter:.48, maxDistance:72, pickupSeconds:2, speed:10 }),
@@ -283,7 +319,7 @@ const DISTRICT_REGISTRATION_PREFIX = Object.freeze({
 });
 const VEHICLE_STATIONS = Object.freeze({
   fuel: { id: 'fuel', label: 'Kerala Fuel Station', x: 11, z: -12, radius: 7 },
-  service: { id: 'service', label: 'Village Service Garage', x: -36, z: -15, radius: 7 },
+  service: { id: 'service', label: 'Village Service Garage', x: -33, z: -12, radius: 7 },
 });
 const VEHICLE_STATION_OPTIONS = Object.freeze({
   fuel: Object.freeze([VEHICLE_STATIONS.fuel, Object.freeze({ id: 'ernakulam-fuel', label: 'Ernakulam Fuel Station', x: 31, z: -25, radius: 7 })]),
@@ -299,8 +335,9 @@ function nearestVehicleServiceStation(user, action, x, z) {
   } else if (district === 'Kottayam') {
     options = [VEHICLE_STATIONS[action]];
   } else {
+    const fuelPosition = genericDistrictFuelPosition(AIRPORT_DISTRICTS.has(district));
     options = action === 'fuel'
-      ? [{ id:'district-fuel', label:`${district} Fuel Station`, x:18, z:-48, radius:7 }]
+      ? [{ id:'district-fuel', label:`${district} Fuel Station`, ...fuelPosition, radius:7 }]
       : [{ id:'district-service', label:`${district} Service Garage`, x:-18, z:-48, radius:7 }];
   }
   return (options || []).filter(Boolean).reduce((best, station) => {
@@ -323,8 +360,8 @@ const REPORT_DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const REPORT_HISTORY_LIMIT = 80;
 const WORLD_SERVICE_POINTS = Object.freeze({
   police: Object.freeze({ id: 'police', service: 'police', label: 'Kerala Police Station', x: -31, z: 14, radius: 6.2 }),
-  fire: Object.freeze({ id: 'fire', service: 'fire', label: 'Fire & Rescue Station', x: -48, z: 8, radius: 6.2 }),
-  'ernakulam-police': Object.freeze({ id: 'ernakulam-police', service: 'police', label: 'Ernakulam City Police', x: -31, z: 11, radius: 6.8 }),
+  fire: Object.freeze({ id: 'fire', service: 'fire', label: 'Fire & Rescue Station', x: -52, z: 8, radius: 6.2 }),
+  'ernakulam-police': Object.freeze({ id: 'ernakulam-police', service: 'police', label: 'Ernakulam City Police', x: -31, z: 42, radius: 6.8 }),
   'ernakulam-fire': Object.freeze({ id: 'ernakulam-fire', service: 'fire', label: 'Ernakulam Fire & Rescue', x: 34, z: 11, radius: 6.8 }),
 });
 const WORLD_SERVICE_HELP_COOLDOWN_MS = 60_000;
@@ -336,7 +373,7 @@ function worldShopForUser(user, shopId) {
   if (genericDistrictWorld(user)) {
     const district = currentWorldDistrict(user);
     const profile = districtCityProfile(district);
-    if (shopId === 'district-market') return { id:'district-market', label:profile.market, x:20, z:16, radius:5.5, openHour:5.5, closeHour:22, items:['water','tea','snack','meal'] };
+    if (shopId === 'district-market') return { id:'district-market', label:profile.market, x:20, z:12.5, radius:5.5, openHour:5.5, closeHour:22, items:['water','tea','snack','meal'] };
     if (shopId === 'district-cafe') return { id:'district-cafe', label:profile.cafe, x:-44, z:22, radius:5.5, openHour:5, closeHour:23, items:['water','tea','snack','meal'] };
   }
   return WORLD_SHOPS[shopId] || null;
@@ -344,7 +381,7 @@ function worldShopForUser(user, shopId) {
 function clinicForUser(user, clinicId) {
   if (clinicId === 'district-hospital' && genericDistrictWorld(user)) {
     const district = currentWorldDistrict(user);
-    return { id:'district-hospital', label:`${district} District Hospital`, x:-20, z:16, radius:7, fee:50, energyRestore:34, thirstRestore:10 };
+    return { id:'district-hospital', label:`${district} District Hospital`, x:-20, z:11.5, radius:7, fee:50, energyRestore:34, thirstRestore:10 };
   }
   return CLINIC_DEFINITIONS[clinicId] || CLINIC_DEFINITION;
 }
@@ -553,7 +590,12 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     let level = 1, remaining = user.points, next = 100;
     while (remaining >= next) { remaining -= next; level++; next = 100 + (level - 1) * 50; }
     const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username);
-    return { id: user.id, username: displayName, name: displayName, displayName, accountUsername: user.username, usernameChangedAt: Number(user.usernameChangedAt || 0), usernameChangeAvailableAt: Number(user.usernameChangedAt || 0) + 10 * 24 * 60 * 60 * 1000, district: user.district, worldDistrict: currentWorldDistrict(user), gender: user.gender, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
+    const savedOutfit = user.jobState?.avatarAppearance?.outfit;
+    const outfit = user.gender === 'male' && savedOutfit === 'mundu'
+      ? 'mundu'
+      : user.gender === 'female' && savedOutfit === 'saree' ? 'saree' : 'casual';
+    const avatarCustomization = cleanAvatarCustomization(user.jobState?.avatarAppearance, user.gender);
+    return { id: user.id, username: displayName, name: displayName, displayName, accountUsername: user.username, usernameChangedAt: Number(user.usernameChangedAt || 0), usernameChangeAvailableAt: Number(user.usernameChangedAt || 0) + 10 * 24 * 60 * 60 * 1000, district: user.district, worldDistrict: currentWorldDistrict(user), gender: user.gender, outfit, avatarCustomization, bio: user.bio, points: user.points, level, followers: db.follows.filter(follow => follow.to === user.id && follow.status === 'accepted').length, following: db.follows.filter(follow => follow.from === user.id && follow.status === 'accepted').length, completedTasks: [...user.completedTasks], walkMeters: Math.floor(user.walkMeters), visitedLandmarks: [...user.visitedLandmarks], x: position?.x ?? saved.x, z: position?.z ?? saved.z, rotation: position?.rotation ?? saved.rotation };
   }
   function progressionStats(user) {
     const jobsCompleted = Object.values(user.jobState?.completed || {}).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
@@ -637,7 +679,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       return candidate && currentWorldDistrict(candidate) === viewerDistrict;
     }).map(([id, state]) => {
       const user = findUser(id);
-      return { id, username: user.displayName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username), gender: user.gender, district: user.district, worldDistrict: currentWorldDistrict(user), x: state.x, z: state.z, rotation: state.rotation, moving: state.moving, mode: state.mode || 'walk' };
+      const avatar = publicUser(user);
+      return { id, username: avatar.username, gender: user.gender, outfit: avatar.outfit, avatarCustomization: avatar.avatarCustomization, district: user.district, worldDistrict: currentWorldDistrict(user), x: state.x, z: state.z, rotation: state.rotation, moving: state.moving, mode: state.mode || 'walk' };
     }) };
   }
   function place(user, { reset = false } = {}) {
@@ -1472,19 +1515,19 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       stops:{
         'district-centre-bus': {
           id:'district-centre-bus', label:`${profile.centre} Bus Stop`, x:10, z:8, radius:6.2,
-          phaseMs:0, destinationId:'district-market-bus', arrivalX:26, arrivalZ:18, arrivalRotation:Math.PI/2,
+          phaseMs:0, destinationId:'district-market-bus', arrivalX:7, arrivalZ:8, arrivalRotation:0,
         },
         'district-market-bus': {
-          id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:18, radius:6.2,
-          phaseMs:11_000, destinationId:'district-rail-bus', arrivalX:-32, arrivalZ:-6, arrivalRotation:-Math.PI/2,
+          id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:13.5, radius:6.2,
+          phaseMs:11_000, destinationId:'district-rail-bus', arrivalX:25, arrivalZ:13.5, arrivalRotation:-Math.PI/2,
         },
         'district-rail-bus': {
-          id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-6, radius:6.2,
-          phaseMs:22_000, destinationId:'district-neighbourhood-bus', arrivalX:-52, arrivalZ:-34, arrivalRotation:Math.PI,
+          id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-14.5, radius:6.2,
+          phaseMs:22_000, destinationId:'district-neighbourhood-bus', arrivalX:-31, arrivalZ:-14.5, arrivalRotation:Math.PI,
         },
         'district-neighbourhood-bus': {
-          id:'district-neighbourhood-bus', label:`${profile.neighbourhood} Bus Stop`, x:-55, z:-34, radius:6.2,
-          phaseMs:33_000, destinationId:'district-centre-bus', arrivalX:8, arrivalZ:8, arrivalRotation:0,
+          id:'district-neighbourhood-bus', label:`${profile.neighbourhood} Bus Stop`, x:-55, z:-29, radius:6.2,
+          phaseMs:33_000, destinationId:'district-centre-bus', arrivalX:-52, arrivalZ:-29, arrivalRotation:Math.PI,
         },
       },
     };
@@ -1737,24 +1780,25 @@ function genericRideDestination(user, destinationId) {
   if (!district) return null;
   const profile = districtCityProfile(district);
   const config = districtWorldConfig(district);
+  const fuelPosition = genericDistrictFuelPosition(!!config.airport);
   const destinations = {
     'district-centre': { id:'district-centre', label:profile.centre, x:0, z:0, arrivalX:4, arrivalZ:0 },
     'district-rail': { id:'district-rail', label:`${district} Railway Station`, x:config.train.x, z:config.train.z, arrivalX:config.train.arrivalX, arrivalZ:config.train.arrivalZ },
-    'district-market': { id:'district-market', label:profile.market, x:20, z:16, arrivalX:24, arrivalZ:16 },
+    'district-market': { id:'district-market', label:profile.market, x:20, z:12.5, arrivalX:24, arrivalZ:12.5 },
     'district-cafe': { id:'district-cafe', label:profile.cafe, x:-44, z:22, arrivalX:-40, arrivalZ:22 },
-    'district-hospital': { id:'district-hospital', label:`${district} District Hospital`, x:-20, z:16, arrivalX:-16, arrivalZ:16 },
+    'district-hospital': { id:'district-hospital', label:`${district} District Hospital`, x:-20, z:11.5, arrivalX:-16, arrivalZ:11.5 },
     'district-police': { id:'district-police', label:`${district} District Police`, x:-20, z:-18, arrivalX:-16, arrivalZ:-18 },
     'district-fire': { id:'district-fire', label:`${district} Fire & Rescue`, x:20, z:-18, arrivalX:16, arrivalZ:-18 },
-    'district-home': { id:'district-home', label:`${district} Rental Home`, x:-24, z:-36, arrivalX:-24, arrivalZ:-31 },
+    'district-home': { id:'district-home', label:`${district} Rental Home`, x:-24, z:-27, arrivalX:-24, arrivalZ:-21.8 },
     'district-rest': { id:'district-rest', label:`${district} Rest Park`, x:-10, z:-10, arrivalX:-7, arrivalZ:-10 },
-    'district-fuel': { id:'district-fuel', label:`${district} Fuel Station`, x:18, z:-48, arrivalX:14, arrivalZ:-48 },
+    'district-fuel': { id:'district-fuel', label:`${district} Fuel Station`, ...fuelPosition, arrivalX:fuelPosition.x - 4, arrivalZ:fuelPosition.z },
     'district-service': { id:'district-service', label:`${district} Service Garage`, x:-18, z:-48, arrivalX:-14, arrivalZ:-48 },
     'district-landmark': { id:'district-landmark', label:profile.landmark, x:50, z:45, arrivalX:44, arrivalZ:45 },
-    'district-neighbourhood': { id:'district-neighbourhood', label:profile.neighbourhood, x:-55, z:-34, arrivalX:-51, arrivalZ:-34 },
+    'district-neighbourhood': { id:'district-neighbourhood', label:profile.neighbourhood, x:-55, z:-29, arrivalX:-51, arrivalZ:-29 },
     'district-centre-bus': { id:'district-centre-bus', label:`${profile.centre} Bus Stop`, x:10, z:8, arrivalX:7, arrivalZ:8 },
-    'district-market-bus': { id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:18, arrivalX:25, arrivalZ:18 },
-    'district-rail-bus': { id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-6, arrivalX:-31, arrivalZ:-6 },
-    'district-neighbourhood-bus': { id:'district-neighbourhood-bus', label:`${profile.neighbourhood} Bus Stop`, x:-55, z:-34, arrivalX:-52, arrivalZ:-34 },
+    'district-market-bus': { id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:13.5, arrivalX:25, arrivalZ:13.5 },
+    'district-rail-bus': { id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-14.5, arrivalX:-31, arrivalZ:-14.5 },
+    'district-neighbourhood-bus': { id:'district-neighbourhood-bus', label:`${profile.neighbourhood} Bus Stop`, x:-55, z:-29, arrivalX:-52, arrivalZ:-29 },
   };
   if (config.airport) destinations['district-airport'] = { id:'district-airport', label:`${district} Airport`, x:config.airport.x, z:config.airport.z, arrivalX:config.airport.arrivalX, arrivalZ:config.airport.arrivalZ };
   return destinations[destinationId] || null;
@@ -2364,8 +2408,15 @@ function publicRideDestinationForUser(user, destinationId) {
       }
       if (path === '/api/profile' && request.method === 'PATCH') {
         const body = await jsonBody(request);
+        const previousGender = user.gender;
         requireValue(body.district === undefined || Object.hasOwn(DISTRICTS, body.district), 400, 'Choose a valid Kerala district.');
         requireValue(body.gender === undefined || ['male', 'female', 'other'].includes(body.gender), 400, 'Choose a valid avatar.');
+        requireValue(body.outfit === undefined || ['casual', 'mundu', 'saree'].includes(body.outfit), 400, 'Choose an available outfit.');
+        requireValue(body.avatarCustomization === undefined || (body.avatarCustomization && typeof body.avatarCustomization === 'object' && !Array.isArray(body.avatarCustomization) && Object.keys(body.avatarCustomization).length <= 10), 400, 'Choose valid avatar appearance options.');
+        const nextGender = body.gender ?? user.gender;
+        const nextAvatarCustomization = body.avatarCustomization === undefined ? {} : cleanAvatarCustomization(body.avatarCustomization, nextGender);
+        requireValue(body.avatarCustomization === undefined || Object.keys(nextAvatarCustomization).length === Object.keys(body.avatarCustomization).length, 400, 'Choose valid avatar appearance options.');
+        requireValue(body.outfit === undefined || body.outfit === 'casual' || (nextGender === 'male' && body.outfit === 'mundu') || (nextGender === 'female' && body.outfit === 'saree'), 400, 'That outfit is not available for this avatar.');
         requireValue(body.bio === undefined || (typeof body.bio === 'string' && body.bio.length <= 180), 400, 'Bio must be 180 characters or fewer.');
         requireValue(body.displayName === undefined || (typeof body.displayName === 'string' && /^[A-Za-z][A-Za-z '-]{1,39}$/.test(body.displayName.trim())), 400, 'Name must be 2–40 letters.');
         requireValue(body.username === undefined || (typeof body.username === 'string' && /^(?=.*[A-Za-z])[A-Za-z0-9_]{3,24}$/.test(body.username.trim())), 400, 'Username must be 3–24 characters and include at least one letter.');
@@ -2379,6 +2430,20 @@ function publicRideDestinationForUser(user, destinationId) {
         if (body.district !== undefined) user.district = body.district;
         if (!user.worldDistrict || !DISTRICT_WORLD_CONFIG[user.worldDistrict]) user.worldDistrict = user.district;
         if (body.gender !== undefined) user.gender = body.gender;
+        if (body.outfit !== undefined || user.jobState?.avatarAppearance?.outfit === 'mundu' && user.gender !== 'male' || user.jobState?.avatarAppearance?.outfit === 'saree' && user.gender !== 'female') {
+          user.jobState ??= freshJobState();
+          user.jobState.avatarAppearance ??= {};
+          user.jobState.avatarAppearance.outfit = body.outfit ?? 'casual';
+        }
+        if (body.avatarCustomization !== undefined || previousGender !== user.gender) {
+          user.jobState ??= freshJobState();
+          const existingAppearance = user.jobState.avatarAppearance || {};
+          const outfit = existingAppearance.outfit;
+          const nextAppearance = cleanAvatarCustomization(existingAppearance, user.gender);
+          Object.assign(nextAppearance, nextAvatarCustomization);
+          if (['casual', 'mundu', 'saree'].includes(outfit)) nextAppearance.outfit = outfit;
+          user.jobState.avatarAppearance = nextAppearance;
+        }
         if (body.bio !== undefined) user.bio = body.bio.trim();
         await persist(); profileChanged(user); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
