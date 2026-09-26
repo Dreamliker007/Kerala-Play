@@ -91,6 +91,38 @@ test('signup starts at zero, hashes passwords, enforces credentials and session 
   assert.ok(!saved.includes('test-password-2026')); assert.match(saved, /passwordHash/);
 });
 
+test('wardrobe outfit choices are validated, saved with the profile and reset when incompatible', async t => {
+  const app = await setup(t), player = app.client();
+  const created = await player('/api/auth/signup', {
+    firstName: 'WardrobePlayer', username: 'WardrobePlayer', password: 'test-password-2026', district: 'Kottayam', gender: 'male'
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.data.user.outfit, 'casual');
+
+  assert.equal((await player('/api/profile', { outfit: 'saree' }, 'PATCH')).status, 400);
+  const mundu = await player('/api/profile', { outfit: 'mundu' }, 'PATCH');
+  assert.equal(mundu.status, 200);
+  assert.equal(mundu.data.user.outfit, 'mundu');
+  const avatarCustomization = { faceShape: 'angular', hairStyle: 'side-part', skin: 0x915a40, shirt: 0x1e8173, bodyBuild: 'broad', height: 1.1 };
+  const personalized = await player('/api/profile', { avatarCustomization }, 'PATCH');
+  assert.equal(personalized.status, 200);
+  assert.deepEqual(personalized.data.user.avatarCustomization, avatarCustomization);
+  assert.equal((await player('/api/profile', { avatarCustomization: { shirt: 0xffffff } }, 'PATCH')).status, 400);
+  assert.equal((await player('/api/profile', { avatarCustomization: { hairStyle: 'long' } }, 'PATCH')).status, 400);
+
+  await app.restart();
+  assert.equal((await player('/api/session')).data.user.outfit, 'mundu');
+  assert.deepEqual((await player('/api/session')).data.user.avatarCustomization, avatarCustomization);
+  const changedGender = await player('/api/profile', { gender: 'female' }, 'PATCH');
+  assert.equal(changedGender.status, 200);
+  assert.equal(changedGender.data.user.outfit, 'casual');
+  assert.equal(changedGender.data.user.avatarCustomization.hairStyle, undefined);
+  assert.equal(changedGender.data.user.avatarCustomization.skin, avatarCustomization.skin);
+  const saree = await player('/api/profile', { outfit: 'saree' }, 'PATCH');
+  assert.equal(saree.status, 200);
+  assert.equal(saree.data.user.outfit, 'saree');
+});
+
 test('district choice sets avatar home and entry world; no choice defaults to Kottayam', async t => {
   const app = await setup(t), explorer = app.client();
   const created = await explorer('/api/auth/signup', {
@@ -1693,3 +1725,4 @@ test('first three district trips are shared across transport modes and the fixed
   assert.equal(paidTeleport.data.wallet.balance, 1500);
   assert.equal(paidTeleport.data.user.worldDistrict, 'Idukki');
 });
+
