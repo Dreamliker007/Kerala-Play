@@ -31,16 +31,15 @@ npm run mobile:open
 
 Then choose an emulator or connected Android phone and press Run.
 
-## Important backend note
+## Backend and game origin
 
-The current Kerala Play client calls relative `/api/...` endpoints and uses the Node server for accounts, sessions, multiplayer, messages, rewards and persistence. A packaged Android WebView does not contain that Node server.
+The Kerala Play client calls relative `/api/...` endpoints and uses the Node server for accounts, sessions, multiplayer, messages, rewards and persistence. A packaged Android WebView does not contain that Node server.
 
-Before distributing the app, deploy the Kerala Play server behind HTTPS and configure the mobile client to call that HTTPS backend (or temporarily load the hosted Kerala Play site from the native shell). Microphone/WebRTC features should also be tested on real devices; some networks may require a TURN relay.
+The V114 production server is hosted at `https://keralaplay.in`. The mobile release configuration loads that HTTPS origin. Microphone/WebRTC features should also be tested on real devices; some networks may require a TURN relay.
 
 ## Build output
 
 For testing, Android Studio can generate an APK. For Google Play distribution, create a signed Android App Bundle (`.aab`).
-
 
 ## Landscape mode
 
@@ -55,10 +54,9 @@ The Android project is generated locally and is ignored by Git, so the npm scrip
 
 The web/PWA button requests fullscreen first and then asks the Screen Orientation API for landscape. If Android/browser policy rejects that request, the prompt tells the player to enable Auto-rotate and rotate manually. Native Capacitor releases should not depend on that web fallback because the Activity itself is locked to sensor landscape.
 
-
 ## Closed testing release metadata
 
-The V114 Play closed-testing update is defined in `mobile-release.json` as version `1.0.13` with `versionCode 14` and uses the beta server URL recorded there.
+The V114 Play closed-testing update is defined in `mobile-release.json` as version `1.0.13` with `versionCode 14` and uses the live game origin `https://keralaplay.in`.
 
 `npm run mobile:add` and `npm run mobile:sync` now run `mobile:configure`, which reapplies:
 
@@ -67,4 +65,3 @@ The V114 Play closed-testing update is defined in `mobile-release.json` as versi
 - the Play `versionName`
 
 This prevents Capacitor regeneration/sync from silently resetting the release metadata before an AAB is generated.
-
