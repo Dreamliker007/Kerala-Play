@@ -2775,6 +2775,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   window.addEventListener('kerala-needs-rest', () => run(async () => {
     const result = await api('/api/needs/rest', {});
     if (result.needs) renderNeeds(result.needs);
+    if (result.rested) window.dispatchEvent(new CustomEvent('kerala-player-rest-pose', { detail: { durationMs: 1900 } }));
     toast(result.rested ? `Rest complete · Energy +${result.restored}` : (result.message || 'Energy is already full'));
   }, walletError));
 
