@@ -5769,7 +5769,7 @@ function applyPlayerJumpPose(player, height, velocity, landingBlend = 0) {
   const kneeFlex = airborne * (.38 + rising * .22) + landing * .40;
 
   // Add a compact airborne tuck and a brief, blended knee bend on touchdown
-  // over the current walk pose. The next locomotion update restores its base pose.
+  // over the current walk pose. Absolute torso lean prevents frame-to-frame rotation drift.
   if (parts.leftLeg) parts.leftLeg.rotation.x -= legTuck;
   if (parts.rightLeg) parts.rightLeg.rotation.x -= legTuck;
   if (parts.leftKnee) parts.leftKnee.rotation.x += kneeFlex;
@@ -5778,7 +5778,7 @@ function applyPlayerJumpPose(player, height, velocity, landingBlend = 0) {
   if (parts.rightArm) parts.rightArm.rotation.x -= airborne * (.18 + rising * .14) + landing * .10;
   if (parts.leftElbow) parts.leftElbow.rotation.x += airborne * .22 + landing * .08;
   if (parts.rightElbow) parts.rightElbow.rotation.x += airborne * .22 + landing * .08;
-  if (parts.torso) parts.torso.rotation.x -= airborne * .035 + landing * .075;
+  if (parts.torso) parts.torso.rotation.x = -airborne * .035 - landing * .075;
 }
 
 function animatePlayerConversation(player, delta, moving) {
