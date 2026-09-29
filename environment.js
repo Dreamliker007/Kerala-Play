@@ -286,6 +286,10 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
     setSettingsOpen(false);
     window.dispatchEvent(new CustomEvent('kerala-open-blocked'));
   });
+  settings.addEventListener('click', event => {
+    const selectedButton = event.target instanceof Element ? event.target.closest('button') : null;
+    if (selectedButton && settings.contains(selectedButton)) setSettingsOpen(false);
+  });
   settings.addEventListener('pointerdown', event => event.stopPropagation());
   document.addEventListener('keydown', event => { if (event.key === 'Escape') setSettingsOpen(false); });
 
@@ -912,3 +916,4 @@ function createSoundscapeLegacy() {
 
   return { update, resume, suspend, dispose };
 }
+
