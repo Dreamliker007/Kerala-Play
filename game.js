@@ -2720,7 +2720,7 @@ function updateWorldInteract() {
   if (!profile || !playerRef) return;
   if (homeInteriorMode) {
     const bed = Math.hypot(playerRef.position.x - 2.7, playerRef.position.z + 2.8);
-    if (bed <= 1.75) {
+    if (bed <= 1.3) {
       worldInteract.hidden = false; worldInteract.dataset.mode = 'home-sleep';
       worldInteract.textContent = 'SLEEP IN BED'; return;
     }
