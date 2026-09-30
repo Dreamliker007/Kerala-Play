@@ -1120,6 +1120,8 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   const app = await setup(t), alice = app.client(), bob = app.client();
   await signup(alice, 'HomeBuilder');
   await signup(bob, 'HomeVisitor');
+  const plot = (await alice('/api/home')).data.localHome;
+  const initialPosition = (await alice('/api/session')).data.user;
   assert.equal((await alice('/api/home/build', {})).status, 409, 'Building is limited to the marked home plot');
   const aliceEvents = await alice.events();
   await aliceEvents.next('world');
@@ -1127,17 +1129,23 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   await firstBobEvents.next('world');
   await firstBobEvents.close();
 
-  app.advance(3_000);
-  assert.equal((await alice('/api/world/move', { x: -20, z: -10, rotation: 0, moving: true, mode: 'walk' })).status, 200);
-  app.advance(3_000);
-  assert.equal((await alice('/api/world/move', { x: -24, z: -30.8, rotation: 0, moving: true, mode: 'walk' })).status, 200);
+  let x = Number(initialPosition.x), z = Number(initialPosition.z);
+  while (Math.hypot(plot.x - x, plot.z - z) > 0.4) {
+    const distance = Math.hypot(plot.x - x, plot.z - z);
+    const step = Math.min(17, distance);
+    x += ((plot.x - x) / distance) * step;
+    z += ((plot.z - z) / distance) * step;
+    app.advance(3_000);
+    const move = await alice('/api/world/move', { x, z, rotation: 0, moving: true, mode: 'walk' });
+    assert.equal(move.status, 200, JSON.stringify(move.data));
+  }
   app.advance(250);
-  assert.equal((await alice('/api/world/move', { x: -24, z: -30.8, rotation: 0, moving: false, mode: 'walk' })).status, 200);
+  assert.equal((await alice('/api/world/move', { x, z, rotation: 0, moving: false, mode: 'walk' })).status, 200);
 
   const built = await alice('/api/home/build', {});
   assert.equal(built.status, 200, JSON.stringify(built.data));
   assert.equal(built.data.home.house.built, true);
-  assert.equal(built.data.home.house.district, 'Kottayam');
+  assert.equal(built.data.home.house.district, 'Ernakulam');
   assert.equal(built.data.home.status, 'owned');
   assert.equal(built.data.home.accessBlocked, false);
   assert.equal((await alice('/api/home/pay', { kind: 'rent' })).status, 409, 'Owned homes do not charge rent');
@@ -1168,15 +1176,15 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   const exited = await alice('/api/home/exit', {});
   assert.equal(exited.status, 200, JSON.stringify(exited.data));
   assert.equal(exited.data.position.mode, 'walk');
-  assert.equal(exited.data.position.x, -24);
-  assert.equal(exited.data.position.z, -30.8);
+  assert.equal(exited.data.position.x, plot.x);
+  assert.equal(exited.data.position.z, plot.z);
   await aliceEvents.close();
 
   await app.restart();
   assert.equal((await alice('/api/auth/login', { identifier: 'HomeBuilder', password: 'test-password-2026' })).status, 200);
   const persisted = (await alice('/api/home')).data;
   assert.equal(persisted.house.built, true);
-  assert.equal(persisted.house.district, 'Kottayam');
+  assert.equal(persisted.house.district, 'Ernakulam');
   assert.equal(persisted.inside, false);
 });
 
