@@ -3844,18 +3844,42 @@ function destinationBusSuggestion(place, player = playerRef) {
   return '';
 }
 
+function currentPersonalHomePlace(district = currentWorldDistrictName()) {
+  const home = homeSnapshot?.localHome || homeSnapshot?.home;
+  if (!home || !Number.isFinite(Number(home.x)) || !Number.isFinite(Number(home.z))) return null;
+  const house = homeSnapshot?.house;
+  if (house?.district && house.district !== district) return null;
+  const buildStage = Number(house?.buildStage || 0);
+  const constructed = !!house && (house.built || buildStage > 0);
+  return {
+    id: 'personal-home',
+    name: 'My Home',
+    icon: 'H',
+    x: Number(home.x),
+    z: Number(home.z),
+    kind: 'home',
+    district,
+    radius: Number(home.radius) || 2.3,
+    description: constructed
+      ? `Your own ${district} home · select this marker to follow the distance to its front door.`
+      : `Your ${district} home plot · select this marker to find where your house will be built.`,
+  };
+}
+
 function currentNavigationPlaces() {
   const district = currentWorldDistrictName();
+  const personalHome = currentPersonalHomePlace(district);
   const existing = navigationPlaces.filter(place =>
     (place.district === district || (district === 'Kottayam' && place.district === 'Village'))
     && place.kind !== 'landmark'
+    && (!personalHome || place.kind !== 'home')
   );
   const attractions = districtAtlasPlaces(district);
-  if (district === 'Kottayam') return [...existing, ...attractions];
+  if (district === 'Kottayam') return [...existing, ...(personalHome ? [personalHome] : []), ...attractions];
   if (district === 'Ernakulam') {
     return [
       ...existing,
-      { id:'ernakulam-rental', name:'Ernakulam Rental Home', icon:'H', x:-48, z:40, kind:'home', district },
+      ...(personalHome ? [personalHome] : [{ id:'ernakulam-rental', name:'Ernakulam Rental Home', icon:'H', x:-48, z:40, kind:'home', district }]),
       { id:'ernakulam-rest', name:'Ernakulam Rest Bench', icon:'R', x:4, z:40, kind:'rest', district },
       ...attractions,
     ];
@@ -3871,7 +3895,7 @@ function currentNavigationPlaces() {
      { id:'district-hospital', name:district + ' District Hospital', icon:'+', x:-20, z:11.5, kind:'health', district },
     { id:'district-police', name:district + ' District Police', icon:'P', x:-20, z:-18, kind:'police', district },
     { id:'district-fire', name:district + ' Fire & Rescue', icon:'F', x:20, z:-18, kind:'emergency', district },
-     { id:'district-home', name:district + ' Rental Home', icon:'H', x:-24, z:-27, kind:'home', district },
+    ...(personalHome ? [personalHome] : [{ id:'district-home', name:district + ' Rental Home', icon:'H', x:-24, z:-27, kind:'home', district }]),
     { id:'district-rest', name:district + ' Rest Park', icon:'R', x:-10, z:-10, kind:'rest', district },
     { id:'district-fuel', name:district + ' Fuel Station', icon:'F', ...fuelPosition, kind:'service', district },
     { id:'district-service', name:district + ' Service Garage', icon:'G', x:-18, z:-48, kind:'service', district },
@@ -3982,6 +4006,7 @@ function renderMapLandmarks() {
     const marker = document.createElementNS(svgNamespace, 'g');
     const classes = ['landmark-marker'];
     if (place.kind !== 'landmark') classes.push('poi-marker', place.kind);
+    if (place.id === 'personal-home') classes.push('personal-home');
     if (selectedDestination?.id === place.id) classes.push('selected');
     marker.setAttribute('class', classes.join(' '));
     marker.setAttribute('transform', 'translate(' + point.x + ' ' + point.y + ')');
@@ -3997,7 +4022,7 @@ function renderMapLandmarks() {
     caption.setAttribute('font-size', place.kind === 'landmark' ? '5.2' : '4.2');
     caption.setAttribute('fill', '#fff');
     caption.setAttribute('text-anchor', 'middle');
-    caption.style.display = mapLabelsVisible || selectedDestination?.id === place.id ? 'block' : 'none';
+    caption.style.display = mapLabelsVisible || selectedDestination?.id === place.id || place.id === 'personal-home' ? 'block' : 'none';
     marker.append(pin, label, caption);
     marker.addEventListener('click', event => { event.stopPropagation(); setWaypoint(place); });
     mapLayer.append(marker);
@@ -4011,6 +4036,8 @@ function setWaypoint(place) {
   selectedLandmark = place.kind === 'landmark' ? place : null;
   lifeLoopAction = 'map';
   missionCard.dataset.lifeAction = 'map';
+  missionCard.hidden = false;
+  missionCard.setAttribute('aria-label', `Navigation to ${place.name}`);
   missionText.textContent = `Destination: ${place.name}`;
   mapStatus.title = place.description || place.name;
   const distance = placeDistance(place);
@@ -4081,7 +4108,9 @@ function updateMapPlayer(player) {
     mapRoute.hidden = false;
     const distance = placeDistance(destination, player);
     const direction = destinationDirection(destination, player);
-    const arrivalRadius = destination.kind === 'landmark' ? 5.2 : 4.6;
+    const arrivalRadius = destination.id === 'personal-home'
+      ? Math.max(2.6, Number(destination.radius || 2.3) + .3)
+      : destination.kind === 'landmark' ? 5.2 : 4.6;
     if (distance < arrivalRadius) {
       if (destination.kind === 'landmark') markLandmarkVisited(destination);
       selectedDestination = null;
@@ -4358,6 +4387,24 @@ function wireInterface() {
     collapseHudMenuAfterAction();
   });
   mapClose.addEventListener('click', () => setOpenPanel());
+  document.querySelector('#home-find')?.addEventListener('click', () => {
+    const house = homeSnapshot?.house;
+    if (house?.district && house.available === false) {
+      showToast(`Your home is in ${house.district}. Travel there first, then select it for directions.`);
+      return;
+    }
+    const places = currentNavigationPlaces();
+    const destination = places.find(place => place.id === 'personal-home')
+      || places.find(place => place.kind === 'home');
+    if (!destination) {
+      showToast('Your home location is not ready yet. Refresh the Home panel and try again.');
+      return;
+    }
+    setWaypoint(destination);
+    setOpenPanel('map');
+    requestAnimationFrame(() => { renderMapLandmarks(); applyMapZoom(mapZoom); });
+    collapseHudMenuAfterAction();
+  });
   mapLabelToggle.addEventListener('click', () => {
     mapLabelsVisible = !mapLabelsVisible;
     mapLabelToggle.textContent = mapLabelsVisible ? 'Labels on' : 'Labels';
