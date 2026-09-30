@@ -38,4 +38,3 @@ test('roof tile slopes have opposite pitch and stay in the house roof footprint'
   assert.ok(Math.abs(frontPosition.y - 5.71) < .001);
   assert.ok(Math.abs(backPosition.z + 1.39) < .001);
 });
-
