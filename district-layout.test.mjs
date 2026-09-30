@@ -7,6 +7,7 @@ import {
   genericDistrictRoads,
   ernakulamDistrictRoads,
   planRoadsideDrainSegments,
+  districtFacadePalette,
 } from './district-layout.js';
 
 function overlaps(a, b) {
@@ -34,6 +35,27 @@ test('all generic district roads form one connected network', () => {
     }
     assert.equal(reached.size, roads.length, hasAirport ? 'airport roads' : 'standard roads');
   }
+});
+
+test('every Kerala district gets a stable, district-specific facade palette', () => {
+  const districts = [
+    'Kasaragod', 'Kannur', 'Wayanad', 'Kozhikode', 'Malappuram', 'Palakkad',
+    'Thrissur', 'Ernakulam', 'Idukki', 'Alappuzha', 'Kottayam', 'Pathanamthitta',
+    'Kollam', 'Thiruvananthapuram',
+  ];
+  const colors = new Set();
+  for (const district of districts) {
+    const first = districtFacadePalette(district, 217);
+    const repeated = districtFacadePalette(district, 217);
+    assert.deepEqual(first, repeated, `${district} palette should be deterministic`);
+    for (const [name, color] of Object.entries(first)) {
+      assert.ok(Number.isInteger(color) && color >= 0 && color <= 0xffffff, `${district} ${name} should be a hex color`);
+    }
+    colors.add(first.houseWall);
+  }
+  assert.ok(colors.size >= 8, 'district homes should not share one repeated facade color');
+  assert.notDeepEqual(districtFacadePalette('Kottayam', 3), districtFacadePalette('Kottayam', 19), 'building positions should get facade variation');
+  assert.deepEqual(districtFacadePalette('Unknown District', 217), districtFacadePalette('Kottayam', 217), 'unknown districts should use the safe Kerala default');
 });
 
 test('fruit trees and service buildings stay clear of roads and airport runway', () => {
