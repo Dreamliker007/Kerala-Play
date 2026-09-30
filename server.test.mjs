@@ -1125,6 +1125,13 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   const built = await alice('/api/home/build', {});
   assert.equal(built.status, 200, JSON.stringify(built.data));
   assert.equal(built.data.home.house.built, true, 'The Home panel can build before travelling to the entrance plot.');
+  const panelEntry = await alice('/api/home/enter', {});
+  assert.equal(panelEntry.status, 200, JSON.stringify(panelEntry.data));
+  assert.equal(panelEntry.data.position.mode, 'home');
+  const panelExit = await alice('/api/home/exit', {});
+  assert.equal(panelExit.status, 200, JSON.stringify(panelExit.data));
+  assert.equal(panelExit.data.position.x, initialPosition.x, 'Home panel exit returns to the saved outdoor position.');
+  assert.equal(panelExit.data.position.z, initialPosition.z);
   const aliceEvents = await alice.events();
   await aliceEvents.next('world');
   const firstBobEvents = await bob.events();
