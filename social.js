@@ -237,6 +237,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const homeRentRow = $('home-rent-row');
   const homeUtilitiesRow = $('home-utilities-row');
   const homeSummaryCard = $('home-summary-card');
+  const homeBuildHeading = $('home-build-heading');
+  const homeBuildNote = $('home-build-note');
+  const homeChargesSection = $('home-charges-section');
   const homeRentStatus = $('home-rent-status');
   const homeUtilityStatus = $('home-utility-status');
   const homePayRent = $('home-pay-rent');
@@ -1312,6 +1315,15 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     }
     if (homeRentRow) homeRentRow.hidden = ownedHome || constructionStarted;
     if (homeUtilitiesRow) homeUtilitiesRow.hidden = ownedHome || constructionStarted;
+    if (homeChargesSection) homeChargesSection.hidden = ownedHome || constructionStarted;
+    if (homeBuildHeading) homeBuildHeading.textContent = ownedHome ? 'Your home is complete' : 'Build a home you own';
+    if (homeBuildNote) {
+      homeBuildNote.textContent = ownedHome
+        ? 'All four stages are complete on your ' + summary.house.district + ' plot. Walk to its front door and tap OPEN FRONT DOOR · ENTER.'
+        : constructionStarted
+          ? 'Stage ' + buildStage + ' of 4 is visible on your ' + summary.house.district + ' plot. Pay ' + formatCash(nextBuildCost) + ' to add the ' + nextBuildLabel.toLowerCase() + ' stage.'
+          : 'Build your Kerala home on your district plot one paid stage at a time. The foundation, walls, roof and finishing appear there as you build.';
+    }
     if (homeBuildButton) {
       homeBuildButton.hidden = ownedHome;
       homeBuildButton.disabled = !summary.house?.available && constructionStarted;
