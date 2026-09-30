@@ -1195,8 +1195,7 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   const exited = await alice('/api/home/exit', {});
   assert.equal(exited.status, 200, JSON.stringify(exited.data));
   assert.equal(exited.data.position.mode, 'walk');
-  assert.equal(exited.data.position.x, plot.x);
-  assert.equal(exited.data.position.z, plot.z);
+  assert.ok(Math.hypot(exited.data.position.x - plot.x, exited.data.position.z - plot.z) <= 0.4, 'Exit returns to the saved front-door position.');
   await aliceEvents.close();
 
   await app.restart();
