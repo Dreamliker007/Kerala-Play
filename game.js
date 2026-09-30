@@ -4477,13 +4477,17 @@ try {
     alpha: false,
     precision: 'highp',
   });
-  let renderScale = isMobile ? .90 : 1;
+  // Keep the full High-quality world, but start mobile at a saner internal
+  // resolution. Dynamic scaling can still move up when a device has headroom.
+  let renderScale = isMobile ? .84 : 1;
   function applyRenderScale() {
     if (atmosphere?.setPerformanceScale) {
       atmosphere.setPerformanceScale(renderScale);
       return;
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? Math.max(1.12, 1.78 * renderScale) : 1.25));
+    const deviceRatio = window.devicePixelRatio || 1;
+    const mobileRatio = Math.max(1.05, 1.58 * renderScale);
+    renderer.setPixelRatio(Math.min(deviceRatio, isMobile ? mobileRatio : 1.25));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
   }
   applyRenderScale();
@@ -4577,16 +4581,37 @@ try {
   let inputY = 0;
   let cameraYaw = player.rotation.y + Math.PI;
   let cameraPitch = .31;
+
+  function resetFollowCameraView() {
+    const playerYaw = Number.isFinite(player.rotation.y) ? player.rotation.y : 0;
+    cameraYaw = playerYaw + Math.PI;
+    cameraPitch = homeInteriorMode ? .24 : .31;
+    const distance = homeInteriorMode ? 3.65 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
+    const horizontal = Math.cos(cameraPitch) * distance;
+    const targetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45;
+    cameraTarget.set(player.position.x, player.position.y + targetHeight, player.position.z);
+    camera.position.set(
+      player.position.x + Math.sin(cameraYaw) * horizontal,
+      player.position.y + targetHeight + Math.sin(cameraPitch) * distance,
+      player.position.z + Math.cos(cameraYaw) * horizontal
+    );
+    camera.lookAt(cameraTarget);
+    camera.updateMatrixWorld(true);
+  }
+  resetFollowCameraView();
+
   window.addEventListener('kerala-home-interior-enter', event => {
     setPrivateHomeInterior(true, event.detail?.position);
     cameraYaw = player.rotation.y + Math.PI; cameraPitch = .24;
     clearGameInput(); walkVelocity.set(0, 0, 0); targetWalkVelocity.set(0, 0, 0); updateWorldInteract();
+    resetFollowCameraView();
   });
   window.addEventListener('kerala-home-interior-exit', event => {
     setPrivateHomeInterior(false, event.detail?.position);
     window.keralaHomeDoor?.(false);
     cameraYaw = player.rotation.y + Math.PI; cameraPitch = .31;
     clearGameInput(); walkVelocity.set(0, 0, 0); targetWalkVelocity.set(0, 0, 0); updateWorldInteract();
+    resetFollowCameraView();
   });
   window.addEventListener('kerala-home-sit', () => {
     if (!homeInteriorMode || !playerRef || playerRef.userData.restPoseReturn) return;
@@ -4723,11 +4748,12 @@ try {
     renderMapLandmarks();
     updateMapPlayer(player);
     updateWorldInteract();
+    resetFollowCameraView();
     updateLifeLoopMission();
   });
   let cameraDriveImpulse = 0;
   let perfFrames = 0, perfTime = performance.now(), perfCooldown = 0;
-  let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0, interactionAccumulator = 0, walkingStuckSeconds = 0;
+  let npcAccumulator = 0, trafficAccumulator = 0, mapAccumulator = 0, interactionAccumulator = 0, hudAccumulator = 0, worldFxAccumulator = 0, walkingStuckSeconds = 0;
   const moveForward = new THREE.Vector3();
   const moveRight = new THREE.Vector3();
   const keys = new Set();
@@ -4946,9 +4972,13 @@ try {
     requestAnimationFrame(gameLoop);
     const delta = Math.min(clock.getDelta(), .05);
     if (document.hidden) return;
+    if (!Number.isFinite(cameraYaw)) cameraYaw = (Number.isFinite(player.rotation.y) ? player.rotation.y : 0) + Math.PI;
+    cameraPitch = THREE.MathUtils.clamp(Number.isFinite(cameraPitch) ? cameraPitch : .31, .12, .64);
+    if (![camera.position.x, camera.position.y, camera.position.z].every(Number.isFinite)) resetFollowCameraView();
     villageTime += delta;
     updateFarVisualDetails(delta);
     npcAccumulator += delta; trafficAccumulator += delta; mapAccumulator += delta; interactionAccumulator += delta;
+    hudAccumulator += delta; worldFxAccumulator += delta;
     if (npcAccumulator >= (isMobile ? .12 : .05)) {
       updateVillagers(villageTime);
       updateAmbientAnimals(villageTime, npcAccumulator);
@@ -5397,8 +5427,11 @@ try {
     camera.lookAt(cameraTarget);
     updateBusStopCameraOcclusion(camera.position, cameraTarget, delta);
     updateRemotePlayers(delta, camera);
-    updateVehicleAction();
-    updateDriveHud();
+    if (hudAccumulator >= (isMobile ? .12 : .05)) {
+      updateVehicleAction();
+      updateDriveHud();
+      hudAccumulator = 0;
+    }
     sendMovement(player, movingNow);
     const weatherState = atmosphere.update(delta, villageTime, {
       moving: movingNow,
@@ -5406,10 +5439,14 @@ try {
       nearWater: Math.hypot(player.position.x - 39, player.position.z + 4) < 15 || Math.hypot(player.position.x + 34, player.position.z + 13) < 13,
       inChallenge: !!challengeRound,
     });
-    updateWorldWeatherVisuals(weatherState);
-    updateWindWorld(villageTime, delta);
-    updateMonsoonWaterVisuals(villageTime, delta);
-    updateVehicleRainSpray(delta);
+    if (!isMobile || worldFxAccumulator >= .034) {
+      const fxDelta = Math.max(delta, worldFxAccumulator);
+      worldFxAccumulator = 0;
+      updateWorldWeatherVisuals(weatherState);
+      updateWindWorld(villageTime, fxDelta);
+      updateMonsoonWaterVisuals(villageTime, fxDelta);
+      updateVehicleRainSpray(fxDelta);
+    }
     if (homeInteriorMode) {
       for (const object of scene.children) {
         if (object === player || object === homeInteriorGroup || object.type === 'HemisphereLight') continue;
@@ -5428,14 +5465,14 @@ try {
         perfTime = now;
         if (perfCooldown > 0) {
           perfCooldown--;
-        } else if (fps < 24 && renderScale > .66) {
-          renderScale = Math.max(.66, renderScale - .07);
+        } else if (fps < 27 && renderScale > .64) {
+          renderScale = Math.max(.64, renderScale - (fps < 22 ? .09 : .05));
           applyRenderScale();
           perfCooldown = 2;
-        } else if (fps > 47 && renderScale < 1) {
-          renderScale = Math.min(1, renderScale + .035);
+        } else if (fps > 52 && renderScale < .94) {
+          renderScale = Math.min(.94, renderScale + .025);
           applyRenderScale();
-          perfCooldown = 3;
+          perfCooldown = 4;
         }
       }
     }
