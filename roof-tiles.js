@@ -84,4 +84,3 @@ export function createKeralaRoofTiles(THREE, x, z) {
   }
   return [front, back];
 }
-
