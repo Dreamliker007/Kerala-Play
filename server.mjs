@@ -213,10 +213,9 @@ const HOME_DEFINITION = Object.freeze({
 const HOME_SLEEP_COOLDOWN_MS = 60_000;
 const HOME_SLEEP_HUNGER_COST = 4;
 const HOME_SLEEP_THIRST_COST = 6;
-const HOME_INTERIOR_SPAWN = Object.freeze({ x: 0, z: 6.2, rotation: 0 });
-const HOME_BED_POSITION = Object.freeze({ x: 3.2, z: -4.2 });
-const HOME_BED_REST_POSITION = Object.freeze({ x: 3.2, z: -1.5 });
-const HOME_INTERIOR_LIMIT = 8.2;
+const HOME_INTERIOR_ENTRY = Object.freeze({ x: 0, z: 4.6, rotation: 0 });
+const HOME_INTERIOR_BED = Object.freeze({ x: 2.7, z: -2.8, radius: 1.45 });
+const HOME_INTERIOR_LIMIT = 5.7;
 const PUBLIC_TRAVEL_ROUTES = Object.freeze({
   'village-line': Object.freeze({
     id: 'village-line',
@@ -355,9 +354,9 @@ const DRIVING_LICENCE_TERMS = Object.freeze({ learner: 14 * 24 * 60 * 60 * 1000,
 const DRIVING_LICENCE_COSTS = Object.freeze({ learner: 0, full: 150, renew_learner: 40, renew_full: 100 });
 const MOVEMENT_PROFILES = Object.freeze({
   walk: { rate: 8.5, maxCredit: 24 },
-  home: { rate: 8.5, maxCredit: 24 },
   bike: { rate: 16, maxCredit: 40 },
   taxi: { rate: 14, maxCredit: 36 },
+  home: { rate: 8.5, maxCredit: 24 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
 const REPORT_REASONS = Object.freeze(['harassment', 'cheating', 'impersonation', 'inappropriate', 'spam', 'other']);
@@ -399,18 +398,9 @@ function worldServicePointForUser(user, pointId) {
   return WORLD_SERVICE_POINTS[pointId] || null;
 }
 function homeDefinitionFor(user) {
-  const house = user.jobState?.home?.house;
-  const district = house?.built && DISTRICT_WORLD_CONFIG[house.district]
-    ? house.district
-    : currentWorldDistrict(user);
-  if (district === 'Ernakulam') return { ...HOME_DEFINITION, id:'ernakulam-home', label:'Ernakulam Home', x:-48, z:40, district };
-  if (district !== 'Kottayam') return { ...HOME_DEFINITION, id:'district-home', label:`${district} Home`, x:-24, z:-21.8, district };
-  return { ...HOME_DEFINITION, id:'kottayam-home', label:'Kottayam Home', district };
-}
-
-function insideHomeInterior(x, z) {
-  return Number.isFinite(x) && Number.isFinite(z)
-    && Math.abs(x) <= HOME_INTERIOR_LIMIT && Math.abs(z) <= HOME_INTERIOR_LIMIT;
+  if (currentWorldDistrict(user) === 'Ernakulam') return { ...HOME_DEFINITION, id:'ernakulam-rental', label:'Ernakulam Rental Home', x:-48, z:40 };
+  if (genericDistrictWorld(user)) return { ...HOME_DEFINITION, id:'district-rental', label:`${currentWorldDistrict(user)} Rental Home` };
+  return HOME_DEFINITION;
 }
 function restPointFor(user) {
   if (currentWorldDistrict(user) === 'Ernakulam') return { ...NEEDS_REST_POINT, id:'ernakulam-rest', label:'Ernakulam Rest Bench', x:4, z:40 };
@@ -422,7 +412,7 @@ const GROUP_MEMBER_LIMIT = 12;
 const GROUP_MEMBERSHIP_LIMIT = 8;
 const GROUP_MESSAGE_LIMIT = 100;
 const GROUP_NAME_MAX = 40;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0, lastClinicAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0, lastClinicAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0, house: null }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
 const SESSION_AGE = 365 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -523,7 +513,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!Array.isArray(user.jobState.traffic.challans)) { user.jobState.traffic.challans = []; migrated = true; }
     if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) { user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 }; migrated = true; }
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) { user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0, lastClinicAt: 0 }; migrated = true; }
-    if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) { user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0, house: { built: false, style: '', district: '', builtAt: 0 } }; migrated = true; }
+    if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) { user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }; migrated = true; }
     if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) { user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] }; migrated = true; }
     if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) { user.jobState.notifications = { items: [], read: {} }; migrated = true; }
     if (!Array.isArray(user.jobState.notifications.items)) { user.jobState.notifications.items = []; migrated = true; }
@@ -600,8 +590,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { x: valid ? x : spawn.x, z: valid ? z : spawn.z, rotation: Number.isFinite(rotation) ? rotation : spawn.rotation || 0, valid };
   }
   function publicUser(user) {
-    const currentPosition = presence.get(user.id), saved = savedPosition(user);
-    const position = currentPosition?.mode === 'home' ? currentPosition.homeReturn : currentPosition;
+    const livePosition = presence.get(user.id), position = livePosition?.mode === 'home' ? livePosition.homeReturn : livePosition, saved = savedPosition(user);
     let level = 1, remaining = user.points, next = 100;
     while (remaining >= next) { remaining -= next; level++; next = 100 + (level - 1) * 50; }
     const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username);
@@ -688,8 +677,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   function worldSnapshot(viewerId) {
     const viewer = findUser(viewerId);
     const viewerDistrict = viewer ? currentWorldDistrict(viewer) : 'Kottayam';
-    return { district: viewerDistrict, players: [...presence.entries()].filter(([id, state]) => {
-      if (!online(id) || blocked(viewerId, id) || state.mode === 'home') return false;
+    return { district: viewerDistrict, players: [...presence.entries()].filter(([id]) => {
+      if (!online(id) || blocked(viewerId, id) || presence.get(id)?.mode === 'home') return false;
       const candidate = findUser(id);
       return candidate && currentWorldDistrict(candidate) === viewerDistrict;
     }).map(([id, state]) => {
@@ -910,14 +899,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const items = [];
     const timestamp = now();
     const home = homeSummary(user);
-    if (home.accessBlocked) {
+    if (!home.house?.built && home.accessBlocked) {
       items.push({
         id: `reminder:home-blocked:${home.rentDueAt}:${home.utilityDueAt}`,
         kind: 'home', title: 'Home access needs attention',
         message: 'Sleep access is paused. Pay overdue rent or utilities to restore it.',
         severity: 'critical', target: 'home', createdAt: Math.min(home.rentGraceUntil, home.utilityGraceUntil),
       });
-    } else {
+    } else if (!home.house?.built) {
       const homeReminders = [
         ['rent', home.rentDueAt, home.rentOverdue, home.home.rent, 'Rent'],
         ['utilities', home.utilityDueAt, home.utilityOverdue, home.home.utilities, 'Utilities'],
@@ -1303,28 +1292,29 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const timestamp = now();
     const rentDueAt = Number(home.rentDueAt);
     const utilityDueAt = Number(home.utilityDueAt);
-    const owned = home.status === 'owned' && home.house?.built === true;
-    const rentOverdue = !owned && timestamp > rentDueAt;
-    const utilityOverdue = !owned && timestamp > utilityDueAt;
     const homeDefinition = homeDefinitionFor(user);
+    const house = home.house && typeof home.house === 'object' ? home.house : null;
+    const owned = !!house?.built;
+    const live = presence.get(user.id);
+    const inHouseDistrict = !owned || house.district === currentWorldDistrict(user);
     const rentGraceUntil = rentDueAt + homeDefinition.graceMs;
     const utilityGraceUntil = utilityDueAt + homeDefinition.graceMs;
+    const rentOverdue = !owned && timestamp > rentDueAt;
+    const utilityOverdue = !owned && timestamp > utilityDueAt;
     const accessBlocked = !owned && (timestamp > rentGraceUntil || timestamp > utilityGraceUntil);
-    const reminder = accessBlocked
-      ? 'Sleep access paused until overdue home charges are paid.'
-      : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
+    const reminder = owned
+      ? (inHouseDistrict ? 'Your Kerala starter home is ready. Enter, use the bed, and make yourself at home.' : `Your home is in ${house.district}. Travel there to enter.`)
+      : accessBlocked
+        ? 'Sleep access paused until overdue home charges are paid.'
+        : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
     return {
       status: owned ? 'owned' : home.status,
-      house: {
-        built: owned,
-        style: owned ? home.house.style : '',
-        district: owned ? home.house.district : '',
-        builtAt: owned ? Number(home.house.builtAt) : 0,
-      },
       home: HOME_DEFINITION,
       localHome: homeDefinition,
-      rentDueAt,
-      utilityDueAt,
+      house: house ? { ...house, available: inHouseDistrict, inside: live?.mode === 'home' } : null,
+      inside: live?.mode === 'home',
+      rentDueAt: owned ? 0 : rentDueAt,
+      utilityDueAt: owned ? 0 : utilityDueAt,
       rentOverdue,
       utilityOverdue,
       rentGraceUntil,
@@ -1401,18 +1391,1797 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) user.jobState.completed = {};
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null };
-    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issue  live.movementCredit = 2;
+    if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } };
+    if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 };
+    if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0, house: null };
+    if (!user.jobState.home.house || typeof user.jobState.home.house !== 'object' || Array.isArray(user.jobState.home.house)) user.jobState.home.house = null;
+    if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] };
+    if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) user.jobState.notifications = { items: [], read: {} };
+    if (!Array.isArray(user.jobState.reports)) user.jobState.reports = [];
+    if (!user.jobState.npcRelations || typeof user.jobState.npcRelations !== 'object' || Array.isArray(user.jobState.npcRelations)) user.jobState.npcRelations = {};
+    if (!user.jobState.npcFavors || typeof user.jobState.npcFavors !== 'object' || Array.isArray(user.jobState.npcFavors)) user.jobState.npcFavors = { active: null, cooldowns: {}, completed: 0 };
+    if (!user.jobState.communityEvents || typeof user.jobState.communityEvents !== 'object' || Array.isArray(user.jobState.communityEvents)) user.jobState.communityEvents = { completedIds: [], contributions: 0 };
+    if (!Array.isArray(user.jobState.communityEvents.completedIds)) user.jobState.communityEvents.completedIds = [];
+    user.jobState.communityEvents.completedIds = user.jobState.communityEvents.completedIds.filter(id => typeof id === 'string' && /^community:\d+:[a-z]+$/.test(id)).slice(-COMMUNITY_EVENT_HISTORY_LIMIT);
+    if (!Number.isInteger(Number(user.jobState.communityEvents.contributions)) || Number(user.jobState.communityEvents.contributions) < 0) user.jobState.communityEvents.contributions = 0;
+    if (!user.jobState.npcFavors.cooldowns || typeof user.jobState.npcFavors.cooldowns !== 'object' || Array.isArray(user.jobState.npcFavors.cooldowns)) user.jobState.npcFavors.cooldowns = {};
+    if (!Number.isInteger(Number(user.jobState.npcFavors.completed)) || Number(user.jobState.npcFavors.completed) < 0) user.jobState.npcFavors.completed = 0;
+    const normalizedFavorCooldowns = {};
+    for (const [npcId, value] of Object.entries(user.jobState.npcFavors.cooldowns)) {
+      if (!npcRelationshipIdentitySafe(npcId)) continue;
+      const timestamp = Number(value);
+      if (Number.isFinite(timestamp) && timestamp > 0) normalizedFavorCooldowns[npcId] = timestamp;
+    }
+    user.jobState.npcFavors.cooldowns = normalizedFavorCooldowns;
+    const normalizedNpcRelations = {};
+    for (const [npcId, relation] of Object.entries(user.jobState.npcRelations)) {
+      const match = /^npc-(\d+)$/.exec(npcId);
+      const npcIndex = match ? Number(match[1]) : -1;
+      if (!match || npcIndex < 0 || npcIndex >= NPC_RELATIONSHIP_COUNT || !relation || typeof relation !== 'object' || Array.isArray(relation)) continue;
+      normalizedNpcRelations[npcId] = {
+        score: Math.max(0, Math.min(NPC_RELATIONSHIP_MAX, Number(relation.score) || 0)),
+        conversations: Math.max(0, Math.min(100000, Math.floor(Number(relation.conversations) || 0))),
+        lastInteractionAt: Math.max(0, Number(relation.lastInteractionAt) || 0),
+        firstMetAt: Math.max(0, Number(relation.firstMetAt) || 0),
+      };
+    }
+    user.jobState.npcRelations = normalizedNpcRelations;
+    if (!Array.isArray(user.jobState.notifications.items)) user.jobState.notifications.items = [];
+    if (!user.jobState.notifications.read || typeof user.jobState.notifications.read !== 'object' || Array.isArray(user.jobState.notifications.read)) user.jobState.notifications.read = {};
+    if (!Array.isArray(user.jobState.traffic.challans)) user.jobState.traffic.challans = [];
+    const needs = user.jobState.needs;
+    for (const key of ['hunger', 'thirst', 'energy']) {
+      if (!Number.isFinite(Number(needs[key]))) needs[key] = 100;
+      needs[key] = Math.max(0, Math.min(NEEDS_MAX, Number(needs[key])));
+    }
+    if (!Number.isFinite(Number(needs.updatedAt)) || Number(needs.updatedAt) <= 0) needs.updatedAt = now();
+    if (!Number.isFinite(Number(needs.lastRestAt))) needs.lastRestAt = 0;
+    const notifications = user.jobState.notifications;
+    notifications.items = notifications.items.filter(item => item && typeof item === 'object' && typeof item.id === 'string').slice(-80);
+    const readEntries = Object.entries(notifications.read).filter(([, value]) => Number.isFinite(Number(value)) && Number(value) > 0).slice(-200);
+    notifications.read = Object.fromEntries(readEntries);
+    const bank = user.jobState.bank;
+    if (!Number.isSafeInteger(Number(bank.balance)) || Number(bank.balance) < 0 || Number(bank.balance) > BANK_LIMIT) bank.balance = 0;
+    if (typeof bank.accountNumber !== 'string') bank.accountNumber = '';
+    if (!Array.isArray(bank.transactions)) bank.transactions = [];
+    bank.transactions = bank.transactions.filter(entry => entry && typeof entry === 'object' && typeof entry.id === 'string').slice(-80);
+    const home = user.jobState.home;
+    if (home.status !== 'rented') home.status = 'rented';
+    if (!Number.isFinite(Number(home.rentDueAt)) || Number(home.rentDueAt) <= 0) { home.rentDueAt = now() + HOME_DEFINITION.periodMs; dirty = true; }
+    if (!Number.isFinite(Number(home.utilityDueAt)) || Number(home.utilityDueAt) <= 0) { home.utilityDueAt = now() + HOME_DEFINITION.periodMs; dirty = true; }
+    if (!Number.isFinite(Number(home.lastSleepAt))) home.lastSleepAt = 0;
+    if (!Number.isInteger(Number(home.rentPayments)) || Number(home.rentPayments) < 0) home.rentPayments = 0;
+    if (!Number.isInteger(Number(home.utilityPayments)) || Number(home.utilityPayments) < 0) home.utilityPayments = 0;
+    if (!user.jobState.traffic.licence || typeof user.jobState.traffic.licence !== 'object' || Array.isArray(user.jobState.traffic.licence)) user.jobState.traffic.licence = { type: 'none', number: '', issuedAt: 0, validUntil: 0 };
+    const licence = user.jobState.traffic.licence;
+    if (!['none', 'learner', 'full'].includes(licence.type)) licence.type = 'none';
+    if (typeof licence.number !== 'string') licence.number = '';
+    if (!Number.isFinite(Number(licence.issuedAt))) licence.issuedAt = 0;
+    if (!Number.isFinite(Number(licence.validUntil))) licence.validUntil = 0;
+    user.jobState.traffic.challans = user.jobState.traffic.challans.filter(challan => challan && typeof challan === 'object' && typeof challan.id === 'string');
+    const garage = user.jobState.garage;
+    if (!Array.isArray(garage.owned)) garage.owned = [];
+    garage.owned = garage.owned.filter(vehicle => vehicle && typeof vehicle === 'object' && GARAGE_CATALOG[vehicle.modelId]);
+    for (const vehicle of garage.owned) {
+      if (!Number.isFinite(Number(vehicle.fuel))) vehicle.fuel = VEHICLE_FUEL_MAX;
+      if (!Number.isFinite(Number(vehicle.condition))) vehicle.condition = VEHICLE_CONDITION_MAX;
+      vehicle.fuel = Math.max(0, Math.min(VEHICLE_FUEL_MAX, Number(vehicle.fuel)));
+      vehicle.condition = Math.max(15, Math.min(VEHICLE_CONDITION_MAX, Number(vehicle.condition)));
+      if (typeof vehicle.entered !== 'boolean') vehicle.entered = false;
+      if (!Number.isFinite(Number(vehicle.lastImpactAt))) vehicle.lastImpactAt = 0;
+      if (typeof vehicle.registration !== 'string' || !vehicle.registration.trim()) { vehicle.registration = registrationNumberFor(user); dirty = true; }
+      if (!Number.isFinite(Number(vehicle.insuranceUntil))) { vehicle.insuranceUntil = now() + VEHICLE_INSURANCE_TERM; dirty = true; }
+      if (!Number.isFinite(Number(vehicle.listedAt))) vehicle.listedAt = 0;
+      if (!Number.isFinite(Number(vehicle.salePrice))) vehicle.salePrice = 0;
+      if (!Number.isInteger(Number(vehicle.ownerChanges))) vehicle.ownerChanges = 0;
+    }
+    if (garage.selectedId && !garage.owned.some(vehicle => vehicle.id === garage.selectedId && !(Number(vehicle.salePrice) > 0))) garage.selectedId = garage.owned.find(vehicle => !(Number(vehicle.salePrice) > 0))?.id || null;
+    if (!garage.selectedId && garage.owned.length) garage.selectedId = garage.owned.find(vehicle => !(Number(vehicle.salePrice) > 0))?.id || null;
+    if (garage.activeVehicleId && !garage.owned.some(vehicle => vehicle.id === garage.activeVehicleId)) garage.activeVehicleId = null;
+    const activeFavor = user.jobState.npcFavors.active;
+    if (activeFavor && (!npcRelationshipIdentitySafe(activeFavor.npcId) || !PUBLIC_RIDE_DESTINATIONS[activeFavor.targetId] || !Number.isFinite(Number(activeFavor.expiresAt)) || Number(activeFavor.expiresAt) <= now())) {
+      user.jobState.npcFavors.active = null;
+      dirty = true;
+    }
+    const active = user.jobState.active;
+    if (active && (!Array.isArray(active.checkpoints) || Number(active.expiresAt) <= now())) {
+      user.jobState.active = null;
+      const live = presence.get(user.id);
+      if (live) { live.mode = 'walk'; live.movementCredit = Math.min(live.movementCredit, 2); }
+      dirty = true;
+    } else if (active) {
+      const job = JOB_DEFINITIONS[active.jobId];
+      if (job?.vehicle) {
+        if (typeof active.vehicleEntered !== 'boolean') { active.vehicleEntered = false; dirty = true; }
+        if (!Number.isFinite(Number(active.vehicleFuel))) { active.vehicleFuel = VEHICLE_FUEL_MAX; dirty = true; }
+        active.vehicleFuel = Math.max(0, Math.min(VEHICLE_FUEL_MAX, Number(active.vehicleFuel)));
+        if (!Number.isFinite(Number(active.vehicleCondition))) { active.vehicleCondition = VEHICLE_CONDITION_MAX; dirty = true; }
+        active.vehicleCondition = Math.max(15, Math.min(VEHICLE_CONDITION_MAX, Number(active.vehicleCondition)));
+        if (!Number.isFinite(Number(active.vehicleLastImpactAt))) active.vehicleLastImpactAt = 0;
+        if (!Number.isFinite(Number(active.vehicleX)) || !Number.isFinite(Number(active.vehicleZ))) {
+          const position = savedPosition(user);
+          active.vehicleX = missionCoordinateFor(user, position.x, 2.8, 'x');
+          active.vehicleZ = missionCoordinateFor(user, position.z, 1.5, 'z');
+          dirty = true;
         }
+      }
+    }
+    return user.jobState;
+  }
+  function jobPosition(user) {
+    const live = presence.get(user.id);
+    if (live && Number.isFinite(live.x) && Number.isFinite(live.z)) return { x: live.x, z: live.z };
+    const saved = savedPosition(user);
+    return { x: saved.x, z: saved.z };
+  }
+
+  function districtCityBusRoute(user) {
+    const district = genericDistrictWorld(user);
+    if (!district) return null;
+    const profile = districtCityProfile(district);
+    return {
+      id:'district-city-line',
+      label:`${district} City Line`,
+      fare:14,
+      intervalMs:45_000,
+      boardingWindowMs:9_000,
+      stops:{
+        'district-centre-bus': {
+          id:'district-centre-bus', label:`${profile.centre} Bus Stop`, x:10, z:8, radius:6.2,
+          phaseMs:0, destinationId:'district-market-bus', arrivalX:7, arrivalZ:8, arrivalRotation:0,
+        },
+        'district-market-bus': {
+          id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:13.5, radius:6.2,
+          phaseMs:11_000, destinationId:'district-rail-bus', arrivalX:25, arrivalZ:13.5, arrivalRotation:-Math.PI/2,
+        },
+        'district-rail-bus': {
+          id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-14.5, radius:6.2,
+          phaseMs:22_000, destinationId:'district-neighbourhood-bus', arrivalX:-31, arrivalZ:-14.5, arrivalRotation:Math.PI,
+        },
+        'district-neighbourhood-bus': {
+          id:'district-neighbourhood-bus', label:`${profile.neighbourhood} Bus Stop`, x:-55, z:-29, radius:6.2,
+          phaseMs:33_000, destinationId:'district-centre-bus', arrivalX:-52, arrivalZ:-29, arrivalRotation:Math.PI,
+        },
+      },
+    };
+  }
+  function publicTravelStop(stopId, user = null) {
+    for (const route of Object.values(PUBLIC_TRAVEL_ROUTES)) {
+      const stop = route.stops[stopId];
+      if (stop) return { route, stop };
+    }
+    if (user) {
+      const route = districtCityBusRoute(user);
+      const stop = route?.stops?.[stopId];
+      if (stop) return { route, stop };
+    }
+    return null;
+  }
+
+  function npcRelationshipIdentity(value) {
+    const match = /^npc-(\d+)$/.exec(String(value || ''));
+    const index = match ? Number(match[1]) : -1;
+    if (!match || !Number.isInteger(index) || index < 0 || index >= NPC_RELATIONSHIP_COUNT) return null;
+    return { id: `npc-${index}`, index, name: NPC_NAMES[index % NPC_NAMES.length] };
+  }
+
+  function npcRelationshipTier(score) {
+    const value = Number(score) || 0;
+    if (value >= 60) return 'Trusted';
+    if (value >= 30) return 'Friendly';
+    if (value >= 15) return 'Familiar';
+    if (value >= 5) return 'Acquaintance';
+    return 'Stranger';
+  }
+
+  function localReputationTier(value) {
+    if (value >= 70) return 'Community Regular';
+    if (value >= 45) return 'Trusted Local';
+    if (value >= 20) return 'Known Local';
+    if (value >= 5) return 'Recognized';
+    return 'Newcomer';
+  }
+
+  function npcRelationshipSummary(user) {
+    const state = jobStateFor(user);
+    const relationships = [];
+    let breadthScore = 0;
+    for (const [npcId, relation] of Object.entries(state.npcRelations)) {
+      const identity = npcRelationshipIdentity(npcId);
+      if (!identity) continue;
+      const score = Math.max(0, Math.min(NPC_RELATIONSHIP_MAX, Number(relation.score) || 0));
+      breadthScore += Math.min(score, 20);
+      relationships.push({
+        npcId,
+        npcIndex: identity.index,
+        name: identity.name,
+        score,
+        tier: npcRelationshipTier(score),
+        conversations: Math.max(0, Number(relation.conversations) || 0),
+        firstMetAt: Number(relation.firstMetAt || 0),
+        lastInteractionAt: Number(relation.lastInteractionAt || 0),
+      });
+    }
+    relationships.sort((a, b) => b.score - a.score || a.npcIndex - b.npcIndex);
+    const relationshipValue = Math.max(0, Math.min(100, Math.round((breadthScore / (NPC_RELATIONSHIP_COUNT * 20)) * 100)));
+    const communityContributions = Math.max(0, Number(state.communityEvents?.contributions || 0));
+    const communityBonus = Math.min(20, communityContributions * 2);
+    const value = Math.max(0, Math.min(100, relationshipValue + communityBonus));
+    return {
+      reputation: {
+        value,
+        tier: localReputationTier(value),
+        met: relationships.length,
+        totalNpcs: NPC_RELATIONSHIP_COUNT,
+        relationshipValue,
+        communityContributions,
+        communityBonus,
+      },
+      relationships,
+      activeFavor: npcFavorSummary(user),
+    };
+  }
+
+  function communityEventForSlot(slot) {
+    const numericSlot = Math.max(0, Math.floor(Number(slot) || 0));
+    const spec = COMMUNITY_EVENT_CATALOG[numericSlot % COMMUNITY_EVENT_CATALOG.length];
+    const target = PUBLIC_RIDE_DESTINATIONS[spec.targetId];
+    const startsAt = numericSlot * COMMUNITY_EVENT_INTERVAL_MS;
+    return {
+      id: `community:${numericSlot}:${spec.key}`,
+      slot: numericSlot,
+      key: spec.key,
+      icon: spec.icon,
+      title: spec.title,
+      description: spec.description,
+      action: spec.action,
+      startsAt,
+      endsAt: startsAt + COMMUNITY_EVENT_ACTIVE_MS,
+      cashReward: spec.cash,
+      pointsReward: spec.points,
+      target: {
+        id: target.id,
+        label: target.label,
+        x: Number(target.x),
+        z: Number(target.z),
+        radius: 6,
+      },
+    };
+  }
+
+  function communityEventsSummary(user, timestamp = now()) {
+    const state = jobStateFor(user);
+    const slot = Math.floor(timestamp / COMMUNITY_EVENT_INTERVAL_MS);
+    const current = communityEventForSlot(slot);
+    const previous = slot > 0 ? communityEventForSlot(slot - 1) : null;
+    const upcoming = communityEventForSlot(slot + 1);
+    const completed = new Set(state.communityEvents.completedIds);
+    const activeNow = timestamp >= current.startsAt && timestamp < current.endsAt;
+    const currentView = {
+      ...current,
+      status: activeNow ? (completed.has(current.id) ? 'completed' : 'active') : 'ended',
+      completed: completed.has(current.id),
+      secondsRemaining: activeNow ? Math.max(0, Math.ceil((current.endsAt - timestamp) / 1000)) : 0,
+    };
+    const recent = previous ? [{
+      ...previous,
+      status: completed.has(previous.id) ? 'completed' : 'ended',
+      completed: completed.has(previous.id),
+    }] : [];
+    return {
+      serverNow: timestamp,
+      current: currentView,
+      upcoming: {
+        ...upcoming,
+        status: 'upcoming',
+        secondsUntilStart: Math.max(0, Math.ceil((upcoming.startsAt - timestamp) / 1000)),
+      },
+      recent,
+      contributions: Number(state.communityEvents.contributions || 0),
+      reputation: npcRelationshipSummary(user).reputation,
+    };
+  }
+
+  function npcRecognitionMessage(tier, name) {
+    if (tier === 'Trusted') return `${name} knows you well and greets you warmly.`;
+    if (tier === 'Friendly') return `${name} is happy to see a familiar face.`;
+    if (tier === 'Familiar') return `${name} remembers you from earlier visits.`;
+    if (tier === 'Acquaintance') return `${name} recognizes you now.`;
+    return `You have met ${name}.`;
+  }
+
+  function npcFavorDefinition(user, identity) {
+    const state = jobStateFor(user);
+    const offset = Math.max(0, Number(state.npcFavors.completed || 0));
+    const spec = NPC_FAVOR_TARGETS[(identity.index + offset) % NPC_FAVOR_TARGETS.length];
+    const target = PUBLIC_RIDE_DESTINATIONS[spec.id];
+    return {
+      id: `${identity.id}:${spec.id}`,
+      npcId: identity.id,
+      npcIndex: identity.index,
+      npcName: identity.name,
+      title: spec.title,
+      action: spec.action,
+      reward: spec.reward,
+      target: {
+        id: target.id,
+        label: target.label,
+        x: Number(target.x),
+        z: Number(target.z),
+        radius: 5.5,
+      },
+    };
+  }
+
+  function npcFavorOffer(user, identity, timestamp = now()) {
+    const state = jobStateFor(user);
+    const relation = state.npcRelations[identity.id];
+    const score = Number(relation?.score || 0);
+    if (score < NPC_FAVOR_MIN_SCORE || state.npcFavors.active || state.active) return null;
+    const cooldownUntil = Number(state.npcFavors.cooldowns[identity.id] || 0);
+    if (cooldownUntil > timestamp) return null;
+    const definition = npcFavorDefinition(user, identity);
+    return {
+      ...definition,
+      available: true,
+      relationshipRequired: NPC_FAVOR_MIN_SCORE,
+      expiresInMs: NPC_FAVOR_EXPIRY_MS,
+    };
+  }
+
+  function npcFavorSummary(user) {
+    const state = jobStateFor(user);
+    const active = state.npcFavors.active;
+    if (!active) return null;
+    const identity = npcRelationshipIdentity(active.npcId);
+    const target = PUBLIC_RIDE_DESTINATIONS[active.targetId];
+    if (!identity || !target) return null;
+    return {
+      id: active.id,
+      npcId: identity.id,
+      npcIndex: identity.index,
+      npcName: identity.name,
+      title: active.title,
+      action: active.action,
+      reward: Number(active.reward || 0),
+      startedAt: Number(active.startedAt || 0),
+      expiresAt: Number(active.expiresAt || 0),
+      target: {
+        id: target.id,
+        label: target.label,
+        x: Number(target.x),
+        z: Number(target.z),
+        radius: 5.5,
+      },
+    };
+  }
+
+  function worldHour(timestamp = now()) {
+    const phase = ((Number(timestamp) % WORLD_DAY_LENGTH_MS) + WORLD_DAY_LENGTH_MS) % WORLD_DAY_LENGTH_MS;
+    return phase / 60_000;
+  }
+
+  function worldShopOpen(shop, timestamp = now()) {
+    if (!shop) return false;
+    const hour = worldHour(timestamp);
+    const open = Number(shop.openHour ?? 0);
+    const close = Number(shop.closeHour ?? 24);
+    return open <= close ? hour >= open && hour < close : hour >= open || hour < close;
+  }
+
+  function worldHourLabel(value) {
+    const numeric = Number(value) || 0;
+    const hour = Math.floor(numeric) % 24;
+    const minute = Math.round((((numeric % 1) + 1) % 1) * 60);
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${suffix}`;
+  }
+
+function publicRideDestinationDistrict(destinationId) {
+  for (const [district, atlas] of Object.entries(KERALA_DISTRICT_ATLAS)) {
+    if (atlas.attractions.some(spot => spot.landmarkId === destinationId)) return district;
+  }
+  if (destinationId === 'bekal') return 'Kasaragod';
+  if (destinationId === 'munnar') return 'Idukki';
+  if (destinationId === 'kochi' || destinationId.startsWith('ernakulam-') || destinationId === 'broadway-cafe') return 'Ernakulam';
+  if (destinationId === 'alappuzha') return 'Alappuzha';
+  if (destinationId === 'temple') return 'Thiruvananthapuram';
+  return 'Kottayam';
+}
+function genericRideDestination(user, destinationId) {
+  const district = genericDistrictWorld(user);
+  if (!district) return null;
+  const profile = districtCityProfile(district);
+  const config = districtWorldConfig(district);
+  const fuelPosition = genericDistrictFuelPosition(!!config.airport);
+  const destinations = {
+    'district-centre': { id:'district-centre', label:profile.centre, x:0, z:0, arrivalX:4, arrivalZ:0 },
+    'district-rail': { id:'district-rail', label:`${district} Railway Station`, x:config.train.x, z:config.train.z, arrivalX:config.train.arrivalX, arrivalZ:config.train.arrivalZ },
+    'district-market': { id:'district-market', label:profile.market, x:20, z:12.5, arrivalX:24, arrivalZ:12.5 },
+    'district-cafe': { id:'district-cafe', label:profile.cafe, x:-44, z:22, arrivalX:-40, arrivalZ:22 },
+    'district-hospital': { id:'district-hospital', label:`${district} District Hospital`, x:-20, z:11.5, arrivalX:-16, arrivalZ:11.5 },
+    'district-police': { id:'district-police', label:`${district} District Police`, x:-20, z:-18, arrivalX:-16, arrivalZ:-18 },
+    'district-fire': { id:'district-fire', label:`${district} Fire & Rescue`, x:20, z:-18, arrivalX:16, arrivalZ:-18 },
+    'district-home': { id:'district-home', label:`${district} Rental Home`, x:-24, z:-27, arrivalX:-24, arrivalZ:-21.8 },
+    'district-rest': { id:'district-rest', label:`${district} Rest Park`, x:-10, z:-10, arrivalX:-7, arrivalZ:-10 },
+    'district-fuel': { id:'district-fuel', label:`${district} Fuel Station`, ...fuelPosition, arrivalX:fuelPosition.x - 4, arrivalZ:fuelPosition.z },
+    'district-service': { id:'district-service', label:`${district} Service Garage`, x:-18, z:-48, arrivalX:-14, arrivalZ:-48 },
+    'district-landmark': { id:'district-landmark', label:profile.landmark, x:50, z:45, arrivalX:44, arrivalZ:45 },
+    'district-neighbourhood': { id:'district-neighbourhood', label:profile.neighbourhood, x:-55, z:-29, arrivalX:-51, arrivalZ:-29 },
+    'district-centre-bus': { id:'district-centre-bus', label:`${profile.centre} Bus Stop`, x:10, z:8, arrivalX:7, arrivalZ:8 },
+    'district-market-bus': { id:'district-market-bus', label:`${profile.market} Bus Stop`, x:28, z:13.5, arrivalX:25, arrivalZ:13.5 },
+    'district-rail-bus': { id:'district-rail-bus', label:`${district} Railway Bus Stop`, x:-34, z:-14.5, arrivalX:-31, arrivalZ:-14.5 },
+    'district-neighbourhood-bus': { id:'district-neighbourhood-bus', label:`${profile.neighbourhood} Bus Stop`, x:-55, z:-29, arrivalX:-52, arrivalZ:-29 },
+  };
+  if (config.airport) destinations['district-airport'] = { id:'district-airport', label:`${district} Airport`, x:config.airport.x, z:config.airport.z, arrivalX:config.airport.arrivalX, arrivalZ:config.airport.arrivalZ };
+  return destinations[destinationId] || null;
+}
+function districtAtlasRideDestination(user, destinationId) {
+  const district = currentWorldDistrict(user);
+  const spot = KERALA_DISTRICT_ATLAS[district]?.attractions.find(attraction => attraction.landmarkId === destinationId);
+  if (!spot) return null;
+  return {
+    id:destinationId,
+    label:spot.name,
+    x:spot.x,
+    z:spot.z,
+    arrivalX:spot.x >= 0 ? spot.x - 3.5 : spot.x + 3.5,
+    arrivalZ:spot.z,
+  };
+}
+function publicRideDestinationForUser(user, destinationId) {
+  return districtAtlasRideDestination(user, destinationId)
+    || genericRideDestination(user, destinationId)
+    || PUBLIC_RIDE_DESTINATIONS[destinationId]
+    || null;
+}
+
+  function publicRideQuote(user, destinationId) {
+    const destination = publicRideDestinationForUser(user, destinationId);
+    requireValue(destination, 404, 'Ride destination not found.');
+    if (!genericDistrictWorld(user)) {
+      requireValue(publicRideDestinationDistrict(destinationId) === currentWorldDistrict(user), 409, 'Auto and taxi rides stay inside the current district. Use train or flight for another district.');
+    }
+    const state = jobStateFor(user);
+    requireValue(!state.active, 409, 'Finish your active job before booking a public ride.');
+    const personal = state.garage.activeVehicleId
+      ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
+      : null;
+    requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before booking a ride.');
+    const live = presence.get(user.id) || place(user);
+    requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before booking a ride.');
+    const distance = Math.hypot(Number(destination.x) - live.x, Number(destination.z) - live.z);
+    requireValue(distance >= 5.5, 409, 'You are already close enough to walk to this destination.');
+    const options = Object.values(PUBLIC_RIDE_SERVICES).map(service => {
+      const available = distance <= Number(service.maxDistance);
+      const fare = Math.max(
+        Number(service.baseFare),
+        Number(service.baseFare) + Math.ceil(distance * Number(service.perMeter))
+      );
+      return {
+        id: service.id,
+        label: service.label,
+        available,
+        fare,
+        pickupSeconds: service.pickupSeconds,
+        travelSeconds: Math.max(3, Math.ceil(distance / Number(service.speed))),
+      };
+    });
+    return {
+      destination: { id: destination.id, label: destination.label, x: destination.x, z: destination.z },
+      distance: Math.round(distance * 10) / 10,
+      walletBalance: user.walletBalance,
+      options,
+    };
+  }
+
+  function publicTravelStatus(stopId, timestamp = now(), user = null) {
+    const found = publicTravelStop(stopId, user);
+    if (!found) return null;
+    const { route, stop } = found;
+    const destination = route.stops[stop.destinationId];
+    const interval = Number(route.intervalMs);
+    const windowMs = Number(route.boardingWindowMs);
+    const phase = Number(stop.phaseMs || 0);
+    const latestArrival = Math.floor((timestamp - phase) / interval) * interval + phase;
+    const boardingUntil = latestArrival + windowMs;
+    const boarding = timestamp >= latestArrival && timestamp <= boardingUntil;
+    const arrivalAt = boarding ? latestArrival : latestArrival + interval;
+    const effectiveBoardingUntil = boarding ? boardingUntil : arrivalAt + windowMs;
+    return {
+      routeId: route.id,
+      routeLabel: route.label,
+      fare: route.fare,
+      intervalMs: interval,
+      serverNow: timestamp,
+      boarding,
+      arrivalAt,
+      boardingUntil: effectiveBoardingUntil,
+      secondsToArrival: boarding ? 0 : Math.max(0, Math.ceil((arrivalAt - timestamp) / 1000)),
+      boardingSecondsRemaining: boarding ? Math.max(0, Math.ceil((effectiveBoardingUntil - timestamp) / 1000)) : 0,
+      stop: { id: stop.id, label: stop.label, x: stop.x, z: stop.z, radius: stop.radius },
+      destination: { id: destination.id, label: destination.label },
+    };
+  }
+  function missionCoordinateFor(user, value, delta, axis = 'x') {
+    const bounds = districtWorldConfig(user).bounds;
+    const min = (axis === 'z' ? bounds.minZ : bounds.minX) + 6;
+    const max = (axis === 'z' ? bounds.maxZ : bounds.maxX) - 6;
+    let next = value + delta;
+    if (next > max || next < min) next = value - delta;
+    return Math.max(min, Math.min(max, next));
+  }
+  function buildJobCheckpoints(user, jobId) {
+    const base = jobPosition(user);
+    const district = currentWorldDistrict(user);
+    const city = districtCityProfile(district);
+    const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinateFor(user, base.x, dx, 'x'), z: missionCoordinateFor(user, base.z, dz, 'z') });
+    if (jobId === 'delivery') return [point(`${district} Parcel Hub`, 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
+    if (jobId === 'taxi') return [point(`${city.centre} Passenger Pickup`, 'Pick up passenger', -7, 5), point(city.neighbourhood || city.secondary, 'Drop off passenger', -20, -7)];
+    return [point(genericDistrictWorld(user) ? city.market : 'Village Shop', 'Check in for shift', 9, -5)];
+  }
+  function personalVehicleSummary(user) {
+    const state = jobStateFor(user);
+    const garage = state.garage;
+    const vehicle = garage.activeVehicleId ? garage.owned.find(item => item.id === garage.activeVehicleId) : null;
+    if (!vehicle) return null;
+    const model = GARAGE_CATALOG[vehicle.modelId];
+    const position = jobPosition(user);
+    const entered = !!vehicle.entered;
+    const x = entered ? position.x : Number(vehicle.parkedX);
+    const z = entered ? position.z : Number(vehicle.parkedZ);
+    const distance = Number.isFinite(x) && Number.isFinite(z) ? Math.hypot(x - position.x, z - position.z) : null;
+    return {
+      source: 'personal',
+      vehicleId: vehicle.id,
+      modelId: vehicle.modelId,
+      kind: model.kind,
+      label: model.label,
+      entered,
+      x,
+      z,
+      radius: PERSONAL_VEHICLE_RADIUS,
+      distance: distance === null ? null : Math.round(distance * 10) / 10,
+      withinRange: distance !== null && distance <= PERSONAL_VEHICLE_RADIUS,
+      fuel: Math.round(vehicle.fuel * 10) / 10,
+      fuelMax: VEHICLE_FUEL_MAX,
+      condition: Math.round(vehicle.condition),
+      conditionMax: VEHICLE_CONDITION_MAX,
+      stations: VEHICLE_STATIONS,
+      registration: vehicle.registration,
+      resaleValue: vehicleResaleValue(vehicle),
+      forSale: Number(vehicle.salePrice) > 0,
+      salePrice: Number(vehicle.salePrice) || 0,
+      ...vehicleInsuranceSummary(vehicle),
+    };
+  }
+
+  function garageSummary(user) {
+    const state = jobStateFor(user);
+    const garage = state.garage;
+    return {
+      walletBalance: user.walletBalance,
+      selectedId: garage.selectedId || null,
+      activeVehicleId: garage.activeVehicleId || null,
+      activeVehicle: personalVehicleSummary(user),
+      catalog: Object.values(GARAGE_CATALOG).map(model => ({
+        ...model,
+        owned: garage.owned.some(vehicle => vehicle.modelId === model.id),
+      })),
+      owned: garage.owned.map(vehicle => {
+        const model = GARAGE_CATALOG[vehicle.modelId];
+        return {
+          id: vehicle.id,
+          modelId: vehicle.modelId,
+          label: model.label,
+          kind: model.kind,
+          fuel: Math.round(vehicle.fuel * 10) / 10,
+          condition: Math.round(vehicle.condition),
+          registration: vehicle.registration,
+          resaleValue: vehicleResaleValue(vehicle),
+          forSale: Number(vehicle.salePrice) > 0,
+          salePrice: Number(vehicle.salePrice) || 0,
+          ownerChanges: Number(vehicle.ownerChanges) || 0,
+          insuranceRenewalCost: VEHICLE_INSURANCE_COST[model.kind],
+          ...vehicleInsuranceSummary(vehicle),
+          selected: garage.selectedId === vehicle.id,
+          active: garage.activeVehicleId === vehicle.id,
+          entered: !!vehicle.entered,
+        };
+      }),
+    };
+  }
+
+  function jobsSummary(user) {
+    const state = jobStateFor(user);
+    const timestamp = now();
+    let active = null;
+    if (state.active) {
+      const source = state.active;
+      const job = JOB_DEFINITIONS[source.jobId];
+      const current = source.phase === 'travel' ? source.checkpoints[source.stepIndex] : (source.phase === 'working' ? source.checkpoints[source.checkpoints.length - 1] : null);
+      const position = jobPosition(user);
+      const distance = current ? Math.hypot(current.x - position.x, current.z - position.z) : null;
+      const readyAt = Number(source.readyAt || 0);
+      const ready = source.phase === 'ready' || (source.phase === 'working' && timestamp >= readyAt);
+      const vehicleEntered = !!job.vehicle && !!source.vehicleEntered;
+      const vehicleX = vehicleEntered ? position.x : Number(source.vehicleX);
+      const vehicleZ = vehicleEntered ? position.z : Number(source.vehicleZ);
+      const vehicleDistance = job.vehicle && Number.isFinite(vehicleX) && Number.isFinite(vehicleZ)
+        ? Math.hypot(vehicleX - position.x, vehicleZ - position.z)
+        : null;
+      active = {
+        taskId: source.taskId,
+        jobId: source.jobId,
+        title: job.title,
+        startedAt: Number(source.startedAt),
+        readyAt,
+        expiresAt: Number(source.expiresAt),
+        phase: source.phase,
+        stepIndex: Number(source.stepIndex || 0),
+        totalSteps: source.checkpoints.length,
+        ready,
+        remainingMs: source.phase === 'working' ? Math.max(0, readyAt - timestamp) : 0,
+        target: current ? { ...current, radius: JOB_MISSION_RADIUS, distance: Math.round(distance * 10) / 10, withinRange: distance <= JOB_MISSION_RADIUS } : null,
+        vehicle: job.vehicle ? {
+          kind: job.vehicle,
+          label: job.vehicleLabel,
+          entered: vehicleEntered,
+          x: vehicleX,
+          z: vehicleZ,
+          radius: JOB_VEHICLE_RADIUS,
+          distance: vehicleDistance === null ? null : Math.round(vehicleDistance * 10) / 10,
+          withinRange: vehicleDistance !== null && vehicleDistance <= JOB_VEHICLE_RADIUS,
+          fuel: Math.round(Math.max(0, Math.min(VEHICLE_FUEL_MAX, Number(source.vehicleFuel))) * 10) / 10,
+          fuelMax: VEHICLE_FUEL_MAX,
+          condition: Math.round(Math.max(15, Math.min(VEHICLE_CONDITION_MAX, Number(source.vehicleCondition)))),
+          conditionMax: VEHICLE_CONDITION_MAX,
+          stations: VEHICLE_STATIONS,
+        } : null,
+      };
+    }
+    return {
+      active,
+      walletBalance: user.walletBalance,
+      jobs: Object.entries(JOB_DEFINITIONS).map(([id, job]) => {
+        const cooldownUntil = Number(state.cooldowns[id] || 0);
+        return {
+          id,
+          title: job.title,
+          description: job.description,
+          reward: job.reward,
+          durationMs: job.durationMs,
+          missionType: job.missionType,
+          vehicle: job.vehicle,
+          vehicleLabel: job.vehicleLabel,
+          cooldownMs: job.cooldownMs,
+          cooldownUntil,
+          cooldownRemainingMs: Math.max(0, cooldownUntil - timestamp),
+          completedCount: Math.max(0, Number(state.completed[id] || 0)),
+          canStart: !active && cooldownUntil <= timestamp,
+        };
+      }),
+    };
+  }
+  const server = http.createServer(async (request, response) => {
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Referrer-Policy', 'same-origin');
+    response.setHeader('X-Frame-Options', 'DENY');
+    response.setHeader('Permissions-Policy', 'microphone=(self), camera=()');
+    try {
+      const url = new URL(request.url, 'http://localhost');
+      const path = decodeURIComponent(url.pathname);
+      if (!path.startsWith('/api/')) {
+        requireValue(request.method === 'GET' || request.method === 'HEAD', 405, 'Method not allowed.');
+        const relative = path === '/' ? 'index.html' : path.slice(1);
+        const extension = extname(relative).toLowerCase();
+        const rootAsset = /^[a-zA-Z0-9_-]+\.(js|css|png|ico|svg|webmanifest)$/.test(relative);
+        const nestedAsset = /^(assets|vendor)\/[a-zA-Z0-9_./-]+$/.test(relative) && PUBLIC_EXTENSIONS.has(extension);
+        requireValue(relative === 'index.html' || rootAsset || nestedAsset, 404, 'File not found.');
+        requireValue(!relative.split('/').some(part => part.startsWith('.')), 404, 'File not found.');
+        const rootPath = await realpath(publicDir);
+        let targetPath;
+        try { targetPath = await realpath(resolve(rootPath, relative)); }
+        catch { throw new ApiError(404, 'File not found.'); }
+        requireValue(targetPath.startsWith(rootPath + sep), 404, 'File not found.');
+        const resolvedRelative = targetPath.slice(rootPath.length + 1).replaceAll('\\', '/');
+        requireValue(!resolvedRelative.split('/').some(part => part.startsWith('.')) && (resolvedRelative === 'index.html' || /^[a-zA-Z0-9_-]+\.(js|css|png|ico|svg|webmanifest)$/.test(resolvedRelative) || (/^(assets|vendor)\/[a-zA-Z0-9_./-]+$/.test(resolvedRelative) && PUBLIC_EXTENSIONS.has(extname(resolvedRelative).toLowerCase()))), 404, 'File not found.');
+        const data = await readFile(targetPath);
+        response.writeHead(200, { 'Content-Type': MIME[extension] || 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'no-cache' });
+        response.end(request.method === 'HEAD' ? undefined : data);
+        return;
+      }
+      const ip = request.socket.remoteAddress || 'unknown';
+      limited(`api:${ip}`, 6000, 60000);
+      const writing = !['GET', 'HEAD'].includes(request.method);
+      if (writing) {
+        const origin = request.headers.origin;
+        requireValue(origin && ['http', 'https'].some(protocol => origin === `${protocol}://${request.headers.host}`), 403, 'Use the same website origin for this request.');
+        requireValue(request.headers['sec-fetch-site'] !== 'cross-site', 403, 'Cross-site request denied.');
+      }
+      if (path === '/api/session' && request.method === 'GET') {
+        const session = sessionFor(request);
+        send(response, 200, { user: session ? publicUser(session.user) : null }); return;
+      }
+      if (path === '/api/auth/provider-status' && request.method === 'GET') {
+        const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!/^https:\/\//.test(supabaseUrl) || !serviceKey) {
+          send(response, 200, { google: false, facebook: false, configured: false }); return;
+        }
+        try {
+          const settingsResponse = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Accept: 'application/json' },
+          });
+          const settings = await settingsResponse.json().catch(() => ({}));
+          const external = settings?.external || {};
+          send(response, 200, {
+            google: external.google === true,
+            facebook: external.facebook === true,
+            configured: settingsResponse.ok,
+          });
+        } catch {
+          send(response, 200, { google: false, facebook: false, configured: false });
+        }
+        return;
+      }
+      if (path === '/api/auth/signup' && request.method === 'POST') {
+        limited(`auth:${ip}`, 30, 15 * 60000);
+        const body = await jsonBody(request);
+        const username = typeof body.username === 'string' ? body.username.trim() : '';
+        const password = body.password;
+        requireValue(/^(?=.*[A-Za-z])[A-Za-z0-9_]{3,24}$/.test(username), 400, 'Username must be 3–24 characters and include at least one letter.');
+        requireValue(typeof password === 'string' && password.length >= 8 && password.length <= 128, 400, 'Use a password with 8–128 characters.');
+        const district = body.district || 'Kottayam', gender = body.gender || 'male';
+        requireValue(Object.hasOwn(DISTRICTS, district) && ['male', 'female', 'other'].includes(gender), 400, 'Choose a valid district and avatar.');
+        requireValue(!db.users.some(user => user.username.toLowerCase() === username.toLowerCase()), 409, 'That username is already taken.');
+        const salt = randomBytes(16).toString('hex');
+        const passwordHash = (await scrypt(password, salt, 64)).toString('hex');
+        requireValue(!db.users.some(user => user.username.toLowerCase() === username.toLowerCase()), 409, 'That username is already taken.');
+        const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+        const mobile = typeof body.mobile === 'string' ? body.mobile.trim() : '';
+        requireValue(!email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 400, 'Enter a valid email address.');
+        requireValue(!mobile || /^\+?[0-9 ()-]{7,20}$/.test(mobile), 400, 'Enter a valid mobile number.');
+        requireValue(!db.users.some(candidate => (email && candidate.email === email) || (mobile && candidate.mobile === mobile)), 409, 'That email or mobile is already in use.');
+        const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
+        requireValue(/^[A-Za-z][A-Za-z '-]{1,39}$/.test(firstName), 400, 'Enter a valid first name.');
+        const [spawnX, spawnZ] = DISTRICTS[district];
+        const user = { id: randomUUID(), firstName, displayName: firstName, username, usernameChangedAt: 0, email, mobile, passwordHash, salt, district, gender, bio: '', points: 0, completedTasks: [], walkMeters: 0, visitedLandmarks: [], districtTravelCount: 0, createdAt: now(), gameDay: '', gameWins: 0, walletBalance: 0, economyActions: [], jobState: freshJobState(), worldDistrict: district, worldX: districtWorldConfig(district).spawn.x, worldZ: districtWorldConfig(district).spawn.z, worldRotation: districtWorldConfig(district).spawn.rotation || 0, worldUpdatedAt: now() };
+        db.users.push(user); walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash'); await persist(); await startSession(user, response, request); socialChanged();
+        send(response, 201, { user: publicUser(user) }); return;
+      }
+      if (path === '/api/auth/login' && request.method === 'POST') {
+        limited(`auth:${ip}`, 30, 15 * 60000);
+        const body = await jsonBody(request);
+        requireValue(typeof body.identifier === 'string' && typeof body.password === 'string' && body.password.length <= 128, 400, 'Enter your username, email, mobile and password.');
+        const district = body.district || 'Kottayam';
+        requireValue(Object.hasOwn(DISTRICT_WORLD_CONFIG, district), 400, 'Choose a valid Kerala district.');
+        const identifier = body.identifier.trim().toLowerCase();
+        const user = db.users.find(candidate => candidate.username.toLowerCase() === identifier || candidate.email === identifier || candidate.mobile === body.identifier.trim());
+        const comparison = await scrypt(body.password, user?.salt || 'not-an-account-salt', 64);
+        const valid = timingSafeEqual(comparison, user ? Buffer.from(user.passwordHash, 'hex') : Buffer.alloc(64));
+        requireValue(user && valid, 401, 'Username or password is incorrect.');
+        const spawn = districtWorldConfig(district).spawn;
+        if (currentWorldDistrict(user) !== district) {
+          user.worldX = spawn.x;
+          user.worldZ = spawn.z;
+          user.worldRotation = spawn.rotation || 0;
+        }
+        user.district = district;
+        user.worldDistrict = district;
+        user.worldUpdatedAt = now();
+        presence.delete(user.id);
+        dirty = true;
+        await startSession(user, response, request); socialChanged();
+        send(response, 200, { user: publicUser(user) }); return;
+      }
+      if (path === '/api/auth/oauth' && request.method === 'POST') {
+        limited(`auth:${ip}`, 30, 15 * 60000);
+        const body = await jsonBody(request);
+        const district = body.district || 'Kottayam';
+        requireValue(Object.hasOwn(DISTRICT_WORLD_CONFIG, district), 400, 'Choose a valid Kerala district.');
+        requireValue(['google', 'facebook'].includes(body.provider), 400, 'Choose Google or Facebook sign in.');
+        requireValue(typeof body.accessToken === 'string' && body.accessToken.length >= 20 && body.accessToken.length <= 8192, 400, 'OAuth session token is missing.');
+        const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        requireValue(/^https:\/\//.test(supabaseUrl) && serviceKey, 503, 'Social sign in is not configured on the Kerala Play server.');
+
+        const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+          headers: { apikey: serviceKey, Authorization: `Bearer ${body.accessToken}`, Accept: 'application/json' },
+        });
+        const authUser = await authResponse.json().catch(() => null);
+        requireValue(authResponse.ok && authUser?.id, 401, 'Social sign in could not be verified.');
+        const providerCandidates = new Set([
+          authUser.app_metadata?.provider,
+          ...(Array.isArray(authUser.app_metadata?.providers) ? authUser.app_metadata.providers : []),
+          ...(Array.isArray(authUser.identities) ? authUser.identities.map(identity => identity?.provider) : []),
+        ].filter(Boolean).map(provider => String(provider).toLowerCase()));
+        requireValue(!providerCandidates.size || providerCandidates.has(body.provider), 401, 'Social sign in provider does not match.');
+        const email = String(authUser.email || '').trim().toLowerCase();
+        requireValue(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 400, 'Your social account must share an email address.');
+
+        let user = db.users.find(candidate => candidate.email === email);
+        let created = false;
+        if (!user) {
+          const metadata = authUser.user_metadata || {};
+          const rawName = String(metadata.given_name || metadata.first_name || metadata.name || email.split('@')[0] || 'Player');
+          let firstName = rawName.split(/\s+/)[0].replace(/[^A-Za-z'-]/g, '').slice(0, 40);
+          if (firstName.length < 2) firstName = 'Player';
+
+          let base = email.split('@')[0].replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '').slice(0, 18);
+          if (!/[A-Za-z]/.test(base)) base = `player_${base}`;
+          if (base.length < 3) base = `player_${base || 'kp'}`;
+          let username = base.slice(0, 24);
+          for (let suffix = 1; db.users.some(candidate => candidate.username.toLowerCase() === username.toLowerCase()); suffix += 1) {
+            const tail = String(suffix);
+            username = `${base.slice(0, Math.max(1, 24 - tail.length))}${tail}`;
+          }
+
+          const salt = randomBytes(16).toString('hex');
+          const randomPassword = randomBytes(48).toString('hex');
+          const spawn = districtWorldConfig(district).spawn;
+          user = {
+            id: randomUUID(),
+            firstName,
+            username,
+            email,
+            mobile: '',
+            passwordHash: (await scrypt(randomPassword, salt, 64)).toString('hex'),
+            salt,
+            district,
+            gender: 'other',
+            bio: '',
+            points: 0,
+            completedTasks: [],
+            walkMeters: 0,
+            visitedLandmarks: [],
+            districtTravelCount: 0,
+            createdAt: now(),
+            gameDay: '',
+            gameWins: 0,
+            walletBalance: 0,
+            economyActions: [],
+            jobState: freshJobState(),
+            worldDistrict: district,
+            worldX: spawn.x,
+            worldZ: spawn.z,
+            worldRotation: spawn.rotation || 0,
+            worldUpdatedAt: now(),
+          };
+          db.users.push(user);
+          walletTransaction(user, STARTER_BALANCE, 'starter', 'Starter Kerala Cash');
+          await persist();
+          created = true;
+        }
+
+        const spawn = districtWorldConfig(district).spawn;
+        if (currentWorldDistrict(user) !== district) {
+          user.worldX = spawn.x;
+          user.worldZ = spawn.z;
+          user.worldRotation = spawn.rotation || 0;
+        }
+        user.district = district;
+        user.worldDistrict = district;
+        user.worldUpdatedAt = now();
+        presence.delete(user.id);
+        dirty = true;
+        await startSession(user, response, request);
+        socialChanged();
+        send(response, created ? 201 : 200, { user: publicUser(user), created, provider: body.provider });
+        return;
+      }
+      if (path === '/api/auth/forgot' && request.method === 'POST') {
+        const body = await jsonBody(request); const identifier = typeof body.identifier === 'string' ? body.identifier.trim().toLowerCase() : '';
+        const user = db.users.find(candidate => candidate.username.toLowerCase() === identifier || candidate.email === identifier || candidate.mobile === body.identifier?.trim());
+        if (!user) send(response, 200, { ok: true, message: 'If that account exists, a reset code was issued.' });
+        else { const code = String(randomInt(100000, 1000000)); resetTokens.set(hashToken(code), { userId: user.id, expires: now() + 10 * 60000 }); const sent = await sendResetEmail(user, code); if (!sent) console.log(`[Kerala Play] reset OTP for ${user.username}: ${code}`); send(response, 200, { ok: true, message: 'If that account exists, a reset code was issued to its saved email.' }); }
+        return;
+      }
+      if (path === '/api/auth/reset' && request.method === 'POST') {
+        const body = await jsonBody(request); const code = String(body.code || ''); const entry = resetTokens.get(hashToken(code));
+        requireValue(entry && entry.expires > now(), 400, 'That reset code is invalid or expired.'); requireValue(typeof body.password === 'string' && body.password.length >= 8, 400, 'Use a password with at least 8 characters.');
+        const target = findUser(entry.userId);
+        const salt = randomBytes(16).toString('hex');
+        target.salt = salt;
+        target.passwordHash = (await scrypt(body.password, salt, 64)).toString('hex');
+        resetTokens.delete(hashToken(code));
+        addNotification(target, {
+          sourceKey: `security:password:${now()}`,
+          kind: 'security',
+          title: 'Password changed',
+          message: 'Your Kerala Play password was changed using account recovery.',
+          severity: 'warning',
+        });
+        await persist();
+        send(response, 200, { ok: true }); return;
+      }
+      const session = sessionFor(request);
+      requireValue(session, 401, 'Please sign in first.');
+      const user = session.user;
+      if (path === '/api/admin/reports' && request.method === 'GET') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        const reports = db.users.flatMap(reporter => (reporter.jobState?.reports || []).map(report => {
+          const target = db.users.find(peer => peer.id === report.targetId);
+          return {
+            id: report.id,
+            status: report.status || 'open',
+            reason: report.reason,
+            details: report.details || '',
+            createdAt: report.createdAt,
+            reporter: { id: reporter.id, username: reporter.username },
+            target: { id: report.targetId, username: target?.username || 'Unknown player' },
+          };
+        })).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 200);
+        send(response, 200, { reports }); return;
+      }
+      const adminReportMatch = path.match(/^\/api\/admin\/reports\/([^/]+)$/);
+      if (adminReportMatch && request.method === 'PATCH') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        limited(`admin-action:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        requireValue(body.status === 'resolved' || body.status === 'dismissed', 400, 'Choose resolved or dismissed.');
+        const reportId = decodeURIComponent(adminReportMatch[1]);
+        let report = null, reporter = null;
+        for (const candidate of db.users) {
+          const found = (candidate.jobState?.reports || []).find(item => item.id === reportId);
+          if (found) { report = found; reporter = candidate; break; }
+        }
+        requireValue(report, 404, 'Report not found.');
+        requireValue((report.status || 'open') === 'open', 409, 'This report is already closed.');
+        const target = db.users.find(peer => peer.id === report.targetId);
+        report.status = body.status;
+        report.reviewedAt = now();
+        report.reviewedBy = user.id;
+        const entry = {
+          id: randomUUID(), actorId: user.id, actorUsername: user.username,
+          action: `report_${body.status}`, reportId: report.id,
+          reporterId: reporter?.id || '', targetId: report.targetId,
+          targetUsername: target?.username || 'Unknown player', createdAt: now()
+        };
+        db.adminAuditLog.push(entry);
+        if (db.adminAuditLog.length > 1000) db.adminAuditLog.splice(0, db.adminAuditLog.length - 1000);
+        dirty = true;
+        await persist();
+        send(response, 200, { report: { id: report.id, status: report.status, reviewedAt: report.reviewedAt }, audit: entry }); return;
+      }
+      if (path === '/api/admin/audit' && request.method === 'GET') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        send(response, 200, { entries: db.adminAuditLog.slice(-100).reverse() }); return;
+      }
+      if (path === '/api/admin/overview' && request.method === 'GET') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        const allReports = db.users.flatMap(peer => peer.jobState?.reports || []);
+        const openReports = allReports.filter(report => report.status === 'open').length;
+        const walletTotal = db.users.reduce((sum, peer) => sum + Math.max(0, Number(peer.wallet) || 0), 0);
+        const bankTotal = db.users.reduce((sum, peer) => sum + Math.max(0, Number(peer.jobState?.bank?.balance) || 0), 0);
+        const activeJobs = db.users.filter(peer => peer.jobState?.active).length;
+        send(response, 200, {
+          generatedAt: now(),
+          players: { total: db.users.length, online: presence.size },
+          moderation: { reportsTotal: allReports.length, reportsOpen: openReports },
+          economy: { walletTotal, bankTotal, combinedMoney: walletTotal + bankTotal },
+          activity: { activeJobs },
+          world: { configuredAlerts: configuredWorldAlerts.length },
+          audit: { entries: db.adminAuditLog.length },
+        }); return;
+      }
+      const adminModerationMatch = path.match(/^\/api\/admin\/players\/([^/]+)\/(warn|mute)$/);
+      if (adminModerationMatch && request.method === 'POST') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        limited(`admin-action:${user.id}`, 30, 60000);
+        const target = findUser(decodeURIComponent(adminModerationMatch[1]));
+        requireValue(target, 404, 'Player not found.');
+        requireValue(target.id !== user.id, 400, 'You cannot moderate your own account.');
+        const body = await jsonBody(request);
+        const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+        requireValue(reason.length >= 3 && reason.length <= 240, 400, 'Moderation reason must be 3–240 characters.');
+        if (!target.moderation || typeof target.moderation !== 'object') target.moderation = { warnings: [], mutedUntil: 0 };
+        if (!Array.isArray(target.moderation.warnings)) target.moderation.warnings = [];
+        const action = adminModerationMatch[2];
+        let mutedUntil = Number(target.moderation.mutedUntil || 0);
+        if (action === 'warn') {
+          target.moderation.warnings.push({ id: randomUUID(), reason, actorId: user.id, createdAt: now() });
+          target.moderation.warnings = target.moderation.warnings.slice(-50);
+          addNotification(target, { sourceKey: `moderation:warning:${now()}`, kind: 'security', title: 'Admin warning', message: reason, severity: 'warning' });
+        } else {
+          const durationMinutes = Number(body.durationMinutes);
+          requireValue(Number.isInteger(durationMinutes) && [15, 60, 360, 1440].includes(durationMinutes), 400, 'Choose a supported mute duration.');
+          mutedUntil = Math.max(now(), mutedUntil) + durationMinutes * 60000;
+          target.moderation.mutedUntil = mutedUntil;
+          addNotification(target, { sourceKey: `moderation:mute:${now()}`, kind: 'security', title: 'Communication muted', message: `${reason} · Until ${new Date(mutedUntil).toISOString()}`, severity: 'warning' });
+        }
+        const entry = { id: randomUUID(), actorId: user.id, actorUsername: user.username, action: `player_${action}`, targetId: target.id, targetUsername: target.username, reason, mutedUntil: action === 'mute' ? mutedUntil : 0, createdAt: now() };
+        db.adminAuditLog.push(entry);
+        if (db.adminAuditLog.length > 1000) db.adminAuditLog.splice(0, db.adminAuditLog.length - 1000);
+        dirty = true;
+        await persist();
+        send(response, 200, { ok: true, action, target: { id: target.id, username: target.username }, mutedUntil: action === 'mute' ? mutedUntil : 0 }); return;
+      }
+      if (path === '/api/admin/actions/note' && request.method === 'POST') {
+        requireValue(adminAccounts.has(String(user.username || '').toLowerCase()), 403, 'Admin access required.');
+        limited(`admin-action:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const note = typeof body.note === 'string' ? body.note.trim() : '';
+        requireValue(note.length >= 3 && note.length <= 240, 400, 'Admin note must be 3–240 characters.');
+        const entry = { id: randomUUID(), actorId: user.id, actorUsername: user.username, action: 'note', note, createdAt: now() };
+        db.adminAuditLog.push(entry);
+        if (db.adminAuditLog.length > 1000) db.adminAuditLog.splice(0, db.adminAuditLog.length - 1000);
+        dirty = true;
+        await persist();
+        send(response, 201, { entry }); return;
+      }
+      if (path === '/api/auth/logout' && request.method === 'POST') {
+        sessions.delete(session.key);
+        dirty = true;
+        for (const client of clients.get(user.id) || []) if (client.key === session.key) client.response.end();
+        if (![...sessions.values()].some(item => item.id === user.id && item.expires > now())) presence.delete(user.id);
+        response.setHeader('Set-Cookie', 'kp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0');
+        await persist();
+        socialChanged(); send(response, 200, { ok: true }); return;
+      }
+      if (path === '/api/profile' && request.method === 'PATCH') {
+        const body = await jsonBody(request);
+        const previousGender = user.gender;
+        requireValue(body.district === undefined || Object.hasOwn(DISTRICTS, body.district), 400, 'Choose a valid Kerala district.');
+        requireValue(body.gender === undefined || ['male', 'female', 'other'].includes(body.gender), 400, 'Choose a valid avatar.');
+        requireValue(body.outfit === undefined || ['casual', 'mundu', 'saree'].includes(body.outfit), 400, 'Choose an available outfit.');
+        requireValue(body.avatarCustomization === undefined || (body.avatarCustomization && typeof body.avatarCustomization === 'object' && !Array.isArray(body.avatarCustomization) && Object.keys(body.avatarCustomization).length <= 10), 400, 'Choose valid avatar appearance options.');
+        const nextGender = body.gender ?? user.gender;
+        const nextAvatarCustomization = body.avatarCustomization === undefined ? {} : cleanAvatarCustomization(body.avatarCustomization, nextGender);
+        requireValue(body.avatarCustomization === undefined || Object.keys(nextAvatarCustomization).length === Object.keys(body.avatarCustomization).length, 400, 'Choose valid avatar appearance options.');
+        requireValue(body.outfit === undefined || body.outfit === 'casual' || (nextGender === 'male' && body.outfit === 'mundu') || (nextGender === 'female' && body.outfit === 'saree'), 400, 'That outfit is not available for this avatar.');
+        requireValue(body.bio === undefined || (typeof body.bio === 'string' && body.bio.length <= 180), 400, 'Bio must be 180 characters or fewer.');
+        requireValue(body.displayName === undefined || (typeof body.displayName === 'string' && /^[A-Za-z][A-Za-z '-]{1,39}$/.test(body.displayName.trim())), 400, 'Name must be 2–40 letters.');
+        requireValue(body.username === undefined || (typeof body.username === 'string' && /^(?=.*[A-Za-z])[A-Za-z0-9_]{3,24}$/.test(body.username.trim())), 400, 'Username must be 3–24 characters and include at least one letter.');
+        if (body.username !== undefined && body.username.trim().toLowerCase() !== user.username.toLowerCase()) {
+          requireValue(now() - Number(user.usernameChangedAt || 0) >= 10 * 24 * 60 * 60 * 1000, 409, 'Username can be changed again after 10 days.');
+          requireValue(!db.users.some(candidate => candidate.id !== user.id && candidate.username.toLowerCase() === body.username.trim().toLowerCase()), 409, 'That username is already taken.');
+          user.username = body.username.trim();
+          user.usernameChangedAt = now();
+        }
+        if (body.displayName !== undefined) { user.displayName = body.displayName.trim(); user.firstName = user.displayName; }
+        if (body.district !== undefined) user.district = body.district;
+        if (!user.worldDistrict || !DISTRICT_WORLD_CONFIG[user.worldDistrict]) user.worldDistrict = user.district;
+        if (body.gender !== undefined) user.gender = body.gender;
+        if (body.outfit !== undefined || user.jobState?.avatarAppearance?.outfit === 'mundu' && user.gender !== 'male' || user.jobState?.avatarAppearance?.outfit === 'saree' && user.gender !== 'female') {
+          user.jobState ??= freshJobState();
+          user.jobState.avatarAppearance ??= {};
+          user.jobState.avatarAppearance.outfit = body.outfit ?? 'casual';
+        }
+        if (body.avatarCustomization !== undefined || previousGender !== user.gender) {
+          user.jobState ??= freshJobState();
+          const existingAppearance = user.jobState.avatarAppearance || {};
+          const outfit = existingAppearance.outfit;
+          const nextAppearance = cleanAvatarCustomization(existingAppearance, user.gender);
+          Object.assign(nextAppearance, nextAvatarCustomization);
+          if (['casual', 'mundu', 'saree'].includes(outfit)) nextAppearance.outfit = outfit;
+          user.jobState.avatarAppearance = nextAppearance;
+        }
+        if (body.bio !== undefined) user.bio = body.bio.trim();
+        await persist(); profileChanged(user); socialChanged();
+        send(response, 200, { user: publicUser(user) }); return;
+      }
+      if (path === '/api/wallet' && request.method === 'GET') {
+        send(response, 200, walletSummary(user)); return;
+      }
+      if (path === '/api/notifications' && request.method === 'GET') {
+        send(response, 200, notificationsSummary(user)); return;
+      }
+      if (path === '/api/notifications/read' && request.method === 'POST') {
+        limited(`notifications-read:${user.id}`, 80, 60000);
+        const body = await jsonBody(request);
+        const summary = notificationsSummary(user);
+        const currentIds = new Set(summary.items.map(item => item.id));
+        const notifications = jobStateFor(user).notifications;
+        const timestamp = now();
+        if (body.all === true) {
+          for (const id of currentIds) notifications.read[id] = timestamp;
+        } else {
+          requireValue(typeof body.id === 'string' && currentIds.has(body.id), 404, 'Notification not found.');
+          notifications.read[body.id] = timestamp;
+        }
+        const entries = Object.entries(notifications.read).slice(-200);
+        notifications.read = Object.fromEntries(entries);
+        dirty = true;
+        await persist();
+        send(response, 200, notificationsSummary(user)); return;
+      }
+      if (path === '/api/bank' && request.method === 'GET') {
+        send(response, 200, bankSummary(user)); return;
+      }
+      if (path === '/api/bank/cash' && request.method === 'POST') {
+        limited(`bank-cash:${user.id}`, 40, 60000);
+        const body = await jsonBody(request);
+        requireValue(body.action === 'deposit' || body.action === 'withdraw', 400, 'Choose deposit or withdraw.');
+        const amount = Number(body.amount);
+        requireValue(Number.isInteger(amount) && amount >= 1 && amount <= BANK_TRANSFER_MAX, 400, `Amount must be between ₹1 and ₹${BANK_TRANSFER_MAX}.`);
+        const state = jobStateFor(user);
+        let walletEntry, bankEntry;
+        if (body.action === 'deposit') {
+          requireValue(Number(state.bank.balance) + amount <= BANK_LIMIT, 409, 'Bank account limit reached.');
+          walletEntry = walletTransaction(user, -amount, 'bank_deposit', 'Deposit to Kerala Bank');
+          bankEntry = bankTransaction(user, amount, 'cash_deposit', 'Wallet → Kerala Bank');
+        } else {
+          requireValue(Number(state.bank.balance) >= amount, 409, 'Not enough money in your Kerala Bank account.');
+          requireValue(user.walletBalance + amount <= WALLET_LIMIT, 409, 'Wallet limit reached.');
+          bankEntry = bankTransaction(user, -amount, 'cash_withdrawal', 'Kerala Bank → Wallet');
+          walletEntry = walletTransaction(user, amount, 'bank_withdrawal', 'Withdraw from Kerala Bank');
+        }
+        await persist();
+        send(response, 200, {
+          action: body.action,
+          amount,
+          bank: bankSummary(user),
+          wallet: walletSummary(user),
+          bankTransaction: bankEntry,
+          walletTransaction: walletEntry,
+        }); return;
+      }
+      if (path === '/api/bank/upi' && request.method === 'POST') {
+        limited(`bank-upi:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const amount = Number(body.amount);
+        requireValue(Number.isInteger(amount) && amount >= 1 && amount <= BANK_TRANSFER_MAX, 400, `UPI amount must be between ₹1 and ₹${BANK_TRANSFER_MAX}.`);
+        const rawRecipient = typeof body.recipient === 'string' ? body.recipient.trim().toLowerCase() : '';
+        const handle = rawRecipient.replace(/@keralapay$/i, '');
+        requireValue(/^(?=.*[a-z])[a-z0-9_]{3,24}$/.test(handle), 400, 'Enter a valid Kerala Pay username or UPI ID.');
+        const recipient = db.users.find(candidate => candidate.username.toLowerCase() === handle);
+        requireValue(recipient, 404, 'Kerala Pay recipient not found.');
+        requireValue(recipient.id !== user.id, 409, 'You cannot send UPI to yourself.');
+        requireValue(!blocked(user.id, recipient.id), 403, 'UPI transfer is unavailable between blocked players.');
+        const senderBank = jobStateFor(user).bank;
+        const recipientBank = jobStateFor(recipient).bank;
+        requireValue(Number(senderBank.balance) >= amount, 409, 'Not enough money in your Kerala Bank account.');
+        requireValue(Number(recipientBank.balance) + amount <= BANK_LIMIT, 409, 'Recipient bank account limit reached.');
+        const transferId = randomUUID();
+        const recipientUpi = bankUpiId(recipient);
+        const senderUpi = bankUpiId(user);
+        const sent = bankTransaction(user, -amount, 'upi_sent', `UPI to ${recipientUpi}`, {
+          transferId, counterparty: recipientUpi,
+        });
+        const received = bankTransaction(recipient, amount, 'upi_received', `UPI from ${senderUpi}`, {
+          transferId, counterparty: senderUpi,
+        });
+        addNotification(recipient, {
+          sourceKey: `upi:${transferId}:received`,
+          kind: 'money',
+          title: 'UPI received',
+          message: `₹${amount} received from ${senderUpi} in Kerala Bank.`,
+          severity: 'success',
+          target: 'wallet',
+        });
+        await persist();
+        emit(recipient.id, 'bank', {});
+        send(response, 200, {
+          amount,
+          transferId,
+          recipient: { username: recipient.username, upiId: recipientUpi },
+          bank: bankSummary(user),
+          transaction: sent,
+          receivedTransactionId: received.id,
+        }); return;
+      }
+      if (path === '/api/community/events' && request.method === 'GET') {
+        send(response, 200, communityEventsSummary(user)); return;
+      }
+      if (path === '/api/community/events/participate' && request.method === 'POST') {
+        limited(`community-event:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const timestamp = now();
+        const summary = communityEventsSummary(user, timestamp);
+        const event = summary.current;
+        requireValue(event?.status === 'active', 409, 'This community event is not active right now.');
+        requireValue(typeof body.eventId === 'string' && body.eventId === event.id, 409, 'This community event has changed. Refresh the notice board.');
+        const state = jobStateFor(user);
+        requireValue(!state.communityEvents.completedIds.includes(event.id), 409, 'You already participated in this event.');
+        requireValue(!state.active, 409, 'Finish your active job before joining a community event.');
+        requireValue(!state.npcFavors.active, 409, 'Finish your current village favor before joining a community event.');
+        const personal = state.garage.activeVehicleId
+          ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
+          : null;
+        requireValue(!personal?.entered, 409, 'Exit your personal vehicle before participating.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before participating.');
+        requireValue(
+          Math.hypot(Number(event.target.x) - live.x, Number(event.target.z) - live.z) <= Number(event.target.radius || 6) + .4,
+          409,
+          `Move closer to ${event.target.label} to join this community event.`
+        );
+
+        const cashReward = Math.max(0, Math.min(200, Math.floor(Number(event.cashReward || 0))));
+        const pointsReward = Math.max(0, Math.min(50, Math.floor(Number(event.pointsReward || 0))));
+        const transaction = walletTransaction(user, cashReward, 'community_event', event.title);
+        user.points = Math.max(0, Number(user.points || 0) + pointsReward);
+        state.communityEvents.completedIds.push(event.id);
+        state.communityEvents.completedIds = state.communityEvents.completedIds.slice(-COMMUNITY_EVENT_HISTORY_LIMIT);
+        state.communityEvents.contributions = Math.max(0, Number(state.communityEvents.contributions || 0)) + 1;
+        dirty = true;
+        addNotification(user, {
+          sourceKey: `community:${event.id}`,
+          kind: 'event',
+          title: 'Community event completed',
+          message: `${event.title} · ₹${cashReward} + ${pointsReward} points received.`,
+          severity: 'success',
+          target: 'events',
+        });
+        await persist();
+        profileChanged(user);
+        const updated = communityEventsSummary(user, timestamp);
+        send(response, 200, {
+          completed: {
+            id: event.id,
+            title: event.title,
+            cashReward,
+            pointsReward,
+            target: event.target,
+          },
+          wallet: walletSummary(user),
+          user: publicUser(user),
+          reputation: updated.reputation,
+          events: updated,
+          transaction,
+        }); return;
+      }
+
+      if (path === '/api/npc/relationships' && request.method === 'GET') {
+        send(response, 200, npcRelationshipSummary(user)); return;
+      }
+      if (path === '/api/npc/interact' && request.method === 'POST') {
+        limited(`npc-interact:${user.id}`, 35, 60000);
+        const body = await jsonBody(request);
+        const identity = npcRelationshipIdentity(body.npcId);
+        requireValue(identity, 404, 'Village NPC not found.');
+        const state = jobStateFor(user);
+        const personal = state.garage.activeVehicleId
+          ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
+          : null;
+        requireValue(!state.active?.vehicleEntered && !personal?.entered, 409, 'Exit the vehicle before talking to someone.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before talking to someone.');
+
+        const timestamp = now();
+        const relation = state.npcRelations[identity.id] || {
+          score: 0,
+          conversations: 0,
+          lastInteractionAt: 0,
+          firstMetAt: timestamp,
+        };
+        const previousTier = npcRelationshipTier(relation.score);
+        const elapsed = timestamp - Number(relation.lastInteractionAt || 0);
+        const progressed = elapsed >= NPC_RELATIONSHIP_COOLDOWN_MS;
+        let gained = 0;
+        if (progressed) {
+          gained = Number(relation.conversations || 0) === 0 ? 5 : (elapsed >= 5 * 60_000 ? 2 : 1);
+          relation.score = Math.min(NPC_RELATIONSHIP_MAX, Number(relation.score || 0) + gained);
+          relation.lastInteractionAt = timestamp;
+        }
+        relation.conversations = Math.min(100000, Number(relation.conversations || 0) + 1);
+        if (!Number(relation.firstMetAt)) relation.firstMetAt = timestamp;
+        state.npcRelations[identity.id] = relation;
+        dirty = true;
+        await persist();
+
+        const tier = npcRelationshipTier(relation.score);
+        const summary = npcRelationshipSummary(user);
+        send(response, 200, {
+          relationship: {
+            npcId: identity.id,
+            npcIndex: identity.index,
+            name: identity.name,
+            score: relation.score,
+            tier,
+            conversations: relation.conversations,
+            firstMetAt: relation.firstMetAt,
+            lastInteractionAt: relation.lastInteractionAt,
+            gained,
+            progressed,
+            tierChanged: tier !== previousTier,
+            previousTier,
+            cooldownRemainingMs: progressed ? NPC_RELATIONSHIP_COOLDOWN_MS : Math.max(0, NPC_RELATIONSHIP_COOLDOWN_MS - elapsed),
+            recognition: npcRecognitionMessage(tier, identity.name),
+          },
+          reputation: summary.reputation,
+          activeFavor: summary.activeFavor,
+          favorOffer: npcFavorOffer(user, identity, timestamp),
+        }); return;
+      }
+
+      if (path === '/api/npc/favor/start' && request.method === 'POST') {
+        limited(`npc-favor-start:${user.id}`, 12, 60000);
+        const body = await jsonBody(request);
+        const identity = npcRelationshipIdentity(body.npcId);
+        requireValue(identity, 404, 'Village NPC not found.');
+        const state = jobStateFor(user);
+        requireValue(!state.active, 409, 'Finish your active job before accepting a village favor.');
+        requireValue(!state.npcFavors.active, 409, 'Finish your current village favor first.');
+        const relation = state.npcRelations[identity.id];
+        requireValue(Number(relation?.score || 0) >= NPC_FAVOR_MIN_SCORE, 409, 'Build a little more familiarity with this villager first.');
+        const timestamp = now();
+        requireValue(timestamp - Number(relation?.lastInteractionAt || 0) <= 90_000, 409, 'Talk to this villager again before accepting the favor.');
+        const cooldownUntil = Number(state.npcFavors.cooldowns[identity.id] || 0);
+        requireValue(cooldownUntil <= timestamp, 409, 'This villager does not need another favor yet.');
+        const personal = state.garage.activeVehicleId
+          ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId)
+          : null;
+        requireValue(!personal?.entered, 409, 'Exit your personal vehicle before accepting a favor.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before accepting a favor.');
+
+        const definition = npcFavorDefinition(user, identity);
+        const activeFavor = {
+          id: randomUUID(),
+          npcId: identity.id,
+          targetId: definition.target.id,
+          title: definition.title,
+          action: definition.action,
+          reward: definition.reward,
+          startedAt: timestamp,
+          expiresAt: timestamp + NPC_FAVOR_EXPIRY_MS,
+        };
+        state.npcFavors.active = activeFavor;
+        dirty = true;
+        await persist();
+        send(response, 200, {
+          activeFavor: npcFavorSummary(user),
+          reputation: npcRelationshipSummary(user).reputation,
+        }); return;
+      }
+
+      if (path === '/api/npc/favor/complete' && request.method === 'POST') {
+        limited(`npc-favor-complete:${user.id}`, 12, 60000);
+        const body = await jsonBody(request);
+        const state = jobStateFor(user);
+        const activeFavor = state.npcFavors.active;
+        requireValue(activeFavor, 409, 'No village favor is active.');
+        requireValue(typeof body.favorId === 'string' && body.favorId === activeFavor.id, 409, 'This village favor is no longer active.');
+        const timestamp = now();
+        requireValue(timestamp <= Number(activeFavor.expiresAt || 0), 409, 'This favor expired. Talk to the villager again later.');
+        const identity = npcRelationshipIdentity(activeFavor.npcId);
+        const target = PUBLIC_RIDE_DESTINATIONS[activeFavor.targetId];
+        requireValue(identity && target, 409, 'This favor is no longer available.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before completing the favor.');
+        requireValue(
+          Math.hypot(Number(target.x) - live.x, Number(target.z) - live.z) <= 5.8,
+          409,
+          `Move closer to ${target.label} before completing the favor.`
+        );
+
+        const reward = Math.max(0, Math.min(200, Number(activeFavor.reward || 0)));
+        const transaction = walletTransaction(user, reward, 'npc_favor', `${identity.name} · ${activeFavor.title}`);
+        const relation = state.npcRelations[identity.id] || {
+          score: 0, conversations: 0, lastInteractionAt: timestamp, firstMetAt: timestamp,
+        };
+        const previousTier = npcRelationshipTier(relation.score);
+        relation.score = Math.min(NPC_RELATIONSHIP_MAX, Number(relation.score || 0) + 3);
+        relation.lastInteractionAt = timestamp;
+        state.npcRelations[identity.id] = relation;
+        state.npcFavors.active = null;
+        state.npcFavors.cooldowns[identity.id] = timestamp + NPC_FAVOR_COOLDOWN_MS;
+        state.npcFavors.completed = Math.max(0, Number(state.npcFavors.completed || 0)) + 1;
+        dirty = true;
+        const tier = npcRelationshipTier(relation.score);
+        addNotification(user, {
+          sourceKey: `favor:${transaction.id}`,
+          kind: 'community',
+          title: 'Village favor completed',
+          message: `${identity.name} · ${activeFavor.title} · ₹${reward} received.`,
+          severity: 'success',
+          target: 'wallet',
+        });
+        await persist();
+        const summary = npcRelationshipSummary(user);
+        send(response, 200, {
+          completed: {
+            id: activeFavor.id,
+            npcId: identity.id,
+            npcName: identity.name,
+            title: activeFavor.title,
+            target: { id: target.id, label: target.label },
+            reward,
+          },
+          relationship: {
+            npcId: identity.id,
+            npcIndex: identity.index,
+            name: identity.name,
+            score: relation.score,
+            tier,
+            conversations: Number(relation.conversations || 0),
+            firstMetAt: Number(relation.firstMetAt || 0),
+            lastInteractionAt: Number(relation.lastInteractionAt || 0),
+            gained: 3,
+            progressed: true,
+            tierChanged: tier !== previousTier,
+            previousTier,
+            recognition: npcRecognitionMessage(tier, identity.name),
+          },
+          reputation: summary.reputation,
+          activeFavor: null,
+          wallet: walletSummary(user),
+          transaction,
+        }); return;
+      }
+
+      if (path === '/api/travel/ride/quote' && request.method === 'GET') {
+        limited(`ride-quote:${user.id}`, 40, 60000);
+        const destinationId = String(url.searchParams.get('destinationId') || '');
+        send(response, 200, publicRideQuote(user, destinationId)); return;
+      }
+      if (path === '/api/travel/ride/book' && request.method === 'POST') {
+        limited(`ride-book:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const destinationId = typeof body.destinationId === 'string' ? body.destinationId : '';
+        const serviceId = typeof body.serviceId === 'string' ? body.serviceId : '';
+        const service = PUBLIC_RIDE_SERVICES[serviceId];
+        requireValue(service, 400, 'Choose auto-rickshaw or taxi.');
+        const quote = publicRideQuote(user, destinationId);
+        const option = quote.options.find(item => item.id === serviceId);
+        requireValue(option?.available, 409, serviceId === 'auto' ? 'Auto-rickshaw is for shorter local trips. Choose taxi for this destination.' : 'This ride is not available.');
+        requireValue(user.walletBalance >= option.fare, 409, 'Not enough Kerala Cash for this ride.');
+        const destination = publicRideDestinationForUser(user, destinationId);
+        requireValue(destination, 404, 'Ride destination not found.');
+        const live = presence.get(user.id) || place(user);
+        const transaction = walletTransaction(user, -option.fare, 'public_ride', `${service.label} · ${destination.label}`);
+        const timestamp = now();
+        live.x = Number(destination.arrivalX);
+        live.z = Number(destination.arrivalZ);
+        live.rotation = 0;
+        live.moving = false;
+        live.mode = 'walk';
+        live.lastSeen = timestamp;
+        live.movedAt = timestamp;
+        live.movementCredit = 12;
+        user.worldX = live.x;
+        user.worldZ = live.z;
+        user.worldRotation = live.rotation;
+        user.worldUpdatedAt = timestamp;
+        dirty = true;
+        worldDirty = true;
+        profileChanged(user);
+        await persist();
+        send(response, 200, {
+          wallet: walletSummary(user),
+          user: publicUser(user),
+          transaction,
+          ride: {
+            serviceId,
+            serviceLabel: service.label,
+            fare: option.fare,
+            pickupSeconds: option.pickupSeconds,
+            travelSeconds: option.travelSeconds,
+            fromDistance: quote.distance,
+            to: { id: destination.id, label: destination.label },
+            x: live.x,
+            z: live.z,
+            rotation: live.rotation,
+          },
+        }); return;
+      }
+
+      if (path === '/api/travel/districts' && request.method === 'GET') {
+        const currentDistrict = currentWorldDistrict(user);
+        const current = districtWorldConfig(currentDistrict);
+        const tripsUsed = Math.max(0, Number(user.districtTravelCount) || 0);
+        send(response, 200, {
+          currentDistrict,
+          tripsUsed,
+          freeTripsRemaining: Math.max(0, DISTRICT_TRAVEL_FREE_TRIPS - tripsUsed),
+          districts: DISTRICT_WORLD_ORDER.map(district => {
+            const config = DISTRICT_WORLD_CONFIG[district];
+            return {
+              district,
+              order: config.order,
+              train: { available: true, id: config.train.id, fare: district === currentDistrict ? 0 : districtTravelFare('train', tripsUsed) },
+              flight: { available: !!config.airport && !!current.airport, id: config.airport?.id || null, fare: district === currentDistrict || !config.airport || !current.airport ? 0 : districtTravelFare('flight', tripsUsed) },
+              teleport: { available:true, id:config.teleport.id, fare:district === currentDistrict ? 0 : districtTravelFare('teleport', tripsUsed) },
+              current: district === currentDistrict,
+            };
+          }),
+          hubs: {
+            train: { ...current.train, district: currentDistrict, label: `${currentDistrict} Railway Station` },
+            airport: current.airport ? { ...current.airport, district: currentDistrict, label: `${currentDistrict} Airport` } : null,
+            teleport: { ...current.teleport, district:currentDistrict, label:`${currentDistrict} District Gate` },
+          },
+        }); return;
+      }
+      if (path === '/api/travel/district/status' && request.method === 'GET') {
+        const pending = user.pendingDistrictTravel;
+        if (!pending) { send(response, 200, { status:'idle', serverNow:now() }); return; }
+        const timestamp = now();
+        if (Number(pending.arrivalAt) > timestamp) {
+          send(response, 200, { status:'pending', travel:{ ...pending, remainingMs:Number(pending.arrivalAt) - timestamp, serverNow:timestamp }, serverNow:timestamp }); return;
+        }
+        const travel = completeDistrictTravel(user, timestamp);
+        await persist();
+        send(response, 200, { status:'arrived', travel, user:publicUser(user), serverNow:timestamp }); return;
+      }
+      if (path === '/api/travel/district/board' && request.method === 'POST') {
+        limited(`district-board:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const mode = ['train','flight','teleport'].includes(body.mode) ? body.mode : 'train';
+        requireValue(!user.pendingDistrictTravel, 409, 'Your district journey is still in progress.');
+        const fromDistrict = currentWorldDistrict(user);
+        const destinationDistrict = String(body.destinationDistrict || '');
+        requireValue(DISTRICT_WORLD_CONFIG[destinationDistrict], 404, 'Destination district not found.');
+        requireValue(destinationDistrict !== fromDistrict, 409, 'You are already in that district.');
+        const fromConfig = districtWorldConfig(fromDistrict);
+        const destinationConfig = districtWorldConfig(destinationDistrict);
+        const hub = mode === 'flight' ? fromConfig.airport : mode === 'teleport' ? fromConfig.teleport : fromConfig.train;
+        const destinationHub = mode === 'flight' ? destinationConfig.airport : mode === 'teleport' ? destinationConfig.teleport : destinationConfig.train;
+        const hubLabel = mode === 'flight' ? 'airport' : mode === 'teleport' ? 'district gate' : 'railway station';
+        requireValue(hub && destinationHub, 409, mode === 'flight' ? 'Flights are only available between airport districts.' : 'District travel is unavailable for this district.');
+        const stateForTravel = jobStateFor(user);
+        requireValue(!stateForTravel.active, 409, 'Finish your active job before inter-district travel.');
+        const personal = stateForTravel.garage.activeVehicleId ? stateForTravel.garage.owned.find(vehicle => vehicle.id === stateForTravel.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before travelling.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before travelling.');
+        requireValue(Math.hypot(live.x - hub.x, live.z - hub.z) <= hub.radius, 409, `Move closer to the ${hubLabel}.`);
+        const modeHubLabel = mode === 'flight' ? 'Airport' : mode === 'teleport' ? 'District Gate' : 'Railway Station';
+        const result = await beginDistrictTravel(user, {
+          mode,
+          fromDistrict,
+          toDistrict:destinationDistrict,
+          hub:{ ...hub, label:`${fromDistrict} ${modeHubLabel}` },
+          destinationHub:{ ...destinationHub, label:`${destinationDistrict} ${modeHubLabel}` },
+          live,
+        });
+        send(response, 200, result); return;
+      }
+      if (path === '/api/travel/train/route' && request.method === 'GET') {
+        const tripsUsed = Math.max(0, Number(user.districtTravelCount) || 0);
+        send(response, 200, {
+          id: DISTRICT_RAIL_ROUTE.id,
+          label: DISTRICT_RAIL_ROUTE.label,
+          fare: districtTravelFare('train', tripsUsed),
+          tripsUsed,
+          freeTripsRemaining: Math.max(0, DISTRICT_TRAVEL_FREE_TRIPS - tripsUsed),
+          stations: Object.values(DISTRICT_RAIL_ROUTE.stations).map(station => ({
+            id: station.id, district: station.district, label: station.label, x: station.x, z: station.z,
+            destinationId: station.destinationId,
+          })),
+        }); return;
+      }
+      if (path === '/api/travel/train/board' && request.method === 'POST') {
+        limited(`train-board:${user.id}`, 10, 60000);
+        const body = await jsonBody(request);
+        const station = DISTRICT_RAIL_ROUTE.stations[String(body.stationId || '')];
+        requireValue(station, 404, 'Railway station not found.');
+        const destination = DISTRICT_RAIL_ROUTE.stations[station.destinationId];
+        requireValue(!user.pendingDistrictTravel, 409, 'Your district journey is still in progress.');
+        const fromDistrict = currentWorldDistrict(user);
+        requireValue(fromDistrict === station.district, 409, 'Choose the railway station in your current district.');
+        const stateForTravel = jobStateFor(user);
+        requireValue(!stateForTravel.active, 409, 'Finish your active job before boarding the train.');
+        const personal = stateForTravel.garage.activeVehicleId ? stateForTravel.garage.owned.find(vehicle => vehicle.id === stateForTravel.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before boarding.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before boarding.');
+        requireValue(Math.hypot(live.x - station.x, live.z - station.z) <= station.radius, 409, `Move closer to ${station.label}.`);
+        const result = await beginDistrictTravel(user, {
+          mode:'train',
+          fromDistrict:station.district,
+          toDistrict:destination.district,
+          hub:{ ...station, label:station.label },
+          destinationHub:{ ...destination, arrivalX:station.arrivalX, arrivalZ:station.arrivalZ, label:destination.label },
+          live,
+        });
+        result.travel.routeId = DISTRICT_RAIL_ROUTE.id;
+        result.travel.routeLabel = DISTRICT_RAIL_ROUTE.label;
+        send(response, 200, result); return;
+      }
+      if (path === '/api/travel/bus/status' && request.method === 'GET') {
+        const stopId = String(url.searchParams.get('stopId') || '');
+        const status = publicTravelStatus(stopId, now(), user);
+        requireValue(status, 404, 'Bus stop not found.');
+        send(response, 200, status); return;
+      }
+      if (path === '/api/travel/bus/board' && request.method === 'POST') {
+        limited(`bus-board:${user.id}`, 12, 60000);
+        const body = await jsonBody(request);
+        const stopId = typeof body.stopId === 'string' ? body.stopId : '';
+        const found = publicTravelStop(stopId, user);
+        requireValue(found, 404, 'Bus stop not found.');
+        const { route, stop } = found;
+        const stateForTravel = jobStateFor(user);
+        requireValue(!stateForTravel.active, 409, 'Finish your active job before boarding public transport.');
+        const personal = stateForTravel.garage.activeVehicleId
+          ? stateForTravel.garage.owned.find(vehicle => vehicle.id === stateForTravel.garage.activeVehicleId)
+          : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before boarding.');
+        const live = presence.get(user.id) || place(user);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before boarding.');
+        requireValue(
+          Math.hypot(live.x - Number(stop.x), live.z - Number(stop.z)) <= Number(stop.radius || 6.2),
+          409,
+          `Move closer to ${stop.label}.`
+        );
+        const status = publicTravelStatus(stopId, now(), user);
+        requireValue(status?.boarding, 409, `Bus has not arrived yet. Wait ${status?.secondsToArrival || 1}s.`);
+        const destination = route.stops[stop.destinationId];
+        const transaction = walletTransaction(user, -Number(route.fare), 'bus_fare', `${route.label} · ${stop.label} → ${destination.label}`);
+        const timestamp = now();
+        live.x = Number(destination.arrivalX);
+        live.z = Number(destination.arrivalZ);
+        live.rotation = Number(destination.arrivalRotation || 0);
+        live.moving = false;
+        live.mode = 'walk';
+        live.lastSeen = timestamp;
+        live.movedAt = timestamp;
+        live.movementCredit = 2;
+        user.worldX = live.x;
+        user.worldZ = live.z;
+        user.worldRotation = live.rotation;
+        user.worldUpdatedAt = timestamp;
+        dirty = true;
+        worldDirty = true;
+        profileChanged(user);
+        await persist();
+        send(response, 200, {
+          wallet: walletSummary(user),
+          user: publicUser(user),
+          transaction,
+          travel: {
+            routeId: route.id,
+            routeLabel: route.label,
+            fare: route.fare,
+            from: { id: stop.id, label: stop.label },
+            to: { id: destination.id, label: destination.label },
+            x: live.x,
+            z: live.z,
+            rotation: live.rotation,
+          },
+          nextStopStatus: publicTravelStatus(destination.id, now(), user),
+        }); return;
+      }
+      if (path === '/api/needs' && request.method === 'GET') {
+        send(response, 200, needsSummary(user)); return;
+      }
+      if (path === '/api/home' && request.method === 'GET') {
+        send(response, 200, homeSummary(user)); return;
+      }
+      if (path === '/api/home/build' && request.method === 'POST') {
+        limited(`home-build:${user.id}`, 8, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        requireValue(!state.home.house?.built, 409, 'You already own a home.');
+        requireValue(!state.active, 409, 'Finish your active job before building a home.');
+        const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle first.');
+        const live = presence.get(user.id) || place(user);
+        const plot = homeDefinitionFor(user);
+        requireValue((live.mode || 'walk') === 'walk' && !live.moving, 409, 'Stop walking before building.');
+        requireValue(Math.hypot(live.x - plot.x, live.z - plot.z) <= plot.radius, 409, `Go to the ${plot.label} plot to build your home.`);
+        const timestamp = now();
+        state.home.house = { id: randomUUID(), built: true, style: 'kerala-starter', district: currentWorldDistrict(user), builtAt: timestamp };
+        state.home.status = 'owned';
+        state.home.rentDueAt = 0;
+        state.home.utilityDueAt = 0;
+        dirty = true;
+        await persist();
+        send(response, 200, { home: homeSummary(user) }); return;
+      }
+      if (path === '/api/home/enter' && request.method === 'POST') {
+        limited(`home-enter:${user.id}`, 16, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        const house = state.home.house;
+        requireValue(house?.built, 409, 'Build your home first.');
+        requireValue(house.district === currentWorldDistrict(user), 409, `Your home is in ${house.district}. Travel there first.`);
+        requireValue(!state.active, 409, 'Finish your active job before going home.');
+        const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle first.');
+        const live = presence.get(user.id) || place(user);
+        const plot = homeDefinitionFor(user);
+        requireValue((live.mode || 'walk') === 'walk' && !live.moving, 409, 'Stop walking before entering your home.');
+        requireValue(Math.hypot(live.x - plot.x, live.z - plot.z) <= plot.radius, 409, `Go to your ${plot.label} porch to enter.`);
+        live.homeReturn = { x: live.x, z: live.z, rotation: live.rotation, district: live.district || currentWorldDistrict(user) };
+        live.x = HOME_INTERIOR_ENTRY.x;
+        live.z = HOME_INTERIOR_ENTRY.z;
+        live.rotation = HOME_INTERIOR_ENTRY.rotation;
+        live.moving = false;
+        live.mode = 'home';
+        live.movedAt = now();
+        live.movementCredit = 2;
+        worldDirty = true;
+        profileChanged(user);
+        send(response, 200, { home: homeSummary(user), position: { x: live.x, z: live.z, rotation: live.rotation, mode: 'home' } }); return;
+      }
+      if (path === '/api/home/exit' && request.method === 'POST') {
+        limited(`home-exit:${user.id}`, 16, 60000);
+        await jsonBody(request);
+        const live = presence.get(user.id);
+        requireValue(live?.mode === 'home' && live.homeReturn, 409, 'You are not inside your home.');
+        const saved = live.homeReturn;
+        live.x = Number(saved.x);
+        live.z = Number(saved.z);
+        live.rotation = Number(saved.rotation) || 0;
+        live.district = saved.district || currentWorldDistrict(user);
+        live.moving = false;
+        live.mode = 'walk';
+        live.movedAt = now();
+        live.movementCredit = 2;
+        delete live.homeReturn;
+        user.worldX = live.x; user.worldZ = live.z; user.worldRotation = live.rotation; user.worldUpdatedAt = now();
+        dirty = true;
+        worldDirty = true;
+        profileChanged(user);
+        await persist();
+        send(response, 200, { home: homeSummary(user), position: { x: live.x, z: live.z, rotation: live.rotation, mode: 'walk' } }); return;
+      }
+      if (path === '/api/home/pay' && request.method === 'POST') {
+        limited(`home-payment:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        requireValue(body.kind === 'rent' || body.kind === 'utilities', 400, 'Choose rent or utilities.');
+        const state = jobStateFor(user);
+        const home = state.home;
+        requireValue(!home.house?.built, 409, 'Your owned starter home has no rent or utility charges.');
+        const homeDefinition = homeDefinitionFor(user);
+        const isRent = body.kind === 'rent';
+        const amount = isRent ? homeDefinition.rent : homeDefinition.utilities;
+        const transaction = walletTransaction(
+          user,
+          -amount,
+          isRent ? 'home_rent' : 'home_utilities',
+          isRent ? `${homeDefinition.label} rent` : `${homeDefinition.label} electricity + water`
+        );
+        if (isRent) {
+          home.rentDueAt = Math.max(now(), Number(home.rentDueAt) || 0) + homeDefinition.periodMs;
+          home.rentPayments = Number(home.rentPayments || 0) + 1;
+        } else {
+          home.utilityDueAt = Math.max(now(), Number(home.utilityDueAt) || 0) + homeDefinition.periodMs;
+          home.utilityPayments = Number(home.utilityPayments || 0) + 1;
+        }
+        dirty = true;
+        await persist();
+        send(response, 200, { home: homeSummary(user), wallet: walletSummary(user), payment: { kind: body.kind, amount }, transaction }); return;
+      }
+      if (path === '/api/home/sleep' && request.method === 'POST') {
+        limited(`home-sleep:${user.id}`, 20, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        requireValue(!state.active, 409, 'Finish your active job before sleeping.');
+        const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before sleeping.');
+        const live = presence.get(user.id) || place(user);
+        requireValue(!live.moving, 409, 'Stop moving before sleeping.');
+        const homeDefinition = homeDefinitionFor(user);
+        const ownedHouse = state.home.house?.built ? state.home.house : null;
+        if (ownedHouse) {
+          requireValue(ownedHouse.district === currentWorldDistrict(user), 409, `Your home is in ${ownedHouse.district}. Travel there first.`);
+          requireValue(live.mode === 'home', 409, 'Enter your home before going to bed.');
+          requireValue(Math.hypot(live.x - HOME_INTERIOR_BED.x, live.z - HOME_INTERIOR_BED.z) <= HOME_INTERIOR_BED.radius, 409, 'Walk up to the bed before sleeping.');
+        } else {
+          requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before sleeping.');
+          const nearLocalHome = Math.hypot(live.x - homeDefinition.x, live.z - homeDefinition.z) <= homeDefinition.radius;
+          const nearLegacyHome = Math.hypot(live.x - HOME_DEFINITION.x, live.z - HOME_DEFINITION.z) <= HOME_DEFINITION.radius;
+          requireValue(nearLocalHome || nearLegacyHome, 409, `Move closer to your ${homeDefinition.label}.`);
+        }
+        const summary = homeSummary(user);
+        requireValue(!summary.accessBlocked, 409, 'Home sleep access is paused. Pay overdue rent or utilities first.');
+        const needsBefore = needsSummary(user);
+        if (needsBefore.energy >= 99) {
+          send(response, 200, { slept: false, message: 'Energy is already full.', home: summary, needs: needsBefore }); return;
+        }
+        const timestamp = now();
+        requireValue(timestamp >= Number(state.home.lastSleepAt || 0) + HOME_SLEEP_COOLDOWN_MS, 409, 'Sleep is still cooling down.');
+        const needs = state.needs;
+        needs.energy = NEEDS_MAX;
+        needs.hunger = Math.max(0, Number(needs.hunger) - HOME_SLEEP_HUNGER_COST);
+        needs.thirst = Math.max(0, Number(needs.thirst) - HOME_SLEEP_THIRST_COST);
+        needs.updatedAt = timestamp;
+        state.home.lastSleepAt = timestamp;
+        if (ownedHouse) { live.x = HOME_INTERIOR_BED.x; live.z = HOME_INTERIOR_BED.z; live.rotation = 0; live.moving = false; live.movedAt = timestamp; live.movementCredit = 2; }
         dirty = true;
         await persist();
         send(response, 200, {
           slept: true,
+          position: ownedHouse ? { x: live.x, z: live.z, rotation: live.rotation, mode: 'home' } : null,
           restoredEnergy: 100,
           hungerCost: HOME_SLEEP_HUNGER_COST,
           thirstCost: HOME_SLEEP_THIRST_COST,
           home: homeSummary(user),
           needs: needsSummary(user),
-          ...(ownedHome ? { position: { x: live.x, z: live.z, rotation: live.rotation } } : {}),
         }); return;
       }
       if (path === '/api/world/emergency-help' && request.method === 'POST') {
@@ -2425,19 +4194,15 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         requireValue(insideDistrictWorld(movementWorld, Number(body.x), Number(body.z), -.01) && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, `You reached the edge of ${currentWorldDistrict(user)}. Use train or flight to travel to another district.`);
         const requestedMode = body.mode === undefined ? 'walk' : body.mode;
         requireValue(Object.hasOwn(MOVEMENT_PROFILES, requestedMode), 400, 'Invalid movement mode.');
-        const stateForMove = jobStateFor(user);
         const state = presence.get(user.id) || place(user);
+        const stateForMove = jobStateFor(user);
         const active = stateForMove.active;
         const activeJob = active ? JOB_DEFINITIONS[active.jobId] : null;
         const personal = stateForMove.garage.activeVehicleId ? stateForMove.garage.owned.find(vehicle => vehicle.id === stateForMove.garage.activeVehicleId) : null;
         const personalModel = personal ? GARAGE_CATALOG[personal.modelId] : null;
-        const expectedMode = state.mode === 'home'
-          ? 'home'
-          : (active?.vehicleEntered && activeJob?.vehicle ? activeJob.vehicle : (personal?.entered && personalModel ? personalModel.kind : 'walk'));
+        const expectedMode = state.mode === 'home' ? 'home' : (active?.vehicleEntered && activeJob?.vehicle ? activeJob.vehicle : (personal?.entered && personalModel ? personalModel.kind : 'walk'));
         requireValue(requestedMode === expectedMode, 409, 'Movement mode is out of sync. Re-enter the active vehicle if needed.');
-        if (requestedMode === 'home') {
-          requireValue(state.homeReturn && stateForMove.home.house?.built === true && insideHomeInterior(Number(body.x), Number(body.z)), 400, 'Stay inside your personal home.');
-        }
+        if (requestedMode === 'home') requireValue(state.homeReturn && Math.abs(Number(body.x)) <= HOME_INTERIOR_LIMIT && Math.abs(Number(body.z)) <= HOME_INTERIOR_LIMIT, 400, 'Stay inside your home.');
         requireValue((state.district || currentWorldDistrict(user)) === currentWorldDistrict(user), 409, 'District world changed. Reload the current district.');
         const movement = MOVEMENT_PROFILES[requestedMode];
         const needsBeforeMove = needsSummary(user);
@@ -2446,7 +4211,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const credit = Math.min(movement.maxCredit * needsFactor, state.movementCredit + elapsed * movement.rate * needsFactor);
         const distance = Math.hypot(body.x - state.x, body.z - state.z);
         if (distance > credit + 0.01) throw new ApiError(409, 'Movement was too fast. Your avatar needs to resync.', { x: state.x, z: state.z });
-        if (!['walk', 'home'].includes(requestedMode) && distance > .01) {
+        if (requestedMode !== 'walk' && requestedMode !== 'home' && distance > .01) {
           const fuel = active?.vehicleEntered ? Number(active.vehicleFuel) : Number(personal?.fuel);
           requireValue(fuel > .05, 409, 'Vehicle fuel is empty. Refuel at Kerala Fuel Station.');
         }
@@ -2490,11 +4255,9 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
         state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving; state.mode = requestedMode;
-        if (requestedMode !== 'home') {
-          user.worldX = state.x; user.worldZ = state.z; user.worldRotation = state.rotation; user.worldUpdatedAt = now();
-        }
-        if (requestedMode === 'walk' || requestedMode === 'home') {
-          if (requestedMode === 'walk') user.walkMeters += distance;
+        if (requestedMode !== 'home') { user.worldX = state.x; user.worldZ = state.z; user.worldRotation = state.rotation; user.worldUpdatedAt = now(); }
+        if (requestedMode === 'walk') {
+          user.walkMeters += distance;
           if (distance > 0) {
             const needs = stateForMove.needs;
             needs.energy = Math.max(0, Number(needs.energy) - distance * .02);
@@ -2514,7 +4277,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
         }
         let discovered = false;
         const activeDistrict = currentWorldDistrict(user);
-        for (const attraction of (requestedMode === 'home' ? [] : KERALA_DISTRICT_ATLAS[activeDistrict]?.attractions || [])) {
+        for (const attraction of requestedMode === 'home' ? [] : (KERALA_DISTRICT_ATLAS[activeDistrict]?.attractions || [])) {
           const radius = Number(attraction.visitRadius || 8);
           if (Math.hypot(attraction.x - state.x, attraction.z - state.z) <= radius
               && !user.visitedLandmarks.includes(attraction.landmarkId)) {
@@ -2649,4 +4412,3 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   server.listen(port, host, () => console.log(`Kerala Play running at http://${host}:${server.address().port}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, async () => { await server.shutdown(); process.exit(0); });
 }
-
