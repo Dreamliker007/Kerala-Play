@@ -2,7 +2,7 @@ import * as THREE from './vendor/three.module.js';
 import { initSocial, api } from './social.js?v=114.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
-import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads } from './district-layout.js?v=114.0';
+import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments } from './district-layout.js?v=116.0';
 import { createKeralaRoofTiles } from './roof-tiles.js?v=115.0';
 
 const busDestinationSignMaterials = new Map();
@@ -8567,18 +8567,7 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
   const roadMaterial = new THREE.MeshStandardMaterial({ map: roadTexture, bumpMap: roadTexture.userData.bumpMap, bumpScale: .024, color: 0xffffff, roughness: .98, metalness: 0 });
   weatherRoadSurfaces.push({ material: roadMaterial, baseRoughness: .98, baseMetalness: 0, baseColor: roadMaterial.color.clone() });
 
-  const roads = [
-    [cx, cz + 2, 72, 8],
-    [cx, cz + 21, 62, 7],
-    [cx, cz - 16, 62, 7],
-    [cx, cz + 2, 8, 62],
-    [cx - 22, cz + 2, 7, 58],
-    [cx + 22, cz + 2, 7, 58],
-    [-38, -19.5, 24, 7],
-    [-29, -17.5, 7, 9],
-    [0, -42, 8, 76],
-    [0, -78, 150, 8],
-  ];
+  const roads = ernakulamDistrictRoads(cx, cz);
   for (const [x, z, width, depth] of roads) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), roadMaterial);
     mesh.rotation.x = -Math.PI / 2;
@@ -10009,6 +9998,72 @@ function createFootpathTexture() {
   return texture;
 }
 
+function addDistrictRoadDrainage(scene) {
+  if (renderedWorldDistrict === 'Kottayam' || !roadEdgePlans.length) return;
+  const obstacles = staticColliders.map(collider => {
+    const isCircle = collider.type === 'circle';
+    return {
+      x: collider.x,
+      z: collider.z,
+      halfWidth: isCircle ? collider.radius : collider.halfWidth,
+      halfDepth: isCircle ? collider.radius : collider.halfDepth,
+    };
+  });
+  const drains = planRoadsideDrainSegments(
+    roadEdgePlans.map(({ x, z, width, depth }) => [x, z, width, depth]),
+    { obstacles },
+  );
+  if (!drains.length) return;
+
+  const channelMaterial = new THREE.MeshStandardMaterial({ color: 0x3c4642, roughness: .98, metalness: 0 });
+  const coverMaterial = new THREE.MeshStandardMaterial({ color: 0x96958c, roughness: .94, metalness: 0 });
+  weatherRoadSurfaces.push(
+    makeWeatherSurfaceState(channelMaterial, { roughnessDrop: .06, minRoughness: .78, darkening: .05 }),
+    makeWeatherSurfaceState(coverMaterial, { roughnessDrop: .08, minRoughness: .72, darkening: .035 }),
+  );
+
+  const unitBox = new THREE.BoxGeometry(1, 1, 1);
+  const channels = new THREE.InstancedMesh(unitBox, channelMaterial, drains.length);
+  channels.name = 'Kerala roadside storm drains';
+  channels.castShadow = false;
+  channels.receiveShadow = false;
+  const covers = [];
+  const transform = new THREE.Object3D();
+
+  drains.forEach((drain, index) => {
+    const horizontal = drain.width >= drain.depth;
+    const length = horizontal ? drain.width : drain.depth;
+    transform.position.set(drain.x, .034, drain.z);
+    transform.scale.set(drain.width, .072, drain.depth);
+    transform.updateMatrix();
+    channels.setMatrixAt(index, transform.matrix);
+
+    for (let along = .72; along < length - .35; along += 1.5) {
+      covers.push({
+        x: drain.x + (horizontal ? along - length / 2 : 0),
+        z: drain.z + (horizontal ? 0 : along - length / 2),
+        horizontal,
+      });
+    }
+  });
+  channels.instanceMatrix.needsUpdate = true;
+  scene.add(channels);
+
+  if (!covers.length) return;
+  const coverMesh = new THREE.InstancedMesh(unitBox, coverMaterial, covers.length);
+  coverMesh.name = 'Concrete drain covers';
+  coverMesh.castShadow = false;
+  coverMesh.receiveShadow = false;
+  covers.forEach((cover, index) => {
+    transform.position.set(cover.x, .071, cover.z);
+    transform.scale.set(cover.horizontal ? .43 : .56, .075, cover.horizontal ? .56 : .43);
+    transform.updateMatrix();
+    coverMesh.setMatrixAt(index, transform.matrix);
+  });
+  coverMesh.instanceMatrix.needsUpdate = true;
+  scene.add(coverMesh);
+}
+
 function finalizeRoadEdges(scene) {
   const curbThickness = .36;
   const sidewalkWidth = 1.7;
@@ -10104,6 +10159,7 @@ function finalizeRoadEdges(scene) {
       });
     }
   });
+  addDistrictRoadDrainage(scene);
   roadEdgePlans.length = 0;
 }
 
