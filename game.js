@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=124.0';
+import { initSocial, api } from './social.js?v=125.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
 import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=117.0';
@@ -288,6 +288,7 @@ let needsSnapshot = null;
 let homeSnapshot = null;
 const homePlotVisuals = new Map();
 let homeInteriorMode = false;
+const HOME_INTERIOR_CHAIR = Object.freeze({ x: -3.7, z: -1.35, standX: -3.7, standZ: -.05, avatarSeatZ: 1.05, radius: 1.65 });
 const HOME_INTERIOR_BACKDROP = new THREE.Color(0xe5d6bf);
 const HOME_INTERIOR_FOG = new THREE.Fog(0xe5d6bf, 28, 75);
 let homeInteriorGroup = null;
@@ -330,6 +331,15 @@ function buildPrivateHomeInterior(scene) {
   box('green cotton bed cover', materials.sheet, 1.94, .055, 2.0, 2.7, .74, -2.25);
   box('bed pillow', materials.mattress, 1.2, .18, .54, 2.7, .78, -4.0);
   box('teak headboard', materials.wood, 2.15, 1.18, .16, 2.7, .72, -4.45);
+  const chair = HOME_INTERIOR_CHAIR;
+  box('woven living-room rug', materials.sheet, 2.8, .035, 2.25, chair.x, .025, chair.z + .38);
+  box('teak living-room chair seat', materials.wood, .92, .16, .92, chair.x, .52, chair.z);
+  box('green chair cushion', materials.sheet, .80, .12, .80, chair.x, .66, chair.z + .02);
+  box('teak chair back', materials.wood, .92, .96, .16, chair.x, 1.08, chair.z - .39);
+  for (const dx of [-.37, .37]) {
+    for (const dz of [-.37, .37]) box('chair leg', materials.wood, .09, .48, .09, chair.x + dx, .25, chair.z + dz);
+    box('chair armrest', materials.wood, .12, .13, .92, chair.x + dx * 1.32, .82, chair.z + .01);
+  }
   box('wardrobe', materials.lightWood, 1.2, 2.12, .62, -4.72, 1.06, -4.4);
   box('wardrobe panel', materials.wood, .025, 1.92, .42, -4.10, 1.08, -4.4);
   box('side table', materials.wood, .78, .62, .68, 4.45, .31, -3.9);
@@ -2720,10 +2730,16 @@ function updateWorldInteract() {
   worldInteract.title = '';
   if (!profile || !playerRef) return;
   if (homeInteriorMode) {
+    if (playerRef.userData.restPoseReturn?.homeInteriorSeat) return;
     const bed = Math.hypot(playerRef.position.x - 2.7, playerRef.position.z + 2.8);
     if (bed <= 1.3) {
       worldInteract.hidden = false; worldInteract.dataset.mode = 'home-sleep';
       worldInteract.textContent = 'SLEEP IN BED'; return;
+    }
+    const chair = HOME_INTERIOR_CHAIR;
+    if (Math.hypot(playerRef.position.x - chair.standX, playerRef.position.z - chair.standZ) <= chair.radius) {
+      worldInteract.hidden = false; worldInteract.dataset.mode = 'home-sit';
+      worldInteract.textContent = 'SIT IN CHAIR'; return;
     }
     if (playerRef.position.z >= 4.9 && Math.abs(playerRef.position.x) <= 1.2) {
       worldInteract.hidden = false; worldInteract.dataset.mode = 'home-exit';
@@ -3027,6 +3043,8 @@ worldInteract?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('kerala-home-enter-request'));
   } else if (worldInteract.dataset.mode === 'home-exit') {
     window.dispatchEvent(new CustomEvent('kerala-home-exit-request'));
+  } else if (worldInteract.dataset.mode === 'home-sit') {
+    window.dispatchEvent(new CustomEvent('kerala-home-sit'));
   } else if (worldInteract.dataset.mode === 'world-service') {
     performWorldActivity(worldInteract.dataset.activity);
   } else if (worldInteract.dataset.mode === 'world-shop-open') {
@@ -4570,6 +4588,31 @@ try {
     cameraYaw = player.rotation.y + Math.PI; cameraPitch = .31;
     clearGameInput(); walkVelocity.set(0, 0, 0); targetWalkVelocity.set(0, 0, 0); updateWorldInteract();
   });
+  window.addEventListener('kerala-home-sit', () => {
+    if (!homeInteriorMode || !playerRef || playerRef.userData.restPoseReturn) return;
+    const chair = HOME_INTERIOR_CHAIR;
+    if (Math.hypot(playerRef.position.x - chair.standX, playerRef.position.z - chair.standZ) > chair.radius + .25) return;
+    const distance = Math.hypot(chair.standX - playerRef.position.x, chair.standZ - playerRef.position.z);
+    playerRef.userData.restPoseReturn = {
+      originX: playerRef.position.x,
+      originZ: playerRef.position.z,
+      originYaw: playerRef.rotation.y,
+      targetX: chair.standX,
+      targetZ: chair.standZ,
+      targetYaw: Math.PI,
+      avatarSeatZ: chair.avatarSeatZ,
+      durationMs: 6500,
+      approaching: distance > .08,
+      atSeat: distance <= .08,
+      stuckSeconds: 0,
+      homeInteriorSeat: true,
+    };
+    playerRef.userData.restPoseUntil = distance <= .08 ? performance.now() + 6500 : 0;
+    if (distance <= .08) playerRef.rotation.y = Math.PI;
+    updateMapPlayer(playerRef);
+    updateWorldInteract();
+    showToast('Sitting at home · move to stand up');
+  });
   window.addEventListener('kerala-home-bed-sleep', event => {
     if (!homeInteriorMode) return;
     if (event.detail?.position) setPrivateHomeInterior(true, event.detail.position);
@@ -4961,7 +5004,8 @@ try {
         const beforeZ = player.position.z;
         const travelYaw = Math.atan2(dx, dz);
         player.rotation.y = rotateTowards(player.rotation.y, travelYaw, delta * 9);
-        moveWithCollision(player, dx / distance * step, dz / distance * step, .43);
+        if (homeInteriorMode) moveInsidePrivateHome(player, dx / distance * step, dz / distance * step);
+        else moveWithCollision(player, dx / distance * step, dz / distance * step, .43);
         const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
         if (movedDistance > .0005) {
           restApproach.stuckSeconds = 0;
@@ -4979,6 +5023,11 @@ try {
         const remaining = Math.hypot(restApproach.targetX - player.position.x, restApproach.targetZ - player.position.z);
         if (remaining <= .08) {
           player.position.set(restApproach.targetX, 0, restApproach.targetZ);
+          if (restApproach.homeInteriorSeat) {
+            restApproach.originX = restApproach.targetX;
+            restApproach.originZ = restApproach.targetZ;
+            restApproach.originYaw = restApproach.targetYaw;
+          }
           restApproach.approaching = false;
           restApproach.atSeat = true;
           restApproach.stuckSeconds = 0;

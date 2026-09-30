@@ -1355,7 +1355,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (homePayUtilities) homePayUtilities.textContent = 'Pay Utilities · ' + formatCash(summary.home?.utilities || 0);
     if (homeSleepNote) {
       homeSleepNote.textContent = ownedHome
-        ? 'Select SHOW MY HOME & DISTANCE to follow the route to your front door. Tap OPEN FRONT DOOR · ENTER to go in. To return outside, go back to the front door and tap OPEN DOOR · EXIT HOME.'
+        ? 'Select SHOW MY HOME & DISTANCE to follow the route to your front door. Tap OPEN FRONT DOOR · ENTER to go in. Inside, tap SIT IN CHAIR to sit or walk to the bed to sleep. To go outside, return to the front door and tap OPEN DOOR · EXIT HOME.'
         : constructionStarted
           ? 'Your ' + summary.house.district + ' plot shows construction stage ' + buildStage + ' of 4. Pay ' + formatCash(nextBuildCost) + ' for ' + nextBuildLabel.toLowerCase() + ' to add the next visible part. After stage 4, enter through the front door.'
           : summary.accessBlocked
