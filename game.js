@@ -2725,9 +2725,9 @@ function updateWorldInteract() {
       worldInteract.hidden = false; worldInteract.dataset.mode = 'home-sleep';
       worldInteract.textContent = 'SLEEP IN BED'; return;
     }
-    if (playerRef.position.z >= 4.9) {
+    if (playerRef.position.z >= 4.9 && Math.abs(playerRef.position.x) <= 1.2) {
       worldInteract.hidden = false; worldInteract.dataset.mode = 'home-exit';
-      worldInteract.textContent = 'EXIT HOME';
+      worldInteract.textContent = 'OPEN DOOR · EXIT HOME';
     }
     return;
   }
@@ -2785,7 +2785,7 @@ function updateWorldInteract() {
       const constructionActive = houseStage > 0 && !homeSnapshot.house?.built;
       worldInteract.hidden = false;
       worldInteract.dataset.mode = homeSnapshot.house?.built ? 'home-enter' : constructionActive || homeSnapshot.accessBlocked ? 'home-open' : 'home-sleep';
-      worldInteract.textContent = homeSnapshot.house?.built ? 'ENTER MY HOME' : constructionActive ? 'CONTINUE BUILDING · ' + houseStage + '/4' : homeSnapshot.accessBlocked ? 'OPEN HOME · PAYMENT DUE' : 'SLEEP · ENERGY ' + Math.round(Number(needsSnapshot?.energy ?? 100)) + '%';
+      worldInteract.textContent = homeSnapshot.house?.built ? 'OPEN FRONT DOOR · ENTER' : constructionActive ? 'CONTINUE BUILDING · ' + houseStage + '/4' : homeSnapshot.accessBlocked ? 'OPEN HOME · PAYMENT DUE' : 'SLEEP · ENERGY ' + Math.round(Number(needsSnapshot?.energy ?? 100)) + '%';
       worldInteract.disabled = false;
       return;
     }
@@ -4519,6 +4519,7 @@ try {
   });
   window.addEventListener('kerala-home-interior-exit', event => {
     setPrivateHomeInterior(false, event.detail?.position);
+    window.keralaHomeDoor?.(false);
     cameraYaw = player.rotation.y + Math.PI; cameraPitch = .31;
     clearGameInput(); walkVelocity.set(0, 0, 0); targetWalkVelocity.set(0, 0, 0); updateWorldInteract();
   });
@@ -12025,9 +12026,31 @@ function addPhotoHouse(scene, x, z, district = 'Kottayam') {
 }
 
 function registerPersonalHomePlot(scene, baseHouse, district, x, z) {
-  homePlotVisuals.set(district, { scene, baseHouse, x, z, construction: null });
+  homePlotVisuals.set(district, { scene, baseHouse, x, z, construction: null, visualStage: -1, doorPivot: null });
   updateHomeConstructionVisual();
 }
+
+function animatePersonalHomeDoor(open) {
+  const district = renderedWorldDistrict || currentWorldDistrictName();
+  const pivot = homePlotVisuals.get(district)?.doorPivot;
+  if (!pivot) return Promise.resolve(false);
+  const from = pivot.rotation.y;
+  const to = open ? 1.32 : 0;
+  if (Math.abs(from - to) < .01) return Promise.resolve(true);
+  const startedAt = performance.now();
+  const duration = 430;
+  return new Promise(resolve => {
+    const step = timestamp => {
+      const progress = Math.min(1, (timestamp - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      pivot.rotation.y = from + (to - from) * eased;
+      if (progress < 1) requestAnimationFrame(step);
+      else resolve(true);
+    };
+    requestAnimationFrame(step);
+  });
+}
+window.keralaHomeDoor = animatePersonalHomeDoor;
 
 function updateHomeConstructionVisual() {
   const district = renderedWorldDistrict || currentWorldDistrictName();
@@ -12039,6 +12062,7 @@ function updateHomeConstructionVisual() {
     : 0;
   const complete = stage >= 4;
   plot.baseHouse.visible = !house || house.district !== district || stage === 0;
+  if (plot.visualStage === stage && (stage === 0 || plot.construction)) return;
   if (plot.construction) {
     const old = plot.construction;
     plot.scene.remove(old);
@@ -12052,10 +12076,13 @@ function updateHomeConstructionVisual() {
     materials.forEach(material => material.dispose());
     plot.construction = null;
   }
+  plot.doorPivot = null;
   if (stage > 0) {
     plot.construction = createHomeConstructionModel(stage, plot.x, plot.z);
+    plot.doorPivot = plot.construction.userData.frontDoorPivot || null;
     plot.scene.add(plot.construction);
   }
+  plot.visualStage = stage;
   if (complete) plot.baseHouse.visible = false;
 }
 
@@ -12104,7 +12131,20 @@ function createHomeConstructionModel(stage, x, z) {
     add(new THREE.BoxGeometry(5.1, .20, 1.85), concrete, 0, .40, 4.10);
     add(new THREE.BoxGeometry(2.4, .20, .72), unfinished, 0, .20, 5.05);
     [-1.95, 1.95].forEach(px => add(new THREE.CylinderGeometry(.15, .17, 3.25, 10), white, px, 2.02, 4.1));
-    add(new THREE.BoxGeometry(1.35, 2.35, .14), wood, 0, 1.59, 3.22);
+    const doorPivot = new THREE.Group();
+    doorPivot.position.set(-.675, .415, 3.22);
+    const doorPanel = new THREE.Mesh(new THREE.BoxGeometry(1.35, 2.35, .14), wood);
+    doorPanel.position.set(.675, 1.175, 0);
+    doorPanel.castShadow = true;
+    doorPanel.receiveShadow = true;
+    doorPivot.add(doorPanel);
+    const brass = new THREE.MeshStandardMaterial({ color: 0xb58b45, roughness: .38, metalness: .72 });
+    const handle = new THREE.Mesh(new THREE.SphereGeometry(.055, 10, 8), brass);
+    handle.position.set(1.16, 1.18, .105);
+    handle.castShadow = true;
+    doorPivot.add(handle);
+    group.add(doorPivot);
+    group.userData.frontDoorPivot = doorPivot;
     [-2.72, 2.72].forEach(px => {
       add(new THREE.BoxGeometry(1.72, 1.42, .16), wood, px, 2.28, 3.21);
       add(new THREE.BoxGeometry(1.42, 1.14, .17), glass, px, 2.28, 3.22);
