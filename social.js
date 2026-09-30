@@ -1355,7 +1355,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (homePayUtilities) homePayUtilities.textContent = 'Pay Utilities · ' + formatCash(summary.home?.utilities || 0);
     if (homeSleepNote) {
       homeSleepNote.textContent = ownedHome
-        ? 'Select SHOW MY HOME & DISTANCE to follow the route to your own front door. At the door, tap OPEN FRONT DOOR · ENTER. Inside, walk to the bed to sleep.'
+        ? 'Select SHOW MY HOME & DISTANCE to follow the route to your front door. Tap OPEN FRONT DOOR · ENTER to go in. To return outside, go back to the front door and tap OPEN DOOR · EXIT HOME.'
         : constructionStarted
           ? 'Your ' + summary.house.district + ' plot shows construction stage ' + buildStage + ' of 4. Pay ' + formatCash(nextBuildCost) + ' for ' + nextBuildLabel.toLowerCase() + ' to add the next visible part. After stage 4, enter through the front door.'
           : summary.accessBlocked
@@ -1395,7 +1395,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       renderHome(result.home);
       closePanels();
       window.dispatchEvent(new CustomEvent('kerala-home-interior-enter', { detail: { position: result.position } }));
-      toast('Welcome home · walk to the bed to rest');
+      toast('Welcome home · tap OPEN DOOR · EXIT HOME at the front door to go outside');
     } catch (error) {
       if (doorOpened) await window.keralaHomeDoor?.(false);
       throw error;
