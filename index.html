@@ -155,8 +155,9 @@
     .panel-heading, .map-header, .chat-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#fff; font-size:13px; font-weight:900; }
     .panel-heading small { color:#abd7c1; font-size:10px; font-weight:600; }
     .panel-close, #map-label-toggle { border:0; border-radius:7px; color:#fff; background:rgba(255,255,255,.13); padding:4px 7px; font:inherit; font-size:12px; cursor:pointer; touch-action:manipulation; }
-    #wardrobe-panel { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:72px; z-index:5; width:min(310px,calc(100vw - 90px)); max-height:min(58dvh,380px); overflow-y:auto; padding:11px; border:1px solid rgba(255,255,255,.3); border-radius:15px; color:#fff; background:rgba(7,24,30,.96); box-shadow:0 9px 26px rgba(0,0,0,.32); touch-action:pan-y; }
+    #wardrobe-panel { display:none; position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:72px; z-index:5; width:min(310px,calc(100vw - 90px)); max-height:min(58dvh,380px); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:11px; border:1px solid rgba(255,255,255,.3); border-radius:15px; color:#fff; background:rgba(7,24,30,.96); box-shadow:0 9px 26px rgba(0,0,0,.32); pointer-events:auto; touch-action:pan-y; }
     #wardrobe-panel.open { display:block; z-index:7; }
+    html.wardrobe-scroll-enabled, body.wardrobe-scroll-enabled { touch-action:pan-y; }
     #wardrobe-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 8px; }
     #wardrobe-options button { min-height:62px; border:1px solid rgba(255,255,255,.2); border-radius:10px; padding:9px; color:#fff; background:rgba(255,255,255,.07); text-align:left; font:800 12px/1.25 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
     #wardrobe-options button[aria-pressed="true"] { border-color:#69dfa0; background:rgba(42,125,84,.68); box-shadow:0 0 0 1px rgba(105,223,160,.26); }
@@ -1521,6 +1522,19 @@
     <div id="onboarding-pointer" hidden aria-hidden="true"></div>
   </section>
 
+  <script>
+    (() => {
+      const panel = document.getElementById('wardrobe-panel');
+      if (!panel) return;
+      const syncWardrobeTouchAction = () => {
+        const isOpen = panel.classList.contains('open');
+        document.documentElement.classList.toggle('wardrobe-scroll-enabled', isOpen);
+        document.body.classList.toggle('wardrobe-scroll-enabled', isOpen);
+      };
+      new MutationObserver(syncWardrobeTouchAction).observe(panel, { attributes: true, attributeFilter: ['class'] });
+      syncWardrobeTouchAction();
+    })();
+  </script>
   <script type="module" src="./boot.js?v=115.0"></script>
 </body>
 </html>
