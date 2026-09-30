@@ -2,7 +2,7 @@ import * as THREE from './vendor/three.module.js';
 import { initSocial, api } from './social.js?v=114.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
-import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments } from './district-layout.js?v=116.0';
+import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=117.0';
 import { createKeralaRoofTiles } from './roof-tiles.js?v=115.0';
 
 const busDestinationSignMaterials = new Map();
@@ -8182,8 +8182,8 @@ function addStreetLifeProps(scene) {
 }
 
 function addTownStreetDetails(scene) {
-  addShop(scene, -14.4, 10.5, 'ANUGRAHA STORES', 'ചായ · SNACKS · GROCERIES');
-  addShop(scene, 14.8, 38.5, 'MALABAR BAKERY', 'BAKERY · TEA · COOL DRINKS');
+  addShop(scene, -14.4, 10.5, 'ANUGRAHA STORES', 'ചായ · SNACKS · GROCERIES', districtFacadePalette('Kottayam', -14.4 * 31 + 10.5 * 47));
+  addShop(scene, 14.8, 38.5, 'MALABAR BAKERY', 'BAKERY · TEA · COOL DRINKS', districtFacadePalette('Kottayam', 14.8 * 31 + 38.5 * 47));
   addBusStop(scene, 11.7, 30, 0, 'TOWN JUNCTION');
   addBusStop(scene, -11.7, -50.5, Math.PI, 'SOUTH STOP');
   addRoadsideIdentitySigns(scene);
@@ -8612,8 +8612,8 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
   addParkedVehicle(scene, 'bike', 0x316d58, -54, -33.5, Math.PI / 2);
   addBusStop(scene, -35, -12, Math.PI / 2, 'RAILWAY BUS');
 
-  addShop(scene, -49, 8.5, 'ERNAKULAM CITY MARKET', 'FOOD · GROCERIES · DAILY NEEDS');
-  addShop(scene, -33, 11.5, 'BROADWAY CAFE', 'TEA · MEALS · SNACKS');
+  addShop(scene, -49, 8.5, 'ERNAKULAM CITY MARKET', 'FOOD · GROCERIES · DAILY NEEDS', districtFacadePalette('Ernakulam', -49 * 31 + 8.5 * 47));
+  addShop(scene, -33, 11.5, 'BROADWAY CAFE', 'TEA · MEALS · SNACKS', districtFacadePalette('Ernakulam', -33 * 31 + 11.5 * 47));
   addCivicBuilding(scene, -11, -34, { title: 'CITY HOSPITAL', subtitle: 'HEALTH · EMERGENCY', color: 0x2d7d63, collider: 'ernakulam-hospital' });
   addCivicBuilding(scene, -31, 42, { title: 'CITY POLICE', subtitle: 'PUBLIC HELP DESK', color: 0x315b84, collider: 'ernakulam-police' });
   addCivicBuilding(scene, 34, 11, { title: 'FIRE & RESCUE', subtitle: 'CITY EMERGENCY SERVICES', color: 0xa84437, collider: 'ernakulam-fire' });
@@ -8624,7 +8624,7 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
   // The north-south carriageway is 12 m wide; keep the stop wholly on its west footpath.
   addBusStop(scene, -10.5, 30.5, Math.PI, 'MARINE DRIVE');
 
-  addPhotoHouse(scene, -48, 40, 9.2, 6.2);
+  addPhotoHouse(scene, -48, 40, 'Ernakulam');
   const ernakulamHomeMarker = new THREE.Group();
   ernakulamHomeMarker.add(missionTag('Rental Home', '#654b36'));
   ernakulamHomeMarker.position.set(-48, 0, 36.6);
@@ -8639,7 +8639,8 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
   addCityTower(scene, 38, 40, 12, 8, 17, 0xaab3b8, 'COMMERCIAL CENTRE');
 
   for (const [x,z] of [[-54,-8],[-51,27],[44,-21],[42,30],[-10,-42],[13,-42]]) {
-    addHouse(scene, x, z, 0xe7ddca, 0x8e523f);
+    const facade = districtFacadePalette('Ernakulam', x * 31 + z * 47);
+    addHouse(scene, x, z, facade.houseWall, facade.roof, facade);
   }
 
   addParkingLot(scene, -31, -5.5, 15, 5.5);
@@ -9446,8 +9447,8 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
   scene.add(districtBoard);
   registerFarVisual(districtBoard,9,8,86);
 
-  addShop(scene, 20, 12.5, profile.market.toUpperCase(), profile.culture?.foodShort || 'FOOD · GROCERIES · DAILY NEEDS');
-  addShop(scene, -44, 22, profile.cafe.toUpperCase(), profile.culture?.foodShort || 'TEA · MEALS · SNACKS');
+  addShop(scene, 20, 12.5, profile.market.toUpperCase(), profile.culture?.foodShort || 'FOOD · GROCERIES · DAILY NEEDS', districtFacadePalette(district, 20 * 31 + 12.5 * 47));
+  addShop(scene, -44, 22, profile.cafe.toUpperCase(), profile.culture?.foodShort || 'TEA · MEALS · SNACKS', districtFacadePalette(district, -44 * 31 + 22 * 47));
   addCivicBuilding(scene, -20, 11.5, { title:'DISTRICT HOSPITAL', subtitle:`${district.toUpperCase()} · HEALTH`, color:0x2d7d63, collider:'district-hospital' });
   addCivicBuilding(scene, -20, -18, { title:'KERALA POLICE', subtitle:`${district.toUpperCase()} DISTRICT`, color:0x315b84, collider:'district-police' });
   addCivicBuilding(scene, 20, -18, { title:'FIRE & RESCUE', subtitle:'EMERGENCY SERVICES', color:0xa84437, collider:'district-fire' });
@@ -9455,7 +9456,7 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
   addFuelStation(scene, fuelPosition.x, fuelPosition.z);
   addServiceGarage(scene, -18, -48);
 
-  addPhotoHouse(scene, -24, -27, 10.2, 6.8);
+  addPhotoHouse(scene, -24, -27, district);
   const districtHomeMarker = new THREE.Group();
   districtHomeMarker.add(missionTag('Rental Home', '#654b36'));
   districtHomeMarker.position.set(-24, 0, -21.8);
@@ -9475,7 +9476,8 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
   addCityTower(scene, 58, 10.5, 9, 7, 13, 0xb3bdc1, 'BUSINESS BLOCK');
 
   for (const [x,z] of [[-54,48],[-38,54],[-54,-58],[-36,-62],[54,-58],[68,-42],[64,28],[45,62]]) {
-    addHouse(scene,x,z,0xe7ddca,0x8e523f);
+    const facade = districtFacadePalette(district, x * 31 + z * 47);
+    addHouse(scene,x,z,facade.houseWall,facade.roof,facade);
   }
   [[-68,20,.78],[68,20,.82],[-62,-20,.76],[62,-20,.80],[25,66,.74],[-25,66,.77],[-68,52,.75],[68,52,.79]]
     .forEach(([x,z,s]) => addPalm(scene,x,z,s));
@@ -9696,7 +9698,7 @@ function buildWorld(scene) {
   addBench(scene, -10, -10);
   addFuelStation(scene, 11, -12);
   addServiceGarage(scene, -33, -12);
-  addShop(scene, 31, 12.5, 'TOWN MARKET', 'GROCERIES · TEA · DAILY NEEDS');
+  addShop(scene, 31, 12.5, 'TOWN MARKET', 'GROCERIES · TEA · DAILY NEEDS', districtFacadePalette('Kottayam', 31 * 31 + 12.5 * 47));
   addCivicBuilding(scene, 42, 31, { title: 'COMMUNITY CLINIC', subtitle: 'HEALTH CENTRE · 24/7', color: 0x2d7d63, collider: 'clinic' });
   addCivicBuilding(scene, -31, 14, { title: 'KERALA POLICE', subtitle: 'POLICE STATION', color: 0x315b84, collider: 'police-station' });
   addCivicBuilding(scene, -52, 8, { title: 'FIRE & RESCUE', subtitle: 'EMERGENCY SERVICES', color: 0xa84437, collider: 'fire-station' });
@@ -11813,7 +11815,10 @@ function updateAmbientAnimals(time, delta) {
   }
 }
 
-function addPhotoHouse(scene, x, z) { addHouse(scene, x, z, 0xf0e5d1, 0x9e533a); }
+function addPhotoHouse(scene, x, z, district = 'Kottayam') {
+  const facade = districtFacadePalette(district, x * 31 + z * 47);
+  addHouse(scene, x, z, facade.houseWall, facade.roof, facade);
+}
 
 
 function addBuildingWeathering(group, kind, seedValue = 1) {
@@ -11890,7 +11895,7 @@ function addBuildingWeathering(group, kind, seedValue = 1) {
   }
 }
 
-function addHouse(scene, x, z, wallColor, roofColor) {
+function addHouse(scene, x, z, wallColor, roofColor, facade = {}) {
   addBoxCollider(x, z, 4.45, 3.95, 'house');
   const group = new THREE.Group();
   const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: .9 });
@@ -11899,9 +11904,9 @@ function addHouse(scene, x, z, wallColor, roofColor) {
     makeWeatherSurfaceState(wallMat, { roughnessDrop: .06, minRoughness: .72, darkening: .04 }),
     makeWeatherSurfaceState(roofMat, { roughnessDrop: .12, minRoughness: .68, darkening: .03 }),
   );
-  const darkWood = new THREE.MeshStandardMaterial({ color: 0x573a2b, roughness: .92 });
+  const darkWood = new THREE.MeshStandardMaterial({ color: facade.wood ?? 0x573a2b, roughness: .92 });
   const windowMat = new THREE.MeshStandardMaterial({
-    color: 0x6fa4b8,
+    color: facade.glass ?? 0x6fa4b8,
     roughness: .18,
     metalness: .12,
     emissive: 0xffc978,
@@ -11924,19 +11929,19 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   roofB.rotation.x = -.52;
   roofA.position.set(0, 5.65, -1.32);
   roofB.position.set(0, 5.65, 1.32);
-  const ridge = new THREE.Mesh(new THREE.BoxGeometry(9.7, .22, .32), new THREE.MeshStandardMaterial({ color: 0x713a2e, roughness: 1 }));
+  const ridge = new THREE.Mesh(new THREE.BoxGeometry(9.7, .22, .32), new THREE.MeshStandardMaterial({ color: facade.roof ?? 0x713a2e, roughness: 1 }));
   ridge.position.y = 6.75;
   group.add(roofA, roofB, ridge);
   group.add(...createKeralaRoofTiles(THREE, x, z));
 
   const skirting = new THREE.Mesh(
     new THREE.BoxGeometry(8.75, .42, 7.6),
-    new THREE.MeshStandardMaterial({ color: 0x8c7d69, roughness: 1 })
+    new THREE.MeshStandardMaterial({ color: facade.skirting ?? 0x8c7d69, roughness: 1 })
   );
   skirting.position.y = .62;
   const facadeBand = new THREE.Mesh(
     new THREE.BoxGeometry(8.25, .16, .11),
-    new THREE.MeshStandardMaterial({ color: 0xd9cbb5, roughness: .92 })
+    new THREE.MeshStandardMaterial({ color: facade.band ?? 0xd9cbb5, roughness: .92 })
   );
   facadeBand.position.set(0, 4.22, 3.82);
 
@@ -11994,7 +11999,7 @@ function addHouse(scene, x, z, wallColor, roofColor) {
     glass.position.set(windowX, 2.65, windowZ + .01);
     vertical.position.set(windowX, 2.65, windowZ + .02);
     horizontal.position.set(windowX, 2.65, windowZ + .02);
-    const sill = new THREE.Mesh(new THREE.BoxGeometry(1.82, .11, .28), new THREE.MeshStandardMaterial({ color: 0xd7cbb5, roughness: .95 }));
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(1.82, .11, .28), new THREE.MeshStandardMaterial({ color: facade.band ?? 0xd7cbb5, roughness: .95 }));
     sill.position.set(windowX, 1.91, windowZ + .10);
     group.add(frame, glass, vertical, horizontal, sill);
   });
@@ -12051,11 +12056,11 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   scene.add(group);
 }
 
-function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ · SNACKS · GROCERIES') {
+function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ · SNACKS · GROCERIES', facade = {}) {
   addBoxCollider(x, z, 4.8, 3.0, 'shop');
   const group = new THREE.Group();
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xf1e7d2, roughness: .92 });
-  const awningMaterial = new THREE.MeshStandardMaterial({ color: 0xb83f36, roughness: .9 });
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: facade.shopWall ?? 0xf1e7d2, roughness: .92 });
+  const awningMaterial = new THREE.MeshStandardMaterial({ color: facade.awning ?? 0xb83f36, roughness: .9 });
   weatherBuildingSurfaces.push(
     makeWeatherSurfaceState(bodyMaterial, { roughnessDrop: .06, minRoughness: .74, darkening: .04 }),
     makeWeatherSurfaceState(awningMaterial, { roughnessDrop: .11, minRoughness: .66, darkening: .035 }),
@@ -12082,12 +12087,12 @@ function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ
   }, 5.28, .78);
   signText.position.set(0, 4.25, 2.985);
   registerFarVisual(signText, x, z, 54);
-  const shutterMat = new THREE.MeshStandardMaterial({ color: 0x6e5845, roughness: .96, metalness: .08 });
+  const shutterMat = new THREE.MeshStandardMaterial({ color: facade.shutter ?? 0x6e5845, roughness: .96, metalness: .08 });
   const shutter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.05, .12), shutterMat);
   shutter.position.set(0, 1.82, 2.96);
   group.add(body, awning, sign, signText, shutter);
 
-  const trimMat = new THREE.MeshStandardMaterial({ color: 0x3d4547, roughness: .74, metalness: .22 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: facade.shopTrim ?? 0x3d4547, roughness: .74, metalness: .22 });
   for (let y = .94; y <= 2.70; y += .22) {
     const slat = new THREE.Mesh(new THREE.BoxGeometry(4.28, .035, .055), trimMat);
     slat.position.set(0, y, 3.035);
