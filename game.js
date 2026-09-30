@@ -8826,7 +8826,7 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
 
   registerPersonalHomePlot(scene, addPhotoHouse(scene, -48, 40, 'Ernakulam'), 'Ernakulam', -48, 40);
   const ernakulamHomeMarker = new THREE.Group();
-  ernakulamHomeMarker.add(missionTag('Rental Home', '#654b36'));
+  ernakulamHomeMarker.add(missionTag('Home Plot', '#654b36'));
   ernakulamHomeMarker.position.set(-48, 0, 36.6);
   scene.add(ernakulamHomeMarker);
   addBench(scene, 4, 40);
@@ -9658,7 +9658,7 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
 
   registerPersonalHomePlot(scene, addPhotoHouse(scene, -24, -27, district), district, -24, -27);
   const districtHomeMarker = new THREE.Group();
-  districtHomeMarker.add(missionTag('Rental Home', '#654b36'));
+  districtHomeMarker.add(missionTag('Home Plot', '#654b36'));
   districtHomeMarker.position.set(-24, 0, -21.8);
   scene.add(districtHomeMarker);
   addBench(scene, -10, -10);
@@ -9863,7 +9863,7 @@ function buildWorld(scene) {
 
   registerPersonalHomePlot(scene, addPhotoHouse(scene, -24, -35, 'Kottayam'), 'Kottayam', -24, -35);
   const rentalHomeMarker = new THREE.Group();
-  rentalHomeMarker.add(missionTag('Rental Home', '#654b36'));
+  rentalHomeMarker.add(missionTag('Home Plot', '#654b36'));
   rentalHomeMarker.position.set(-24, 0, -29.8);
   scene.add(rentalHomeMarker);
   addPhotoHouse(scene, 28, 34, 8.8, 5.9);
@@ -12355,6 +12355,7 @@ function addHouse(scene, x, z, wallColor, roofColor, facade = {}) {
   addBuildingWeathering(group, 'house', x * 31 + z * 47);
   group.position.set(x, 0, z);
   scene.add(group);
+  return group;
 }
 
 function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ · SNACKS · GROCERIES', facade = {}) {
