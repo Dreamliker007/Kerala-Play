@@ -1122,9 +1122,21 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   await signup(bob, 'HomeVisitor');
   const plot = (await alice('/api/home')).data.localHome;
   const initialPosition = (await alice('/api/session')).data.user;
-  const built = await alice('/api/home/build', {});
-  assert.equal(built.status, 200, JSON.stringify(built.data));
-  assert.equal(built.data.home.house.built, true, 'The Home panel can build before travelling to the entrance plot.');
+  let built;
+  const buildCosts = [50, 100, 150, 200];
+  for (let index = 0; index < buildCosts.length; index++) {
+    const before = (await alice('/api/wallet')).data.balance;
+    built = await alice('/api/home/build', {});
+    assert.equal(built.status, 200, JSON.stringify(built.data));
+    assert.equal(built.data.construction.stage, index + 1);
+    assert.equal(built.data.construction.cost, buildCosts[index]);
+    assert.equal(built.data.home.house.buildStage, index + 1);
+    assert.equal(built.data.home.house.built, index === buildCosts.length - 1);
+    assert.equal(built.data.wallet.balance, before - buildCosts[index], 'Every construction stage is charged to Kerala Cash.');
+    if (index === 0) assert.equal((await alice('/api/home/enter', {})).status, 409, 'An unfinished house cannot be entered.');
+  }
+  assert.equal(built.data.home.house.built, true, 'The Home panel completes the paid four-stage build.');
+  assert.equal(built.data.wallet.balance, 0);
   const panelEntry = await alice('/api/home/enter', {});
   assert.equal(panelEntry.status, 200, JSON.stringify(panelEntry.data));
   assert.equal(panelEntry.data.position.mode, 'home');
@@ -1191,6 +1203,7 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   assert.equal((await alice('/api/auth/login', { identifier: 'HomeBuilder', password: 'test-password-2026' })).status, 200);
   const persisted = (await alice('/api/home')).data;
   assert.equal(persisted.house.built, true);
+  assert.equal(persisted.house.buildStage, 4);
   assert.equal(persisted.house.district, 'Ernakulam');
   assert.equal(persisted.inside, false);
 });
