@@ -1318,11 +1318,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       homeBuildButton.textContent = 'Build ' + nextBuildLabel + ' · ' + formatCash(nextBuildCost);
       homeBuildButton.setAttribute('aria-label', 'Build ' + nextBuildLabel + ' for ' + formatCash(nextBuildCost));
     }
-    if (homeEnterButton) {
-      homeEnterButton.hidden = !ownedHome || !!summary.inside;
-      homeEnterButton.disabled = !!ownedHome && !summary.house.available;
-    }
-    if (homeExitButton) homeExitButton.hidden = !summary.inside;
+    if (homeEnterButton) { homeEnterButton.hidden = true; homeEnterButton.disabled = true; }
+    if (homeExitButton) { homeExitButton.hidden = true; homeExitButton.disabled = true; }
     if (homeRentStatus) {
       homeRentStatus.textContent = formatCash(summary.home?.rent || 0) + ' · ' + homeDueText(summary.rentDueAt, summary.rentOverdue);
       homeRentStatus.classList.toggle('overdue', !!summary.rentOverdue);
@@ -1335,12 +1332,12 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (homePayUtilities) homePayUtilities.textContent = 'Pay Utilities · ' + formatCash(summary.home?.utilities || 0);
     if (homeSleepNote) {
       homeSleepNote.textContent = ownedHome
-        ? 'Walk up to the bed inside your completed home and choose SLEEP IN BED. Tap EXIT HOME near the front door to return outside.'
+        ? 'Walk to the front door of your completed home and tap OPEN FRONT DOOR · ENTER. Inside, walk to the bed to sleep; use EXIT HOME at the doorway to return outside.'
         : constructionStarted
-          ? 'Your ' + summary.house.district + ' plot is showing stage ' + buildStage + ' of 4. Pay ' + formatCash(nextBuildCost) + ' for ' + nextBuildLabel.toLowerCase() + ' to continue. You can enter and use the bed after all four stages are complete.'
+          ? 'Your ' + summary.house.district + ' plot shows construction stage ' + buildStage + ' of 4. Pay ' + formatCash(nextBuildCost) + ' for ' + nextBuildLabel.toLowerCase() + ' to add the next visible part. After stage 4, enter through the front door.'
           : summary.accessBlocked
             ? 'Sleep access is paused after the grace period. Pay overdue home charges to restore access.'
-            : 'Build on your district home plot with Kerala Cash, one stage at a time. Finish the house to enter and rest in your own bed.';
+            : 'Build on your district home plot with Kerala Cash, one stage at a time. Watch each paid stage appear on the plot, then open the front door to enter.';
     }
   }
 
@@ -1367,11 +1364,19 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       : construction.label + ' complete · ' + construction.stage + '/4 stages · next: ' + (construction.nextStage ? construction.nextStage.label : 'complete') + ' · ' + (construction.nextStage ? formatCash(construction.nextStage.cost) : ''));
   }
   async function enterPersonalHome() {
-    const result = await api('/api/home/enter', {});
-    renderHome(result.home);
-    closePanels();
-    window.dispatchEvent(new CustomEvent('kerala-home-interior-enter', { detail: { position: result.position } }));
-    toast('Welcome home · walk to the bed to rest');
+    let doorOpened = false;
+    try {
+      doorOpened = await window.keralaHomeDoor?.(true);
+      if (!doorOpened) throw new Error('Walk up to your home’s front door first.');
+      const result = await api('/api/home/enter', {});
+      renderHome(result.home);
+      closePanels();
+      window.dispatchEvent(new CustomEvent('kerala-home-interior-enter', { detail: { position: result.position } }));
+      toast('Welcome home · walk to the bed to rest');
+    } catch (error) {
+      if (doorOpened) await window.keralaHomeDoor?.(false);
+      throw error;
+    }
   }
   async function exitPersonalHome() {
     const result = await api('/api/home/exit', {});
@@ -2619,8 +2624,6 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       if (!result && homeError?.textContent) toast(homeError.textContent);
     });
   });
-  homeEnterButton?.addEventListener('click', () => run(enterPersonalHome, homeError));
-  homeExitButton?.addEventListener('click', () => run(exitPersonalHome, homeError));
   garageToggle?.addEventListener('click', () => garagePanel?.classList.contains('open') ? closePanels() : openGarage());
   garageClose?.addEventListener('click', () => { closePanels(); garageToggle?.focus(); });
   garageRefresh?.addEventListener('click', () => run(refreshGarage, garageError));

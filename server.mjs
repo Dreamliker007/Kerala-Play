@@ -410,9 +410,9 @@ function worldServicePointForUser(user, pointId) {
   return WORLD_SERVICE_POINTS[pointId] || null;
 }
 function homeDefinitionFor(user) {
-  if (currentWorldDistrict(user) === 'Ernakulam') return { ...HOME_DEFINITION, id:'ernakulam-rental', label:'Ernakulam Rental Home', x:-48, z:40 };
-  if (genericDistrictWorld(user)) return { ...HOME_DEFINITION, id:'district-rental', label:`${currentWorldDistrict(user)} Rental Home` };
-  return HOME_DEFINITION;
+  if (currentWorldDistrict(user) === 'Ernakulam') return { ...HOME_DEFINITION, id:'ernakulam-rental', label:'Ernakulam Rental Home', x:-48, z:44.5, radius:2.3 };
+  if (genericDistrictWorld(user)) return { ...HOME_DEFINITION, id:'district-rental', label:`${currentWorldDistrict(user)} Rental Home`, x:-24, z:-22.5, radius:2.3 };
+  return { ...HOME_DEFINITION, x:-24, z:-30.5, radius:2.3 };
 }
 function restPointFor(user) {
   if (currentWorldDistrict(user) === 'Ernakulam') return { ...NEEDS_REST_POINT, id:'ernakulam-rest', label:'Ernakulam Rest Bench', x:4, z:40 };
@@ -3120,6 +3120,8 @@ function publicRideDestinationForUser(user, destinationId) {
         requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle first.');
         const live = presence.get(user.id) || place(user);
         requireValue((live.mode || 'walk') === 'walk', 409, 'Exit your vehicle before entering your home.');
+        const homeDoor = homeDefinitionFor(user);
+        requireValue(Math.hypot(Number(live.x) - homeDoor.x, Number(live.z) - homeDoor.z) <= Number(homeDoor.radius || 2.3) + .4, 409, 'Walk to the front door to enter your home.');
         live.homeReturn = { x: live.x, z: live.z, rotation: live.rotation, district: live.district || currentWorldDistrict(user) };
         live.x = HOME_INTERIOR_ENTRY.x;
         live.z = HOME_INTERIOR_ENTRY.z;
@@ -3137,6 +3139,7 @@ function publicRideDestinationForUser(user, destinationId) {
         await jsonBody(request);
         const live = presence.get(user.id);
         requireValue(live?.mode === 'home' && live.homeReturn, 409, 'You are not inside your home.');
+        requireValue(Math.abs(Number(live.x) - HOME_INTERIOR_ENTRY.x) <= 1.2 && Number(live.z) >= 4.9, 409, 'Walk to the front door to leave your home.');
         const saved = live.homeReturn;
         live.x = Number(saved.x);
         live.z = Number(saved.z);

@@ -1137,13 +1137,8 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   }
   assert.equal(built.data.home.house.built, true, 'The Home panel completes the paid four-stage build.');
   assert.equal(built.data.wallet.balance, 0);
-  const panelEntry = await alice('/api/home/enter', {});
-  assert.equal(panelEntry.status, 200, JSON.stringify(panelEntry.data));
-  assert.equal(panelEntry.data.position.mode, 'home');
-  const panelExit = await alice('/api/home/exit', {});
-  assert.equal(panelExit.status, 200, JSON.stringify(panelExit.data));
-  assert.equal(panelExit.data.position.x, initialPosition.x, 'Home panel exit returns to the saved outdoor position.');
-  assert.equal(panelExit.data.position.z, initialPosition.z);
+  const remoteEntry = await alice('/api/home/enter', {});
+  assert.equal(remoteEntry.status, 409, 'A completed home can only be entered at its front door.');
   const aliceEvents = await alice.events();
   await aliceEvents.next('world');
   const firstBobEvents = await bob.events();
@@ -1192,11 +1187,15 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   assert.deepEqual(slept.data.position, { x: 2.7, z: -2.8, rotation: 0, mode: 'home' });
   assert.equal(slept.data.needs.energy, 100);
 
+  assert.equal((await alice('/api/home/exit', {})).status, 409, 'A player must walk back to the front door before leaving.');
+  app.advance(3_000);
+  assert.equal((await alice('/api/world/move', { x: 0, z: 5.1, rotation: 0, moving: true, mode: 'home' })).status, 200);
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x: 0, z: 5.1, rotation: 0, moving: false, mode: 'home' })).status, 200);
   const exited = await alice('/api/home/exit', {});
   assert.equal(exited.status, 200, JSON.stringify(exited.data));
   assert.equal(exited.data.position.mode, 'walk');
-  assert.equal(exited.data.position.x, plot.x);
-  assert.equal(exited.data.position.z, plot.z);
+  assert.ok(Math.hypot(exited.data.position.x - plot.x, exited.data.position.z - plot.z) <= 0.4, 'Exit returns to the saved front-door position.');
   await aliceEvents.close();
 
   await app.restart();
