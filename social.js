@@ -1335,7 +1335,6 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         ? 'Travel to ' + summary.house.district + ' first to navigate to your home.'
         : 'Select your own home plot and keep its distance visible until you arrive.';
     }
-    }
     if (homeBuildButton) {
       homeBuildButton.hidden = ownedHome;
       homeBuildButton.disabled = !summary.house?.available && constructionStarted;
