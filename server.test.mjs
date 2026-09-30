@@ -1115,70 +1115,69 @@ test('rental home rent utilities grace sleep and persistence stay server control
   assert.equal((await alice('/api/wallet')).data.balance, 420);
 });
 
-test('personal homes are per-account, enter a private interior, and require reaching the bed to sleep', async t => {
-  const app = await setup(t), alice = app.client(), bystander = app.client();
-  const created = await alice('/api/auth/signup', {
-    firstName:'HouseBuilder', username:'HouseBuilder', password:'test-password-2026', district:'Ernakulam', gender:'female',
-  });
-  assert.equal(created.status, 201, JSON.stringify(created.data));
-  const user = created.data.user;
-  await signup(bystander, 'HouseBystander');
-  const events = await bystander.events();
-  await events.next('world');
 
-  let summary = (await alice('/api/home')).data;
-  assert.equal(summary.house.built, false);
-  const plot = summary.localHome;
-  assert.equal(plot.district, 'Ernakulam');
-  assert.equal((await alice('/api/home/build', { style:'kerala-starter' })).status, 409, 'A home can only be built at its own plot.');
+test('players can build a private Kerala home, use its bed, exit, and retain ownership', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  await signup(alice, 'HomeBuilder');
+  await signup(bob, 'HomeVisitor');
+  assert.equal((await alice('/api/home/build', {})).status, 409, 'Building is limited to the marked home plot');
+  const aliceEvents = await alice.events();
+  await aliceEvents.next('world');
+  const firstBobEvents = await bob.events();
+  await firstBobEvents.next('world');
+  await firstBobEvents.close();
 
-  let x = user.x, z = user.z;
-  const distance = Math.hypot(plot.x - x, plot.z - z);
-  const steps = Math.ceil(distance / 7);
-  for (let step = 1; step <= steps; step++) {
-    x = user.x + (plot.x - user.x) * step / steps;
-    z = user.z + (plot.z - user.z) * step / steps;
-    app.advance(1000);
-    const move = await alice('/api/world/move', { x, z, rotation:0, moving:true, mode:'walk' });
-    assert.equal(move.status, 200, JSON.stringify(move.data));
-    app.advance(250);
-    assert.equal((await alice('/api/world/move', { x, z, rotation:0, moving:false, mode:'walk' })).status, 200);
-  }
-
-  const built = await alice('/api/home/build', { style:'kerala-starter' });
-  assert.equal(built.status, 200, JSON.stringify(built.data));
-  assert.equal(built.data.home.status, 'owned');
-  assert.equal(built.data.home.house.built, true);
-  assert.equal(built.data.home.accessBlocked, false);
-  assert.equal((await alice('/api/home/build', { style:'kerala-starter' })).status, 409, 'Each account can build its home once.');
-  assert.equal((await alice('/api/home/pay', { kind:'rent' })).status, 409, 'Owned homes do not charge rent.');
-
-  assert.equal((await alice('/api/home/enter', {})).status, 200);
-  const publicPosition = (await alice('/api/session')).data.user;
-  assert.ok(Math.hypot(publicPosition.x - x, publicPosition.z - z) < .01, 'The saved public position stays outside the private interior.');
-  assert.equal((await alice('/api/home/sleep', {})).status, 409, 'The player must walk to the bed before sleeping.');
-  assert.equal((await alice('/api/world/move', { x:0, z:6.2, rotation:0, moving:false, mode:'walk' })).status, 409, 'Home movement has a separate server mode.');
-
-  let privateWorld;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    privateWorld = await events.next('world', payload => !payload.players.some(player => player.id === user.id));
-    if (privateWorld) break;
-  }
-  assert.ok(privateWorld, 'Other players must not see the owner while inside their home.');
-
-  app.advance(2_000);
-  assert.equal((await alice('/api/world/move', { x:3.2, z:-4.2, rotation:0, moving:true, mode:'home' })).status, 200);
+  app.advance(3_000);
+  assert.equal((await alice('/api/world/move', { x: -20, z: -10, rotation: 0, moving: true, mode: 'walk' })).status, 200);
+  app.advance(3_000);
+  assert.equal((await alice('/api/world/move', { x: -24, z: -30.8, rotation: 0, moving: true, mode: 'walk' })).status, 200);
   app.advance(250);
-  assert.equal((await alice('/api/world/move', { x:3.2, z:-4.2, rotation:0, moving:false, mode:'home' })).status, 200);
-  const sleep = await alice('/api/home/sleep', {});
-  assert.equal(sleep.status, 200, JSON.stringify(sleep.data));
-  assert.equal(sleep.data.slept, true, 'A tired player can sleep in their own bed.');
-  assert.deepEqual(sleep.data.position, { x:3.2, z:-1.5, rotation:Math.PI });
+  assert.equal((await alice('/api/world/move', { x: -24, z: -30.8, rotation: 0, moving: false, mode: 'walk' })).status, 200);
+
+  const built = await alice('/api/home/build', {});
+  assert.equal(built.status, 200, JSON.stringify(built.data));
+  assert.equal(built.data.home.house.built, true);
+  assert.equal(built.data.home.house.district, 'Kottayam');
+  assert.equal(built.data.home.status, 'owned');
+  assert.equal(built.data.home.accessBlocked, false);
+  assert.equal((await alice('/api/home/pay', { kind: 'rent' })).status, 409, 'Owned homes do not charge rent');
+
+  const entered = await alice('/api/home/enter', {});
+  assert.equal(entered.status, 200, JSON.stringify(entered.data));
+  assert.equal(entered.data.home.inside, true);
+  assert.equal(entered.data.position.mode, 'home');
+  assert.equal((await alice('/api/world/move', { x: 7, z: 0, rotation: 0, moving: false, mode: 'home' })).status, 400, 'Interior movement stays inside its room');
+  assert.equal((await alice('/api/home/sleep', {})).status, 409, 'Sleep requires reaching the bed');
+
+  const privateEvents = await bob.events();
+  const privateWorld = await privateEvents.next('world');
+  assert.equal(privateWorld.players.some(player => player.username === 'HomeBuilder'), false, 'Players inside a home are hidden from public world snapshots');
+  await privateEvents.close();
+
+  app.advance(3_000);
+  assert.equal((await alice('/api/world/move', { x: 2.7, z: -2.8, rotation: 0, moving: true, mode: 'home' })).status, 200);
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x: 2.7, z: -2.8, rotation: 0, moving: false, mode: 'home' })).status, 200);
+  app.advance(12 * 60 * 1000);
+  const slept = await alice('/api/home/sleep', {});
+  assert.equal(slept.status, 200, JSON.stringify(slept.data));
+  assert.equal(slept.data.slept, true);
+  assert.deepEqual(slept.data.position, { x: 2.7, z: -2.8, rotation: 0, mode: 'home' });
+  assert.equal(slept.data.needs.energy, 100);
 
   const exited = await alice('/api/home/exit', {});
-  assert.equal(exited.status, 200);
-  assert.ok(Math.hypot(exited.data.position.x - x, exited.data.position.z - z) < .01);
-  await events.close();
+  assert.equal(exited.status, 200, JSON.stringify(exited.data));
+  assert.equal(exited.data.position.mode, 'walk');
+  assert.equal(exited.data.position.x, -24);
+  assert.equal(exited.data.position.z, -30.8);
+  await aliceEvents.close();
+
+  await app.restart();
+  assert.equal((await alice('/api/auth/login', { identifier: 'HomeBuilder', password: 'test-password-2026' })).status, 200);
+  const persisted = (await alice('/api/home')).data;
+  assert.equal(persisted.house.built, true);
+  assert.equal(persisted.house.district, 'Kottayam');
+  assert.equal(persisted.inside, false);
 });
 
 
@@ -1791,5 +1790,4 @@ test('first three district trips are shared across transport modes and the fixed
   assert.equal(paidTeleport.data.wallet.balance, 1500);
   assert.equal(paidTeleport.data.user.worldDistrict, 'Idukki');
 });
-
 
