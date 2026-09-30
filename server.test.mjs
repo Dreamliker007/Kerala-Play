@@ -1122,7 +1122,16 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   await signup(bob, 'HomeVisitor');
   const plot = (await alice('/api/home')).data.localHome;
   const initialPosition = (await alice('/api/session')).data.user;
-  assert.equal((await alice('/api/home/build', {})).status, 409, 'Building is limited to the marked home plot');
+  const built = await alice('/api/home/build', {});
+  assert.equal(built.status, 200, JSON.stringify(built.data));
+  assert.equal(built.data.home.house.built, true, 'The Home panel can build before travelling to the entrance plot.');
+  const panelEntry = await alice('/api/home/enter', {});
+  assert.equal(panelEntry.status, 200, JSON.stringify(panelEntry.data));
+  assert.equal(panelEntry.data.position.mode, 'home');
+  const panelExit = await alice('/api/home/exit', {});
+  assert.equal(panelExit.status, 200, JSON.stringify(panelExit.data));
+  assert.equal(panelExit.data.position.x, initialPosition.x, 'Home panel exit returns to the saved outdoor position.');
+  assert.equal(panelExit.data.position.z, initialPosition.z);
   const aliceEvents = await alice.events();
   await aliceEvents.next('world');
   const firstBobEvents = await bob.events();
@@ -1142,9 +1151,7 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   app.advance(250);
   assert.equal((await alice('/api/world/move', { x, z, rotation: 0, moving: false, mode: 'walk' })).status, 200);
 
-  const built = await alice('/api/home/build', {});
-  assert.equal(built.status, 200, JSON.stringify(built.data));
-  assert.equal(built.data.home.house.built, true);
+  assert.equal((await alice('/api/home/build', {})).status, 409, 'Each account can build only one personal home.');
   assert.equal(built.data.home.house.district, 'Ernakulam');
   assert.equal(built.data.home.status, 'owned');
   assert.equal(built.data.home.accessBlocked, false);

@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=118.0';
+import { initSocial, api } from './social.js?v=119.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
 import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=117.0';
@@ -7022,17 +7022,21 @@ function addRoadsideLife(scene) {
 
   for (let i = 0; i < 92; i++) {
     const side = i % 2 ? 1 : -1;
-    const x = side * (10 + random() * 11);
-    const z = -75 + random() * 150;
-    if (Math.abs(z + 22) < 9 && side < 0) continue;
-    positions.push([x, z, .65 + random() * .85, random() * Math.PI]);
+    const rawX = side * (10 + random() * 11);
+    const rawZ = -75 + random() * 150;
+    if (Math.abs(rawZ + 22) < 9 && side < 0) continue;
+    const placement = resolveRoadsideClearPlacement(rawX, rawZ, .34, .34, .16, 3.5);
+    if (!placement) continue;
+    positions.push([placement.x, placement.z, .65 + random() * .85, random() * Math.PI]);
   }
   for (let i = 0; i < 48; i++) {
-    const x = -67 + random() * 78;
+    const rawX = -67 + random() * 78;
     const side = i % 2 ? 1 : -1;
-    const z = -22 + side * (8.5 + random() * 6.5);
-    if (Math.abs(x) < 11) continue;
-    positions.push([x, z, .65 + random() * .8, random() * Math.PI]);
+    const rawZ = -22 + side * (8.5 + random() * 6.5);
+    if (Math.abs(rawX) < 11) continue;
+    const placement = resolveRoadsideClearPlacement(rawX, rawZ, .34, .34, .16, 3.5);
+    if (!placement) continue;
+    positions.push([placement.x, placement.z, .65 + random() * .8, random() * Math.PI]);
   }
 
   const grass = new THREE.InstancedMesh(grassGeometry, grassMaterial, positions.length);
@@ -7162,6 +7166,11 @@ function addRoadsideIdentitySigns(scene) {
   const postMaterial = new THREE.MeshStandardMaterial({ color: 0x555d5e, roughness: .76, metalness: .24 });
 
   const addBoard = ({ x, z, rotation = 0, title, subtitle, background, width = 3.3, height = .92 }) => {
+    const halfWidth = Math.abs(Math.cos(rotation)) * width / 2 + Math.abs(Math.sin(rotation)) * .12;
+    const halfDepth = Math.abs(Math.sin(rotation)) * width / 2 + Math.abs(Math.cos(rotation)) * .12;
+    const placement = resolveRoadsideClearPlacement(x, z, halfWidth, halfDepth, .30, 12);
+    if (!placement) return;
+    x = placement.x; z = placement.z;
     const root = new THREE.Group();
     const board = createWorldSignMesh({ title, subtitle, background }, width, height);
     board.position.y = 2.15;
@@ -7263,6 +7272,17 @@ function resolveRoadsidePropPlacement(x, z, halfWidth, halfDepth, clearance = .2
     }
   }
   return { x, z };
+}
+
+// Keep environmental props and vegetation outside every paved carriageway.
+// Reuse the shared placement search so moved props also avoid solid world objects.
+function resolveRoadsideClearPlacement(x, z, halfWidth, halfDepth, clearance = .32, maxDistance = 18) {
+  const placement = resolveRoadsidePropPlacement(x, z, halfWidth, halfDepth, clearance, maxDistance);
+  const overlapsRoad = roadEdgePlans.some(road =>
+    Math.abs(placement.x - road.x) < halfWidth + road.width / 2 + clearance &&
+    Math.abs(placement.z - road.z) < halfDepth + road.depth / 2 + clearance
+  );
+  return overlapsRoad ? null : placement;
 }
 
 function addBusStop(scene, x, z, rotation = 0, stopName = 'KERALA PLAY') {
@@ -7543,6 +7563,9 @@ function addRoadsideClutter(scene) {
   const metal = new THREE.MeshStandardMaterial({ color: 0x555b5c, roughness: .74, metalness: .22 });
 
   [[-12.2,-4],[12.8,5],[-13.5,36],[13.0,-46]].forEach(([x,z], index) => {
+    const placement = resolveRoadsideClearPlacement(x, z, .82, .42, .20, 12);
+    if (!placement) return;
+    x = placement.x; z = placement.z;
     const root = new THREE.Group();
     const crate = new THREE.Mesh(new THREE.BoxGeometry(.62, .48, .52), crateMat);
     crate.position.y = .24;
@@ -7559,6 +7582,9 @@ function addRoadsideClutter(scene) {
   });
 
   [[-10.8,12],[11.0,55],[-22.0,-30]].forEach(([x,z], index) => {
+    const placement = resolveRoadsideClearPlacement(x, z, .58, .12, .18, 12);
+    if (!placement) return;
+    x = placement.x; z = placement.z;
     const root = new THREE.Group();
     const post = new THREE.Mesh(new THREE.BoxGeometry(.08, 1.55, .08), metal);
     post.position.y = .78;
@@ -7611,6 +7637,9 @@ function getBananaLeafGeometry() {
 }
 
 function addBananaPlant(scene, x, z, scale = 1, yaw = 0) {
+  const placement = resolveRoadsideClearPlacement(x, z, 2.6 * scale, 2.6 * scale, .34, 18);
+  if (!placement) return;
+  x = placement.x; z = placement.z;
   const group = new THREE.Group();
   const stemMat = new THREE.MeshStandardMaterial({ color: 0x6f963f, roughness: .94 });
   const leafMat = new THREE.MeshStandardMaterial({
@@ -7783,6 +7812,9 @@ function getRubberTreeAssets() {
 }
 
 function addRubberTree(scene, x, z, scale = 1, yaw = 0, tapped = false) {
+  const placement = resolveRoadsideClearPlacement(x, z, 2.25 * scale, 2.25 * scale, .35, 18);
+  if (!placement) return;
+  x = placement.x; z = placement.z;
   addCircleCollider(x, z, Math.max(.34, .40 * scale), 'rubber-tree');
   const assets = getRubberTreeAssets();
   const group = new THREE.Group();
@@ -8093,7 +8125,10 @@ function addKeralaStreetRealism(scene) {
   ].forEach(([cx, cz, width]) => {
     for (let offset = -width / 2; offset <= width / 2; offset += .72) {
       if (Math.abs(offset) < 1.7) continue;
-      hedgePositions.push([cx + offset, cz, .80 + (Math.abs(Math.round(offset * 10)) % 3) * .08]);
+      const x = cx + offset;
+      const scale = .80 + (Math.abs(Math.round(offset * 10)) % 3) * .08;
+      const placement = resolveRoadsideClearPlacement(x, cz, .46 * scale, .40 * scale, .16, 12);
+      if (placement) hedgePositions.push([placement.x, placement.z, scale]);
     }
   });
   const hedge = new THREE.InstancedMesh(hedgeGeometry, hedgeMat, hedgePositions.length);
@@ -8148,6 +8183,11 @@ function addWorldRealismPass(scene) {
     [-18,-31.6,1.4,.48,.12], [34,-29.8,1.6,.55,-.10],
   ];
   groundPatches.forEach(([x,z,sx,sz,rotation], index) => {
+    const halfWidth = Math.abs(Math.cos(rotation)) * sx + Math.abs(Math.sin(rotation)) * sz;
+    const halfDepth = Math.abs(Math.sin(rotation)) * sx + Math.abs(Math.cos(rotation)) * sz;
+    const placement = resolveRoadsideClearPlacement(x, z, halfWidth, halfDepth, .16, 14);
+    if (!placement) return;
+    x = placement.x; z = placement.z;
     const patch = new THREE.Mesh(patchGeometry, index % 3 === 0 ? mossMaterial : soilMaterial);
     patch.rotation.x = -Math.PI / 2;
     patch.rotation.z = rotation;
@@ -8174,10 +8214,14 @@ function addWorldRealismPass(scene) {
     for (let i = 0; i < perCluster; i++) {
       const angle = random() * Math.PI * 2;
       const radius = .25 + random() * 2.4;
-      dummy.position.set(cx + Math.cos(angle) * radius, .01, cz + Math.sin(angle) * radius);
-      dummy.rotation.set((random() - .5) * .06, random() * Math.PI, (random() - .5) * .08);
+      const rawX = cx + Math.cos(angle) * radius;
+      const rawZ = cz + Math.sin(angle) * radius;
       const scale = .58 + random() * .72;
-      dummy.scale.set(scale * (.82 + random() * .38), scale, scale * (.82 + random() * .30));
+      const placement = resolveRoadsideClearPlacement(rawX, rawZ, .38 * scale, .38 * scale, .16, 4.5);
+      dummy.position.set(placement?.x ?? rawX, placement ? .01 : -100, placement?.z ?? rawZ);
+      dummy.rotation.set((random() - .5) * .06, random() * Math.PI, (random() - .5) * .08);
+      const visibleScale = placement ? scale : 0;
+      dummy.scale.set(visibleScale * (.82 + random() * .38), visibleScale, visibleScale * (.82 + random() * .30));
       dummy.updateMatrix();
       undergrowth.setMatrixAt(undergrowthIndex++, dummy.matrix);
     }
@@ -8216,6 +8260,9 @@ function addWorldRealismPass(scene) {
     [32.0,20.0,.08],[-40.5,29.0,-.10],[22.5,-36.4,.04],
   ];
   laundrySpots.forEach(([x,z,rotation], spotIndex) => {
+    const placement = resolveRoadsideClearPlacement(x, z, 1.72, .14, .24, 14);
+    if (!placement) return;
+    x = placement.x; z = placement.z;
     const root = new THREE.Group();
     const left = new THREE.Mesh(new THREE.CylinderGeometry(.035,.05,2.0,6), poleMaterial);
     const right = left.clone();
@@ -11683,6 +11730,9 @@ function addRoadsideGardens(scene) {
     [-31, -10], [31, 9], [-33, 47], [34, 52]
   ];
   gardenSpots.forEach(([x, z], index) => {
+    const placement = resolveRoadsideClearPlacement(x, z, 1.45, 1.28, .18, 18);
+    if (!placement) return;
+    x = placement.x; z = placement.z;
     const random = visualRandom(Math.abs(Math.floor(x * 73 + z * 131)) + 11031);
     for (let shrubIndex = 0; shrubIndex < 3; shrubIndex++) {
       const shrub = new THREE.Mesh(shrubGeometry, shrubMaterials[(index + shrubIndex) % shrubMaterials.length]);
@@ -12321,6 +12371,9 @@ function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ
 }
 
 function addTree(scene, x, z, scale, fruitSpecies = null) {
+  const placement = resolveRoadsideClearPlacement(x, z, 3.15 * scale, 3.15 * scale, .35, 22);
+  if (!placement) return;
+  x = placement.x; z = placement.z;
   addCircleCollider(x, z, Math.max(.42, .58 * scale), 'tree');
   const group = new THREE.Group();
   const random = visualRandom(Math.abs(Math.floor(x * 137 + z * 211 + scale * 1000)) + 9041);
@@ -12489,6 +12542,9 @@ function createPalmFrondGeometry(frondCount = 10, segments = 9) {
 }
 
 function addArecaClump(scene, x, z, scale = 1, yaw = 0) {
+  const placement = resolveRoadsideClearPlacement(x, z, 3.0 * scale, 3.0 * scale, .34, 20);
+  if (!placement) return;
+  x = placement.x; z = placement.z;
   addCircleCollider(x, z, Math.max(.34, .42 * scale), 'areca');
   const group = new THREE.Group();
   const random = visualRandom(Math.abs(Math.floor(x * 163 + z * 229 + scale * 1000)) + 1471);
@@ -12586,6 +12642,9 @@ function addArecaClump(scene, x, z, scale = 1, yaw = 0) {
 }
 
 function addPalm(scene, x, z, scale) {
+  const placement = resolveRoadsideClearPlacement(x, z, 3.35 * scale, 3.35 * scale, .36, 22);
+  if (!placement) return;
+  x = placement.x; z = placement.z;
   addCircleCollider(x + .18 * scale, z, Math.max(.34, .42 * scale), 'palm');
   const palm = new THREE.Group();
   const random = visualRandom(Math.abs(Math.floor(x * 191 + z * 109 + scale * 1000)) + 6151);

@@ -3045,13 +3045,9 @@ function publicRideDestinationForUser(user, destinationId) {
         await jsonBody(request);
         const state = jobStateFor(user);
         requireValue(!state.home.house?.built, 409, 'You already own a home.');
-        requireValue(!state.active, 409, 'Finish your active job before building a home.');
-        const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
-        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle first.');
-        const live = presence.get(user.id) || place(user);
-        const plot = homeDefinitionFor(user);
-        requireValue((live.mode || 'walk') === 'walk' && !live.moving, 409, 'Stop walking before building.');
-        requireValue(Math.hypot(live.x - plot.x, live.z - plot.z) <= plot.radius, 409, `Go to the ${plot.label} plot to build your home.`);
+        // Building is an account-level action from the Home panel. The district
+        // plot remains the visible home entrance, but construction needs no
+        // precise player position or stopped-movement state.
         const timestamp = now();
         state.home.house = { id: randomUUID(), built: true, style: 'kerala-starter', district: currentWorldDistrict(user), builtAt: timestamp };
         state.home.status = 'owned';
@@ -3072,9 +3068,7 @@ function publicRideDestinationForUser(user, destinationId) {
         const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
         requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle first.');
         const live = presence.get(user.id) || place(user);
-        const plot = homeDefinitionFor(user);
-        requireValue((live.mode || 'walk') === 'walk' && !live.moving, 409, 'Stop walking before entering your home.');
-        requireValue(Math.hypot(live.x - plot.x, live.z - plot.z) <= plot.radius, 409, `Go to your ${plot.label} porch to enter.`);
+        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit your vehicle before entering your home.');
         live.homeReturn = { x: live.x, z: live.z, rotation: live.rotation, district: live.district || currentWorldDistrict(user) };
         live.x = HOME_INTERIOR_ENTRY.x;
         live.z = HOME_INTERIOR_ENTRY.z;

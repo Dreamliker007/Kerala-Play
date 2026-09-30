@@ -1326,7 +1326,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         ? 'Walk up to the bed inside your home and choose SLEEP IN BED. Tap EXIT HOME near the front door to return outside.'
         : summary.accessBlocked
           ? 'Sleep access is paused after the grace period. Pay overdue home charges to restore access.'
-          : 'Build your own home at the Kerala home plot. Until then, use the rental porch to sleep.';
+          : 'Build your free home from the panel, then enter it and rest in your own bed.';
     }
   }
 
@@ -1346,7 +1346,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   async function buildPersonalHome() {
     const result = await api('/api/home/build', {});
     renderHome(result.home);
-    toast('Your Kerala starter home is ready · enter from the home plot');
+    toast('Your Kerala starter home is ready · enter from the Home panel or its district plot');
   }
   async function enterPersonalHome() {
     const result = await api('/api/home/enter', {});
@@ -2596,7 +2596,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   homeToggle?.addEventListener('click', () => homePanel?.classList.contains('open') ? closePanels() : openHome());
   homeClose?.addEventListener('click', () => { closePanels(); homeToggle?.focus(); });
   homeRefresh?.addEventListener('click', () => run(refreshHome, homeError));
-  homeBuildButton?.addEventListener('click', () => run(buildPersonalHome, homeError));
+  homeBuildButton?.addEventListener('click', () => {
+    run(buildPersonalHome, homeError).then(result => {
+      if (!result && homeError?.textContent) toast(homeError.textContent);
+    });
+  });
   homeEnterButton?.addEventListener('click', () => run(enterPersonalHome, homeError));
   homeExitButton?.addEventListener('click', () => run(exitPersonalHome, homeError));
   garageToggle?.addEventListener('click', () => garagePanel?.classList.contains('open') ? closePanels() : openGarage());
