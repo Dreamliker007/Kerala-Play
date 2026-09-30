@@ -56,4 +56,3 @@ import('./game.js?v=115.0').then(() => {
     ? 'Start Kerala Play with npm start in its project folder, then open http://localhost:3000. Accounts and multiplayer need the included server.'
     : 'Kerala Play could not load. Reload this page. If it continues, restart the server with npm start and check its terminal output.';
 });
-
