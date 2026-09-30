@@ -1115,6 +1115,72 @@ test('rental home rent utilities grace sleep and persistence stay server control
   assert.equal((await alice('/api/wallet')).data.balance, 420);
 });
 
+test('personal homes are per-account, enter a private interior, and require reaching the bed to sleep', async t => {
+  const app = await setup(t), alice = app.client(), bystander = app.client();
+  const created = await alice('/api/auth/signup', {
+    firstName:'HouseBuilder', username:'HouseBuilder', password:'test-password-2026', district:'Ernakulam', gender:'female',
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  const user = created.data.user;
+  await signup(bystander, 'HouseBystander');
+  const events = await bystander.events();
+  await events.next('world');
+
+  let summary = (await alice('/api/home')).data;
+  assert.equal(summary.house.built, false);
+  const plot = summary.localHome;
+  assert.equal(plot.district, 'Ernakulam');
+  assert.equal((await alice('/api/home/build', { style:'kerala-starter' })).status, 409, 'A home can only be built at its own plot.');
+
+  let x = user.x, z = user.z;
+  const distance = Math.hypot(plot.x - x, plot.z - z);
+  const steps = Math.ceil(distance / 7);
+  for (let step = 1; step <= steps; step++) {
+    x = user.x + (plot.x - user.x) * step / steps;
+    z = user.z + (plot.z - user.z) * step / steps;
+    app.advance(1000);
+    const move = await alice('/api/world/move', { x, z, rotation:0, moving:true, mode:'walk' });
+    assert.equal(move.status, 200, JSON.stringify(move.data));
+    app.advance(250);
+    assert.equal((await alice('/api/world/move', { x, z, rotation:0, moving:false, mode:'walk' })).status, 200);
+  }
+
+  const built = await alice('/api/home/build', { style:'kerala-starter' });
+  assert.equal(built.status, 200, JSON.stringify(built.data));
+  assert.equal(built.data.home.status, 'owned');
+  assert.equal(built.data.home.house.built, true);
+  assert.equal(built.data.home.accessBlocked, false);
+  assert.equal((await alice('/api/home/build', { style:'kerala-starter' })).status, 409, 'Each account can build its home once.');
+  assert.equal((await alice('/api/home/pay', { kind:'rent' })).status, 409, 'Owned homes do not charge rent.');
+
+  assert.equal((await alice('/api/home/enter', {})).status, 200);
+  const publicPosition = (await alice('/api/session')).data.user;
+  assert.ok(Math.hypot(publicPosition.x - x, publicPosition.z - z) < .01, 'The saved public position stays outside the private interior.');
+  assert.equal((await alice('/api/home/sleep', {})).status, 409, 'The player must walk to the bed before sleeping.');
+  assert.equal((await alice('/api/world/move', { x:0, z:6.2, rotation:0, moving:false, mode:'walk' })).status, 409, 'Home movement has a separate server mode.');
+
+  let privateWorld;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    privateWorld = await events.next('world', payload => !payload.players.some(player => player.id === user.id));
+    if (privateWorld) break;
+  }
+  assert.ok(privateWorld, 'Other players must not see the owner while inside their home.');
+
+  app.advance(2_000);
+  assert.equal((await alice('/api/world/move', { x:3.2, z:-4.2, rotation:0, moving:true, mode:'home' })).status, 200);
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x:3.2, z:-4.2, rotation:0, moving:false, mode:'home' })).status, 200);
+  const sleep = await alice('/api/home/sleep', {});
+  assert.equal(sleep.status, 200, JSON.stringify(sleep.data));
+  assert.equal(sleep.data.slept, true, 'A tired player can sleep in their own bed.');
+  assert.deepEqual(sleep.data.position, { x:3.2, z:-1.5, rotation:Math.PI });
+
+  const exited = await alice('/api/home/exit', {});
+  assert.equal(exited.status, 200);
+  assert.ok(Math.hypot(exited.data.position.x - x, exited.data.position.z - z) < .01);
+  await events.close();
+});
+
 
 test('Kerala Bank cash movement UPI transfers and persistence stay server controlled', async t => {
   const app = await setup(t), alice = app.client(), bob = app.client();
@@ -1725,4 +1791,5 @@ test('first three district trips are shared across transport modes and the fixed
   assert.equal(paidTeleport.data.wallet.balance, 1500);
   assert.equal(paidTeleport.data.user.worldDistrict, 'Idukki');
 });
+
 
