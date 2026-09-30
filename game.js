@@ -1,8 +1,9 @@
 import * as THREE from './vendor/three.module.js';
 import { initSocial, api } from './social.js?v=114.0';
-import { createAtmosphere } from './environment.js?v=114.0';
+import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
 import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads } from './district-layout.js?v=114.0';
+import { createKeralaRoofTiles } from './roof-tiles.js?v=115.0';
 
 const busDestinationSignMaterials = new Map();
 const busDestinationSignGeometry = new THREE.PlaneGeometry(1.30, .15);
@@ -11870,25 +11871,7 @@ function addHouse(scene, x, z, wallColor, roofColor) {
   const ridge = new THREE.Mesh(new THREE.BoxGeometry(9.7, .22, .32), new THREE.MeshStandardMaterial({ color: 0x713a2e, roughness: 1 }));
   ridge.position.y = 6.75;
   group.add(roofA, roofB, ridge);
-  const tileMaterials = [
-    new THREE.MeshStandardMaterial({ color: 0xb46244, roughness: 1 }),
-    new THREE.MeshStandardMaterial({ color: 0xa9543d, roughness: 1 }),
-    new THREE.MeshStandardMaterial({ color: 0xc06d4d, roughness: 1 }),
-  ];
-  const tileGeometry = new THREE.BoxGeometry(.88, .07, 4.45);
-  let tileIndex = 0;
-  for (let xTile = -4.15; xTile <= 4.15; xTile += 1.18) {
-    const tileSeed = Math.abs(Math.round(x * 11 + z * 17 + tileIndex * 7));
-    const material = tileMaterials[tileSeed % tileMaterials.length];
-    const frontTile = new THREE.Mesh(tileGeometry, material);
-    frontTile.rotation.x = -.52;
-    frontTile.position.set(xTile, 5.71, 1.39);
-    const backTile = new THREE.Mesh(tileGeometry, material);
-    backTile.rotation.x = .52;
-    backTile.position.set(xTile, 5.71, -1.39);
-    group.add(frontTile, backTile);
-    tileIndex++;
-  }
+  group.add(...createKeralaRoofTiles(THREE, x, z));
 
   const skirting = new THREE.Mesh(
     new THREE.BoxGeometry(8.75, .42, 7.6),
