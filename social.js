@@ -231,6 +231,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const homePanel = $('home-panel');
   const homeToggle = $('home-toggle');
   const homeClose = $('home-close');
+  const homeBuildButton = $('home-build');
+  const homeEnterButton = $('home-enter');
+  const homeExitButton = $('home-exit');
+  const homeRentRow = $('home-rent-row');
+  const homeUtilitiesRow = $('home-utilities-row');
   const homeSummaryCard = $('home-summary-card');
   const homeRentStatus = $('home-rent-status');
   const homeUtilityStatus = $('home-utility-status');
@@ -1290,14 +1295,22 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     homeSnapshot = summary || null;
     window.dispatchEvent(new CustomEvent('kerala-home-state', { detail: homeSnapshot }));
     if (!summary) return;
+    const ownedHome = !!summary.house?.built;
     if (homeSummaryCard) {
       homeSummaryCard.classList.toggle('overdue', !!(summary.rentOverdue || summary.utilityOverdue));
       homeSummaryCard.classList.toggle('blocked', !!summary.accessBlocked);
       const title = homeSummaryCard.querySelector('strong');
       const status = homeSummaryCard.querySelector('span');
-      if (title) title.textContent = summary.home?.label || 'Village Rental Home';
+      const label = homeSummaryCard.querySelector('small');
+      if (label) label.textContent = ownedHome ? 'YOUR KERALA HOME' : 'STARTER RENTAL';
+      if (title) title.textContent = ownedHome ? `${summary.house.district} Kerala Home` : (summary.home?.label || 'Village Rental Home');
       if (status) status.textContent = summary.reminder || 'Home payments are up to date.';
     }
+    if (homeRentRow) homeRentRow.hidden = ownedHome;
+    if (homeUtilitiesRow) homeUtilitiesRow.hidden = ownedHome;
+    if (homeBuildButton) homeBuildButton.hidden = ownedHome;
+    if (homeEnterButton) { homeEnterButton.hidden = !ownedHome || !!summary.inside; homeEnterButton.disabled = !!ownedHome && !summary.house.available; }
+    if (homeExitButton) homeExitButton.hidden = !summary.inside;
     if (homeRentStatus) {
       homeRentStatus.textContent = `${formatCash(summary.home?.rent || 0)} · ${homeDueText(summary.rentDueAt, summary.rentOverdue)}`;
       homeRentStatus.classList.toggle('overdue', !!summary.rentOverdue);
@@ -1309,9 +1322,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (homePayRent) homePayRent.textContent = `Pay Rent · ${formatCash(summary.home?.rent || 0)}`;
     if (homePayUtilities) homePayUtilities.textContent = `Pay Utilities · ${formatCash(summary.home?.utilities || 0)}`;
     if (homeSleepNote) {
-      homeSleepNote.textContent = summary.accessBlocked
-        ? 'Sleep access is paused after the grace period. Pay overdue home charges to restore access.'
-        : 'Go to your home porch in the world and tap SLEEP. Energy restores to 100; Hunger −4 and Thirst −6.';
+      homeSleepNote.textContent = ownedHome
+        ? 'Walk up to the bed inside your home and choose SLEEP IN BED. Tap EXIT HOME near the front door to return outside.'
+        : summary.accessBlocked
+          ? 'Sleep access is paused after the grace period. Pay overdue home charges to restore access.'
+          : 'Build your own home at the Kerala home plot. Until then, use the rental porch to sleep.';
     }
   }
 
@@ -1326,6 +1341,26 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (!requireUser()) return;
     showPanel(homePanel);
     run(refreshHome, homeError);
+  }
+
+  async function buildPersonalHome() {
+    const result = await api('/api/home/build', {});
+    renderHome(result.home);
+    toast('Your Kerala starter home is ready · enter from the home plot');
+  }
+  async function enterPersonalHome() {
+    const result = await api('/api/home/enter', {});
+    renderHome(result.home);
+    closePanels();
+    window.dispatchEvent(new CustomEvent('kerala-home-interior-enter', { detail: { position: result.position } }));
+    toast('Welcome home · walk to the bed to rest');
+  }
+  async function exitPersonalHome() {
+    const result = await api('/api/home/exit', {});
+    renderHome(result.home);
+    closePanels();
+    window.dispatchEvent(new CustomEvent('kerala-home-interior-exit', { detail: { position: result.position } }));
+    toast('You are back outside');
   }
   function renderProgression(summary) {
     progressionSnapshot = summary?.recognition || null;
@@ -2561,6 +2596,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   homeToggle?.addEventListener('click', () => homePanel?.classList.contains('open') ? closePanels() : openHome());
   homeClose?.addEventListener('click', () => { closePanels(); homeToggle?.focus(); });
   homeRefresh?.addEventListener('click', () => run(refreshHome, homeError));
+  homeBuildButton?.addEventListener('click', () => run(buildPersonalHome, homeError));
+  homeEnterButton?.addEventListener('click', () => run(enterPersonalHome, homeError));
+  homeExitButton?.addEventListener('click', () => run(exitPersonalHome, homeError));
   garageToggle?.addEventListener('click', () => garagePanel?.classList.contains('open') ? closePanels() : openGarage());
   garageClose?.addEventListener('click', () => { closePanels(); garageToggle?.focus(); });
   garageRefresh?.addEventListener('click', () => run(refreshGarage, garageError));
@@ -2608,6 +2646,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     const result = await api('/api/home/sleep', {});
     if (result.home) renderHome(result.home);
     if (result.needs) renderNeeds(result.needs);
+    if (result.slept && result.position) window.dispatchEvent(new CustomEvent('kerala-home-bed-sleep', { detail: { position: result.position } }));
     toast(result.slept
       ? `Sleep complete · Energy 100 · Hunger −${result.hungerCost} · Thirst −${result.thirstCost}`
       : (result.message || 'Energy is already full'));
@@ -2780,6 +2819,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }, walletError));
 
   window.addEventListener('kerala-open-home', openHome);
+  window.addEventListener('kerala-home-enter-request', () => run(enterPersonalHome, homeError));
+  window.addEventListener('kerala-home-exit-request', () => run(exitPersonalHome, homeError));
   window.addEventListener('kerala-world-shop-open', event => openWorldShop(event.detail));
 
   window.addEventListener('kerala-bus-stop-view', event => run(async () => {

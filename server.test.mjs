@@ -1116,6 +1116,79 @@ test('rental home rent utilities grace sleep and persistence stay server control
 });
 
 
+test('players can build a private Kerala home, use its bed, exit, and retain ownership', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  await signup(alice, 'HomeBuilder');
+  await signup(bob, 'HomeVisitor');
+  const plot = (await alice('/api/home')).data.localHome;
+  const initialPosition = (await alice('/api/session')).data.user;
+  assert.equal((await alice('/api/home/build', {})).status, 409, 'Building is limited to the marked home plot');
+  const aliceEvents = await alice.events();
+  await aliceEvents.next('world');
+  const firstBobEvents = await bob.events();
+  await firstBobEvents.next('world');
+  await firstBobEvents.close();
+
+  let x = Number(initialPosition.x), z = Number(initialPosition.z);
+  while (Math.hypot(plot.x - x, plot.z - z) > 0.4) {
+    const distance = Math.hypot(plot.x - x, plot.z - z);
+    const step = Math.min(17, distance);
+    x += ((plot.x - x) / distance) * step;
+    z += ((plot.z - z) / distance) * step;
+    app.advance(3_000);
+    const move = await alice('/api/world/move', { x, z, rotation: 0, moving: true, mode: 'walk' });
+    assert.equal(move.status, 200, JSON.stringify(move.data));
+  }
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x, z, rotation: 0, moving: false, mode: 'walk' })).status, 200);
+
+  const built = await alice('/api/home/build', {});
+  assert.equal(built.status, 200, JSON.stringify(built.data));
+  assert.equal(built.data.home.house.built, true);
+  assert.equal(built.data.home.house.district, 'Ernakulam');
+  assert.equal(built.data.home.status, 'owned');
+  assert.equal(built.data.home.accessBlocked, false);
+  assert.equal((await alice('/api/home/pay', { kind: 'rent' })).status, 409, 'Owned homes do not charge rent');
+
+  const entered = await alice('/api/home/enter', {});
+  assert.equal(entered.status, 200, JSON.stringify(entered.data));
+  assert.equal(entered.data.home.inside, true);
+  assert.equal(entered.data.position.mode, 'home');
+  assert.equal((await alice('/api/world/move', { x: 7, z: 0, rotation: 0, moving: false, mode: 'home' })).status, 400, 'Interior movement stays inside its room');
+  assert.equal((await alice('/api/home/sleep', {})).status, 409, 'Sleep requires reaching the bed');
+
+  const privateEvents = await bob.events();
+  const privateWorld = await privateEvents.next('world');
+  assert.equal(privateWorld.players.some(player => player.username === 'HomeBuilder'), false, 'Players inside a home are hidden from public world snapshots');
+  await privateEvents.close();
+
+  app.advance(3_000);
+  assert.equal((await alice('/api/world/move', { x: 2.7, z: -2.8, rotation: 0, moving: true, mode: 'home' })).status, 200);
+  app.advance(250);
+  assert.equal((await alice('/api/world/move', { x: 2.7, z: -2.8, rotation: 0, moving: false, mode: 'home' })).status, 200);
+  app.advance(12 * 60 * 1000);
+  const slept = await alice('/api/home/sleep', {});
+  assert.equal(slept.status, 200, JSON.stringify(slept.data));
+  assert.equal(slept.data.slept, true);
+  assert.deepEqual(slept.data.position, { x: 2.7, z: -2.8, rotation: 0, mode: 'home' });
+  assert.equal(slept.data.needs.energy, 100);
+
+  const exited = await alice('/api/home/exit', {});
+  assert.equal(exited.status, 200, JSON.stringify(exited.data));
+  assert.equal(exited.data.position.mode, 'walk');
+  assert.equal(exited.data.position.x, plot.x);
+  assert.equal(exited.data.position.z, plot.z);
+  await aliceEvents.close();
+
+  await app.restart();
+  assert.equal((await alice('/api/auth/login', { identifier: 'HomeBuilder', password: 'test-password-2026' })).status, 200);
+  const persisted = (await alice('/api/home')).data;
+  assert.equal(persisted.house.built, true);
+  assert.equal(persisted.house.district, 'Ernakulam');
+  assert.equal(persisted.inside, false);
+});
+
+
 test('Kerala Bank cash movement UPI transfers and persistence stay server controlled', async t => {
   const app = await setup(t), alice = app.client(), bob = app.client();
   await signup(alice, 'BankAlice');

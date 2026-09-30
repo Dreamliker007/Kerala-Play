@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=114.0';
+import { initSocial, api } from './social.js?v=118.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
 import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=117.0';
@@ -286,6 +286,103 @@ let garageSnapshot = null;
 let trafficSnapshot = null;
 let needsSnapshot = null;
 let homeSnapshot = null;
+let homeInteriorMode = false;
+const HOME_INTERIOR_BACKDROP = new THREE.Color(0xe5d6bf);
+const HOME_INTERIOR_FOG = new THREE.Fog(0xe5d6bf, 28, 75);
+let homeInteriorGroup = null;
+let homeInteriorVisibility = new Map();
+let homeInteriorSceneStyle = null;
+let homeInteriorUiStyle = [];
+function buildPrivateHomeInterior(scene) {
+  if (homeInteriorGroup) return homeInteriorGroup;
+  const room = new THREE.Group();
+  room.name = 'Kerala private home interior';
+  const materials = {
+    plaster: new THREE.MeshStandardMaterial({ color: 0xe6d7bd, roughness: .92 }),
+    trim: new THREE.MeshStandardMaterial({ color: 0x8b5835, roughness: .76 }),
+    tile: new THREE.MeshStandardMaterial({ color: 0x9e4932, roughness: .88 }),
+    wood: new THREE.MeshStandardMaterial({ color: 0x69432d, roughness: .68 }),
+    lightWood: new THREE.MeshStandardMaterial({ color: 0xa2764e, roughness: .75 }),
+    mattress: new THREE.MeshStandardMaterial({ color: 0xe8dfce, roughness: .94 }),
+    sheet: new THREE.MeshStandardMaterial({ color: 0x6b9b83, roughness: .93 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x7eafb5, roughness: .28, metalness: .05 }),
+    dark: new THREE.MeshStandardMaterial({ color: 0x39271d, roughness: .84 }),
+  };
+  const box = (name, material, width, height, depth, x, y, z, parent = room) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    mesh.name = name;
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
+  box('laterite foundation', materials.dark, 13.1, .22, 13.1, 0, -.18, 0);
+  box('polished red oxide floor', materials.tile, 12.8, .10, 12.8, 0, -.045, 0);
+  box('rear plaster wall', materials.plaster, 12.8, 2.75, .22, 0, 1.32, -6.28);
+  box('left plaster wall', materials.plaster, .22, 2.75, 12.5, -6.28, 1.32, 0);
+  box('right plaster wall', materials.plaster, .22, 2.75, 12.5, 6.28, 1.32, 0);
+  box('front wall left', materials.plaster, 4.55, 2.75, .22, -4.02, 1.32, 6.28);
+  box('front wall right', materials.plaster, 4.55, 2.75, .22, 4.02, 1.32, 6.28);
+  for (const x of [-6.03, 6.03]) box('teak skirting', materials.trim, .07, .20, 12.0, x, .12, 0);
+  box('bed frame', materials.wood, 2.1, .44, 3.25, 2.7, .22, -2.8);
+  box('cot mattress', materials.mattress, 1.98, .30, 3.10, 2.7, .57, -2.8);
+  box('green cotton bed cover', materials.sheet, 1.94, .055, 2.0, 2.7, .74, -2.25);
+  box('bed pillow', materials.mattress, 1.2, .18, .54, 2.7, .78, -4.0);
+  box('teak headboard', materials.wood, 2.15, 1.18, .16, 2.7, .72, -4.45);
+  box('wardrobe', materials.lightWood, 1.2, 2.12, .62, -4.72, 1.06, -4.4);
+  box('wardrobe panel', materials.wood, .025, 1.92, .42, -4.10, 1.08, -4.4);
+  box('side table', materials.wood, .78, .62, .68, 4.45, .31, -3.9);
+  box('teak window frame', materials.wood, .13, 1.22, 2.0, -6.14, 1.65, .7);
+  box('window glass', materials.glass, .08, 1.02, 1.78, -6.08, 1.65, .7);
+  box('window sill', materials.trim, .36, .12, 2.22, -6.02, 1.03, .7);
+  const door = box('open front door', materials.wood, 2.0, 2.22, .12, 1.1, 1.08, 6.12);
+  door.rotation.y = -.95;
+  box('door lintel', materials.trim, 2.15, .15, .35, 0, 2.61, 6.12);
+  box('ceiling beam front', materials.trim, 12.7, .16, .18, 0, 2.75, 5.95);
+  box('ceiling beam back', materials.trim, 12.7, .16, .18, 0, 2.75, -5.95);
+  const warm = new THREE.PointLight(0xffd39b, 1.35, 18, 1.8);
+  warm.position.set(-1.8, 2.35, .5);
+  room.add(warm);
+  scene.add(room);
+  homeInteriorGroup = room;
+  room.visible = false;
+  return room;
+}
+function setPrivateHomeInterior(active, position = null) {
+  if (!sceneRef || !playerRef) return;
+  const room = buildPrivateHomeInterior(sceneRef);
+  if (active && !homeInteriorMode) {
+    homeInteriorSceneStyle = { background: sceneRef.background, fog: sceneRef.fog };
+    homeInteriorVisibility = new Map(sceneRef.children.filter(object => object !== playerRef && object !== room && object.type !== 'HemisphereLight').map(object => [object, object.visible]));
+    for (const [object] of homeInteriorVisibility) object.visible = false;
+    const map = document.getElementById('minimap');
+    const labels = document.getElementById('avatar-labels');
+    homeInteriorUiStyle = [map, labels].filter(Boolean).map(element => [element, element.hidden, element.style.display]);
+    if (map) { map.hidden = true; map.style.display = 'none'; }
+    if (labels) { labels.hidden = true; labels.style.display = 'none'; }
+    sceneRef.background = HOME_INTERIOR_BACKDROP;
+    sceneRef.fog = HOME_INTERIOR_FOG;
+    room.visible = true;
+    homeInteriorMode = true;
+  } else if (!active && homeInteriorMode) {
+    for (const [object, visible] of homeInteriorVisibility) if (object.parent === sceneRef) object.visible = visible;
+    homeInteriorVisibility = new Map();
+    if (homeInteriorSceneStyle) { sceneRef.background = homeInteriorSceneStyle.background; sceneRef.fog = homeInteriorSceneStyle.fog; }
+    for (const [element, hidden, display] of homeInteriorUiStyle) { element.hidden = hidden; element.style.display = display; }
+    homeInteriorUiStyle = [];
+    homeInteriorSceneStyle = null;
+    room.visible = false;
+    homeInteriorMode = false;
+  }
+  if (position && Number.isFinite(Number(position.x)) && Number.isFinite(Number(position.z))) {
+    playerRef.position.set(Number(position.x), 0, Number(position.z));
+    if (Number.isFinite(Number(position.rotation))) playerRef.rotation.y = Number(position.rotation);
+    playerRef.rotation.z = 0;
+    playerRef.userData.homeSleepPoseUntil = 0;
+    playerRef.position.y = 0;
+    updateMapPlayer(playerRef);
+  }
+}
 let npcRelationshipSnapshot = null;
 let activeNpcFavor = null;
 let npcFavorCompletionPending = false;
@@ -2621,6 +2718,18 @@ function updateWorldInteract() {
   worldInteract.dataset.transport = '';
   worldInteract.title = '';
   if (!profile || !playerRef) return;
+  if (homeInteriorMode) {
+    const bed = Math.hypot(playerRef.position.x - 2.7, playerRef.position.z + 2.8);
+    if (bed <= 1.3) {
+      worldInteract.hidden = false; worldInteract.dataset.mode = 'home-sleep';
+      worldInteract.textContent = 'SLEEP IN BED'; return;
+    }
+    if (playerRef.position.z >= 4.9) {
+      worldInteract.hidden = false; worldInteract.dataset.mode = 'home-exit';
+      worldInteract.textContent = 'EXIT HOME';
+    }
+    return;
+  }
   if (playerRef.userData.restPoseReturn) return;
   const active = activeJobMission;
   const checkpoint = trafficSnapshot?.checkpoint;
@@ -2667,15 +2776,13 @@ function updateWorldInteract() {
     }
   }
 
-  if (!active && vehicleMode === 'walk' && (homeSnapshot?.localHome || homeSnapshot?.home)) {
+  if (!active && vehicleMode === 'walk' && (!homeSnapshot?.house?.built || homeSnapshot.house.available) && (homeSnapshot?.localHome || homeSnapshot?.home)) {
     const home = homeSnapshot.localHome || homeSnapshot.home;
     const distance = Math.hypot(playerRef.position.x - Number(home.x), playerRef.position.z - Number(home.z));
     if (distance <= Number(home.radius || 5.2) + .3) {
       worldInteract.hidden = false;
-      worldInteract.dataset.mode = homeSnapshot.accessBlocked ? 'home-open' : 'home-sleep';
-      worldInteract.textContent = homeSnapshot.accessBlocked
-        ? 'OPEN HOME · PAYMENT DUE'
-        : `SLEEP · ENERGY ${Math.round(Number(needsSnapshot?.energy ?? 100))}%`;
+      worldInteract.dataset.mode = homeSnapshot.house?.built ? 'home-enter' : homeSnapshot.accessBlocked ? 'home-open' : 'home-sleep';
+      worldInteract.textContent = homeSnapshot.house?.built ? 'ENTER MY HOME' : homeSnapshot.accessBlocked ? 'OPEN HOME · PAYMENT DUE' : `SLEEP · ENERGY ${Math.round(Number(needsSnapshot?.energy ?? 100))}%`;
       worldInteract.disabled = false;
       return;
     }
@@ -2913,6 +3020,10 @@ worldInteract?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('kerala-home-sleep'));
   } else if (worldInteract.dataset.mode === 'home-open') {
     window.dispatchEvent(new CustomEvent('kerala-open-home'));
+  } else if (worldInteract.dataset.mode === 'home-enter') {
+    window.dispatchEvent(new CustomEvent('kerala-home-enter-request'));
+  } else if (worldInteract.dataset.mode === 'home-exit') {
+    window.dispatchEvent(new CustomEvent('kerala-home-exit-request'));
   } else if (worldInteract.dataset.mode === 'world-service') {
     performWorldActivity(worldInteract.dataset.activity);
   } else if (worldInteract.dataset.mode === 'world-shop-open') {
@@ -3575,7 +3686,7 @@ async function sendMovement(player, moving) {
   movementPending = true; lastMovementSend = now;
   const userId = profile.id;
   try {
-    const result = await api('/api/world/move', { x: player.position.x, z: player.position.z, rotation: player.rotation.y, moving, mode: vehicleMode });
+    const result = await api('/api/world/move', { x: player.position.x, z: player.position.z, rotation: player.rotation.y, moving, mode: homeInteriorMode ? 'home' : vehicleMode });
     if (profile?.id !== userId) return;
     lastMovementMoving = moving;
     if (result.user) acceptUser(result.user);
@@ -3619,7 +3730,7 @@ function flushMovement() {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x: playerRef.position.x, z: playerRef.position.z, rotation: playerRef.rotation.y, moving: false, mode: vehicleMode }),
+    body: JSON.stringify({ x: playerRef.position.x, z: playerRef.position.z, rotation: playerRef.rotation.y, moving: false, mode: homeInteriorMode ? 'home' : vehicleMode }),
     keepalive: true
   }).catch(() => {});
 }
@@ -4397,6 +4508,25 @@ try {
   let inputY = 0;
   let cameraYaw = player.rotation.y + Math.PI;
   let cameraPitch = .31;
+  window.addEventListener('kerala-home-interior-enter', event => {
+    setPrivateHomeInterior(true, event.detail?.position);
+    cameraYaw = player.rotation.y + Math.PI; cameraPitch = .24;
+    clearGameInput(); walkVelocity.set(0, 0, 0); targetWalkVelocity.set(0, 0, 0); updateWorldInteract();
+  });
+  window.addEventListener('kerala-home-interior-exit', event => {
+    setPrivateHomeInterior(false, event.detail?.position);
+    cameraYaw = player.rotation.y + Math.PI; cameraPitch = .31;
+    clearGameInput(); walkVelocity.set(0, 0, 0); targetWalkVelocity.set(0, 0, 0); updateWorldInteract();
+  });
+  window.addEventListener('kerala-home-bed-sleep', event => {
+    if (!homeInteriorMode) return;
+    if (event.detail?.position) setPrivateHomeInterior(true, event.detail.position);
+    player.userData.homeSleepPoseUntil = performance.now() + 3200;
+    player.userData.homeSleepPoseStarted = performance.now();
+    player.userData.homeSleepStartYaw = player.rotation.y;
+    player.rotation.y += Math.PI / 2;
+    player.position.y = .62;
+  });
   let runHeld = false;
   let runPointerId = null;
   let runCruiseArmed = false;
@@ -4739,7 +4869,11 @@ try {
     const keyboardY = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
     const controlX = Math.abs(keyboardX) > 0 ? keyboardX : inputX;
     const controlY = Math.abs(keyboardY) > 0 ? keyboardY : inputY;
-    const paused = !profile || !connectionReady || publicRideInProgress || !!document.querySelector('[aria-modal="true"]:not([hidden])');
+    const sleepingAtHome = performance.now() < Number(player.userData.homeSleepPoseUntil || 0);
+    const sleepProgress = THREE.MathUtils.clamp((performance.now() - Number(player.userData.homeSleepPoseStarted || performance.now())) / 650, 0, 1);
+    if (sleepingAtHome) player.rotation.z = Math.PI * .5 * THREE.MathUtils.smoothstep(sleepProgress, 0, 1);
+    else if (player.userData.homeSleepPoseUntil) { player.rotation.z = 0; player.rotation.y = Number(player.userData.homeSleepStartYaw) || 0; player.position.y = 0; player.userData.homeSleepPoseUntil = 0; }
+    const paused = !profile || !connectionReady || publicRideInProgress || sleepingAtHome || !!document.querySelector('[aria-modal="true"]:not([hidden])');
     if (paused) clearGameInput();
     const transitionLocked = performance.now() < Number(player.userData.vehicleTransition?.lockUntil || 0);
     const controlLength = paused || transitionLocked ? 0 : Math.min(1, Math.hypot(controlX, controlY));
@@ -4783,7 +4917,7 @@ try {
           const animationAmount = Math.min(1, movedDistance / Math.max(.0001, restWalkSpeed * delta));
           animatePlayer(player, walkPhase, animationAmount, 0);
           movingNow = true;
-          addWalkProgress(movedDistance);
+          if (!homeInteriorMode) addWalkProgress(movedDistance);
           if (mapAccumulator >= .15) { updateMapPlayer(player); mapAccumulator = 0; }
         } else {
           restApproach.stuckSeconds += delta;
@@ -4957,9 +5091,10 @@ try {
         const dz = walkVelocity.z * delta;
         const beforeX = player.position.x;
         const beforeZ = player.position.z;
-        moveWithCollision(player, dx, dz, .43);
+        if (homeInteriorMode) moveInsidePrivateHome(player, dx, dz);
+        else moveWithCollision(player, dx, dz, .43);
         const movedDistance = Math.hypot(player.position.x - beforeX, player.position.z - beforeZ);
-        const overlappingWorld = positionBlockedStatic(player.position.x, player.position.z, .43);
+        const overlappingWorld = !homeInteriorMode && positionBlockedStatic(player.position.x, player.position.z, .43);
         walkingStuckSeconds = movedDistance < .0005 ? walkingStuckSeconds + delta : 0;
 
         // Do not teleport someone simply because they are pressing into a wall.
@@ -4983,7 +5118,7 @@ try {
           walkVelocity.multiplyScalar(.12);
         }
 
-        addWalkProgress(movedDistance);
+        if (!homeInteriorMode) addWalkProgress(movedDistance);
         if (movedDistance > .0005) {
           if (movedDistance > .015) recordOnboardingAction('move');
           const actualX = player.position.x - beforeX;
@@ -5123,7 +5258,7 @@ try {
     );
 
     const interiorCamera = vehicleMode === 'taxi' && vehicleCameraView === 'interior';
-    const baseDistance = interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
+    const baseDistance = homeInteriorMode ? 3.65 : interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
     const distance = baseDistance
       + (drivingCamera && !interiorCamera ? driveSpeedRatio * 1.35 + cameraDriveImpulse * .72 : 0);
     const horizontal = Math.cos(cameraPitch) * distance;
@@ -5152,10 +5287,10 @@ try {
       camera.updateProjectionMatrix();
     }
 
-    if (!interiorCamera) resolveCameraCollision(cameraTarget, cameraPosition, drivingCamera ? .42 : .34);
+    if (!interiorCamera && !homeInteriorMode) resolveCameraCollision(cameraTarget, cameraPosition, drivingCamera ? .42 : .34);
     const cameraResponse = drivingCamera ? 6.5 + driveSpeedRatio * 1.6 : 8.6;
     camera.position.lerp(cameraPosition, 1 - Math.exp(-delta * cameraResponse));
-    if (!interiorCamera && positionBlockedStatic(camera.position.x, camera.position.z, drivingCamera ? .38 : .30)) {
+    if (!interiorCamera && !homeInteriorMode && positionBlockedStatic(camera.position.x, camera.position.z, drivingCamera ? .38 : .30)) {
       camera.position.copy(cameraPosition);
     }
     camera.lookAt(cameraTarget);
@@ -5174,6 +5309,14 @@ try {
     updateWindWorld(villageTime, delta);
     updateMonsoonWaterVisuals(villageTime, delta);
     updateVehicleRainSpray(delta);
+    if (homeInteriorMode) {
+      for (const object of scene.children) {
+        if (object === player || object === homeInteriorGroup || object.type === 'HemisphereLight') continue;
+        if (!homeInteriorVisibility.has(object)) homeInteriorVisibility.set(object, object.visible);
+        object.visible = false;
+      }
+      scene.background = HOME_INTERIOR_BACKDROP; scene.fog = HOME_INTERIOR_FOG;
+    }
     renderer.render(scene, camera);
     if (isMobile) {
       perfFrames++;
@@ -6480,6 +6623,12 @@ function nearestSafeTrafficProgress(config, preferred) {
     if (backward >= min && !trafficHitsStaticWorld(config, backward)) return backward;
   }
   return start;
+}
+
+function moveInsidePrivateHome(player, dx, dz) {
+  const limit = 5.7;
+  player.position.x = THREE.MathUtils.clamp(player.position.x + dx, -limit, limit);
+  player.position.z = THREE.MathUtils.clamp(player.position.z + dz, -limit, limit);
 }
 
 function positionBlockedStatic(x, z, radius = .45) {

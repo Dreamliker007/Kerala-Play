@@ -213,6 +213,9 @@ const HOME_DEFINITION = Object.freeze({
 const HOME_SLEEP_COOLDOWN_MS = 60_000;
 const HOME_SLEEP_HUNGER_COST = 4;
 const HOME_SLEEP_THIRST_COST = 6;
+const HOME_INTERIOR_ENTRY = Object.freeze({ x: 0, z: 4.6, rotation: 0 });
+const HOME_INTERIOR_BED = Object.freeze({ x: 2.7, z: -2.8, radius: 1.45 });
+const HOME_INTERIOR_LIMIT = 5.7;
 const PUBLIC_TRAVEL_ROUTES = Object.freeze({
   'village-line': Object.freeze({
     id: 'village-line',
@@ -353,6 +356,7 @@ const MOVEMENT_PROFILES = Object.freeze({
   walk: { rate: 8.5, maxCredit: 24 },
   bike: { rate: 16, maxCredit: 40 },
   taxi: { rate: 14, maxCredit: 36 },
+  home: { rate: 8.5, maxCredit: 24 },
 });
 const JOB_EXPIRY_GRACE = 20 * 60 * 1000;
 const REPORT_REASONS = Object.freeze(['harassment', 'cheating', 'impersonation', 'inappropriate', 'spam', 'other']);
@@ -408,7 +412,7 @@ const GROUP_MEMBER_LIMIT = 12;
 const GROUP_MEMBERSHIP_LIMIT = 8;
 const GROUP_MESSAGE_LIMIT = 100;
 const GROUP_NAME_MAX = 40;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0, lastClinicAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0, lastClinicAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0, house: null }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
 const SESSION_AGE = 365 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -586,7 +590,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return { x: valid ? x : spawn.x, z: valid ? z : spawn.z, rotation: Number.isFinite(rotation) ? rotation : spawn.rotation || 0, valid };
   }
   function publicUser(user) {
-    const position = presence.get(user.id), saved = savedPosition(user);
+    const livePosition = presence.get(user.id), position = livePosition?.mode === 'home' ? livePosition.homeReturn : livePosition, saved = savedPosition(user);
     let level = 1, remaining = user.points, next = 100;
     while (remaining >= next) { remaining -= next; level++; next = 100 + (level - 1) * 50; }
     const displayName = user.displayName || user.firstName || (/^\d+$/.test(user.username) ? 'Explorer' : user.username);
@@ -674,7 +678,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const viewer = findUser(viewerId);
     const viewerDistrict = viewer ? currentWorldDistrict(viewer) : 'Kottayam';
     return { district: viewerDistrict, players: [...presence.entries()].filter(([id]) => {
-      if (!online(id) || blocked(viewerId, id)) return false;
+      if (!online(id) || blocked(viewerId, id) || presence.get(id)?.mode === 'home') return false;
       const candidate = findUser(id);
       return candidate && currentWorldDistrict(candidate) === viewerDistrict;
     }).map(([id, state]) => {
@@ -895,14 +899,14 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const items = [];
     const timestamp = now();
     const home = homeSummary(user);
-    if (home.accessBlocked) {
+    if (!home.house?.built && home.accessBlocked) {
       items.push({
         id: `reminder:home-blocked:${home.rentDueAt}:${home.utilityDueAt}`,
         kind: 'home', title: 'Home access needs attention',
         message: 'Sleep access is paused. Pay overdue rent or utilities to restore it.',
         severity: 'critical', target: 'home', createdAt: Math.min(home.rentGraceUntil, home.utilityGraceUntil),
       });
-    } else {
+    } else if (!home.house?.built) {
       const homeReminders = [
         ['rent', home.rentDueAt, home.rentOverdue, home.home.rent, 'Rent'],
         ['utilities', home.utilityDueAt, home.utilityOverdue, home.home.utilities, 'Utilities'],
@@ -1288,21 +1292,29 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const timestamp = now();
     const rentDueAt = Number(home.rentDueAt);
     const utilityDueAt = Number(home.utilityDueAt);
-    const rentOverdue = timestamp > rentDueAt;
-    const utilityOverdue = timestamp > utilityDueAt;
     const homeDefinition = homeDefinitionFor(user);
+    const house = home.house && typeof home.house === 'object' ? home.house : null;
+    const owned = !!house?.built;
+    const live = presence.get(user.id);
+    const inHouseDistrict = !owned || house.district === currentWorldDistrict(user);
     const rentGraceUntil = rentDueAt + homeDefinition.graceMs;
     const utilityGraceUntil = utilityDueAt + homeDefinition.graceMs;
-    const accessBlocked = timestamp > rentGraceUntil || timestamp > utilityGraceUntil;
-    const reminder = accessBlocked
-      ? 'Sleep access paused until overdue home charges are paid.'
-      : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
+    const rentOverdue = !owned && timestamp > rentDueAt;
+    const utilityOverdue = !owned && timestamp > utilityDueAt;
+    const accessBlocked = !owned && (timestamp > rentGraceUntil || timestamp > utilityGraceUntil);
+    const reminder = owned
+      ? (inHouseDistrict ? 'Your Kerala starter home is ready. Enter, use the bed, and make yourself at home.' : `Your home is in ${house.district}. Travel there to enter.`)
+      : accessBlocked
+        ? 'Sleep access paused until overdue home charges are paid.'
+        : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
     return {
-      status: home.status,
+      status: owned ? 'owned' : home.status,
       home: HOME_DEFINITION,
       localHome: homeDefinition,
-      rentDueAt,
-      utilityDueAt,
+      house: house ? { ...house, available: inHouseDistrict, inside: live?.mode === 'home' } : null,
+      inside: live?.mode === 'home',
+      rentDueAt: owned ? 0 : rentDueAt,
+      utilityDueAt: owned ? 0 : utilityDueAt,
       rentOverdue,
       utilityOverdue,
       rentGraceUntil,
@@ -1381,7 +1393,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null };
     if (!user.jobState.traffic || typeof user.jobState.traffic !== 'object' || Array.isArray(user.jobState.traffic)) user.jobState.traffic = { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } };
     if (!user.jobState.needs || typeof user.jobState.needs !== 'object' || Array.isArray(user.jobState.needs)) user.jobState.needs = { hunger: 100, thirst: 100, energy: 100, updatedAt: now(), lastRestAt: 0 };
-    if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0 };
+    if (!user.jobState.home || typeof user.jobState.home !== 'object' || Array.isArray(user.jobState.home)) user.jobState.home = { status: 'rented', rentDueAt: now() + HOME_DEFINITION.periodMs, utilityDueAt: now() + HOME_DEFINITION.periodMs, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0, house: null };
+    if (!user.jobState.home.house || typeof user.jobState.home.house !== 'object' || Array.isArray(user.jobState.home.house)) user.jobState.home.house = null;
     if (!user.jobState.bank || typeof user.jobState.bank !== 'object' || Array.isArray(user.jobState.bank)) user.jobState.bank = { balance: 0, accountNumber: '', transactions: [] };
     if (!user.jobState.notifications || typeof user.jobState.notifications !== 'object' || Array.isArray(user.jobState.notifications)) user.jobState.notifications = { items: [], read: {} };
     if (!Array.isArray(user.jobState.reports)) user.jobState.reports = [];
@@ -3027,12 +3040,82 @@ function publicRideDestinationForUser(user, destinationId) {
       if (path === '/api/home' && request.method === 'GET') {
         send(response, 200, homeSummary(user)); return;
       }
+      if (path === '/api/home/build' && request.method === 'POST') {
+        limited(`home-build:${user.id}`, 8, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        requireValue(!state.home.house?.built, 409, 'You already own a home.');
+        requireValue(!state.active, 409, 'Finish your active job before building a home.');
+        const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle first.');
+        const live = presence.get(user.id) || place(user);
+        const plot = homeDefinitionFor(user);
+        requireValue((live.mode || 'walk') === 'walk' && !live.moving, 409, 'Stop walking before building.');
+        requireValue(Math.hypot(live.x - plot.x, live.z - plot.z) <= plot.radius, 409, `Go to the ${plot.label} plot to build your home.`);
+        const timestamp = now();
+        state.home.house = { id: randomUUID(), built: true, style: 'kerala-starter', district: currentWorldDistrict(user), builtAt: timestamp };
+        state.home.status = 'owned';
+        state.home.rentDueAt = 0;
+        state.home.utilityDueAt = 0;
+        dirty = true;
+        await persist();
+        send(response, 200, { home: homeSummary(user) }); return;
+      }
+      if (path === '/api/home/enter' && request.method === 'POST') {
+        limited(`home-enter:${user.id}`, 16, 60000);
+        await jsonBody(request);
+        const state = jobStateFor(user);
+        const house = state.home.house;
+        requireValue(house?.built, 409, 'Build your home first.');
+        requireValue(house.district === currentWorldDistrict(user), 409, `Your home is in ${house.district}. Travel there first.`);
+        requireValue(!state.active, 409, 'Finish your active job before going home.');
+        const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
+        requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle first.');
+        const live = presence.get(user.id) || place(user);
+        const plot = homeDefinitionFor(user);
+        requireValue((live.mode || 'walk') === 'walk' && !live.moving, 409, 'Stop walking before entering your home.');
+        requireValue(Math.hypot(live.x - plot.x, live.z - plot.z) <= plot.radius, 409, `Go to your ${plot.label} porch to enter.`);
+        live.homeReturn = { x: live.x, z: live.z, rotation: live.rotation, district: live.district || currentWorldDistrict(user) };
+        live.x = HOME_INTERIOR_ENTRY.x;
+        live.z = HOME_INTERIOR_ENTRY.z;
+        live.rotation = HOME_INTERIOR_ENTRY.rotation;
+        live.moving = false;
+        live.mode = 'home';
+        live.movedAt = now();
+        live.movementCredit = 2;
+        worldDirty = true;
+        profileChanged(user);
+        send(response, 200, { home: homeSummary(user), position: { x: live.x, z: live.z, rotation: live.rotation, mode: 'home' } }); return;
+      }
+      if (path === '/api/home/exit' && request.method === 'POST') {
+        limited(`home-exit:${user.id}`, 16, 60000);
+        await jsonBody(request);
+        const live = presence.get(user.id);
+        requireValue(live?.mode === 'home' && live.homeReturn, 409, 'You are not inside your home.');
+        const saved = live.homeReturn;
+        live.x = Number(saved.x);
+        live.z = Number(saved.z);
+        live.rotation = Number(saved.rotation) || 0;
+        live.district = saved.district || currentWorldDistrict(user);
+        live.moving = false;
+        live.mode = 'walk';
+        live.movedAt = now();
+        live.movementCredit = 2;
+        delete live.homeReturn;
+        user.worldX = live.x; user.worldZ = live.z; user.worldRotation = live.rotation; user.worldUpdatedAt = now();
+        dirty = true;
+        worldDirty = true;
+        profileChanged(user);
+        await persist();
+        send(response, 200, { home: homeSummary(user), position: { x: live.x, z: live.z, rotation: live.rotation, mode: 'walk' } }); return;
+      }
       if (path === '/api/home/pay' && request.method === 'POST') {
         limited(`home-payment:${user.id}`, 30, 60000);
         const body = await jsonBody(request);
         requireValue(body.kind === 'rent' || body.kind === 'utilities', 400, 'Choose rent or utilities.');
         const state = jobStateFor(user);
         const home = state.home;
+        requireValue(!home.house?.built, 409, 'Your owned starter home has no rent or utility charges.');
         const homeDefinition = homeDefinitionFor(user);
         const isRent = body.kind === 'rent';
         const amount = isRent ? homeDefinition.rent : homeDefinition.utilities;
@@ -3061,12 +3144,19 @@ function publicRideDestinationForUser(user, destinationId) {
         const personal = state.garage.activeVehicleId ? state.garage.owned.find(vehicle => vehicle.id === state.garage.activeVehicleId) : null;
         requireValue(!personal?.entered, 409, 'Park and exit your personal vehicle before sleeping.');
         const live = presence.get(user.id) || place(user);
-        requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before sleeping.');
         requireValue(!live.moving, 409, 'Stop moving before sleeping.');
         const homeDefinition = homeDefinitionFor(user);
-        const nearLocalHome = Math.hypot(live.x - homeDefinition.x, live.z - homeDefinition.z) <= homeDefinition.radius;
-        const nearLegacyHome = Math.hypot(live.x - HOME_DEFINITION.x, live.z - HOME_DEFINITION.z) <= HOME_DEFINITION.radius;
-        requireValue(nearLocalHome || nearLegacyHome, 409, `Move closer to your ${homeDefinition.label}.`);
+        const ownedHouse = state.home.house?.built ? state.home.house : null;
+        if (ownedHouse) {
+          requireValue(ownedHouse.district === currentWorldDistrict(user), 409, `Your home is in ${ownedHouse.district}. Travel there first.`);
+          requireValue(live.mode === 'home', 409, 'Enter your home before going to bed.');
+          requireValue(Math.hypot(live.x - HOME_INTERIOR_BED.x, live.z - HOME_INTERIOR_BED.z) <= HOME_INTERIOR_BED.radius, 409, 'Walk up to the bed before sleeping.');
+        } else {
+          requireValue((live.mode || 'walk') === 'walk', 409, 'Exit the vehicle before sleeping.');
+          const nearLocalHome = Math.hypot(live.x - homeDefinition.x, live.z - homeDefinition.z) <= homeDefinition.radius;
+          const nearLegacyHome = Math.hypot(live.x - HOME_DEFINITION.x, live.z - HOME_DEFINITION.z) <= HOME_DEFINITION.radius;
+          requireValue(nearLocalHome || nearLegacyHome, 409, `Move closer to your ${homeDefinition.label}.`);
+        }
         const summary = homeSummary(user);
         requireValue(!summary.accessBlocked, 409, 'Home sleep access is paused. Pay overdue rent or utilities first.');
         const needsBefore = needsSummary(user);
@@ -3081,10 +3171,12 @@ function publicRideDestinationForUser(user, destinationId) {
         needs.thirst = Math.max(0, Number(needs.thirst) - HOME_SLEEP_THIRST_COST);
         needs.updatedAt = timestamp;
         state.home.lastSleepAt = timestamp;
+        if (ownedHouse) { live.x = HOME_INTERIOR_BED.x; live.z = HOME_INTERIOR_BED.z; live.rotation = 0; live.moving = false; live.movedAt = timestamp; live.movementCredit = 2; }
         dirty = true;
         await persist();
         send(response, 200, {
           slept: true,
+          position: ownedHouse ? { x: live.x, z: live.z, rotation: live.rotation, mode: 'home' } : null,
           restoredEnergy: 100,
           hungerCost: HOME_SLEEP_HUNGER_COST,
           thirstCost: HOME_SLEEP_THIRST_COST,
@@ -4102,14 +4194,15 @@ function publicRideDestinationForUser(user, destinationId) {
         requireValue(insideDistrictWorld(movementWorld, Number(body.x), Number(body.z), -.01) && Number.isFinite(body.rotation) && Math.abs(body.rotation) < 100000 && typeof body.moving === 'boolean', 400, `You reached the edge of ${currentWorldDistrict(user)}. Use train or flight to travel to another district.`);
         const requestedMode = body.mode === undefined ? 'walk' : body.mode;
         requireValue(Object.hasOwn(MOVEMENT_PROFILES, requestedMode), 400, 'Invalid movement mode.');
+        const state = presence.get(user.id) || place(user);
         const stateForMove = jobStateFor(user);
         const active = stateForMove.active;
         const activeJob = active ? JOB_DEFINITIONS[active.jobId] : null;
         const personal = stateForMove.garage.activeVehicleId ? stateForMove.garage.owned.find(vehicle => vehicle.id === stateForMove.garage.activeVehicleId) : null;
         const personalModel = personal ? GARAGE_CATALOG[personal.modelId] : null;
-        const expectedMode = active?.vehicleEntered && activeJob?.vehicle ? activeJob.vehicle : (personal?.entered && personalModel ? personalModel.kind : 'walk');
+        const expectedMode = state.mode === 'home' ? 'home' : (active?.vehicleEntered && activeJob?.vehicle ? activeJob.vehicle : (personal?.entered && personalModel ? personalModel.kind : 'walk'));
         requireValue(requestedMode === expectedMode, 409, 'Movement mode is out of sync. Re-enter the active vehicle if needed.');
-        const state = presence.get(user.id) || place(user);
+        if (requestedMode === 'home') requireValue(state.homeReturn && Math.abs(Number(body.x)) <= HOME_INTERIOR_LIMIT && Math.abs(Number(body.z)) <= HOME_INTERIOR_LIMIT, 400, 'Stay inside your home.');
         requireValue((state.district || currentWorldDistrict(user)) === currentWorldDistrict(user), 409, 'District world changed. Reload the current district.');
         const movement = MOVEMENT_PROFILES[requestedMode];
         const needsBeforeMove = needsSummary(user);
@@ -4118,7 +4211,7 @@ function publicRideDestinationForUser(user, destinationId) {
         const credit = Math.min(movement.maxCredit * needsFactor, state.movementCredit + elapsed * movement.rate * needsFactor);
         const distance = Math.hypot(body.x - state.x, body.z - state.z);
         if (distance > credit + 0.01) throw new ApiError(409, 'Movement was too fast. Your avatar needs to resync.', { x: state.x, z: state.z });
-        if (requestedMode !== 'walk' && distance > .01) {
+        if (requestedMode !== 'walk' && requestedMode !== 'home' && distance > .01) {
           const fuel = active?.vehicleEntered ? Number(active.vehicleFuel) : Number(personal?.fuel);
           requireValue(fuel > .05, 409, 'Vehicle fuel is empty. Refuel at Kerala Fuel Station.');
         }
@@ -4162,7 +4255,7 @@ function publicRideDestinationForUser(user, destinationId) {
         const previousRotation = state.rotation;
         state.movementCredit = credit - distance; state.movedAt = now(); state.lastSeen = now();
         state.x = body.x; state.z = body.z; state.rotation = body.rotation; state.moving = body.moving; state.mode = requestedMode;
-        user.worldX = state.x; user.worldZ = state.z; user.worldRotation = state.rotation; user.worldUpdatedAt = now();
+        if (requestedMode !== 'home') { user.worldX = state.x; user.worldZ = state.z; user.worldRotation = state.rotation; user.worldUpdatedAt = now(); }
         if (requestedMode === 'walk') {
           user.walkMeters += distance;
           if (distance > 0) {
@@ -4184,7 +4277,7 @@ function publicRideDestinationForUser(user, destinationId) {
         }
         let discovered = false;
         const activeDistrict = currentWorldDistrict(user);
-        for (const attraction of KERALA_DISTRICT_ATLAS[activeDistrict]?.attractions || []) {
+        for (const attraction of requestedMode === 'home' ? [] : (KERALA_DISTRICT_ATLAS[activeDistrict]?.attractions || [])) {
           const radius = Number(attraction.visitRadius || 8);
           if (Math.hypot(attraction.x - state.x, attraction.z - state.z) <= radius
               && !user.visitedLandmarks.includes(attraction.landmarkId)) {

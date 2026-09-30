@@ -1465,19 +1465,26 @@
       <div class="wallet-section"><div class="wallet-history-heading"><strong>Transactions</strong><button id="wallet-refresh" type="button">Refresh</button></div><div id="wallet-transactions" aria-live="polite"></div></div>
       <div id="wallet-error" class="social-error" role="status"></div>
     </section>
-    <section id="home-panel" aria-label="Rental home and bills">
+    <section id="home-panel" aria-label="Your home">
       <div class="panel-heading"><span>My Home</span><button id="home-close" class="panel-close" type="button" aria-label="Close home">×</button></div>
       <div id="home-summary-card" class="home-summary-card" aria-live="polite">
         <small>STARTER RENTAL</small><strong>Village Rental Home</strong><span>Loading home status…</span>
       </div>
-      <div class="wallet-section">
-        <div class="home-charge-row"><div><strong>🏠 Daily Rent</strong><small id="home-rent-status">₹60 · first day free</small></div><button id="home-pay-rent" type="button">Pay ₹60</button></div>
-        <div class="home-charge-row"><div><strong>💡 Electricity + Water</strong><small id="home-utility-status">₹20 · first day free</small></div><button id="home-pay-utilities" type="button">Pay ₹20</button></div>
+      <div class="wallet-section home-house-actions">
+        <strong>Build a home you own</strong>
+        <p class="panel-note">At the Kerala home plot, build your own starter house. Enter it to walk around, use the bed and rest.</p>
+        <button id="home-build" type="button">BUILD MY HOME</button>
+        <button id="home-enter" type="button" hidden>ENTER MY HOME</button>
+        <button id="home-exit" type="button" hidden>EXIT HOME</button>
       </div>
-      <div class="wallet-section"><strong>Sleep & Recovery</strong><p id="home-sleep-note" class="panel-note">Go to your home porch in the world. SLEEP restores Energy to 100.</p></div>
+      <div class="wallet-section">
+        <div id="home-rent-row" class="home-charge-row"><div><strong>🏠 Daily Rent</strong><small id="home-rent-status">₹60 · first day free</small></div><button id="home-pay-rent" type="button">Pay ₹60</button></div>
+        <div id="home-utilities-row" class="home-charge-row"><div><strong>💡 Electricity + Water</strong><small id="home-utility-status">₹20 · first day free</small></div><button id="home-pay-utilities" type="button">Pay ₹20</button></div>
+      </div>
+      <div class="wallet-section"><strong>Sleep & Recovery</strong><p id="home-sleep-note" class="panel-note">Build your own home at the Kerala home plot, then go to bed to sleep.</p></div>
       <div class="wallet-history-heading"><strong>Home Status</strong><button id="home-refresh" type="button">Refresh</button></div>
       <div id="home-error" class="social-error" role="status"></div>
-    </section>
+    </section>ion>
     <section id="wardrobe-panel" aria-label="Character wardrobe">
       <div class="panel-heading"><span>Wardrobe</span><button id="wardrobe-close" class="panel-close" type="button" aria-label="Close wardrobe">×</button></div>
       <p class="panel-note">Choose a Kerala outfit. Your choice stays with your account and appears to nearby players.</p>
@@ -1535,6 +1542,6 @@
       syncWardrobeTouchAction();
     })();
   </script>
-  <script type="module" src="./boot.js?v=117.0"></script>
+  <script type="module" src="./boot.js?v=118.0"></script>
 </body>
 </html>
