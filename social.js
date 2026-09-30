@@ -1296,37 +1296,51 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     window.dispatchEvent(new CustomEvent('kerala-home-state', { detail: homeSnapshot }));
     if (!summary) return;
     const ownedHome = !!summary.house?.built;
+    const buildStage = Number(summary.house?.buildStage || summary.buildStage || 0);
+    const constructionStarted = buildStage > 0 && !ownedHome;
+    const nextBuildLabel = summary.house?.nextBuildLabel || summary.nextBuildLabel || 'Foundation';
+    const nextBuildCost = Number(summary.house?.nextBuildCost ?? summary.nextBuildCost ?? 0);
     if (homeSummaryCard) {
       homeSummaryCard.classList.toggle('overdue', !!(summary.rentOverdue || summary.utilityOverdue));
       homeSummaryCard.classList.toggle('blocked', !!summary.accessBlocked);
       const title = homeSummaryCard.querySelector('strong');
       const status = homeSummaryCard.querySelector('span');
       const label = homeSummaryCard.querySelector('small');
-      if (label) label.textContent = ownedHome ? 'YOUR KERALA HOME' : 'STARTER RENTAL';
-      if (title) title.textContent = ownedHome ? `${summary.house.district} Kerala Home` : (summary.home?.label || 'Village Rental Home');
+      if (label) label.textContent = ownedHome ? 'YOUR KERALA HOME' : constructionStarted ? 'HOME CONSTRUCTION · ' + buildStage + '/4' : 'STARTER RENTAL';
+      if (title) title.textContent = ownedHome || constructionStarted ? summary.house.district + ' Kerala Home' : (summary.home?.label || 'Village Rental Home');
       if (status) status.textContent = summary.reminder || 'Home payments are up to date.';
     }
-    if (homeRentRow) homeRentRow.hidden = ownedHome;
-    if (homeUtilitiesRow) homeUtilitiesRow.hidden = ownedHome;
-    if (homeBuildButton) homeBuildButton.hidden = ownedHome;
-    if (homeEnterButton) { homeEnterButton.hidden = !ownedHome || !!summary.inside; homeEnterButton.disabled = !!ownedHome && !summary.house.available; }
+    if (homeRentRow) homeRentRow.hidden = ownedHome || constructionStarted;
+    if (homeUtilitiesRow) homeUtilitiesRow.hidden = ownedHome || constructionStarted;
+    if (homeBuildButton) {
+      homeBuildButton.hidden = ownedHome;
+      homeBuildButton.disabled = !summary.house?.available && constructionStarted;
+      homeBuildButton.textContent = 'Build ' + nextBuildLabel + ' · ' + formatCash(nextBuildCost);
+      homeBuildButton.setAttribute('aria-label', 'Build ' + nextBuildLabel + ' for ' + formatCash(nextBuildCost));
+    }
+    if (homeEnterButton) {
+      homeEnterButton.hidden = !ownedHome || !!summary.inside;
+      homeEnterButton.disabled = !!ownedHome && !summary.house.available;
+    }
     if (homeExitButton) homeExitButton.hidden = !summary.inside;
     if (homeRentStatus) {
-      homeRentStatus.textContent = `${formatCash(summary.home?.rent || 0)} · ${homeDueText(summary.rentDueAt, summary.rentOverdue)}`;
+      homeRentStatus.textContent = formatCash(summary.home?.rent || 0) + ' · ' + homeDueText(summary.rentDueAt, summary.rentOverdue);
       homeRentStatus.classList.toggle('overdue', !!summary.rentOverdue);
     }
     if (homeUtilityStatus) {
-      homeUtilityStatus.textContent = `${formatCash(summary.home?.utilities || 0)} · ${homeDueText(summary.utilityDueAt, summary.utilityOverdue)}`;
+      homeUtilityStatus.textContent = formatCash(summary.home?.utilities || 0) + ' · ' + homeDueText(summary.utilityDueAt, summary.utilityOverdue);
       homeUtilityStatus.classList.toggle('overdue', !!summary.utilityOverdue);
     }
-    if (homePayRent) homePayRent.textContent = `Pay Rent · ${formatCash(summary.home?.rent || 0)}`;
-    if (homePayUtilities) homePayUtilities.textContent = `Pay Utilities · ${formatCash(summary.home?.utilities || 0)}`;
+    if (homePayRent) homePayRent.textContent = 'Pay Rent · ' + formatCash(summary.home?.rent || 0);
+    if (homePayUtilities) homePayUtilities.textContent = 'Pay Utilities · ' + formatCash(summary.home?.utilities || 0);
     if (homeSleepNote) {
       homeSleepNote.textContent = ownedHome
-        ? 'Walk up to the bed inside your home and choose SLEEP IN BED. Tap EXIT HOME near the front door to return outside.'
-        : summary.accessBlocked
-          ? 'Sleep access is paused after the grace period. Pay overdue home charges to restore access.'
-          : 'Build your free home from the panel, then enter it and rest in your own bed.';
+        ? 'Walk up to the bed inside your completed home and choose SLEEP IN BED. Tap EXIT HOME near the front door to return outside.'
+        : constructionStarted
+          ? 'Your ' + summary.house.district + ' plot is showing stage ' + buildStage + ' of 4. Pay ' + formatCash(nextBuildCost) + ' for ' + nextBuildLabel.toLowerCase() + ' to continue. You can enter and use the bed after all four stages are complete.'
+          : summary.accessBlocked
+            ? 'Sleep access is paused after the grace period. Pay overdue home charges to restore access.'
+            : 'Build on your district home plot with Kerala Cash, one stage at a time. Finish the house to enter and rest in your own bed.';
     }
   }
 
@@ -1346,7 +1360,11 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   async function buildPersonalHome() {
     const result = await api('/api/home/build', {});
     renderHome(result.home);
-    toast('Your Kerala starter home is ready · enter from the Home panel or its district plot');
+    renderWallet(result.wallet);
+    const construction = result.construction;
+    toast(construction.complete
+      ? 'Your Kerala home is complete · enter it and use the bed'
+      : construction.label + ' complete · ' + construction.stage + '/4 stages · next: ' + (construction.nextStage ? construction.nextStage.label : 'complete') + ' · ' + (construction.nextStage ? formatCash(construction.nextStage.cost) : ''));
   }
   async function enterPersonalHome() {
     const result = await api('/api/home/enter', {});

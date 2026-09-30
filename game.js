@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=119.0';
+import { initSocial, api } from './social.js?v=120.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
 import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=117.0';
@@ -286,6 +286,7 @@ let garageSnapshot = null;
 let trafficSnapshot = null;
 let needsSnapshot = null;
 let homeSnapshot = null;
+const homePlotVisuals = new Map();
 let homeInteriorMode = false;
 const HOME_INTERIOR_BACKDROP = new THREE.Color(0xe5d6bf);
 const HOME_INTERIOR_FOG = new THREE.Fog(0xe5d6bf, 28, 75);
@@ -2776,13 +2777,15 @@ function updateWorldInteract() {
     }
   }
 
-  if (!active && vehicleMode === 'walk' && (!homeSnapshot?.house?.built || homeSnapshot.house.available) && (homeSnapshot?.localHome || homeSnapshot?.home)) {
+  if (!active && vehicleMode === 'walk' && (!homeSnapshot?.house || homeSnapshot.house.available) && (homeSnapshot?.localHome || homeSnapshot?.home)) {
     const home = homeSnapshot.localHome || homeSnapshot.home;
     const distance = Math.hypot(playerRef.position.x - Number(home.x), playerRef.position.z - Number(home.z));
     if (distance <= Number(home.radius || 5.2) + .3) {
+      const houseStage = Number(homeSnapshot.house?.buildStage || 0);
+      const constructionActive = houseStage > 0 && !homeSnapshot.house?.built;
       worldInteract.hidden = false;
-      worldInteract.dataset.mode = homeSnapshot.house?.built ? 'home-enter' : homeSnapshot.accessBlocked ? 'home-open' : 'home-sleep';
-      worldInteract.textContent = homeSnapshot.house?.built ? 'ENTER MY HOME' : homeSnapshot.accessBlocked ? 'OPEN HOME · PAYMENT DUE' : `SLEEP · ENERGY ${Math.round(Number(needsSnapshot?.energy ?? 100))}%`;
+      worldInteract.dataset.mode = homeSnapshot.house?.built ? 'home-enter' : constructionActive || homeSnapshot.accessBlocked ? 'home-open' : 'home-sleep';
+      worldInteract.textContent = homeSnapshot.house?.built ? 'ENTER MY HOME' : constructionActive ? 'CONTINUE BUILDING · ' + houseStage + '/4' : homeSnapshot.accessBlocked ? 'OPEN HOME · PAYMENT DUE' : 'SLEEP · ENERGY ' + Math.round(Number(needsSnapshot?.energy ?? 100)) + '%';
       worldInteract.disabled = false;
       return;
     }
@@ -3221,6 +3224,7 @@ window.addEventListener('kerala-needs-state', event => {
 });
 window.addEventListener('kerala-home-state', event => {
   homeSnapshot = event.detail || null;
+  updateHomeConstructionVisual();
   updateWorldInteract();
   updateLifeLoopMission();
 });
@@ -8820,9 +8824,9 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
   // The north-south carriageway is 12 m wide; keep the stop wholly on its west footpath.
   addBusStop(scene, -10.5, 30.5, Math.PI, 'MARINE DRIVE');
 
-  addPhotoHouse(scene, -48, 40, 'Ernakulam');
+  registerPersonalHomePlot(scene, addPhotoHouse(scene, -48, 40, 'Ernakulam'), 'Ernakulam', -48, 40);
   const ernakulamHomeMarker = new THREE.Group();
-  ernakulamHomeMarker.add(missionTag('Rental Home', '#654b36'));
+  ernakulamHomeMarker.add(missionTag('Home Plot', '#654b36'));
   ernakulamHomeMarker.position.set(-48, 0, 36.6);
   scene.add(ernakulamHomeMarker);
   addBench(scene, 4, 40);
@@ -9652,9 +9656,9 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
   addFuelStation(scene, fuelPosition.x, fuelPosition.z);
   addServiceGarage(scene, -18, -48);
 
-  addPhotoHouse(scene, -24, -27, district);
+  registerPersonalHomePlot(scene, addPhotoHouse(scene, -24, -27, district), district, -24, -27);
   const districtHomeMarker = new THREE.Group();
-  districtHomeMarker.add(missionTag('Rental Home', '#654b36'));
+  districtHomeMarker.add(missionTag('Home Plot', '#654b36'));
   districtHomeMarker.position.set(-24, 0, -21.8);
   scene.add(districtHomeMarker);
   addBench(scene, -10, -10);
@@ -9711,6 +9715,7 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
 
 
 function buildWorld(scene) {
+  homePlotVisuals.clear();
   roadEdgePlans.length = 0;
   staticColliders.length = 0;
   busStopCameraOccluders.length = 0;
@@ -9856,9 +9861,9 @@ function buildWorld(scene) {
   addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: 19.9, min: -15, max: 20, progress: 16, direction: -1, speed: 5.1, color: 0x2d7650, flowPhase: 3.3 });
   addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -40.7, min: -31, max: 19, progress: 12, direction: -1, speed: 5.4, color: 0x6f4a88, flowPhase: 2.2 });
 
-  addPhotoHouse(scene, -24, -35, 10.2, 6.8);
+  registerPersonalHomePlot(scene, addPhotoHouse(scene, -24, -35, 'Kottayam'), 'Kottayam', -24, -35);
   const rentalHomeMarker = new THREE.Group();
-  rentalHomeMarker.add(missionTag('Rental Home', '#654b36'));
+  rentalHomeMarker.add(missionTag('Home Plot', '#654b36'));
   rentalHomeMarker.position.set(-24, 0, -29.8);
   scene.add(rentalHomeMarker);
   addPhotoHouse(scene, 28, 34, 8.8, 5.9);
@@ -12016,7 +12021,104 @@ function updateAmbientAnimals(time, delta) {
 
 function addPhotoHouse(scene, x, z, district = 'Kottayam') {
   const facade = districtFacadePalette(district, x * 31 + z * 47);
-  addHouse(scene, x, z, facade.houseWall, facade.roof, facade);
+  return addHouse(scene, x, z, facade.houseWall, facade.roof, facade);
+}
+
+function registerPersonalHomePlot(scene, baseHouse, district, x, z) {
+  homePlotVisuals.set(district, { scene, baseHouse, x, z, construction: null });
+  updateHomeConstructionVisual();
+}
+
+function updateHomeConstructionVisual() {
+  const district = renderedWorldDistrict || currentWorldDistrictName();
+  const plot = homePlotVisuals.get(district);
+  if (!plot) return;
+  const house = homeSnapshot?.house;
+  const stage = house?.district === district
+    ? (house.built ? 4 : Math.max(0, Math.min(4, Math.floor(Number(house.buildStage) || 0))))
+    : 0;
+  const complete = stage >= 4;
+  plot.baseHouse.visible = !house || house.district !== district || stage === 0;
+  if (plot.construction) {
+    const old = plot.construction;
+    plot.scene.remove(old);
+    const materials = new Set();
+    old.traverse(part => {
+      part.geometry?.dispose();
+      for (const material of (Array.isArray(part.material) ? part.material : [part.material])) {
+        if (material) materials.add(material);
+      }
+    });
+    materials.forEach(material => material.dispose());
+    plot.construction = null;
+  }
+  if (stage > 0) {
+    plot.construction = createHomeConstructionModel(stage, plot.x, plot.z);
+    plot.scene.add(plot.construction);
+  }
+  if (complete) plot.baseHouse.visible = false;
+}
+
+function createHomeConstructionModel(stage, x, z) {
+  const group = new THREE.Group();
+  const concrete = new THREE.MeshStandardMaterial({ color: stage >= 4 ? 0xe0d6c5 : 0xb9b2a5, roughness: .92 });
+  const unfinished = new THREE.MeshStandardMaterial({ color: 0xaaa69a, roughness: .96 });
+  const beam = new THREE.MeshStandardMaterial({ color: 0x8b7659, roughness: .9 });
+  const roofMaterial = new THREE.MeshStandardMaterial({ color: stage >= 4 ? 0x873f32 : 0x59636b, roughness: .82, metalness: stage >= 4 ? .02 : .16 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x63402d, roughness: .84 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x83b7c2, roughness: .22, metalness: .12, transparent: true, opacity: .76 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xf3eddf, roughness: .9 });
+  const add = (geometry, material, px, py, pz, rx = 0, ry = 0, rz = 0) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(px, py, pz);
+    mesh.rotation.set(rx, ry, rz);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    return mesh;
+  };
+  add(new THREE.BoxGeometry(9.25, .32, 8.25), concrete, 0, .16, 0);
+  add(new THREE.BoxGeometry(8.45, .10, 7.45), unfinished, 0, .37, 0);
+  if (stage < 4) {
+    const rebar = new THREE.MeshStandardMaterial({ color: 0x6c7375, roughness: .6, metalness: .55 });
+    [-3.7, -1.3, 1.3, 3.7].forEach(px => add(new THREE.CylinderGeometry(.035, .035, 7.4, 7), rebar, px, .55, 0, Math.PI / 2));
+  }
+  if (stage >= 2) {
+    const wallMaterial = stage >= 4 ? concrete : new THREE.MeshStandardMaterial({ color: 0xb7aa92, roughness: .96 });
+    add(new THREE.BoxGeometry(8.3, 3.0, .28), wallMaterial, 0, 1.9, -3.05);
+    add(new THREE.BoxGeometry(.28, 3.0, 6.1), wallMaterial, -4.02, 1.9, 0);
+    add(new THREE.BoxGeometry(.28, 3.0, 6.1), wallMaterial, 4.02, 1.9, 0);
+    add(new THREE.BoxGeometry(3.35, 3.0, .28), wallMaterial, -2.42, 1.9, 3.05);
+    add(new THREE.BoxGeometry(3.35, 3.0, .28), wallMaterial, 2.42, 1.9, 3.05);
+    add(new THREE.BoxGeometry(1.55, .35, .32), beam, 0, 3.38, 3.05);
+    [-3.85, 3.85].forEach(px => add(new THREE.BoxGeometry(.22, 3.15, .22), beam, px, 1.95, -3.0));
+  }
+  if (stage >= 3) {
+    const leftRoof = add(new THREE.BoxGeometry(9.25, .22, 4.45), roofMaterial, 0, 4.20, -1.18, .50);
+    const rightRoof = add(new THREE.BoxGeometry(9.25, .22, 4.45), roofMaterial, 0, 4.20, 1.18, -.50);
+    const ridge = add(new THREE.BoxGeometry(9.48, .25, .35), beam, 0, 5.28, 0);
+    leftRoof.receiveShadow = rightRoof.receiveShadow = ridge.receiveShadow = true;
+    group.add(...createKeralaRoofTiles(THREE, x, z));
+  }
+  if (stage >= 4) {
+    add(new THREE.BoxGeometry(5.1, .20, 1.85), concrete, 0, .40, 4.10);
+    add(new THREE.BoxGeometry(2.4, .20, .72), unfinished, 0, .20, 5.05);
+    [-1.95, 1.95].forEach(px => add(new THREE.CylinderGeometry(.15, .17, 3.25, 10), white, px, 2.02, 4.1));
+    add(new THREE.BoxGeometry(1.35, 2.35, .14), wood, 0, 1.59, 3.22);
+    [-2.72, 2.72].forEach(px => {
+      add(new THREE.BoxGeometry(1.72, 1.42, .16), wood, px, 2.28, 3.21);
+      add(new THREE.BoxGeometry(1.42, 1.14, .17), glass, px, 2.28, 3.22);
+      add(new THREE.BoxGeometry(.08, 1.18, .20), wood, px, 2.28, 3.23);
+      add(new THREE.BoxGeometry(1.48, .08, .20), wood, px, 2.28, 3.23);
+      add(new THREE.BoxGeometry(1.83, .12, .26), white, px, 1.52, 3.28);
+    });
+    add(new THREE.BoxGeometry(5.4, .16, 2.10), roofMaterial, 0, 3.85, 4.10, -.08);
+    const lampMaterial = new THREE.MeshStandardMaterial({ color: 0xffe8ae, emissive: 0xffbd60, emissiveIntensity: .24, roughness: .45 });
+    add(new THREE.SphereGeometry(.13, 10, 8), lampMaterial, 1.05, 3.24, 3.42);
+  }
+  group.position.set(x, 0, z);
+  group.userData.homeConstructionStage = stage;
+  return group;
 }
 
 
@@ -12253,6 +12355,7 @@ function addHouse(scene, x, z, wallColor, roofColor, facade = {}) {
   addBuildingWeathering(group, 'house', x * 31 + z * 47);
   group.position.set(x, 0, z);
   scene.add(group);
+  return group;
 }
 
 function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ · SNACKS · GROCERIES', facade = {}) {
