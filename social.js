@@ -236,10 +236,17 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const homeUtilityStatus = $('home-utility-status');
   const homePayRent = $('home-pay-rent');
   const homePayUtilities = $('home-pay-utilities');
+  const homeRentRow = $('home-rent-row');
+  const homeUtilitiesRow = $('home-utilities-row');
+  const homeHouseStatus = $('home-house-status');
+  const homeBuildButton = $('home-build');
+  const homeEnterButton = $('home-enter');
+  const homeExitButton = $('home-exit');
   const homeSleepNote = $('home-sleep-note');
   const homeRefresh = $('home-refresh');
   const homeError = $('home-error');
   let homeSnapshot = null;
+  let homeInteriorOpen = false;
   const garagePanel = $('garage-panel');
   const garageToggle = $('garage-toggle');
   const garageClose = $('garage-close');
@@ -1290,14 +1297,23 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     homeSnapshot = summary || null;
     window.dispatchEvent(new CustomEvent('kerala-home-state', { detail: homeSnapshot }));
     if (!summary) return;
+    const houseBuilt = summary.house?.built === true;
     if (homeSummaryCard) {
       homeSummaryCard.classList.toggle('overdue', !!(summary.rentOverdue || summary.utilityOverdue));
       homeSummaryCard.classList.toggle('blocked', !!summary.accessBlocked);
       const title = homeSummaryCard.querySelector('strong');
       const status = homeSummaryCard.querySelector('span');
-      if (title) title.textContent = summary.home?.label || 'Village Rental Home';
-      if (status) status.textContent = summary.reminder || 'Home payments are up to date.';
+      if (title) title.textContent = houseBuilt ? `${summary.house.district} Personal Home` : (summary.home?.label || 'Village Rental Home');
+      if (status) status.textContent = houseBuilt ? 'Owned · your private home is ready' : (summary.reminder || 'Home payments are up to date.');
     }
+    if (homeHouseStatus) homeHouseStatus.textContent = houseBuilt
+      ? `Your ${summary.house.district} home is built. Enter it from the front door, walk to the bed, and use SLEEP IN BED.`
+      : `Your plot is in ${summary.localHome?.label || summary.home?.label || 'your district'}. Visit it and build your free Kerala starter home.`;
+    if (homeBuildButton) homeBuildButton.hidden = houseBuilt;
+    if (homeEnterButton) homeEnterButton.hidden = !houseBuilt || homeInteriorOpen;
+    if (homeExitButton) homeExitButton.hidden = !homeInteriorOpen;
+    if (homeRentRow) homeRentRow.hidden = houseBuilt;
+    if (homeUtilitiesRow) homeUtilitiesRow.hidden = houseBuilt;
     if (homeRentStatus) {
       homeRentStatus.textContent = `${formatCash(summary.home?.rent || 0)} · ${homeDueText(summary.rentDueAt, summary.rentOverdue)}`;
       homeRentStatus.classList.toggle('overdue', !!summary.rentOverdue);
@@ -1309,7 +1325,9 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (homePayRent) homePayRent.textContent = `Pay Rent · ${formatCash(summary.home?.rent || 0)}`;
     if (homePayUtilities) homePayUtilities.textContent = `Pay Utilities · ${formatCash(summary.home?.utilities || 0)}`;
     if (homeSleepNote) {
-      homeSleepNote.textContent = summary.accessBlocked
+      homeSleepNote.textContent = houseBuilt
+        ? 'Inside your home, walk to the bed and tap SLEEP IN BED. Your avatar lies down, then gets up after resting.'
+        : summary.accessBlocked
         ? 'Sleep access is paused after the grace period. Pay overdue home charges to restore access.'
         : 'Go to your home porch in the world and tap SLEEP. Energy restores to 100; Hunger −4 and Thirst −6.';
     }
@@ -1348,6 +1366,31 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       card.append(head, meter);
       progressionAchievements?.append(card);
     }
+  }
+  async function buildPersonalHome() {
+    const result = await api('/api/home/build', { style: 'kerala-starter' });
+    renderHome(result.home);
+    toast('Your Kerala starter home is built. Enter through the front door to use it.');
+  }
+  async function enterPersonalHome() {
+    const result = await api('/api/home/enter', {});
+    if (result.home) renderHome(result.home);
+    closePanels();
+    homeInteriorOpen = true;
+    homeEnterButton.hidden = true;
+    homeExitButton.hidden = false;
+    window.dispatchEvent(new CustomEvent('kerala-home-interior-enter', { detail: result }));
+    window.dispatchEvent(new CustomEvent('kerala-home-interior-state', { detail: { open: true } }));
+  }
+  async function exitPersonalHome() {
+    const result = await api('/api/home/exit', {});
+    if (result.home) renderHome(result.home);
+    homeInteriorOpen = false;
+    homeEnterButton.hidden = !(result.home?.house?.built);
+    homeExitButton.hidden = true;
+    window.dispatchEvent(new CustomEvent('kerala-home-interior-exit', { detail: result }));
+    window.dispatchEvent(new CustomEvent('kerala-home-interior-state', { detail: { open: false } }));
+    toast('You stepped outside your home.');
   }
 
   function renderLeaderboardCategories(categories) {
@@ -2603,11 +2646,25 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   };
   homePayRent?.addEventListener('click', () => payHomeCharge(homePayRent, 'rent'));
   homePayUtilities?.addEventListener('click', () => payHomeCharge(homePayUtilities, 'utilities'));
+  homeBuildButton?.addEventListener('click', () => run(buildPersonalHome, homeError));
+  homeEnterButton?.addEventListener('click', () => run(enterPersonalHome, homeError));
+  homeExitButton?.addEventListener('click', () => run(exitPersonalHome, homeError));
+  window.addEventListener('kerala-home-build', () => run(buildPersonalHome, homeError));
+  window.addEventListener('kerala-home-enter', () => run(enterPersonalHome, homeError));
+  window.addEventListener('kerala-home-exit', () => run(exitPersonalHome, homeError));
+  window.addEventListener('kerala-home-interior-state', event => {
+    homeInteriorOpen = event.detail?.open === true;
+    if (homeEnterButton) homeEnterButton.hidden = !homeSnapshot?.house?.built || homeInteriorOpen;
+    if (homeExitButton) homeExitButton.hidden = !homeInteriorOpen;
+  });
 
   window.addEventListener('kerala-home-sleep', () => run(async () => {
     const result = await api('/api/home/sleep', {});
     if (result.home) renderHome(result.home);
     if (result.needs) renderNeeds(result.needs);
+    if (result.slept && result.home?.house?.built) {
+      window.dispatchEvent(new CustomEvent('kerala-home-bed-sleep', { detail: result }));
+    }
     toast(result.slept
       ? `Sleep complete · Energy 100 · Hunger −${result.hungerCost} · Thirst −${result.thirstCost}`
       : (result.message || 'Energy is already full'));
@@ -2992,3 +3049,4 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     onState(listener) { listeners.add(listener); listener({ user, connected }); return () => listeners.delete(listener); },
   };
 }
+
