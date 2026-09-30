@@ -225,7 +225,7 @@ function homeConstructionStage(house) {
   const stage = Number(house.buildStage);
   return Math.max(0, Math.min(HOME_CONSTRUCTION_STAGES.length, Number.isFinite(stage) ? Math.floor(stage) : 0));
 }
-const HOME_INTERIOR_ENTRY = Object.freeze({ x: 0, z: 4.6, rotation: 0 });
+const HOME_INTERIOR_ENTRY = Object.freeze({ x: 0, z: 5.15, rotation: 0 });
 const HOME_INTERIOR_BED = Object.freeze({ x: 2.7, z: -2.8, radius: 1.45 });
 const HOME_INTERIOR_LIMIT = 5.7;
 const PUBLIC_TRAVEL_ROUTES = Object.freeze({
