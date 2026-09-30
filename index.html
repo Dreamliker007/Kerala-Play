@@ -218,6 +218,7 @@
     .landmark-marker.poi-marker .pin { fill:#2e8b66; stroke:#d7ffea; }
     .landmark-marker.poi-marker.bus .pin { fill:#2f6993; }
     .landmark-marker.poi-marker.home .pin { fill:#8b6741; }
+    .landmark-marker.poi-marker.personal-home .pin { fill:#e1b744; stroke:#fff2b2; stroke-width:1.7; }
     .landmark-marker.poi-marker.service .pin { fill:#7768a8; }
     .landmark-marker.selected .pin { stroke:#fff; stroke-width:2.2; filter:drop-shadow(0 0 4px rgba(107,236,158,.95)); }
     #chat-channel { margin-top:8px; width:100%; border:1px solid rgba(255,255,255,.23); border-radius:8px; padding:7px; color:#fff; background:#17323a; font-size:12px; }
@@ -1472,7 +1473,8 @@
       </div>
       <div class="wallet-section home-house-actions">
         <strong id="home-build-heading">Build a home you own</strong>
-        <p id="home-build-note" class="panel-note">Build your Kerala home on your own plot with Kerala Cash, one stage at a time. Watch the foundation, walls, roof and finishing appear there; once complete, walk to the front door, open it and enter.</p>
+        <p id="home-build-note" class="panel-note">Build your Kerala home on your own plot with Kerala Cash, one stage at a time. Watch the foundation, walls, roof and finishing appear there; once complete, select it to follow the distance to its front door.</p>
+        <button id="home-find" class="action-button home-find-button" type="button">FIND HOME PLOT</button>
         <button id="home-build" type="button">BUILD MY HOME</button>
         <button id="home-enter" type="button" hidden>ENTER MY HOME</button>
         <button id="home-exit" type="button" hidden>EXIT HOME</button>
@@ -1542,6 +1544,6 @@
       syncWardrobeTouchAction();
     })();
   </script>
-  <script type="module" src="./boot.js?v=122.0"></script>
+  <script type="module" src="./boot.js?v=123.0"></script>
 </body>
 </html>

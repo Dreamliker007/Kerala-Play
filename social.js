@@ -232,6 +232,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const homeToggle = $('home-toggle');
   const homeClose = $('home-close');
   const homeBuildButton = $('home-build');
+  const homeFindButton = $('home-find');
   const homeEnterButton = $('home-enter');
   const homeExitButton = $('home-exit');
   const homeRentRow = $('home-rent-row');
@@ -1319,10 +1320,20 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (homeBuildHeading) homeBuildHeading.textContent = ownedHome ? 'Your home is complete' : 'Build a home you own';
     if (homeBuildNote) {
       homeBuildNote.textContent = ownedHome
-        ? 'All four stages are complete on your ' + summary.house.district + ' plot. Walk to its front door and tap OPEN FRONT DOOR · ENTER.'
+        ? 'Your home is complete on your ' + summary.house.district + ' plot. Select SHOW MY HOME & DISTANCE to follow the route to its front door.'
         : constructionStarted
-          ? 'Stage ' + buildStage + ' of 4 is visible on your ' + summary.house.district + ' plot. Pay ' + formatCash(nextBuildCost) + ' to add the ' + nextBuildLabel.toLowerCase() + ' stage.'
-          : 'Build your Kerala home on your district plot one paid stage at a time. The foundation, walls, roof and finishing appear there as you build.';
+          ? 'Stage ' + buildStage + ' of 4 is visible on your ' + summary.house.district + ' plot. Select SHOW MY HOME PLOT to find it, then pay ' + formatCash(nextBuildCost) + ' to add the ' + nextBuildLabel.toLowerCase() + ' stage.'
+          : 'Select FIND HOME PLOT to locate your plot. Build your Kerala home there one paid stage at a time.';
+    }
+    if (homeFindButton) {
+      const homeElsewhere = !!summary.house?.district && summary.house.available === false;
+      homeFindButton.textContent = homeElsewhere
+        ? 'HOME IN ' + summary.house.district.toUpperCase()
+        : ownedHome ? 'SHOW MY HOME & DISTANCE' : constructionStarted ? 'SHOW MY HOME PLOT' : 'FIND HOME PLOT';
+      homeFindButton.disabled = false;
+      homeFindButton.title = homeElsewhere
+        ? 'Travel to ' + summary.house.district + ' first to navigate to your home.'
+        : 'Select your own home plot and keep its distance visible until you arrive.';
     }
     if (homeBuildButton) {
       homeBuildButton.hidden = ownedHome;
@@ -1344,7 +1355,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (homePayUtilities) homePayUtilities.textContent = 'Pay Utilities · ' + formatCash(summary.home?.utilities || 0);
     if (homeSleepNote) {
       homeSleepNote.textContent = ownedHome
-        ? 'Walk to the front door of your completed home and tap OPEN FRONT DOOR · ENTER. Inside, walk to the bed to sleep; use EXIT HOME at the doorway to return outside.'
+        ? 'Select SHOW MY HOME & DISTANCE to follow the route to your own front door. At the door, tap OPEN FRONT DOOR · ENTER. Inside, walk to the bed to sleep.'
         : constructionStarted
           ? 'Your ' + summary.house.district + ' plot shows construction stage ' + buildStage + ' of 4. Pay ' + formatCash(nextBuildCost) + ' for ' + nextBuildLabel.toLowerCase() + ' to add the next visible part. After stage 4, enter through the front door.'
           : summary.accessBlocked
