@@ -44,7 +44,7 @@ import('./navigation-assist.js?v=113.0').catch(error => console.warn('Navigation
 import('./ride-assist.js?v=113.0').catch(error => console.warn('Ride assist unavailable:', error));
 
 // Display a useful recovery screen even if a module fails before game.js runs.
-import('./game.js?v=113.0').then(() => {
+import('./game.js?v=115.0').then(() => {
   // Give the first rendered frame a moment to settle before revealing the world.
   requestAnimationFrame(() => setTimeout(finishKeralaSplash, 260));
 }).catch(error => {
@@ -56,3 +56,4 @@ import('./game.js?v=113.0').then(() => {
     ? 'Start Kerala Play with npm start in its project folder, then open http://localhost:3000. Accounts and multiplayer need the included server.'
     : 'Kerala Play could not load. Reload this page. If it continues, restart the server with npm start and check its terminal output.';
 });
+
