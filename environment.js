@@ -25,13 +25,14 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
   const preferences = readPreferences();
   const quality = 'high';
   const mobileLike = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
-  let performanceScale = mobileLike ? .90 : 1;
+  let performanceScale = mobileLike ? .84 : 1;
   let disposed = false;
   let lastHudMinute = -1;
   let lastHudWeather = '';
   let materialTimer = 1;
   let currentWeather = { daylight: 1, hour: 12, rain: 0, overcast: 0, mist: 0, weather: 'Clear', needsLights: false };
   let audioEnabled = false;
+  let audioUpdateTimer = .25;
   let soundscape = null;
   const disposables = [];
   const originalRenderer = { toneMapping: renderer.toneMapping, exposure: renderer.toneMappingExposure, shadows: renderer.shadowMap.enabled, shadowType: renderer.shadowMap.type, pixelRatio: renderer.getPixelRatio() };
@@ -301,7 +302,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
   }
   function applyPerformanceScale() {
     const deviceRatio = devicePixelRatio || 1;
-    const mobileCap = Math.max(1.12, 1.78 * performanceScale);
+    const mobileCap = Math.max(1.05, 1.58 * performanceScale);
     renderer.setPixelRatio(Math.min(deviceRatio, mobileLike ? mobileCap : 2));
     renderer.setSize(innerWidth, innerHeight, false);
   }
@@ -374,6 +375,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
         await soundscape.resume();
         if (disposed) { await soundscape.dispose(); return; }
         audioEnabled = true;
+        audioUpdateTimer = .25;
         if (document.hidden) await soundscape.suspend();
       }
       audioStatus.textContent = audioEnabled ? 'World sound enabled.' : 'World sound muted.';
@@ -547,7 +549,9 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
       const weatherText = weather === 'Clear' ? '' : ` · ${weather}`;
       clockOutput.textContent = `${icon} ${period}${weatherText} · ${String(Math.floor(hour)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
     }
-    if (audioEnabled && !document.hidden) {
+    audioUpdateTimer += Math.max(0, Number(delta) || 0);
+    if (audioEnabled && !document.hidden && audioUpdateTimer >= .25) {
+      audioUpdateTimer = 0;
       // Match the expanded physical road network so traffic ambience follows
       // State Road, Village Link, Market Road and Station Road.
       const roadProximity = Math.max(
@@ -635,7 +639,7 @@ function createSoundscape() {
   // that can stall some Android WebViews while the game is rendering.
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) throw new Error('Web Audio is unavailable');
-  const context = new AudioContext({ latencyHint: 'interactive' });
+  const context = new AudioContext({ latencyHint: 'playback' });
   const master = context.createGain();
   master.gain.value = .12;
   master.connect(context.destination);
