@@ -213,6 +213,18 @@ const HOME_DEFINITION = Object.freeze({
 const HOME_SLEEP_COOLDOWN_MS = 60_000;
 const HOME_SLEEP_HUNGER_COST = 4;
 const HOME_SLEEP_THIRST_COST = 6;
+const HOME_CONSTRUCTION_STAGES = Object.freeze([
+  Object.freeze({ stage: 1, key: 'foundation', label: 'Foundation', cost: 50 }),
+  Object.freeze({ stage: 2, key: 'walls', label: 'Walls', cost: 100 }),
+  Object.freeze({ stage: 3, key: 'roof', label: 'Roof', cost: 150 }),
+  Object.freeze({ stage: 4, key: 'finishing', label: 'Finishing', cost: 200 }),
+]);
+function homeConstructionStage(house) {
+  if (!house || typeof house !== 'object') return 0;
+  if (house.built) return HOME_CONSTRUCTION_STAGES.length;
+  const stage = Number(house.buildStage);
+  return Math.max(0, Math.min(HOME_CONSTRUCTION_STAGES.length, Number.isFinite(stage) ? Math.floor(stage) : 0));
+}
 const HOME_INTERIOR_ENTRY = Object.freeze({ x: 0, z: 4.6, rotation: 0 });
 const HOME_INTERIOR_BED = Object.freeze({ x: 2.7, z: -2.8, radius: 1.45 });
 const HOME_INTERIOR_LIMIT = 5.7;
@@ -1294,27 +1306,47 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     const utilityDueAt = Number(home.utilityDueAt);
     const homeDefinition = homeDefinitionFor(user);
     const house = home.house && typeof home.house === 'object' ? home.house : null;
-    const owned = !!house?.built;
+    const buildStage = homeConstructionStage(house);
+    const constructionStarted = buildStage > 0;
+    const owned = buildStage >= HOME_CONSTRUCTION_STAGES.length;
+    const nextBuildStep = HOME_CONSTRUCTION_STAGES[buildStage] || null;
     const live = presence.get(user.id);
-    const inHouseDistrict = !owned || house.district === currentWorldDistrict(user);
+    const inHouseDistrict = !house || house.district === currentWorldDistrict(user);
     const rentGraceUntil = rentDueAt + homeDefinition.graceMs;
     const utilityGraceUntil = utilityDueAt + homeDefinition.graceMs;
-    const rentOverdue = !owned && timestamp > rentDueAt;
-    const utilityOverdue = !owned && timestamp > utilityDueAt;
-    const accessBlocked = !owned && (timestamp > rentGraceUntil || timestamp > utilityGraceUntil);
+    const rentOverdue = !constructionStarted && timestamp > rentDueAt;
+    const utilityOverdue = !constructionStarted && timestamp > utilityDueAt;
+    const accessBlocked = !constructionStarted && (timestamp > rentGraceUntil || timestamp > utilityGraceUntil);
     const reminder = owned
-      ? (inHouseDistrict ? 'Your Kerala starter home is ready. Enter, use the bed, and make yourself at home.' : `Your home is in ${house.district}. Travel there to enter.`)
-      : accessBlocked
-        ? 'Sleep access paused until overdue home charges are paid.'
-        : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
+      ? (inHouseDistrict ? 'Your Kerala starter home is complete. Enter it, use the bed, and make yourself at home.' : 'Your home is in ' + house.district + '. Travel there to enter.')
+      : constructionStarted
+        ? ((nextBuildStep ? nextBuildStep.label + ' is next · ₹' + nextBuildStep.cost : 'Construction in progress') + ' · ' + buildStage + '/' + HOME_CONSTRUCTION_STAGES.length + ' stages complete. Continue building from the Home panel.')
+        : accessBlocked
+          ? 'Sleep access paused until overdue home charges are paid.'
+          : (rentOverdue || utilityOverdue ? 'Home payment is overdue but still inside the grace period.' : 'Home payments are up to date.');
     return {
-      status: owned ? 'owned' : home.status,
+      status: owned ? 'owned' : constructionStarted ? 'building' : home.status,
       home: HOME_DEFINITION,
       localHome: homeDefinition,
-      house: house ? { ...house, available: inHouseDistrict, inside: live?.mode === 'home' } : null,
+      house: house ? {
+        ...house,
+        built: owned,
+        buildStage,
+        constructionComplete: owned,
+        nextBuildStage: nextBuildStep ? nextBuildStep.stage : null,
+        nextBuildLabel: nextBuildStep ? nextBuildStep.label : null,
+        nextBuildCost: nextBuildStep ? nextBuildStep.cost : 0,
+        available: inHouseDistrict,
+        inside: live?.mode === 'home',
+      } : null,
+      buildStage,
+      nextBuildStage: nextBuildStep ? nextBuildStep.stage : null,
+      nextBuildLabel: nextBuildStep ? nextBuildStep.label : null,
+      nextBuildCost: nextBuildStep ? nextBuildStep.cost : 0,
+      constructionSteps: HOME_CONSTRUCTION_STAGES,
       inside: live?.mode === 'home',
-      rentDueAt: owned ? 0 : rentDueAt,
-      utilityDueAt: owned ? 0 : utilityDueAt,
+      rentDueAt: constructionStarted ? 0 : rentDueAt,
+      utilityDueAt: constructionStarted ? 0 : utilityDueAt,
       rentOverdue,
       utilityOverdue,
       rentGraceUntil,
@@ -3041,21 +3073,40 @@ function publicRideDestinationForUser(user, destinationId) {
         send(response, 200, homeSummary(user)); return;
       }
       if (path === '/api/home/build' && request.method === 'POST') {
-        limited(`home-build:${user.id}`, 8, 60000);
+        limited('home-build:' + user.id, 8, 60000);
         await jsonBody(request);
         const state = jobStateFor(user);
-        requireValue(!state.home.house?.built, 409, 'You already own a home.');
-        // Building is an account-level action from the Home panel. The district
-        // plot remains the visible home entrance, but construction needs no
-        // precise player position or stopped-movement state.
+        const house = state.home.house && typeof state.home.house === 'object' ? state.home.house : null;
+        const buildStage = homeConstructionStage(house);
+        requireValue(buildStage < HOME_CONSTRUCTION_STAGES.length, 409, 'Your Kerala home is already complete.');
+        const nextStep = HOME_CONSTRUCTION_STAGES[buildStage];
+        const transaction = walletTransaction(user, -nextStep.cost, 'home_construction', nextStep.label + ' · Kerala starter home');
         const timestamp = now();
-        state.home.house = { id: randomUUID(), built: true, style: 'kerala-starter', district: currentWorldDistrict(user), builtAt: timestamp };
-        state.home.status = 'owned';
+        const ownedHouse = house || { id: randomUUID(), style: 'kerala-starter', district: currentWorldDistrict(user), constructionStartedAt: timestamp };
+        ownedHouse.buildStage = nextStep.stage;
+        ownedHouse.built = nextStep.stage >= HOME_CONSTRUCTION_STAGES.length;
+        ownedHouse.style = ownedHouse.style || 'kerala-starter';
+        ownedHouse.district = ownedHouse.district || currentWorldDistrict(user);
+        ownedHouse.updatedAt = timestamp;
+        if (ownedHouse.built) ownedHouse.builtAt = timestamp;
+        state.home.house = ownedHouse;
+        state.home.status = ownedHouse.built ? 'owned' : 'building';
         state.home.rentDueAt = 0;
         state.home.utilityDueAt = 0;
         dirty = true;
         await persist();
-        send(response, 200, { home: homeSummary(user) }); return;
+        send(response, 200, {
+          home: homeSummary(user),
+          wallet: walletSummary(user),
+          construction: {
+            stage: nextStep.stage,
+            label: nextStep.label,
+            cost: nextStep.cost,
+            complete: ownedHouse.built,
+            nextStage: HOME_CONSTRUCTION_STAGES[nextStep.stage] || null,
+          },
+          transaction,
+        }); return;
       }
       if (path === '/api/home/enter' && request.method === 'POST') {
         limited(`home-enter:${user.id}`, 16, 60000);
@@ -3109,7 +3160,7 @@ function publicRideDestinationForUser(user, destinationId) {
         requireValue(body.kind === 'rent' || body.kind === 'utilities', 400, 'Choose rent or utilities.');
         const state = jobStateFor(user);
         const home = state.home;
-        requireValue(!home.house?.built, 409, 'Your owned starter home has no rent or utility charges.');
+        requireValue(homeConstructionStage(home.house) === 0, 409, 'Your owned or under-construction home has no rent or utility charges.');
         const homeDefinition = homeDefinitionFor(user);
         const isRent = body.kind === 'rent';
         const amount = isRent ? homeDefinition.rent : homeDefinition.utilities;
