@@ -9173,6 +9173,12 @@ function updateMonsoonWaterVisuals(time, delta) {
 
   const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
   const activeRain = THREE.MathUtils.smoothstep(rain, .08, .72);
+  if (activeRain <= .02) {
+    for (const ripple of puddleRipples) ripple.mesh.visible = false;
+    for (const flow of drainWaterSurfaces) flow.mesh.visible = false;
+    for (const jet of roofRunoffJets) jet.mesh.visible = false;
+    return;
+  }
 
   for (const ripple of puddleRipples) {
     const rippleDistance = playerRef
