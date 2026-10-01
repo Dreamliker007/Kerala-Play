@@ -1,0 +1,53 @@
+name: Kerala Play Android Generated Release Check
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - package.json
+      - capacitor.config.json
+      - manifest.webmanifest
+      - mobile-release.json
+      - scripts/prepare-mobile.mjs
+      - scripts/lock-android-landscape.mjs
+      - scripts/set-android-version.mjs
+      - scripts/set-android-branding.mjs
+      - scripts/check-mobile-release.mjs
+      - .github/workflows/android-release-check.yml
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - capacitor.config.json
+      - manifest.webmanifest
+      - mobile-release.json
+      - scripts/prepare-mobile.mjs
+      - scripts/lock-android-landscape.mjs
+      - scripts/set-android-version.mjs
+      - scripts/set-android-branding.mjs
+      - scripts/check-mobile-release.mjs
+      - .github/workflows/android-release-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  generated-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Capacitor tooling
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Generate and configure Android project
+        run: npm run mobile:add
+      - name: Verify generated Android release project
+        env:
+          REQUIRE_GENERATED_ANDROID: "1"
+        run: npm run mobile:release:check
