@@ -10,6 +10,7 @@ on:
       - manifest.webmanifest
       - mobile-release.json
       - scripts/prepare-mobile.mjs
+      - scripts/patch-runtime.mjs
       - scripts/lock-android-landscape.mjs
       - scripts/set-android-version.mjs
       - scripts/set-android-branding.mjs
@@ -23,6 +24,7 @@ on:
       - manifest.webmanifest
       - mobile-release.json
       - scripts/prepare-mobile.mjs
+      - scripts/patch-runtime.mjs
       - scripts/lock-android-landscape.mjs
       - scripts/set-android-version.mjs
       - scripts/set-android-branding.mjs
