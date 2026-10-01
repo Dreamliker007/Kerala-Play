@@ -2760,7 +2760,9 @@ function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) 
         drawJourneyFrame(Math.max(0, durationMs - updatedRemaining), updatedRemaining);
         districtJourneyCountdown && (districtJourneyCountdown.textContent = formatJourneyClock(updatedRemaining));
       } else if (status.status === 'idle') {
-        finishDistrictJourney({ ...travel, to:{ district:toDistrict } });
+        // The server has no journey to confirm. Reload the authoritative
+        // profile instead of assuming the client-side destination arrived.
+        finishDistrictJourney({});
       }
     } catch { /* Keep the server-based countdown running and retry next second. */ }
     finally { statusRequestPending = false; }
