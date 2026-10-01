@@ -11810,7 +11810,13 @@ function addRoadVehicle(scene, config) {
   attachTrafficWetEffects(vehicle, config.kind);
   applyDynamicHighQuality(vehicle);
   const trafficState = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
-  trafficState.progress = nearestSafeTrafficProgress(trafficState, trafficState.progress);
+  const safeProgress = nearestSafeTrafficProgress(trafficState, trafficState.progress);
+  if (safeProgress === null) {
+    vehicle.visible = false;
+    trafficState.progress = THREE.MathUtils.clamp(Number(trafficState.progress), Number(trafficState.min), Number(trafficState.max));
+  } else {
+    trafficState.progress = safeProgress;
+  }
   vehicle.userData.traffic = trafficState;
   if (trafficState.axis === 'z') {
     vehicle.position.set(trafficState.fixed, 0, trafficState.progress);
@@ -11916,7 +11922,7 @@ function updateTraffic(delta) {
       config.currentSpeed = 0;
       if (safeProgress === null) {
         vehicle.visible = false;
-        continue;
+        return;
       }
       config.progress = safeProgress;
       if (config.axis === 'z') vehicle.position.z = config.progress;
