@@ -8912,6 +8912,16 @@ function addErnakulamCrosswalks(scene, centerX, centerZ) {
   scene.add(markings);
 }
 
+function addOuterRoadsideTrees(scene, seedOffset = 0) {
+  const placements = [
+    [-86,-70],[-86,-28],[-86,28],[-86,70],
+    [86,-70],[86,-28],[86,28],[86,70],
+    [-66,82],[-22,82],[22,82],[66,82],
+    [-66,-102],[-22,-102],[22,-102],[66,-102],
+  ];
+  placements.forEach(([x,z], index) => addPalm(scene, x, z, .66 + ((index + seedOffset) % 4) * .055));
+}
+
 function addErnakulamDistrictFoundation(scene, roadTexture) {
   const cx = ERNAKULAM_CITY.x;
   const cz = ERNAKULAM_CITY.z;
@@ -8938,6 +8948,7 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
     scene.add(dash);
   }
   addErnakulamCrosswalks(scene, cx, cz);
+  addOuterRoadsideTrees(scene, 1);
 
   addRailTracks(scene, -40, -26.8, 38);
   addRailPlatform(scene, -40, -30.1, 38);
@@ -9768,6 +9779,7 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
   ])));
   addDistrictLaneMarkings(scene, roads);
   addDistrictCrosswalks(scene);
+  addOuterRoadsideTrees(scene, DISTRICT_INSTANCE_ORDER.indexOf(district));
 
   addRailTracks(scene, config.train.x, -17, 30);
   addRailPlatform(scene, config.train.x, -9.6, 28);
