@@ -67,7 +67,7 @@ async function setup(t, serverOptions = {}) {
   return { client, advance(ms) { timestamp += ms; }, dataDir, async restart() { await server.shutdown(); await boot(); } };
 }
 async function signup(client, username) {
-  const response = await client('/api/auth/signup', { firstName: username, username, password: 'test-password-2026', gender: 'female' });
+  const response = await client('/api/auth/signup', { firstName: username, username, password: 'test-password-2026', district: 'Ernakulam', gender: 'female' });
   assert.equal(response.status, 201, JSON.stringify(response.data));
   return response.data.user;
 }
@@ -123,32 +123,34 @@ test('wardrobe outfit choices are validated, saved with the profile and reset wh
   assert.equal(saree.data.user.outfit, 'saree');
 });
 
-test('district choice sets avatar home and entry world; no choice defaults to Kottayam', async t => {
-  const app = await setup(t), explorer = app.client();
-  const created = await explorer('/api/auth/signup', {
+test('district choice belongs to signup; login resumes the saved district', async t => {
+  const app = await setup(t), defaultExplorer = app.client(), selectedExplorer = app.client();
+  const defaulted = await defaultExplorer('/api/auth/signup', {
     firstName: 'DistrictPlayer', username: 'DistrictPlayer', password: 'test-password-2026', gender: 'female'
   });
-  assert.equal(created.status, 201, JSON.stringify(created.data));
-  assert.equal(created.data.user.district, 'Kottayam');
-  assert.equal(created.data.user.worldDistrict, 'Kottayam');
-  assert.equal(created.data.user.x, 19);
-  assert.equal(created.data.user.z, -23);
+  assert.equal(defaulted.status, 201, JSON.stringify(defaulted.data));
+  assert.equal(defaulted.data.user.district, 'Kottayam');
+  assert.equal(defaulted.data.user.worldDistrict, 'Kottayam');
+  assert.equal(defaulted.data.user.x, 19);
+  assert.equal(defaulted.data.user.z, -23);
 
-  const selected = await explorer('/api/auth/login', {
-    identifier: 'DistrictPlayer', password: 'test-password-2026', district: 'Idukki'
+  const selected = await selectedExplorer('/api/auth/signup', {
+    firstName: 'IdukkiPlayer', username: 'IdukkiPlayer', password: 'test-password-2026', district: 'Idukki', gender: 'female'
   });
-  assert.equal(selected.status, 200, JSON.stringify(selected.data));
+  assert.equal(selected.status, 201, JSON.stringify(selected.data));
   assert.equal(selected.data.user.district, 'Idukki');
   assert.equal(selected.data.user.worldDistrict, 'Idukki');
   assert.equal(selected.data.user.x, 12);
   assert.equal(selected.data.user.z, 0);
 
-  const defaulted = await explorer('/api/auth/login', { identifier: 'DistrictPlayer', password: 'test-password-2026' });
-  assert.equal(defaulted.status, 200, JSON.stringify(defaulted.data));
-  assert.equal(defaulted.data.user.district, 'Kottayam');
-  assert.equal(defaulted.data.user.worldDistrict, 'Kottayam');
-  assert.equal(defaulted.data.user.x, 19);
-  assert.equal(defaulted.data.user.z, -23);
+  const resumed = await defaultExplorer('/api/auth/login', {
+    identifier: 'DistrictPlayer', password: 'test-password-2026', district: 'Idukki'
+  });
+  assert.equal(resumed.status, 200, JSON.stringify(resumed.data));
+  assert.equal(resumed.data.user.district, 'Kottayam');
+  assert.equal(resumed.data.user.worldDistrict, 'Kottayam');
+  assert.equal(resumed.data.user.x, 19);
+  assert.equal(resumed.data.user.z, -23);
 });
 
 test('a receiver must accept a follow before text, voice messages or live voice; blocks revoke both directions', async t => {
