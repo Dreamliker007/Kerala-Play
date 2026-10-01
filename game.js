@@ -2,7 +2,7 @@ import * as THREE from './vendor/three.module.js';
 import { initSocial, api } from './social.js?v=125.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
-import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=117.0';
+import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=118.0';
 import { createKeralaRoofTiles } from './roof-tiles.js?v=115.0';
 
 const busDestinationSignMaterials = new Map();
@@ -1150,7 +1150,6 @@ function updateFootstepEffects(delta, player, moving, running, phase = 0) {
 
 function roadZoneAt(x, z) {
   const district = currentWorldDistrictName();
-  if (district !== 'Kottayam' && district !== 'Ernakulam') {
     if (Math.abs(z + 92) <= 4.5 && x >= -100 && x <= 100) {
       return { id:'district-south-ring', label:`${district.toUpperCase()} SOUTH RING ROAD`, displayLimit:30, bikeLimit:5.1, taxiLimit:4.9 };
     }
@@ -1163,24 +1162,25 @@ function roadZoneAt(x, z) {
     if (Math.abs(x - 96) <= 4.5 && z >= -92 && z <= 92) {
       return { id:'district-east-ring', label:`${district.toUpperCase()} EAST RING ROAD`, displayLimit:30, bikeLimit:5.1, taxiLimit:4.9 };
     }
+    if (Math.abs(x) <= 6 && z >= -100 && z <= 100) {
       return { id:'district-spine', label:`${district.toUpperCase()} MAIN ROAD`, displayLimit:35, bikeLimit:5.8, taxiLimit:5.6 };
     }
-    if (Math.abs(z) <= 5 && x >= -68 && x <= 68) {
+    if (Math.abs(z) <= 5 && x >= -100 && x <= 100) {
       return { id:'district-cross', label:`${district.toUpperCase()} CITY ROAD`, displayLimit:30, bikeLimit:5.2, taxiLimit:5.0 };
     }
-    if (Math.abs(z + 6) <= 3.5 && x >= -48 && x <= 0) {
+    if (Math.abs(z + 6) <= 3.5 && x >= -96 && x <= 48) {
       return { id:'district-station-road', label:'RAILWAY STATION ROAD', displayLimit:25, bikeLimit:4.6, taxiLimit:4.4 };
     }
-    if (Math.abs(z - 22) <= 3.5 && x >= -18 && x <= 58) {
+    if (Math.abs(z - 22) <= 3.5 && x >= -58 && x <= 98) {
       return { id:'district-market-road', label:`${districtCityProfile(district).market.toUpperCase()} ROAD`, displayLimit:25, bikeLimit:4.6, taxiLimit:4.4 };
     }
-    if (Math.abs(z + 36) <= 3.5 && x >= -67 && x <= 19) {
+    if (Math.abs(z + 36) <= 3.5 && x >= -97 && x <= 49) {
       return { id:'district-residential-road', label:'RESIDENTIAL ROAD', displayLimit:25, bikeLimit:4.4, taxiLimit:4.2 };
     }
-    if (Math.abs(z - 45) <= 3.5 && x >= -12 && x <= 62) {
+    if (Math.abs(z - 45) <= 3.5 && x >= -47 && x <= 97) {
       return { id:'district-landmark-road', label:`${districtCityProfile(district).landmark.toUpperCase()} ROAD`, displayLimit:25, bikeLimit:4.4, taxiLimit:4.2 };
     }
-    if (Math.abs(z - 34) <= 3.5 && x >= -67 && x <= -3) {
+    if (Math.abs(z - 34) <= 3.5 && x >= -97 && x <= 27) {
       return { id:'district-secondary-road', label:districtCityProfile(district).secondary.toUpperCase(), displayLimit:25, bikeLimit:4.5, taxiLimit:4.3 };
     }
     if (currentDistrictInstance().airport && Math.abs(z + 28) <= 3.5 && x >= 0 && x <= 44) {
@@ -10027,7 +10027,7 @@ function buildWorld(scene) {
   // the established state-road traffic controller.
   addRoadVehicle(scene, { kind: 'bus', axis: 'x', fixed: 24.1, min: -94, max: 94, progress: -10, direction: 1, speed: 4.6, color: 0xd7aa2d, flowPhase: 1.7 });
   addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: 19.9, min: -94, max: 94, progress: 16, direction: -1, speed: 5.1, color: 0x2d7650, flowPhase: 3.3 });
-  addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -60, min: -46, max: -24, progress: 12, direction: -1, speed: 5.4, color: 0x6f4a88, flowPhase: 2.2 });
+  addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -60, min: -46, max: -24, progress: -34, direction: -1, speed: 5.4, color: 0x6f4a88, flowPhase: 2.2 });
   addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: 92, min: -92, max: 92, progress: -36, direction: 1, speed: 6.2, color: 0x5f7187, flowPhase: 5.8 });
   addRoadVehicle(scene, { kind: 'auto', axis: 'z', fixed: 96, min: -88, max: 88, progress: 35, direction: -1, speed: 5.2, color: 0x2b773f, flowPhase: 6.7 });
 
