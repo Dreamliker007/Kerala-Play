@@ -3818,14 +3818,13 @@ function updateRemotePlayers(delta, camera) {
     remote.position.lerp(remote.userData.predicted, 1 - Math.exp(-delta * 10));
     remote.rotation.y = rotateTowards(remote.rotation.y, remote.userData.yaw, delta * 12);
 
-    const playerDistance = playerRef
-      ? Math.hypot(remote.position.x - playerRef.position.x, remote.position.z - playerRef.position.z)
-      : 0;
-    const animateRemote = !runtimeIsMobile || playerDistance < 58;
+    const playerDx = playerRef ? remote.position.x - playerRef.position.x : 0;
+    const playerDz = playerRef ? remote.position.z - playerRef.position.z : 0;
+    const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
+    const animateRemote = !runtimeIsMobile || playerDistanceSq < 58 * 58;
     if (animateRemote) {
-      const remoteWalkSpeed = remote.userData.velocity.length();
       const remoteOnFoot = remote.userData.moving && remote.userData.mode === 'walk';
-      const remoteRunning = remoteOnFoot && remoteWalkSpeed > 3.9;
+      const remoteRunning = remoteOnFoot && remote.userData.velocity.lengthSq() > 3.9 * 3.9;
       remote.userData.phase += delta * (remoteRunning ? 10.5 : 5.2);
       animatePlayer(remote, remote.userData.phase, remoteOnFoot ? (remoteRunning ? .78 : .36) : 0, remoteRunning ? 1 : 0);
     }
