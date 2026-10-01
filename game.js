@@ -6500,8 +6500,10 @@ function updateVillagers(time) {
     if (communityEvent?.target && dailyRoutine && !dailyRoutine.hidden) {
       const baseX = Number(dailyRoutine.toX ?? data.startX);
       const baseZ = Number(dailyRoutine.toZ ?? data.startZ);
-      const eventDistance = Math.hypot(baseX - Number(communityEvent.target.x), baseZ - Number(communityEvent.target.z));
-      const joinsEvent = eventDistance <= 18 && ((Number(data.npcIndex || 0) + Number(communityEvent.slot || 0)) % 3 === 0);
+      const eventDx = baseX - Number(communityEvent.target.x);
+      const eventDz = baseZ - Number(communityEvent.target.z);
+      const joinsEvent = eventDx * eventDx + eventDz * eventDz <= 18 * 18
+        && ((Number(data.npcIndex || 0) + Number(communityEvent.slot || 0)) % 3 === 0);
       if (joinsEvent) {
         const elapsed = Math.max(0, Date.now() - Number(communityEvent.startsAt || Date.now()));
         const blend = THREE.MathUtils.smoothstep(Math.min(1, elapsed / 30000), 0, 1);
@@ -12205,7 +12207,7 @@ function updateAmbientAnimals(time, delta) {
     animal.position.z += (targetZ - animal.position.z) * Math.min(1, delta * response);
     const moveX = animal.position.x - beforeX;
     const moveZ = animal.position.z - beforeZ;
-    const moving = Math.hypot(moveX, moveZ) > .0015;
+    const moving = moveX * moveX + moveZ * moveZ > .0015 * .0015;
     if (moving) animal.rotation.y = Math.atan2(moveX, moveZ);
 
     const gait = Math.sin(time * (data.kind === 'chicken' ? 11 : alert > .15 ? 9 : 5.5) + data.phase);
