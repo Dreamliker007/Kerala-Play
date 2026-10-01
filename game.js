@@ -12136,15 +12136,15 @@ function updateAmbientAnimals(time, delta) {
   for (const animal of ambientAnimals) {
     const data = animal.userData.ambientAnimal;
     if (!data) continue;
-    const playerDistance = playerRef
-      ? Math.hypot(animal.position.x - playerRef.position.x, animal.position.z - playerRef.position.z)
-      : 0;
+    const playerDx = playerRef ? animal.position.x - playerRef.position.x : 0;
+    const playerDz = playerRef ? animal.position.z - playerRef.position.z : 0;
+    const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
 
     if (data.kind === 'bird' || data.kind === 'butterfly') {
       const butterfly = data.kind === 'butterfly';
       animal.visible = !night
         && rain < (butterfly ? .42 : .62)
-        && (!runtimeIsMobile || playerDistance < 52);
+        && (!runtimeIsMobile || playerDistanceSq < 52 * 52);
       if (!animal.visible) continue;
       const angle = time * data.speed + data.phase;
       const radius = data.radius;
@@ -12168,7 +12168,7 @@ function updateAmbientAnimals(time, delta) {
     const hideAtNight = data.kind === 'chicken' || data.kind === 'goat' || data.kind === 'cow';
     animal.visible = !(hideAtNight && night);
     if (!animal.visible) continue;
-    if (playerDistance > 55) continue;
+    if (playerDistanceSq > 55 * 55) continue;
 
     const parts = data.parts || {};
     const phase = time * data.speed + data.phase;
@@ -12178,13 +12178,14 @@ function updateAmbientAnimals(time, delta) {
     let alert = 0;
 
     if (playerRef?.visible) {
-      const dx = animal.position.x - playerRef.position.x;
-      const dz = animal.position.z - playerRef.position.z;
-      const distance = Math.max(.001, Math.hypot(dx, dz));
+      const dx = playerDx;
+      const dz = playerDz;
       const reactionRadius = vehicleMode === 'walk'
         ? (data.kind === 'chicken' ? 3.4 : data.kind === 'dog' ? 3.0 : 3.3)
         : 5.5;
-      if (distance < reactionRadius) {
+      const reactionRadiusSq = reactionRadius * reactionRadius;
+      if (playerDistanceSq < reactionRadiusSq) {
+        const distance = Math.max(.001, Math.sqrt(playerDistanceSq));
         alert = 1 - distance / reactionRadius;
         const escape = (data.kind === 'chicken' ? 3.0 : data.kind === 'dog' ? 1.8 : 2.1) * alert;
         targetX = animal.position.x + dx / distance * escape;
