@@ -2811,11 +2811,10 @@ window.addEventListener('kerala-district-journey', event => {
 async function resumeDistrictJourney(userId) {
   if (!userId || districtJourneyResumeUserId === userId) return;
   districtJourneyResumeUserId = userId;
-  // Hold movement while the server decides whether this session is still in
-  // district transit. This prevents a reload/login race from saving movement
-  // into the departure district before a pending journey is restored.
-  publicRideInProgress = true;
-  clearGameInput();
+  // Do not freeze local controls while checking whether a journey needs to be
+  // resumed. The server already rejects world-move writes during pending
+  // district travel, so a slow status request must never make the app appear
+  // stuck. Lock movement only after a real pending journey is confirmed.
   try {
     const result = await api('/api/travel/district/status');
     if (result.status === 'pending' && result.travel) {
