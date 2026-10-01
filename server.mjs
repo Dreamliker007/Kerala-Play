@@ -53,8 +53,8 @@ function cleanAvatarCustomization(value, gender = 'male') {
   return clean;
 }
 const DISTRICT_TRAVEL_FREE_TRIPS = 3;
-const DISTRICT_TRAVEL_FARES = Object.freeze({ train:500, flight:1000, teleport:2000 });
-const DISTRICT_TRAVEL_DURATIONS = Object.freeze({ train:60_000, flight:30_000, teleport:0 });
+const DISTRICT_TRAVEL_FARES = Object.freeze({ train:250, flight:500, teleport:1000 });
+const DISTRICT_TRAVEL_DURATIONS = Object.freeze({ train:10_000, flight:5_000, teleport:0 });
 const GENERIC_WORLD_BOUNDS = Object.freeze({ minX:-110, maxX:110, minZ:-110, maxZ:110 });
 const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_ORDER.map((district, index) => {
   const generic = {
@@ -310,7 +310,11 @@ const PUBLIC_RIDE_SERVICES = Object.freeze({
 const JOB_DEFINITIONS = Object.freeze({
   delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Take the delivery bike, collect a parcel, then ride to the customer.', missionType: 'route', vehicle: 'bike', vehicleLabel: 'Delivery Bike' },
   taxi: { title: 'Taxi Driver', reward: 220, durationMs: 0, cooldownMs: 35_000, description: 'Enter the taxi, reach the passenger pickup point, then drive to the destination.', missionType: 'route', vehicle: 'taxi', vehicleLabel: 'Kerala Taxi' },
-  shop: { title: 'Shop Worker', reward: 140, durationMs: 10_000, cooldownMs: 25_000, description: 'Travel to the village shop, check in and complete a short on-site shift.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  shop: { title: 'Shop Worker', reward: 140, durationMs: 10_000, cooldownMs: 25_000, description: 'Travel to the local shop, check in and complete a short on-site shift.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  hospital: { title: 'Hospital Assistant', reward: 175, durationMs: 12_000, cooldownMs: 30_000, description: 'Report to the district hospital and help with a short reception and support shift.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  mechanic: { title: 'Garage Helper', reward: 190, durationMs: 12_000, cooldownMs: 32_000, description: 'Report to the service garage and help inspect and prepare vehicles.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  market: { title: 'Market Helper', reward: 155, durationMs: 9_000, cooldownMs: 24_000, description: 'Help a local market stall restock and prepare customer orders.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  civic: { title: 'Municipal Worker', reward: 165, durationMs: 10_000, cooldownMs: 28_000, description: 'Report to the town civic point and complete a short public-service shift.', missionType: 'shift', vehicle: null, vehicleLabel: null },
 });
 const JOB_MISSION_RADIUS = 5.5;
 const JOB_VEHICLE_RADIUS = 4.5;
@@ -1950,6 +1954,10 @@ function publicRideDestinationForUser(user, destinationId) {
     const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinateFor(user, base.x, dx, 'x'), z: missionCoordinateFor(user, base.z, dz, 'z') });
     if (jobId === 'delivery') return [point(`${district} Parcel Hub`, 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
     if (jobId === 'taxi') return [point(`${city.centre} Passenger Pickup`, 'Pick up passenger', -7, 5), point(city.neighbourhood || city.secondary, 'Drop off passenger', -20, -7)];
+    if (jobId === 'hospital') return [point(`${district} District Hospital`, 'Check in for hospital shift', -12, 8)];
+    if (jobId === 'mechanic') return [point(`${district} Service Garage`, 'Check in at the workshop', -18, -10)];
+    if (jobId === 'market') return [point(city.market || `${district} Market`, 'Help restock the market', 12, 7)];
+    if (jobId === 'civic') return [point(`${city.centre} Civic Point`, 'Check in for public-service shift', 8, -12)];
     return [point(genericDistrictWorld(user) ? city.market : 'Village Shop', 'Check in for shift', 9, -5)];
   }
   function personalVehicleSummary(user) {
