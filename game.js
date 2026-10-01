@@ -2662,10 +2662,13 @@ function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) 
     districtJourneyTimers.push(setTimeout(() => finishDistrictJourney(travel), animationMs));
     return;
   }
+  let statusRequestPending = false;
   districtJourneyInterval = setInterval(async () => {
     const remaining = Math.max(0, arrivalAt - (Date.now() + timeOffset));
     const elapsed = Math.max(0, durationMs - remaining);
     drawJourneyFrame(elapsed, remaining);
+    if (statusRequestPending) return;
+    statusRequestPending = true;
     try {
       const status = await api('/api/travel/district/status');
       if (status.status === 'arrived') { finishDistrictJourney(status.travel || travel); return; }
@@ -2680,6 +2683,7 @@ function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) 
         finishDistrictJourney({ ...travel, to:{ district:toDistrict } });
       }
     } catch { /* Keep the server-based countdown running and retry next second. */ }
+    finally { statusRequestPending = false; }
   }, 1000);
 }
 
