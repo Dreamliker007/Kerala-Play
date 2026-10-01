@@ -6528,16 +6528,18 @@ function updateVillagers(time) {
       return;
     }
 
-    const playerDistance = playerRef
-      ? Math.hypot(villager.position.x - playerRef.position.x, villager.position.z - playerRef.position.z)
-      : 0;
-    if (runtimeIsMobile && playerDistance > 64 && data.behavior !== 'crossing') {
+    const playerDx = playerRef ? villager.position.x - playerRef.position.x : 0;
+    const playerDz = playerRef ? villager.position.z - playerRef.position.z : 0;
+    const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
+    if (runtimeIsMobile && playerDistanceSq > 64 * 64 && data.behavior !== 'crossing') {
       data.crossingActive = false;
       return;
     }
 
+    const shelterDx = data.hasRainShelter ? villager.position.x - data.rainShelterX : 0;
+    const shelterDz = data.hasRainShelter ? villager.position.z - data.rainShelterZ : 0;
     const nearRainShelter = data.hasRainShelter
-      && Math.hypot(villager.position.x - data.rainShelterX, villager.position.z - data.rainShelterZ) <= 5.5;
+      && shelterDx * shelterDx + shelterDz * shelterDz <= 5.5 * 5.5;
     const usingUmbrella = rainReaction > .18 && !nearRainShelter;
     if (data.umbrella) {
       data.umbrella.visible = usingUmbrella;
