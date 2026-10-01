@@ -1638,9 +1638,12 @@ test('Kottayam station quotes a train ticket and boards into Ernakulam station',
   assert.equal(ernakulam.train.fare, 0);
   assert.equal(routes.data.freeTripsRemaining, 3);
 
-  app.advance(1500);
-  const stationApproach = await player('/api/world/move', { x: 7, z: -23, rotation: 0, moving: true });
-  assert.equal(stationApproach.status, 200, JSON.stringify(stationApproach.data));
+  let stationApproach;
+  for (const [x, z] of [[0, -30], [-18, -36], [-36, -42], [-52, -48], [-60, -50]]) {
+    app.advance(2500);
+    stationApproach = await player('/api/world/move', { x, z, rotation: 0, moving: true });
+    assert.equal(stationApproach.status, 200, JSON.stringify(stationApproach.data));
+  }
   const trip = await player('/api/travel/district/board', { mode: 'train', destinationDistrict: 'Ernakulam' });
   assert.equal(trip.status, 200, JSON.stringify(trip.data));
   assert.equal(trip.data.travel.status, 'pending');
@@ -1651,9 +1654,9 @@ test('Kottayam station quotes a train ticket and boards into Ernakulam station',
   assert.equal(trip.data.transaction, null);
   assert.equal(trip.data.travel.freeTripsRemaining, 2);
   assert.equal(trip.data.user.worldDistrict, 'Kottayam');
-  assert.equal(trip.data.user.x, 7);
-  assert.equal(trip.data.user.z, -23);
-  assert.equal((await player('/api/world/move', { x: 7, z: -23, rotation: 0, moving: false })).status, 409);
+  assert.equal(trip.data.user.x, -60);
+  assert.equal(trip.data.user.z, -50);
+  assert.equal((await player('/api/world/move', { x: -60, z: -50, rotation: 0, moving: false })).status, 409);
 
   app.advance(9_999);
   const waiting = await player('/api/travel/district/status');
@@ -1738,7 +1741,7 @@ test('first three district trips are shared across transport modes and the fixed
     }
   }
 
-  await walkTo(19, -23, 7, -23);
+  await walkTo(19, -23, -60, -50);
   const train = await player('/api/travel/district/board', { mode:'train', destinationDistrict:'Ernakulam' });
   assert.equal(train.data.travel.fare, 0);
   assert.equal(train.data.travel.tripNumber, 1);
@@ -1808,7 +1811,9 @@ test('first three district trips are shared across transport modes and the fixed
   const paidTrainArrival = await airportPlayer('/api/travel/district/status');
   assert.equal(paidTrainArrival.data.status, 'arrived');
   assert.equal(paidTrainArrival.data.user.worldDistrict, 'Kottayam');
-  await walkTo(11, -23, 78, 72, airportPlayer);
+  assert.equal(paidTrainArrival.data.user.x, -54);
+  assert.equal(paidTrainArrival.data.user.z, -50);
+  await walkTo(-54, -50, 78, 72, airportPlayer);
   const paidTeleport = await airportPlayer('/api/travel/district/board', { mode:'teleport', destinationDistrict:'Idukki' });
   assert.equal(paidTeleport.status, 200, JSON.stringify(paidTeleport.data));
   assert.equal(paidTeleport.data.travel.fare, 1000);
