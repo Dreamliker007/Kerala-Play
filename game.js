@@ -2656,11 +2656,21 @@ districtTravelConfirm?.addEventListener('click', async () => {
       destinationDistrict: districtTravelSelected,
     });
     clearTimeout(boardTimeout);
-    if (!boardRequestActive) return;
-    boardRequestActive = false;
     const travel = result?.travel || {};
     const toDistrict = travel.to?.district || travel.district || districtTravelSelected;
     const fromDistrict = travel.from?.district || currentWorldDistrictName();
+    if (!boardRequestActive) {
+      // The board request can finish after the timeout reconciler has already
+      // run. If no journey UI (or arrival reload) was recovered, use this
+      // authoritative success response instead of silently leaving the player
+      // in server-side transit.
+      if (!districtJourneyFinishing && !districtJourneyScreen?.classList.contains('open')) {
+        closeDistrictTravelPanel();
+        showDistrictJourney(travel.mode || districtTravelMode, fromDistrict, toDistrict, Number(travel.fare || 0), travel);
+      }
+      return;
+    }
+    boardRequestActive = false;
     closeDistrictTravelPanel();
     showDistrictJourney(districtTravelMode, fromDistrict, toDistrict, Number(travel.fare || 0), travel);
   } catch (error) {
