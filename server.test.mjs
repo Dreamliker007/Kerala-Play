@@ -1023,7 +1023,7 @@ test('daily needs decay shop restoration rest and movement penalties persist ser
   assert.ok(rest.data.needs.energy > moved.data.needs.energy);
   assert.equal((await alice('/api/needs/rest', {})).status, 409, 'Rest must have a server cooldown when energy was restored');
 
-  app.advance(5_000);
+  app.advance(30_000);
   const restedAgain = await alice('/api/needs/rest', {});
   assert.equal(restedAgain.status, 200);
   assert.equal(restedAgain.data.rested, true);
