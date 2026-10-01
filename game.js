@@ -11940,9 +11940,11 @@ function updateTraffic(delta) {
     if (trafficHitsStaticWorld(config, nextProgress)) {
       // Ambient traffic must never enter buildings, shelters or other static
       // world geometry. Hold at the last safe point and reverse along its lane.
+      // At a road end the direction was already reversed above, so do not flip
+      // it a second time in the same frame and pin the vehicle to the boundary.
       nextProgress = Number(config.progress);
       config.currentSpeed = 0;
-      config.direction *= -1;
+      if (!reachedRoadEnd) config.direction *= -1;
       if (config.kind === 'bus') {
         config.lastBusStop = null;
         config.stopUntil = 0;
