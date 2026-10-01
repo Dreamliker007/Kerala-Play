@@ -2490,8 +2490,10 @@ let districtTravelSnapshot = null;
 let districtJourneyTimers = [];
 let districtJourneyInterval = null;
 let districtJourneyResumeUserId = '';
+let districtTravelLoadGeneration = 0;
 
 function closeDistrictTravelPanel() {
+  districtTravelLoadGeneration++;
   districtTravelPanel?.classList.remove('open');
   districtTravelSelected = '';
   if (districtTravelConfirm) {
@@ -2546,6 +2548,7 @@ function renderDistrictTravelDestinations() {
 }
 
 async function openDistrictTravelPanel(mode = 'train') {
+  const loadGeneration = ++districtTravelLoadGeneration;
   districtTravelMode = ['train','flight','teleport'].includes(mode) ? mode : 'train';
   districtTravelSelected = '';
   if (districtTravelPanel) districtTravelPanel.classList.add('open');
@@ -2560,9 +2563,12 @@ async function openDistrictTravelPanel(mode = 'train') {
   if (districtTravelError) districtTravelError.textContent = '';
   if (districtTravelConfirm) districtTravelConfirm.disabled = true;
   try {
-    districtTravelSnapshot = await api('/api/travel/districts');
+    const snapshot = await api('/api/travel/districts');
+    if (loadGeneration !== districtTravelLoadGeneration || !districtTravelPanel?.classList.contains('open')) return;
+    districtTravelSnapshot = snapshot;
     renderDistrictTravelDestinations();
   } catch (error) {
+    if (loadGeneration !== districtTravelLoadGeneration || !districtTravelPanel?.classList.contains('open')) return;
     if (districtTravelDestinations) districtTravelDestinations.replaceChildren();
     if (districtTravelError) districtTravelError.textContent = error.message || 'Travel routes unavailable.';
   }
