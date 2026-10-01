@@ -1373,6 +1373,8 @@ function updateVehicleWeatherSurfaces(vehicle, wet) {
   for (const surface of vehicle?.userData?.weatherSurfaces || []) applyWeatherSurfaceState(surface, wet);
 }
 
+let lastWorldMaterialWeather = null;
+
 function updateWorldWeatherVisuals(state) {
   if (!state) return;
   worldWeatherState = state;
@@ -1380,6 +1382,13 @@ function updateWorldWeatherVisuals(state) {
   const wet = THREE.MathUtils.clamp(Number(state.rain || 0), 0, 1);
   const daylight = THREE.MathUtils.clamp(Number(state.daylight ?? 1), 0, 1);
   const overcast = THREE.MathUtils.clamp(Number(state.overcast || 0), 0, 1);
+  const materialWeatherChanged = !lastWorldMaterialWeather
+    || Math.abs(wet - lastWorldMaterialWeather.wet) >= .012
+    || Math.abs(daylight - lastWorldMaterialWeather.daylight) >= .012
+    || Math.abs(overcast - lastWorldMaterialWeather.overcast) >= .012
+    || !!state.needsLights !== lastWorldMaterialWeather.needsLights;
+  if (!materialWeatherChanged) return;
+  lastWorldMaterialWeather = { wet, daylight, overcast, needsLights: !!state.needsLights };
   const darkness = THREE.MathUtils.clamp(1 - daylight, 0, 1);
   const lightStrength = THREE.MathUtils.clamp(Math.max(darkness, overcast * .72), 0, 1);
   const lightsNeeded = !!state.needsLights;
