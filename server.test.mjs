@@ -67,7 +67,7 @@ async function setup(t, serverOptions = {}) {
   return { client, advance(ms) { timestamp += ms; }, dataDir, async restart() { await server.shutdown(); await boot(); } };
 }
 async function signup(client, username) {
-  const response = await client('/api/auth/signup', { firstName: username, username, password: 'test-password-2026', district: 'Ernakulam', gender: 'female' });
+  const response = await client('/api/auth/signup', { firstName: username, username, password: 'test-password-2026', gender: 'female' });
   assert.equal(response.status, 201, JSON.stringify(response.data));
   return response.data.user;
 }
@@ -816,7 +816,7 @@ test('traffic checkpoint documents challans payments and speeding stay server co
   assert.equal(traffic.rules.speedingFine, 25);
 
   app.advance(31 * 24 * 60 * 60 * 1000);
-  assert.equal((await alice('/api/auth/login', { identifier: 'TrafficAlice', password: 'test-password-2026', district: 'Ernakulam' })).status, 200);
+  assert.equal((await alice('/api/auth/login', { identifier: 'TrafficAlice', password: 'test-password-2026' })).status, 200);
   traffic = (await alice('/api/traffic')).data;
   assert.equal(traffic.documents[0].insuranceActive, false);
 
@@ -1412,7 +1412,7 @@ test('server-owned world alerts are filtered by time and district and keep read 
   assert.equal(alerts.items.find(item => item.id === rain.id).read, true);
 
   await app.restart();
-  assert.equal((await alice('/api/auth/login', { identifier: 'WorldAlertAlice', password: 'test-password-2026', district: 'Ernakulam' })).status, 200);
+  assert.equal((await alice('/api/auth/login', { identifier: 'WorldAlertAlice', password: 'test-password-2026' })).status, 200);
   alerts = (await alice('/api/notifications')).data;
   assert.equal(alerts.items.find(item => item.id === rain.id).read, true);
 });
@@ -1594,7 +1594,7 @@ test('emergency help cannot farm recognition during cooldown', async t => {
   await writeFile(dbPath, JSON.stringify(db, null, 2));
   await app.restart();
   player = app.client();
-  await player('/api/auth/login', { identifier: 'ResponderAlice', password: 'test-password-2026', district: 'Ernakulam' });
+  await player('/api/auth/login', { identifier: 'ResponderAlice', password: 'test-password-2026' });
 
   const first = await player('/api/world/emergency-help', { service: 'police' });
   assert.equal(first.status, 200);
@@ -1785,7 +1785,9 @@ test('first three district trips are shared across transport modes and the fixed
   await writeFile(dbPath, JSON.stringify(db, null, 2));
   await app.restart();
   const airportPlayer = app.client();
-  await airportPlayer('/api/auth/login', { identifier:'TripCounter', password:'test-password-2026', district:'Kannur' });
+  await airportPlayer('/api/auth/login', { identifier:'TripCounter', password:'test-password-2026' });
+  const loggedInTripCounter = await airportPlayer('/api/session');
+  assert.equal(loggedInTripCounter.data.user.worldDistrict, 'Kannur');
   const airportRoutes = await airportPlayer('/api/travel/districts');
   const flightRoute = airportRoutes.data.districts.find(item => item.district === 'Ernakulam');
   assert.equal(flightRoute.flight.fare, 500);
