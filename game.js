@@ -9058,10 +9058,13 @@ function updateWindWorld(time, delta) {
 
   for (const item of windVegetation) {
     if (playerRef && Number.isFinite(item.x) && Number.isFinite(item.z)) {
-      const distance = Math.hypot(playerRef.position.x - item.x, playerRef.position.z - item.z);
+      const dx = playerRef.position.x - item.x;
+      const dz = playerRef.position.z - item.z;
+      const distanceSq = dx * dx + dz * dz;
       // Trees and fields behind the fog need neither draw calls nor wind work.
-      // The extra range covers tall crowns and the edges of paddy fields.
-      if (item.root) item.root.visible = distance <= (sceneRef?.fog?.far || 180) + 14;
+      // Squared distance checks avoid a square root for every vegetation item.
+      const fogVisualDistance = (sceneRef?.fog?.far || 180) + 14;
+      if (item.root) item.root.visible = distanceSq <= fogVisualDistance * fogVisualDistance;
       if (item.root && !item.root.visible) continue;
       if ((item.kind === 'tree' || item.kind === 'rubber' || item.kind === 'palm' || item.kind === 'areca' || item.kind === 'banana') && item.nearGroup && item.farGroup) {
         const isPalmType = item.kind === 'palm' || item.kind === 'areca';
@@ -9069,7 +9072,8 @@ function updateWindWorld(time, delta) {
         const farEnterDistance = item.kind === 'banana' ? 34 : (isPalmType ? 50 : 52);
         const adjustedFarDistance = isRubberType ? 42 : farEnterDistance;
         const nearReturnDistance = item.kind === 'banana' ? 28 : (isRubberType ? 34 : (isPalmType ? 42 : 44));
-        const useFar = item.usingFar ? distance > nearReturnDistance : distance > adjustedFarDistance;
+        const lodDistance = item.usingFar ? nearReturnDistance : adjustedFarDistance;
+        const useFar = distanceSq > lodDistance * lodDistance;
         if (useFar !== item.usingFar) {
           item.usingFar = useFar;
           item.nearGroup.visible = !useFar;
@@ -9077,7 +9081,7 @@ function updateWindWorld(time, delta) {
           item.nodes.forEach(node => { node.castShadow = !useFar; });
         }
       }
-      if (distance > 62) continue;
+      if (distanceSq > 62 * 62) continue;
     }
     const phase = Number(item.phase || 0);
     if (item.kind === 'palm' || item.kind === 'areca') {
