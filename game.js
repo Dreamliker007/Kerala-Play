@@ -11864,7 +11864,9 @@ function updateTraffic(delta) {
     for (const other of traffic) {
       if (other === vehicle || !other?.visible) continue;
       const otherConfig = other.userData.traffic;
-      if (otherConfig.axis !== config.axis || Math.abs(Number(otherConfig.fixed) - Number(config.fixed)) > 1.1) continue;
+      if (otherConfig.axis !== config.axis
+        || Number(otherConfig.direction) !== Number(config.direction)
+        || Math.abs(Number(otherConfig.fixed) - Number(config.fixed)) > 1.1) continue;
       const gap = (Number(otherConfig.progress) - Number(config.progress)) * Number(config.direction);
       const selfLength = trafficFootprint(config);
       const otherLength = trafficFootprint(otherConfig);
