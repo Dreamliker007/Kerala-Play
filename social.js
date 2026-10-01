@@ -1858,24 +1858,29 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   window.addEventListener('kerala-garage-state-local', event => { if (event.detail) renderGarage(event.detail); });
 
   async function performVehicleService(action, source = 'job') {
-    if (!user || !['refuel', 'repair'].includes(action)) return;
-    let result;
-    if (source === 'personal') {
-      const active = garageSnapshot?.activeVehicle;
-      if (!active) return;
-      result = await api('/api/garage/vehicle/service', { vehicleId: active.vehicleId, action });
-      renderGarage(result.garage);
-    } else {
-      const active = jobsSnapshot?.active;
-      if (!active?.vehicle) return;
-      result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle/service`, { taskId: active.taskId, action });
-      renderJobs(result.jobs);
+    if (!user || !['refuel', 'repair'].includes(action) || vehicleActionPending) return;
+    vehicleActionPending = true;
+    try {
+      let result;
+      if (source === 'personal') {
+        const active = garageSnapshot?.activeVehicle;
+        if (!active) return;
+        result = await api('/api/garage/vehicle/service', { vehicleId: active.vehicleId, action });
+        renderGarage(result.garage);
+      } else {
+        const active = jobsSnapshot?.active;
+        if (!active?.vehicle) return;
+        result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle/service`, { taskId: active.taskId, action });
+        renderJobs(result.jobs);
+      }
+      renderWallet(result.wallet);
+      const service = result.service;
+      toast(action === 'refuel'
+        ? `Fuel tank full · ${formatCash(service.cost)} paid`
+        : `Vehicle repaired · condition 100% · ${formatCash(service.cost)} paid`);
+    } finally {
+      vehicleActionPending = false;
     }
-    renderWallet(result.wallet);
-    const service = result.service;
-    toast(action === 'refuel'
-      ? `Fuel tank full · ${formatCash(service.cost)} paid`
-      : `Vehicle repaired · condition 100% · ${formatCash(service.cost)} paid`);
   }
   window.addEventListener('kerala-vehicle-service', event => run(() => performVehicleService(event.detail?.action, event.detail?.source || 'job')));
 
