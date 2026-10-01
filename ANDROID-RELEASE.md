@@ -1,6 +1,6 @@
 # Kerala Play Android closed-testing update
 
-This repository is prepared for the V114 update to the existing Google Play closed-testing track.
+This repository is prepared for the current update to the existing Google Play closed-testing track.
 
 ## Release identity
 
@@ -36,7 +36,7 @@ In Android Studio use **Build > Generate Signed App Bundle or APK > Android App 
 
 Use the same Play app and the same upload signing key used for the existing Kerala Play listing. Do not create a second application ID. Upload the resulting signed `.aab` to the existing **Closed testing** track.
 
-V114 is deployed at `https://keralaplay.in`. Closed-test users receive the Android update only after its signed AAB is uploaded and released in the existing closed-testing track.
+The current production web build is deployed at `https://keralaplay.in`. Closed-test users receive the Android update only after its signed AAB is uploaded and released in the existing closed-testing track.
 
 ## Closed-testing update checks
 

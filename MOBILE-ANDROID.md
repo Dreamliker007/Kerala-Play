@@ -4,7 +4,7 @@ This branch adds a Capacitor wrapper around the existing Kerala Play web client.
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - Android Studio with an Android SDK installed
 - Java/JDK supported by the installed Android Studio / Capacitor Android tooling
 
@@ -35,7 +35,7 @@ Then choose an emulator or connected Android phone and press Run.
 
 The Kerala Play client calls relative `/api/...` endpoints and uses the Node server for accounts, sessions, multiplayer, messages, rewards and persistence. A packaged Android WebView does not contain that Node server.
 
-The V114 production server is hosted at `https://keralaplay.in`. The mobile release configuration loads that HTTPS origin. Microphone/WebRTC features should also be tested on real devices; some networks may require a TURN relay.
+The current production server is hosted at `https://keralaplay.in`. The mobile release configuration loads that HTTPS origin. Microphone/WebRTC features should also be tested on real devices; some networks may require a TURN relay.
 
 ## Build output
 
@@ -43,7 +43,7 @@ For testing, Android Studio can generate an APK. For Google Play distribution, c
 
 ## Landscape mode
 
-Kerala Play is landscape-first on phones. The hosted web client shows a rotate prompt in portrait and requests landscape when supported. The PWA manifest also declares landscape orientation.
+Kerala Play is landscape-first on phones. The PWA manifest declares landscape orientation, and native Capacitor releases lock MainActivity to sensor landscape.
 
 The Android project is generated locally and is ignored by Git, so the npm scripts patch the generated MainActivity automatically:
 
@@ -56,7 +56,7 @@ The web/PWA button requests fullscreen first and then asks the Screen Orientatio
 
 ## Closed testing release metadata
 
-The V114 Play closed-testing update is defined in `mobile-release.json` as version `1.0.13` with `versionCode 14` and uses the live game origin `https://keralaplay.in`.
+The current Play closed-testing update is defined in `mobile-release.json` as version `1.0.13` with `versionCode 14` and uses the live game origin `https://keralaplay.in`.
 
 `npm run mobile:add` and `npm run mobile:sync` now run `mobile:configure`, which reapplies:
 
