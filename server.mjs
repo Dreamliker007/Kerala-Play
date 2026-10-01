@@ -1952,12 +1952,19 @@ function publicRideDestinationForUser(user, destinationId) {
     const district = currentWorldDistrict(user);
     const city = districtCityProfile(district);
     const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinateFor(user, base.x, dx, 'x'), z: missionCoordinateFor(user, base.z, dz, 'z') });
+    const fixed = (name, action, x, z) => ({ name, action, x, z });
     if (jobId === 'delivery') return [point(`${district} Parcel Hub`, 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
     if (jobId === 'taxi') return [point(`${city.centre} Passenger Pickup`, 'Pick up passenger', -7, 5), point(city.neighbourhood || city.secondary, 'Drop off passenger', -20, -7)];
-    if (jobId === 'hospital') return [point(`${district} District Hospital`, 'Check in for hospital shift', -12, 8)];
-    if (jobId === 'mechanic') return [point(`${district} Service Garage`, 'Check in at the workshop', -18, -10)];
-    if (jobId === 'market') return [point(city.market || `${district} Market`, 'Help restock the market', 12, 7)];
-    if (jobId === 'civic') return [point(`${city.centre} Civic Point`, 'Check in for public-service shift', 8, -12)];
+
+    const servicePoints = district === 'Kottayam'
+      ? { hospital:[42,35.5], mechanic:[-34,-11.7], market:[29,15], civic:[13,16] }
+      : district === 'Ernakulam'
+        ? { hospital:[-11,-29.5], mechanic:[-32,34], market:[-49,12.5], civic:[5,-8] }
+        : { hospital:[-20,19], mechanic:[-18,-44], market:[20,19], civic:[9,8] };
+    if (jobId === 'hospital') return [fixed(`${district} District Hospital`, 'Check in for hospital shift', ...servicePoints.hospital)];
+    if (jobId === 'mechanic') return [fixed(`${district} Service Garage`, 'Check in at the workshop', ...servicePoints.mechanic)];
+    if (jobId === 'market') return [fixed(city.market || `${district} Market`, 'Help restock the market', ...servicePoints.market)];
+    if (jobId === 'civic') return [fixed(`${city.centre} Civic Point`, 'Check in for public-service shift', ...servicePoints.civic)];
     return [point(genericDistrictWorld(user) ? city.market : 'Village Shop', 'Check in for shift', 9, -5)];
   }
   function personalVehicleSummary(user) {
