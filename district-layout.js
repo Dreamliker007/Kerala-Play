@@ -1,27 +1,35 @@
 // Shared client/server coordinates for the reusable district street layout.
 // Keep gameplay service points aligned with visible buildings as districts grow.
 const BASE_ROADS = Object.freeze([
-  Object.freeze([0, 0, 12, 160]),
-  Object.freeze([0, 0, 150, 10]),
-  Object.freeze([20, 22, 76, 7]),
-  Object.freeze([-24, -6, 48, 7]),
-  Object.freeze([-24, -36, 86, 7]),
-  Object.freeze([25, 45, 74, 7]),
-  Object.freeze([-35, 34, 64, 7]),
-  Object.freeze([0, -78, 150, 8]),
+  // Main cross roads now run nearly to the district boundary.
+  Object.freeze([0, 0, 12, 200]),
+  Object.freeze([0, 0, 200, 10]),
+  Object.freeze([20, 22, 156, 7]),
+  Object.freeze([-24, -6, 144, 7]),
+  Object.freeze([-24, -36, 146, 7]),
+  Object.freeze([25, 45, 144, 7]),
+  Object.freeze([-35, 34, 124, 7]),
+  // Connected outer loop keeps roads continuous instead of ending in grass.
+  Object.freeze([0, -92, 200, 8]),
+  Object.freeze([0, 92, 200, 8]),
+  Object.freeze([-96, 0, 8, 184]),
+  Object.freeze([96, 0, 8, 184]),
 ]);
 const AIRPORT_LINK_ROAD = Object.freeze([22, -28, 44, 7]);
 const ERNAKULAM_ROADS = Object.freeze([
-  Object.freeze([0, 2, 72, 8]),
-  Object.freeze([0, 21, 62, 7]),
-  Object.freeze([0, -16, 62, 7]),
-  Object.freeze([0, 2, 8, 62]),
-  Object.freeze([-22, 2, 7, 58]),
-  Object.freeze([22, 2, 7, 58]),
-  Object.freeze([-38, -19.5, 24, 7]),
-  Object.freeze([-29, -17.5, 7, 9]),
-  Object.freeze([0, -42, 8, 76]),
-  Object.freeze([0, -78, 150, 8]),
+  Object.freeze([0, 2, 200, 8]),
+  Object.freeze([0, 21, 150, 7]),
+  Object.freeze([0, -16, 150, 7]),
+  Object.freeze([0, 2, 8, 200]),
+  Object.freeze([-22, 2, 7, 118]),
+  Object.freeze([22, 2, 7, 118]),
+  Object.freeze([-38, -19.5, 64, 7]),
+  Object.freeze([-29, -17.5, 7, 49]),
+  Object.freeze([0, -42, 8, 116]),
+  Object.freeze([0, -92, 200, 8]),
+  Object.freeze([0, 92, 200, 8]),
+  Object.freeze([-96, 0, 8, 184]),
+  Object.freeze([96, 0, 8, 184]),
 ]);
 
 export const GENERIC_DISTRICT_OFFICE = Object.freeze({ x: 36, z: -68 });
