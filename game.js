@@ -1845,6 +1845,32 @@ function restorePlayerVehiclePose() {
   }
 }
 
+function hasSafeVehicleExit(vehicleVisual) {
+  if (!playerRef || !vehicleVisual) return false;
+  const yaw = Number(vehicleVisual.rotation.y) || playerRef.rotation.y || 0;
+  const sideX = Math.cos(yaw);
+  const sideZ = -Math.sin(yaw);
+  const forwardX = Math.sin(yaw);
+  const forwardZ = Math.cos(yaw);
+  const sideDistance = vehicleVisual.userData.vehicleKind === 'bike' ? 1.02 : 1.38;
+  const candidates = [
+    [sideX * sideDistance, sideZ * sideDistance],
+    [-sideX * sideDistance, -sideZ * sideDistance],
+    [forwardX * 1.72, forwardZ * 1.72],
+    [-forwardX * 1.72, -forwardZ * 1.72],
+  ];
+  if (candidates.some(([dx, dz]) => !positionBlocked(playerRef.position.x + dx, playerRef.position.z + dz, .43))) return true;
+  for (const distance of [2.1, 2.6, 3.2]) {
+    for (let index = 0; index < 12; index++) {
+      const angle = yaw + index / 12 * Math.PI * 2;
+      const x = playerRef.position.x + Math.sin(angle) * distance;
+      const z = playerRef.position.z + Math.cos(angle) * distance;
+      if (!positionBlocked(x, z, .43)) return true;
+    }
+  }
+  return false;
+}
+
 function movePlayerOutsideVehicle(vehicleVisual) {
   if (!playerRef || !vehicleVisual) return 0;
   const { x, z } = vehicleVisual.position;
@@ -3261,6 +3287,11 @@ vehicleAction?.addEventListener('click', () => {
   if (!vehicle || !source || vehicleAction.disabled) return;
   vehicleAction.disabled = true;
   const action = vehicle.entered ? 'exit' : 'enter';
+  if (action === 'exit' && jobVehicleVisual && !hasSafeVehicleExit(jobVehicleVisual)) {
+    vehicleAction.disabled = false;
+    showToast('Move the vehicle to a clear area before parking');
+    return;
+  }
   if (playerRef) {
     if (playerRef.userData.restPoseReturn) restorePlayerRestPosition(playerRef);
     const startedAt = performance.now();
