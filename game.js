@@ -422,8 +422,8 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'ernakulam-station-bus', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Ernakulam Railway Bus Stop', x: -35, z: -12, radius: 4.2, discoverRadius: 7.5 }),
   Object.freeze({ id: 'ernakulam-mg-road', kind: 'bus', routeId: 'ernakulam-city-line', label: 'MG Road Bus Stop', x: 16, z: 13.5, radius: 4.2, discoverRadius: 7.5 }),
   Object.freeze({ id: 'ernakulam-marine', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Marine Drive Bus Stop', x: -3, z: 30.5, radius: 4.2, discoverRadius: 7.5 }),
-  Object.freeze({ id: 'kottayam-rail', kind: 'train', stationId: 'kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Ernakulam', fare: 500 }),
-  Object.freeze({ id: 'ernakulam-rail', kind: 'train', stationId: 'ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, discoverRadius: 10.5, destinationLabel: 'Kottayam', fare: 500 }),
+  Object.freeze({ id: 'kottayam-rail', kind: 'train', stationId: 'kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Ernakulam', fare: 250 }),
+  Object.freeze({ id: 'ernakulam-rail', kind: 'train', stationId: 'ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, discoverRadius: 10.5, destinationLabel: 'Kottayam', fare: 250 }),
   Object.freeze({ id: 'town-market', kind: 'shop', label: 'Town Market', x: 31, z: 12.5, radius: 4.2, discoverRadius: 7.2, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
   Object.freeze({ id: 'community-clinic', kind: 'service', service: 'clinic', label: 'Community Clinic', x: 42, z: 31, radius: 4.8, discoverRadius: 8.0 }),
   Object.freeze({ id: 'police-station', kind: 'service', service: 'police', label: 'Kerala Police Station', x: -31, z: 14, radius: 4.8, discoverRadius: 8.0 }),
@@ -2578,7 +2578,7 @@ function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) 
   const train = mode === 'train';
   const flight = mode === 'flight';
   const teleport = mode === 'teleport';
-  const durationMs = Math.max(0, Number(travel.durationMs ?? (train ? 60_000 : flight ? 30_000 : 0)));
+  const durationMs = Math.max(0, Number(travel.durationMs ?? (train ? 10_000 : flight ? 5_000 : 0)));
   const animationMs = teleport ? 1800 : durationMs;
   const tripNumber = Math.max(1, Number(travel.tripNumber) || 1);
   const freeTripsRemaining = Math.max(0, Number(travel.freeTripsRemaining) || 0);
@@ -2616,17 +2616,17 @@ function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) 
     [1350, 'Crossing into ' + toDistrict + '…'],
   ] : flight ? [
     [0, 'Ticket verified · proceed to Gate 01 at ' + fromDistrict + ' Airport…'],
-    [3000, 'Boarding complete · cabin doors closing…'],
-    [7000, 'Take-off · climbing above Kerala…'],
-    [15000, 'Cruising to ' + toDistrict + ' · district boundary crossed…'],
-    [25000, 'Beginning descent · approaching ' + toDistrict + ' Airport…'],
-    [28500, 'Landing · taxiing to the terminal…'],
+    [700, 'Boarding complete · cabin doors closing…'],
+    [1500, 'Take-off · climbing above Kerala…'],
+    [2800, 'Cruising to ' + toDistrict + ' · district boundary crossed…'],
+    [4100, 'Beginning descent · approaching ' + toDistrict + ' Airport…'],
+    [4700, 'Landing · taxiing to the terminal…'],
   ] : [
     [0, 'Ticket checked · doors closing at ' + fromDistrict + ' Station…'],
-    [5000, 'Departed ' + fromDistrict + ' · train leaving the platform…'],
-    [20000, 'On the way to ' + toDistrict + ' · district boundary crossed…'],
-    [46000, 'Approaching ' + toDistrict + ' Railway Station…'],
-    [57000, 'Arriving at ' + toDistrict + ' · preparing to stop…'],
+    [1600, 'Departed ' + fromDistrict + ' · train leaving the platform…'],
+    [4200, 'On the way to ' + toDistrict + ' · district boundary crossed…'],
+    [7600, 'Approaching ' + toDistrict + ' Railway Station…'],
+    [9300, 'Arriving at ' + toDistrict + ' · preparing to stop…'],
   ];
   const drawJourneyFrame = (elapsed, remaining) => {
     const phase = [...phases].reverse().find(([at]) => elapsed >= at);
@@ -8646,7 +8646,7 @@ function addKottayamRailwayFoundation(scene) {
   });
   const board = createWorldSignMesh({
     title: 'KOTTAYAM STATION',
-    subtitle: 'BOARD HERE · ERNAKULAM ₹35',
+    subtitle: 'BOARD HERE · AFTER FREE TRIPS ₹250',
     background: '#315f78',
   }, 4.2, .92);
   board.position.set(7, 2.35, -22.3);
@@ -8933,7 +8933,7 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
   });
   const stationBoard = createWorldSignMesh({
     title: 'ERNAKULAM STATION',
-    subtitle: 'KOTTAYAM · ₹35 · DISTRICT TRAINS',
+    subtitle: 'KOTTAYAM · AFTER FREE TRIPS ₹250',
     background: '#385f7b',
   }, 4.8, .92);
   stationBoard.position.set(-40, 2.35, -30.7);
