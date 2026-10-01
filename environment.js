@@ -498,7 +498,10 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
     cloudMaterial.color.copy(nightLightColor).lerp(whiteColor, daylight).lerp(warmColor, twilight).lerp(stormCloud, overcast * .76).multiplyScalar(.35 + daylight * .65);
     if (lightning > 0) cloudMaterial.color.lerp(lightningColor, lightning * .72);
 
-    const rainLimit = 620;
+    // Only animate the drops that the current quality preset actually draws.
+    // This avoids spending rainy-frame CPU time on hidden particles, especially
+    // on coarse-pointer/mobile devices where low and balanced presets draw less.
+    const rainLimit = Math.min(maxRainDrops, Math.floor(rainGeometry.drawRange.count / 2));
     rainField.visible = rain > .035;
     rainMaterial.opacity = rain * .72;
     rainField.position.set(camera.position.x, 0, camera.position.z);
