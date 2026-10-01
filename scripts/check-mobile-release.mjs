@@ -68,10 +68,9 @@ if (requireGeneratedAndroid) {
   }
 
   const versionCodePattern = new RegExp('\\bversionCode\\s*(?:=\\s*)?' + Number(release.versionCode) + '\\b');
-  const escapedVersionName = String(release.versionName).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-  const versionNamePattern = new RegExp('\\bversionName\\s*(?:=\\s*)?["\\']' + escapedVersionName + '["\\']');
+  const versionNameMatches = appGradle.includes('versionName "' + release.versionName + '"') || appGradle.includes('versionName = "' + release.versionName + '"');
   if (!versionCodePattern.test(appGradle)) errors.push('Generated Android versionCode does not match ' + release.versionCode + '.');
-  if (!versionNamePattern.test(appGradle)) errors.push('Generated Android versionName does not match ' + release.versionName + '.');
+  if (!versionNameMatches) errors.push('Generated Android versionName does not match ' + release.versionName + '.');
   if (!launcherForeground.includes('#B8F19A') || !launcherAdaptive.includes('kerala_play_launcher_foreground')) {
     errors.push('Generated Android Kerala Play launcher branding is incomplete.');
   }
