@@ -4760,7 +4760,14 @@ try {
 
   window.addEventListener('kerala-public-travel-arrival', event => {
     const detail = event.detail || {};
-    if (!Number.isFinite(Number(detail.x)) || !Number.isFinite(Number(detail.z))) return;
+    if (!Number.isFinite(Number(detail.x)) || !Number.isFinite(Number(detail.z))) {
+      publicRideInProgress = false;
+      player.visible = !!profile;
+      clearRidePickupVisual();
+      clearGameInput();
+      showToast('Travel arrival data was invalid. Movement restored.', 3200);
+      return;
+    }
     publicRideInProgress = false;
     clearRidePickupVisual();
     vehicleMode = 'walk';
