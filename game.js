@@ -2627,8 +2627,22 @@ districtTravelConfirm?.addEventListener('click', async () => {
   if (districtTravelError) districtTravelError.textContent = '';
   window.dispatchEvent(new CustomEvent('kerala-ride-travel-start'));
   let boardRequestActive = true;
-  const boardTimeout = setTimeout(() => {
+  const boardTimeout = setTimeout(async () => {
     boardRequestActive = false;
+    if (districtTravelError) districtTravelError.textContent = 'Travel request timed out. Checking journey status…';
+    try {
+      const status = await api('/api/travel/district/status');
+      if (status.status === 'pending' && status.travel) {
+        closeDistrictTravelPanel();
+        const travel = status.travel;
+        showDistrictJourney(travel.mode || districtTravelMode, travel.from?.district || currentWorldDistrictName(), travel.to?.district || '', Number(travel.fare || 0), travel);
+        return;
+      }
+      if (status.status === 'arrived' && status.travel) {
+        finishDistrictJourney(status.travel);
+        return;
+      }
+    } catch { /* Fall through to the normal retry state. */ }
     window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));
     districtTravelConfirm.disabled = false;
     if (districtTravelError) districtTravelError.textContent = 'Travel request timed out. Please try again.';
