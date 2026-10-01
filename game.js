@@ -9889,21 +9889,21 @@ function addDistrictIdentityEnvironment(scene, district, profile) {
   if (profile.environment === 'coastal') {
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(28, 150), waterMat);
     sea.rotation.x = -Math.PI / 2;
-    sea.position.set(91,.02,18);
+    sea.position.set(91,.006,18);
     scene.add(sea);
     const beach = new THREE.Mesh(new THREE.PlaneGeometry(3.2,150), sandMat);
     beach.rotation.x = -Math.PI / 2;
-    beach.position.set(75.5,.025,18);
+    beach.position.set(75.5,.009,18);
     scene.add(beach);
     [[72,-55,.82],[72,-26,.76],[72,9,.80],[72,36,.78],[72,66,.84]].forEach(([x,z,s]) => addPalm(scene,x,z,s));
   } else if (profile.environment === 'backwater') {
     const canal = new THREE.Mesh(new THREE.PlaneGeometry(13, 150), waterMat);
     canal.rotation.x = -Math.PI / 2;
-    canal.position.set(-83,.02,15);
+    canal.position.set(-83,.006,15);
     scene.add(canal);
     const bankA = new THREE.Mesh(new THREE.PlaneGeometry(2.4,150), soilMat);
     bankA.rotation.x = -Math.PI / 2;
-    bankA.position.set(-75.2,.023,15);
+    bankA.position.set(-75.2,.009,15);
     scene.add(bankA);
     [[-72,-52,.76],[-72,-20,.82],[-72,14,.78],[-72,46,.84],[-72,70,.75]].forEach(([x,z,s]) => addPalm(scene,x,z,s));
   } else if (profile.environment === 'highland') {
