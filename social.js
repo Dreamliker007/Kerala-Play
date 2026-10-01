@@ -609,9 +609,10 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     resetForm.hidden = true;
     authTabs.hidden = false;
     authForm.hidden = false;
-    signupFields.hidden = false;
+    // Home district is chosen only when a new account is created.
+    signupFields.hidden = mode !== 'signup';
     signupAvatarField.hidden = mode !== 'signup';
-    districtField.querySelector('span').textContent = mode === 'signup' ? 'Home district · first entry' : 'Enter and own district';
+    districtField.querySelector('span').textContent = 'Home district · first entry';
     signupContact.hidden = mode !== 'signup';
     firstName.parentElement.hidden = mode !== 'signup';
     firstName.required = mode === 'signup';
@@ -735,14 +736,18 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   const peopleTabs = node('div', 'social-tabs people-tabs');
   // People is intentionally a private social space: only relationship lists
   // are shown here. New players can still be met naturally in the world.
-  for (const [value, label] of [['followers', 'Followers'], ['following', 'Following'], ['requests', 'Requests'], ['groups', 'Groups']]) {
+  for (const [value, label] of [['followers', 'Followers'], ['following', 'Following'], ['requests', 'Requests'], ['search', 'Search'], ['groups', 'Groups']]) {
     const tab = button(label, () => { peopleFilter = value; renderPeople(); if (value === 'groups') run(refreshGroups, peopleError); });
     tab.dataset.filter = value;
     peopleTabs.append(tab);
   }
   const search = input('search', { placeholder: 'Find a username', maxLength: 24 });
   search.setAttribute('aria-label', 'Find people by username');
-  search.addEventListener('input', () => { peopleSearch = search.value.trim().toLowerCase(); renderPeople(); });
+  search.addEventListener('input', () => {
+    peopleSearch = search.value.trim().toLowerCase();
+    if (peopleSearch && peopleFilter !== 'groups') peopleFilter = 'search';
+    renderPeople();
+  });
   const peopleError = node('div', 'social-error');
   peopleError.setAttribute('role', 'status');
   const peopleList = node('div', 'social-people-list');
@@ -928,7 +933,12 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (peopleFilter === 'groups') renderGroupsList();
     else {
       const visible = people.filter(person => {
-        if (person.id === user?.id || !person.username?.toLowerCase().includes(peopleSearch)) return false;
+        if (person.id === user?.id) return false;
+        const searchableUsername = String(person.username || person.accountUsername || '').toLowerCase();
+        if (peopleFilter === 'search') {
+          return !person.blocked && peopleSearch.length >= 2 && searchableUsername.includes(peopleSearch);
+        }
+        if (peopleSearch && !searchableUsername.includes(peopleSearch)) return false;
         if (peopleFilter === 'blocked') return person.blocked;
         if (person.blocked) return false;
         if (peopleFilter === 'followers') return ['follower', 'mutual'].includes(person.relationship);
@@ -936,7 +946,14 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
         if (peopleFilter === 'requests') return ['outgoing', 'incoming'].includes(person.relationship);
         return true;
       }).sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
-      if (!visible.length) peopleList.append(node('p', 'social-empty', 'No people in this list yet.'));
+      if (!visible.length) {
+        const emptyCopy = peopleFilter === 'search' && peopleSearch.length < 2
+          ? 'Type at least 2 letters of a username to find a friend.'
+          : peopleFilter === 'search'
+            ? 'No matching username found.'
+            : 'No people in this list yet.';
+        peopleList.append(node('p', 'social-empty', emptyCopy));
+      }
       for (const person of visible) peopleList.append(personCard(person));
     }
     conversations.replaceChildren();
