@@ -6921,7 +6921,7 @@ function nearestSafeTrafficProgress(config, preferred) {
     const backward = start - distance;
     if (backward >= min && !trafficHitsStaticWorld(config, backward)) return backward;
   }
-  return start;
+  return null;
 }
 
 function moveInsidePrivateHome(player, dx, dz) {
@@ -11912,8 +11912,13 @@ function updateTraffic(delta) {
     if (Math.abs(config.currentSpeed) < .03) config.currentSpeed = 0;
 
     if (trafficHitsStaticWorld(config, Number(config.progress))) {
-      config.progress = nearestSafeTrafficProgress(config, Number(config.progress));
+      const safeProgress = nearestSafeTrafficProgress(config, Number(config.progress));
       config.currentSpeed = 0;
+      if (safeProgress === null) {
+        vehicle.visible = false;
+        continue;
+      }
+      config.progress = safeProgress;
       if (config.axis === 'z') vehicle.position.z = config.progress;
       else vehicle.position.x = config.progress;
     }
