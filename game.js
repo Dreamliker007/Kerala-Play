@@ -5002,10 +5002,12 @@ try {
     fallback.style.display = 'none';
   });
 
+  let lastFrameRuntimeError = 0;
   function gameLoop() {
     requestAnimationFrame(gameLoop);
     const delta = Math.min(clock.getDelta(), .05);
     if (document.hidden || webglContextLost) return;
+    try {
     if (!Number.isFinite(cameraYaw)) cameraYaw = (Number.isFinite(player.rotation.y) ? player.rotation.y : 0) + Math.PI;
     cameraPitch = THREE.MathUtils.clamp(Number.isFinite(cameraPitch) ? cameraPitch : .31, .12, .64);
     if (![camera.position.x, camera.position.y, camera.position.z].every(Number.isFinite)) resetFollowCameraView();
@@ -5509,6 +5511,17 @@ try {
           perfCooldown = 4;
         }
       }
+    }
+    } catch (error) {
+      const now = performance.now();
+      if (now - lastFrameRuntimeError > 3000) {
+        console.error('Recovered from gameplay frame error:', error);
+        lastFrameRuntimeError = now;
+      }
+      clearGameInput();
+      walkVelocity.set(0, 0, 0);
+      targetWalkVelocity.set(0, 0, 0);
+      if (![camera.position.x, camera.position.y, camera.position.z].every(Number.isFinite)) resetFollowCameraView();
     }
   }
   gameLoop();
