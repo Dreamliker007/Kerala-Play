@@ -3894,8 +3894,27 @@ function recoverBlockedPlayerSpawn(player, force = false) {
       if (!positionBlockedStatic(x, z, .43)) { player.position.set(x, 0, z); return true; }
     }
   }
-  player.position.set(0, 0, -8);
-  return true;
+  const districtSpawn = currentDistrictInstance().spawn;
+  const fallbackX = clampDistrictX(Number(districtSpawn?.x) || 0, 2);
+  const fallbackZ = clampDistrictZ(Number(districtSpawn?.z) || 0, 2);
+  if (!positionBlockedStatic(fallbackX, fallbackZ, .43)) {
+    player.position.set(fallbackX, 0, fallbackZ);
+    player.rotation.y = Number(districtSpawn?.rotation) || 0;
+    return true;
+  }
+  for (const ring of [1.2, 2.4, 4, 6.5, 10, 15, 22, 32]) {
+    for (let index = 0; index < 24; index++) {
+      const angle = index / 24 * Math.PI * 2;
+      const x = clampDistrictX(fallbackX + Math.sin(angle) * ring, 2);
+      const z = clampDistrictZ(fallbackZ + Math.cos(angle) * ring, 2);
+      if (!positionBlockedStatic(x, z, .43)) {
+        player.position.set(x, 0, z);
+        player.rotation.y = Number(districtSpawn?.rotation) || 0;
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function showAssetNotice(message) {
