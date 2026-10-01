@@ -53,8 +53,8 @@ function cleanAvatarCustomization(value, gender = 'male') {
   return clean;
 }
 const DISTRICT_TRAVEL_FREE_TRIPS = 3;
-const DISTRICT_TRAVEL_FARES = Object.freeze({ train:500, flight:1000, teleport:2000 });
-const DISTRICT_TRAVEL_DURATIONS = Object.freeze({ train:60_000, flight:30_000, teleport:0 });
+const DISTRICT_TRAVEL_FARES = Object.freeze({ train:250, flight:500, teleport:1000 });
+const DISTRICT_TRAVEL_DURATIONS = Object.freeze({ train:10_000, flight:5_000, teleport:0 });
 const GENERIC_WORLD_BOUNDS = Object.freeze({ minX:-110, maxX:110, minZ:-110, maxZ:110 });
 const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_ORDER.map((district, index) => {
   const generic = {
@@ -66,7 +66,7 @@ const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_OR
     airport:AIRPORT_DISTRICTS.has(district) ? Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-airport`, x:42, z:-28, radius:8.2, arrivalX:36, arrivalZ:-28 }) : null,
     teleport:Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-district-gate`, x:78, z:72, radius:7.2, arrivalX:75, arrivalZ:72 }),
   };
-  if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:7,z:-23,radius:7.2,arrivalX:11,arrivalZ:-23 }) })];
+  if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:-60,z:-50,radius:7.2,arrivalX:-54,arrivalZ:-50 }) })];
   if (district === 'Ernakulam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:-14,z:6,rotation:0 }), train:Object.freeze({ id:'ernakulam-rail', x:-40,z:-30.5,radius:6.6,arrivalX:-34,arrivalZ:-19.5 }), airport:Object.freeze({ id:'ernakulam-airport', x:38,z:36,radius:8.2,arrivalX:32,arrivalZ:36 }) })];
   return [district, Object.freeze(generic)];
 })));
@@ -275,10 +275,10 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
 const DISTRICT_RAIL_ROUTE = Object.freeze({
   id: 'kottayam-ernakulam-rail',
   label: 'Kottayam ↔ Ernakulam Passenger',
-  fare: 500,
+  fare: 250,
   stations: Object.freeze({
-    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -34, arrivalZ: -19.5 }),
-    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
+    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: -60, z: -50, radius: 7.2, destinationId: 'ernakulam', arrivalX: -34, arrivalZ: -19.5 }),
+    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, destinationId: 'kottayam', arrivalX: -54, arrivalZ: -50 }),
   }),
 });
 const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
@@ -310,7 +310,11 @@ const PUBLIC_RIDE_SERVICES = Object.freeze({
 const JOB_DEFINITIONS = Object.freeze({
   delivery: { title: 'Delivery Rider', reward: 180, durationMs: 0, cooldownMs: 30_000, description: 'Take the delivery bike, collect a parcel, then ride to the customer.', missionType: 'route', vehicle: 'bike', vehicleLabel: 'Delivery Bike' },
   taxi: { title: 'Taxi Driver', reward: 220, durationMs: 0, cooldownMs: 35_000, description: 'Enter the taxi, reach the passenger pickup point, then drive to the destination.', missionType: 'route', vehicle: 'taxi', vehicleLabel: 'Kerala Taxi' },
-  shop: { title: 'Shop Worker', reward: 140, durationMs: 10_000, cooldownMs: 25_000, description: 'Travel to the village shop, check in and complete a short on-site shift.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  shop: { title: 'Shop Worker', reward: 140, durationMs: 10_000, cooldownMs: 25_000, description: 'Travel to the local shop, check in and complete a short on-site shift.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  hospital: { title: 'Hospital Assistant', reward: 175, durationMs: 12_000, cooldownMs: 30_000, description: 'Report to the district hospital and help with a short reception and support shift.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  mechanic: { title: 'Garage Helper', reward: 190, durationMs: 12_000, cooldownMs: 32_000, description: 'Report to the service garage and help inspect and prepare vehicles.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  market: { title: 'Market Helper', reward: 155, durationMs: 9_000, cooldownMs: 24_000, description: 'Help a local market stall restock and prepare customer orders.', missionType: 'shift', vehicle: null, vehicleLabel: null },
+  civic: { title: 'Municipal Worker', reward: 165, durationMs: 10_000, cooldownMs: 28_000, description: 'Report to the town civic point and complete a short public-service shift.', missionType: 'shift', vehicle: null, vehicleLabel: null },
 });
 const JOB_MISSION_RADIUS = 5.5;
 const JOB_VEHICLE_RADIUS = 4.5;
@@ -1948,8 +1952,19 @@ function publicRideDestinationForUser(user, destinationId) {
     const district = currentWorldDistrict(user);
     const city = districtCityProfile(district);
     const point = (name, action, dx, dz) => ({ name, action, x: missionCoordinateFor(user, base.x, dx, 'x'), z: missionCoordinateFor(user, base.z, dz, 'z') });
+    const fixed = (name, action, x, z) => ({ name, action, x, z });
     if (jobId === 'delivery') return [point(`${district} Parcel Hub`, 'Collect parcel', 7, 4), point('Customer House', 'Deliver parcel', 19, -8)];
     if (jobId === 'taxi') return [point(`${city.centre} Passenger Pickup`, 'Pick up passenger', -7, 5), point(city.neighbourhood || city.secondary, 'Drop off passenger', -20, -7)];
+
+    const servicePoints = district === 'Kottayam'
+      ? { hospital:[42,35.5], mechanic:[-34,-11.7], market:[29,15], civic:[13,16] }
+      : district === 'Ernakulam'
+        ? { hospital:[-11,-29.5], mechanic:[-32,34], market:[-49,12.5], civic:[5,-8] }
+        : { hospital:[-20,19], mechanic:[-18,-44], market:[20,19], civic:[9,8] };
+    if (jobId === 'hospital') return [fixed(`${district} District Hospital`, 'Check in for hospital shift', ...servicePoints.hospital)];
+    if (jobId === 'mechanic') return [fixed(`${district} Service Garage`, 'Check in at the workshop', ...servicePoints.mechanic)];
+    if (jobId === 'market') return [fixed(city.market || `${district} Market`, 'Help restock the market', ...servicePoints.market)];
+    if (jobId === 'civic') return [fixed(`${city.centre} Civic Point`, 'Check in for public-service shift', ...servicePoints.civic)];
     return [point(genericDistrictWorld(user) ? city.market : 'Village Shop', 'Check in for shift', 9, -5)];
   }
   function personalVehicleSummary(user) {
@@ -2186,24 +2201,14 @@ function publicRideDestinationForUser(user, destinationId) {
         limited(`auth:${ip}`, 30, 15 * 60000);
         const body = await jsonBody(request);
         requireValue(typeof body.identifier === 'string' && typeof body.password === 'string' && body.password.length <= 128, 400, 'Enter your username, email, mobile and password.');
-        const district = body.district || 'Kottayam';
-        requireValue(Object.hasOwn(DISTRICT_WORLD_CONFIG, district), 400, 'Choose a valid Kerala district.');
         const identifier = body.identifier.trim().toLowerCase();
         const user = db.users.find(candidate => candidate.username.toLowerCase() === identifier || candidate.email === identifier || candidate.mobile === body.identifier.trim());
         const comparison = await scrypt(body.password, user?.salt || 'not-an-account-salt', 64);
         const valid = timingSafeEqual(comparison, user ? Buffer.from(user.passwordHash, 'hex') : Buffer.alloc(64));
         requireValue(user && valid, 401, 'Username or password is incorrect.');
-        const spawn = districtWorldConfig(district).spawn;
-        if (currentWorldDistrict(user) !== district) {
-          user.worldX = spawn.x;
-          user.worldZ = spawn.z;
-          user.worldRotation = spawn.rotation || 0;
-        }
-        user.district = district;
-        user.worldDistrict = district;
-        user.worldUpdatedAt = now();
+        // Login resumes the account in its saved world district. District choice
+        // is an account-creation decision, not something that changes on login.
         presence.delete(user.id);
-        dirty = true;
         await startSession(user, response, request); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
       }
@@ -2286,17 +2291,9 @@ function publicRideDestinationForUser(user, destinationId) {
           created = true;
         }
 
-        const spawn = districtWorldConfig(district).spawn;
-        if (currentWorldDistrict(user) !== district) {
-          user.worldX = spawn.x;
-          user.worldZ = spawn.z;
-          user.worldRotation = spawn.rotation || 0;
-        }
-        user.district = district;
-        user.worldDistrict = district;
-        user.worldUpdatedAt = now();
+        // Existing social-login accounts resume their saved district. The
+        // selected district above is used only while creating a new account.
         presence.delete(user.id);
-        dirty = true;
         await startSession(user, response, request);
         socialChanged();
         send(response, created ? 201 : 200, { user: publicUser(user), created, provider: body.provider });

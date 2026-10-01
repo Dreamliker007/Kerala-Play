@@ -123,32 +123,34 @@ test('wardrobe outfit choices are validated, saved with the profile and reset wh
   assert.equal(saree.data.user.outfit, 'saree');
 });
 
-test('district choice sets avatar home and entry world; no choice defaults to Kottayam', async t => {
-  const app = await setup(t), explorer = app.client();
-  const created = await explorer('/api/auth/signup', {
+test('district choice belongs to signup; login resumes the saved district', async t => {
+  const app = await setup(t), defaultExplorer = app.client(), selectedExplorer = app.client();
+  const defaulted = await defaultExplorer('/api/auth/signup', {
     firstName: 'DistrictPlayer', username: 'DistrictPlayer', password: 'test-password-2026', gender: 'female'
   });
-  assert.equal(created.status, 201, JSON.stringify(created.data));
-  assert.equal(created.data.user.district, 'Kottayam');
-  assert.equal(created.data.user.worldDistrict, 'Kottayam');
-  assert.equal(created.data.user.x, 19);
-  assert.equal(created.data.user.z, -23);
+  assert.equal(defaulted.status, 201, JSON.stringify(defaulted.data));
+  assert.equal(defaulted.data.user.district, 'Kottayam');
+  assert.equal(defaulted.data.user.worldDistrict, 'Kottayam');
+  assert.equal(defaulted.data.user.x, 19);
+  assert.equal(defaulted.data.user.z, -23);
 
-  const selected = await explorer('/api/auth/login', {
-    identifier: 'DistrictPlayer', password: 'test-password-2026', district: 'Idukki'
+  const selected = await selectedExplorer('/api/auth/signup', {
+    firstName: 'IdukkiPlayer', username: 'IdukkiPlayer', password: 'test-password-2026', district: 'Idukki', gender: 'female'
   });
-  assert.equal(selected.status, 200, JSON.stringify(selected.data));
+  assert.equal(selected.status, 201, JSON.stringify(selected.data));
   assert.equal(selected.data.user.district, 'Idukki');
   assert.equal(selected.data.user.worldDistrict, 'Idukki');
   assert.equal(selected.data.user.x, 12);
   assert.equal(selected.data.user.z, 0);
 
-  const defaulted = await explorer('/api/auth/login', { identifier: 'DistrictPlayer', password: 'test-password-2026' });
-  assert.equal(defaulted.status, 200, JSON.stringify(defaulted.data));
-  assert.equal(defaulted.data.user.district, 'Kottayam');
-  assert.equal(defaulted.data.user.worldDistrict, 'Kottayam');
-  assert.equal(defaulted.data.user.x, 19);
-  assert.equal(defaulted.data.user.z, -23);
+  const resumed = await defaultExplorer('/api/auth/login', {
+    identifier: 'DistrictPlayer', password: 'test-password-2026', district: 'Idukki'
+  });
+  assert.equal(resumed.status, 200, JSON.stringify(resumed.data));
+  assert.equal(resumed.data.user.district, 'Kottayam');
+  assert.equal(resumed.data.user.worldDistrict, 'Kottayam');
+  assert.equal(resumed.data.user.x, 19);
+  assert.equal(resumed.data.user.z, -23);
 });
 
 test('a receiver must accept a follow before text, voice messages or live voice; blocks revoke both directions', async t => {
@@ -503,8 +505,8 @@ test('jobs require job vehicles, real world checkpoints, server salary, cooldown
   await signup(alice, 'JobAlice');
 
   let jobs = (await alice('/api/jobs')).data;
-  assert.equal(jobs.jobs.length, 3);
-  assert.deepEqual(jobs.jobs.map(job => job.id).sort(), ['delivery', 'shop', 'taxi']);
+  assert.equal(jobs.jobs.length, 7);
+  assert.deepEqual(jobs.jobs.map(job => job.id).sort(), ['civic', 'delivery', 'hospital', 'market', 'mechanic', 'shop', 'taxi']);
   assert.equal(jobs.walletBalance, 500);
   assert.equal(jobs.jobs.find(job => job.id === 'delivery').vehicle, 'bike');
   assert.equal(jobs.jobs.find(job => job.id === 'taxi').vehicle, 'taxi');
@@ -816,7 +818,7 @@ test('traffic checkpoint documents challans payments and speeding stay server co
   assert.equal(traffic.rules.speedingFine, 25);
 
   app.advance(31 * 24 * 60 * 60 * 1000);
-  assert.equal((await alice('/api/auth/login', { identifier: 'TrafficAlice', password: 'test-password-2026', district: 'Ernakulam' })).status, 200);
+  assert.equal((await alice('/api/auth/login', { identifier: 'TrafficAlice', password: 'test-password-2026' })).status, 200);
   traffic = (await alice('/api/traffic')).data;
   assert.equal(traffic.documents[0].insuranceActive, false);
 
@@ -1412,7 +1414,7 @@ test('server-owned world alerts are filtered by time and district and keep read 
   assert.equal(alerts.items.find(item => item.id === rain.id).read, true);
 
   await app.restart();
-  assert.equal((await alice('/api/auth/login', { identifier: 'WorldAlertAlice', password: 'test-password-2026', district: 'Ernakulam' })).status, 200);
+  assert.equal((await alice('/api/auth/login', { identifier: 'WorldAlertAlice', password: 'test-password-2026' })).status, 200);
   alerts = (await alice('/api/notifications')).data;
   assert.equal(alerts.items.find(item => item.id === rain.id).read, true);
 });
@@ -1594,7 +1596,7 @@ test('emergency help cannot farm recognition during cooldown', async t => {
   await writeFile(dbPath, JSON.stringify(db, null, 2));
   await app.restart();
   player = app.client();
-  await player('/api/auth/login', { identifier: 'ResponderAlice', password: 'test-password-2026', district: 'Ernakulam' });
+  await player('/api/auth/login', { identifier: 'ResponderAlice', password: 'test-password-2026' });
 
   const first = await player('/api/world/emergency-help', { service: 'police' });
   assert.equal(first.status, 200);
@@ -1638,24 +1640,27 @@ test('Kottayam station quotes a train ticket and boards into Ernakulam station',
   assert.equal(ernakulam.train.fare, 0);
   assert.equal(routes.data.freeTripsRemaining, 3);
 
-  app.advance(1500);
-  const stationApproach = await player('/api/world/move', { x: 7, z: -23, rotation: 0, moving: true });
-  assert.equal(stationApproach.status, 200, JSON.stringify(stationApproach.data));
+  let stationApproach;
+  for (const [x, z] of [[0, -30], [-18, -36], [-36, -42], [-52, -48], [-60, -50]]) {
+    app.advance(2500);
+    stationApproach = await player('/api/world/move', { x, z, rotation: 0, moving: true });
+    assert.equal(stationApproach.status, 200, JSON.stringify(stationApproach.data));
+  }
   const trip = await player('/api/travel/district/board', { mode: 'train', destinationDistrict: 'Ernakulam' });
   assert.equal(trip.status, 200, JSON.stringify(trip.data));
   assert.equal(trip.data.travel.status, 'pending');
-  assert.equal(trip.data.travel.durationMs, 60_000);
+  assert.equal(trip.data.travel.durationMs, 10_000);
   assert.equal(trip.data.travel.from.district, 'Kottayam');
   assert.equal(trip.data.travel.to.district, 'Ernakulam');
   assert.equal(trip.data.travel.fare, 0);
   assert.equal(trip.data.transaction, null);
   assert.equal(trip.data.travel.freeTripsRemaining, 2);
   assert.equal(trip.data.user.worldDistrict, 'Kottayam');
-  assert.equal(trip.data.user.x, 7);
-  assert.equal(trip.data.user.z, -23);
-  assert.equal((await player('/api/world/move', { x: 7, z: -23, rotation: 0, moving: false })).status, 409);
+  assert.equal(trip.data.user.x, -60);
+  assert.equal(trip.data.user.z, -50);
+  assert.equal((await player('/api/world/move', { x: -60, z: -50, rotation: 0, moving: false })).status, 409);
 
-  app.advance(59_999);
+  app.advance(9_999);
   const waiting = await player('/api/travel/district/status');
   assert.equal(waiting.data.status, 'pending');
   assert.equal(waiting.data.travel.remainingMs, 1);
@@ -1701,14 +1706,14 @@ test('airport routes require an airport at both ends and flight boarding arrives
   const trip = await player('/api/travel/district/board', { mode: 'flight', destinationDistrict: 'Ernakulam' });
   assert.equal(trip.status, 200, JSON.stringify(trip.data));
   assert.equal(trip.data.travel.status, 'pending');
-  assert.equal(trip.data.travel.durationMs, 30_000);
+  assert.equal(trip.data.travel.durationMs, 5_000);
   assert.equal(trip.data.travel.mode, 'flight');
   assert.equal(trip.data.travel.from.district, 'Kannur');
   assert.equal(trip.data.travel.to.district, 'Ernakulam');
   assert.equal(trip.data.travel.fare, 0);
   assert.equal(trip.data.transaction, null);
   assert.equal(trip.data.user.worldDistrict, 'Kannur');
-  app.advance(30_000);
+  app.advance(5_000);
   const arrived = await player('/api/travel/district/status');
   assert.equal(arrived.data.status, 'arrived');
   assert.equal(arrived.data.travel.to.district, 'Ernakulam');
@@ -1738,12 +1743,12 @@ test('first three district trips are shared across transport modes and the fixed
     }
   }
 
-  await walkTo(19, -23, 7, -23);
+  await walkTo(19, -23, -60, -50);
   const train = await player('/api/travel/district/board', { mode:'train', destinationDistrict:'Ernakulam' });
   assert.equal(train.data.travel.fare, 0);
   assert.equal(train.data.travel.tripNumber, 1);
   assert.equal(train.data.travel.freeTripsRemaining, 2);
-  app.advance(60_000);
+  app.advance(10_000);
   assert.equal((await player('/api/travel/district/status')).data.status, 'arrived');
 
   await walkTo(-34, -19.5, 38, 36);
@@ -1751,7 +1756,7 @@ test('first three district trips are shared across transport modes and the fixed
   assert.equal(flight.data.travel.fare, 0);
   assert.equal(flight.data.travel.tripNumber, 2);
   assert.equal(flight.data.travel.freeTripsRemaining, 1);
-  app.advance(30_000);
+  app.advance(5_000);
   assert.equal((await player('/api/travel/district/status')).data.status, 'arrived');
 
   await walkTo(36, -28, 78, 72);
@@ -1767,8 +1772,8 @@ test('first three district trips are shared across transport modes and the fixed
   const alappuzha = paidRoutes.data.districts.find(item => item.district === 'Alappuzha');
   assert.equal(paidRoutes.data.tripsUsed, 3);
   assert.equal(paidRoutes.data.freeTripsRemaining, 0);
-  assert.equal(alappuzha.train.fare, 500);
-  assert.equal(alappuzha.teleport.fare, 2000);
+  assert.equal(alappuzha.train.fare, 250);
+  assert.equal(alappuzha.teleport.fare, 1000);
 
   const dbPath = join(app.dataDir, 'game.json');
   const db = JSON.parse(await readFile(dbPath, 'utf8'));
@@ -1782,39 +1787,43 @@ test('first three district trips are shared across transport modes and the fixed
   await writeFile(dbPath, JSON.stringify(db, null, 2));
   await app.restart();
   const airportPlayer = app.client();
-  await airportPlayer('/api/auth/login', { identifier:'TripCounter', password:'test-password-2026', district:'Kannur' });
+  await airportPlayer('/api/auth/login', { identifier:'TripCounter', password:'test-password-2026' });
+  const loggedInTripCounter = await airportPlayer('/api/session');
+  assert.equal(loggedInTripCounter.data.user.worldDistrict, 'Kannur');
   const airportRoutes = await airportPlayer('/api/travel/districts');
   const flightRoute = airportRoutes.data.districts.find(item => item.district === 'Ernakulam');
-  assert.equal(flightRoute.flight.fare, 1000);
+  assert.equal(flightRoute.flight.fare, 500);
   const paidFlight = await airportPlayer('/api/travel/district/board', { mode:'flight', destinationDistrict:'Ernakulam' });
   assert.equal(paidFlight.status, 200, JSON.stringify(paidFlight.data));
-  assert.equal(paidFlight.data.travel.fare, 1000);
-  assert.equal(paidFlight.data.transaction.amount, 1000);
+  assert.equal(paidFlight.data.travel.fare, 500);
+  assert.equal(paidFlight.data.transaction.amount, 500);
   assert.equal(paidFlight.data.travel.status, 'pending');
-  assert.equal(paidFlight.data.wallet.balance, 4000);
+  assert.equal(paidFlight.data.wallet.balance, 4500);
 
-  app.advance(30_000);
+  app.advance(5_000);
   const paidFlightArrival = await airportPlayer('/api/travel/district/status');
   assert.equal(paidFlightArrival.data.status, 'arrived');
   await walkTo(32, 36, -40, -30.5, airportPlayer);
   const paidTrain = await airportPlayer('/api/travel/district/board', { mode:'train', destinationDistrict:'Kottayam' });
   assert.equal(paidTrain.status, 200, JSON.stringify(paidTrain.data));
-  assert.equal(paidTrain.data.travel.fare, 500);
-  assert.equal(paidTrain.data.transaction.amount, 500);
-  assert.equal(paidTrain.data.wallet.balance, 3500);
-  assert.equal(paidTrain.data.travel.durationMs, 60_000);
+  assert.equal(paidTrain.data.travel.fare, 250);
+  assert.equal(paidTrain.data.transaction.amount, 250);
+  assert.equal(paidTrain.data.wallet.balance, 4250);
+  assert.equal(paidTrain.data.travel.durationMs, 10_000);
 
-  app.advance(60_000);
+  app.advance(10_000);
   const paidTrainArrival = await airportPlayer('/api/travel/district/status');
   assert.equal(paidTrainArrival.data.status, 'arrived');
   assert.equal(paidTrainArrival.data.user.worldDistrict, 'Kottayam');
-  await walkTo(11, -23, 78, 72, airportPlayer);
+  assert.equal(paidTrainArrival.data.user.x, -54);
+  assert.equal(paidTrainArrival.data.user.z, -50);
+  await walkTo(-54, -50, 78, 72, airportPlayer);
   const paidTeleport = await airportPlayer('/api/travel/district/board', { mode:'teleport', destinationDistrict:'Idukki' });
   assert.equal(paidTeleport.status, 200, JSON.stringify(paidTeleport.data));
-  assert.equal(paidTeleport.data.travel.fare, 2000);
+  assert.equal(paidTeleport.data.travel.fare, 1000);
   assert.equal(paidTeleport.data.travel.durationMs, 0);
-  assert.equal(paidTeleport.data.transaction.amount, 2000);
-  assert.equal(paidTeleport.data.wallet.balance, 1500);
+  assert.equal(paidTeleport.data.transaction.amount, 1000);
+  assert.equal(paidTeleport.data.wallet.balance, 3250);
   assert.equal(paidTeleport.data.user.worldDistrict, 'Idukki');
 });
 

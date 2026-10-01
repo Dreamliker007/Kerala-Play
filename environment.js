@@ -23,9 +23,11 @@ export function highlandMistLevel(THREE, climate, hour, rain = 0, overcast = 0) 
 /** Environment controller; time is game elapsed time, while the sky uses UTC epoch time. */
 export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, climate = '' }) {
   const preferences = readPreferences();
-  const quality = 'high';
+  const allowedQualities = new Set(['low', 'balanced', 'high']);
+  let quality = allowedQualities.has(preferences.quality) ? preferences.quality : 'high';
   const mobileLike = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
-  let performanceScale = mobileLike ? .84 : 1;
+  let requestedPerformanceScale = mobileLike ? .84 : 1;
+  let performanceScale = requestedPerformanceScale;
   let disposed = false;
   let lastHudMinute = -1;
   let lastHudWeather = '';
@@ -227,7 +229,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
     }
     #world-settings button[aria-pressed="true"] { background:#247a54; }
     #world-settings :focus-visible { outline:2px solid #9be7c1; outline-offset:2px; }
-    #world-quality-fixed { min-width:96px; text-align:right; color:#bff7d7; font-weight:900; letter-spacing:.25px; }
+    #world-quality { min-width:96px; text-align:right; color:#bff7d7; font-weight:900; letter-spacing:.25px; }
     .settings-fullscreen { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:800!important; }
     #world-audio-status { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
     @media(max-width:979px) {
@@ -249,7 +251,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
   const settings = document.createElement('div');
   settings.id = 'world-settings';
   settings.setAttribute('aria-label', 'Game settings');
-  settings.innerHTML = '<div class="world-settings-head"><strong>Settings</strong><button type="button" id="world-settings-close" aria-label="Close settings">×</button></div><label class="world-setting-row"><span>World sound</span><button type="button" id="world-sound" aria-pressed="false">Off</button></label><div class="world-setting-row"><span>Graphics</span><strong id="world-quality-fixed">HIGH QUALITY</strong></div><div class="world-setting-row"><span>Version</span><strong>1.0.12 · V113.0</strong></div><button type="button" id="blocked-accounts" class="settings-fullscreen">Blocked accounts</button><output id="world-audio-status" role="status"></output>';
+  settings.innerHTML = '<div class="world-settings-head"><strong>Settings</strong><button type="button" id="world-settings-close" aria-label="Close settings">×</button></div><label class="world-setting-row"><span>World sound</span><button type="button" id="world-sound" aria-pressed="false">Off</button></label><label class="world-setting-row"><span>Graphics</span><select id="world-quality" aria-label="Graphics quality"><option value="low">LOW</option><option value="balanced">BALANCED</option><option value="high">HIGH</option></select></label><div class="world-setting-row"><span>Version</span><strong>1.0.12 · V113.0</strong></div><button type="button" id="blocked-accounts" class="settings-fullscreen">Blocked accounts</button><output id="world-audio-status" role="status"></output>';
 
   const quickActions = document.querySelector('#quick-actions');
   const settingsToggle = document.createElement('button');
@@ -272,6 +274,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
 
   (document.querySelector('#hud') || document.body).append(clockOutput, settings);
   const soundButton = settings.querySelector('#world-sound');
+  const qualitySelect = settings.querySelector('#world-quality');
   const audioStatus = settings.querySelector('#world-audio-status');
   const settingsClose = settings.querySelector('#world-settings-close');
   const blockedAccounts = settings.querySelector('#blocked-accounts');
@@ -294,37 +297,44 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
   settings.addEventListener('pointerdown', event => event.stopPropagation());
   document.addEventListener('keydown', event => { if (event.key === 'Escape') setSettingsOpen(false); });
 
+  qualitySelect.value = quality;
   if (preferences.sound) soundButton.textContent = 'Resume';
   soundButton.title = 'Enable birds, water, night insects, and gentle music';
 
   function savePreferences() {
-    try { localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ quality: 'high', sound: audioEnabled })); } catch { /* Storage can be unavailable in private mode. */ }
+    try { localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ quality, sound: audioEnabled })); } catch { /* Storage can be unavailable in private mode. */ }
+  }
+  function qualityScaleCap() {
+    return quality === 'low' ? .68 : quality === 'balanced' ? .84 : 1;
   }
   function applyPerformanceScale() {
     const deviceRatio = devicePixelRatio || 1;
-    const mobileCap = Math.max(1.05, 1.58 * performanceScale);
-    renderer.setPixelRatio(Math.min(deviceRatio, mobileLike ? mobileCap : 2));
+    const mobileCap = Math.max(1.0, 1.58 * performanceScale);
+    const desktopCap = quality === 'low' ? 1 : quality === 'balanced' ? 1.35 : 2;
+    renderer.setPixelRatio(Math.min(deviceRatio, mobileLike ? mobileCap : desktopCap));
     renderer.setSize(innerWidth, innerHeight, false);
   }
 
   function setPerformanceScale(nextScale = 1) {
     if (disposed) return;
-    performanceScale = THREE.MathUtils.clamp(Number(nextScale) || 1, mobileLike ? .64 : .85, 1);
+    requestedPerformanceScale = THREE.MathUtils.clamp(Number(nextScale) || 1, mobileLike ? .64 : .75, 1);
+    performanceScale = Math.min(requestedPerformanceScale, qualityScaleCap());
     applyPerformanceScale();
   }
 
   function applyQuality() {
+    performanceScale = Math.min(requestedPerformanceScale, qualityScaleCap());
     applyPerformanceScale();
-    // "High quality" remains the only user-facing preset. On mobile we keep all
-    // lighting/weather/material detail but use contact shadows instead of a full
-    // scene shadow map, which removes one of the largest GPU stalls.
-    renderer.shadowMap.enabled = !mobileLike;
+    // Quality presets keep the same world/gameplay while scaling expensive
+    // rendering details. Mobile still uses contact shadows instead of a full
+    // scene shadow map to avoid GPU stalls.
+    renderer.shadowMap.enabled = !mobileLike && quality !== 'low';
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.shadowMap.needsUpdate = !mobileLike;
+    renderer.shadowMap.needsUpdate = !mobileLike && quality !== 'low';
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.20;
 
-    const anisotropyCap = mobileLike ? 4 : 8;
+    const anisotropyCap = quality === 'low' ? 2 : quality === 'balanced' ? (mobileLike ? 3 : 6) : (mobileLike ? 4 : 8);
     const anisotropy = Math.max(1, Math.min(renderer.capabilities.getMaxAnisotropy?.() || 1, anisotropyCap));
     scene.traverse(object => {
       if (!object.isMesh && !object.isSprite) return;
@@ -346,7 +356,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
     });
 
     if (sun) {
-      sun.castShadow = !mobileLike;
+      sun.castShadow = !mobileLike && quality !== 'low';
       if (!mobileLike && sun.shadow && (sun.shadow.mapSize.x !== 2048 || sun.shadow.mapSize.y !== 2048)) {
         sun.shadow.mapSize.set(2048, 2048);
         sun.shadow.map?.dispose?.();
@@ -354,15 +364,22 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
       }
     }
     stars.visible = true;
-    clouds.count = mobileLike ? 24 : 30;
+    starGeometry.setDrawRange(0, quality === 'low' ? (mobileLike ? 80 : 110) : quality === 'balanced' ? (mobileLike ? 140 : 175) : 220);
+    clouds.count = quality === 'low' ? (mobileLike ? 10 : 14) : quality === 'balanced' ? (mobileLike ? 18 : 22) : (mobileLike ? 24 : 30);
     clouds.visible = true;
-    rainGeometry.setDrawRange(0, (mobileLike ? 520 : 620) * 2);
-    rainMaterial.opacity = Math.min(rainMaterial.opacity, .72);
+    const rainDropsVisible = quality === 'low' ? (mobileLike ? 220 : 300) : quality === 'balanced' ? (mobileLike ? 360 : 460) : (mobileLike ? 520 : 620);
+    rainGeometry.setDrawRange(0, rainDropsVisible * 2);
+    rainMaterial.opacity = Math.min(rainMaterial.opacity, quality === 'low' ? .56 : quality === 'balanced' ? .66 : .72);
   }
-  function setQuality() {
+  function setQuality(nextQuality = quality) {
     if (disposed) return;
+    quality = allowedQualities.has(nextQuality) ? nextQuality : 'high';
+    qualitySelect.value = quality;
+    performanceScale = Math.min(requestedPerformanceScale, qualityScaleCap());
     applyQuality();
+    savePreferences();
   }
+  qualitySelect.addEventListener('change', () => setQuality(qualitySelect.value));
   async function toggleSound() {
     if (disposed) return;
     soundButton.disabled = true;

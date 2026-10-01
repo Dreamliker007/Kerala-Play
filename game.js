@@ -2,7 +2,7 @@ import * as THREE from './vendor/three.module.js';
 import { initSocial, api } from './social.js?v=125.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
-import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=117.0';
+import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=118.0';
 import { createKeralaRoofTiles } from './roof-tiles.js?v=115.0';
 
 const busDestinationSignMaterials = new Map();
@@ -138,7 +138,7 @@ const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTA
     airport: DISTRICT_AIRPORTS.has(district) ? { x:42, z:-28, radius:8.2 } : null,
     teleport: { x:78, z:72, radius:7.2 },
   };
-  if (district === 'Kottayam') return [district, { ...generic, spawn:{ x:19,z:-23,rotation:0 }, train:{ x:7,z:-23,radius:7.2 } }];
+  if (district === 'Kottayam') return [district, { ...generic, spawn:{ x:19,z:-23,rotation:0 }, train:{ x:-60,z:-50,radius:7.2 } }];
   if (district === 'Ernakulam') return [district, {
     ...generic,
     bounds:{ minX:-110,maxX:110,minZ:-110,maxZ:110 },
@@ -422,8 +422,8 @@ const WORLD_ACTIVITY_SPOTS = Object.freeze([
   Object.freeze({ id: 'ernakulam-station-bus', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Ernakulam Railway Bus Stop', x: -35, z: -12, radius: 4.2, discoverRadius: 7.5 }),
   Object.freeze({ id: 'ernakulam-mg-road', kind: 'bus', routeId: 'ernakulam-city-line', label: 'MG Road Bus Stop', x: 16, z: 13.5, radius: 4.2, discoverRadius: 7.5 }),
   Object.freeze({ id: 'ernakulam-marine', kind: 'bus', routeId: 'ernakulam-city-line', label: 'Marine Drive Bus Stop', x: -3, z: 30.5, radius: 4.2, discoverRadius: 7.5 }),
-  Object.freeze({ id: 'kottayam-rail', kind: 'train', stationId: 'kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Ernakulam', fare: 500 }),
-  Object.freeze({ id: 'ernakulam-rail', kind: 'train', stationId: 'ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, discoverRadius: 10.5, destinationLabel: 'Kottayam', fare: 500 }),
+  Object.freeze({ id: 'kottayam-rail', kind: 'train', stationId: 'kottayam', label: 'Kottayam Railway Station', x: -60, z: -50, radius: 7.2, discoverRadius: 11.5, destinationLabel: 'Ernakulam', fare: 250 }),
+  Object.freeze({ id: 'ernakulam-rail', kind: 'train', stationId: 'ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, discoverRadius: 10.5, destinationLabel: 'Kottayam', fare: 250 }),
   Object.freeze({ id: 'town-market', kind: 'shop', label: 'Town Market', x: 31, z: 12.5, radius: 4.2, discoverRadius: 7.2, openHour: 6, closeHour: 21, items: ['water', 'tea', 'snack', 'meal'] }),
   Object.freeze({ id: 'community-clinic', kind: 'service', service: 'clinic', label: 'Community Clinic', x: 42, z: 31, radius: 4.8, discoverRadius: 8.0 }),
   Object.freeze({ id: 'police-station', kind: 'service', service: 'police', label: 'Kerala Police Station', x: -31, z: 14, radius: 4.8, discoverRadius: 8.0 }),
@@ -595,16 +595,22 @@ const worldZones = Object.freeze([
   Object.freeze({ id: 'south', name: 'South Kerala', districts: ['Kollam', 'Thiruvananthapuram'], minZ: -72, maxZ: -38 }),
 ]);
 const roadNetwork = Object.freeze([
-  Object.freeze({ id: 'state-spine', name: 'Kerala State Road', axis: 'z', center: 0, min: -72, max: 72, halfWidth: 7.75, displayLimit: 40, bikeLimit: 6.6, taxiLimit: 6.4 }),
-  Object.freeze({ id: 'outskirts-access-road', name: 'District Outskirts Road', axis: 'x', center: -78, min: -75, max: 75, halfWidth: 4.1, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
-  Object.freeze({ id: 'village-link', name: 'Village Link Road', axis: 'x', center: -22, min: -72, max: 16, halfWidth: 5.75, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
-  Object.freeze({ id: 'market-link', name: 'Market Road', axis: 'x', center: 22, min: -18, max: 48, halfWidth: 3.4, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
-  Object.freeze({ id: 'station-link', name: 'Station Road', axis: 'z', center: -42, min: -34, max: 22, halfWidth: 3.2, displayLimit: 25, bikeLimit: 4.4, taxiLimit: 4.2 }),
-  Object.freeze({ id: 'ernakulam-mg', name: 'MG Road', axis: 'x', center: 2, min: -32, max: 32, halfWidth: 4.2, displayLimit: 35, bikeLimit: 5.8, taxiLimit: 5.6 }),
-  Object.freeze({ id: 'ernakulam-marine-road', name: 'Marine Drive Road', axis: 'x', center: 21, min: -28, max: 28, halfWidth: 3.8, displayLimit: 30, bikeLimit: 5.2, taxiLimit: 5.0 }),
-  Object.freeze({ id: 'ernakulam-city-spine', name: 'Banerji Road', axis: 'z', center: 0, min: -26, max: 30, halfWidth: 4.2, displayLimit: 35, bikeLimit: 5.8, taxiLimit: 5.6 }),
+  Object.freeze({ id: 'state-spine', name: 'Kerala State Road', axis: 'z', center: 0, min: -100, max: 100, halfWidth: 7.75, displayLimit: 40, bikeLimit: 6.6, taxiLimit: 6.4 }),
+  Object.freeze({ id: 'outskirts-access-road', name: 'District South Ring Road', axis: 'x', center: -92, min: -100, max: 100, halfWidth: 4.1, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
+  Object.freeze({ id: 'village-link', name: 'Village Link Road', axis: 'x', center: -22, min: -98, max: 98, halfWidth: 5.75, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
+  Object.freeze({ id: 'market-link', name: 'Market Road', axis: 'x', center: 22, min: -98, max: 98, halfWidth: 3.4, displayLimit: 30, bikeLimit: 4.9, taxiLimit: 4.7 }),
+  Object.freeze({ id: 'station-link', name: 'Railway Access Road', axis: 'z', center: -60, min: -46, max: -22, halfWidth: 3.5, displayLimit: 25, bikeLimit: 4.4, taxiLimit: 4.2 }),
+  Object.freeze({ id: 'north-ring-road', name: 'District North Ring Road', axis: 'x', center: 92, min: -100, max: 100, halfWidth: 4.1, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
+  Object.freeze({ id: 'west-ring-road', name: 'District West Ring Road', axis: 'z', center: -96, min: -92, max: 92, halfWidth: 4.1, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
+  Object.freeze({ id: 'east-ring-road', name: 'District East Ring Road', axis: 'z', center: 96, min: -92, max: 92, halfWidth: 4.1, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
+  Object.freeze({ id: 'ernakulam-mg', name: 'MG Road', axis: 'x', center: 2, min: -100, max: 100, halfWidth: 4.2, displayLimit: 35, bikeLimit: 5.8, taxiLimit: 5.6 }),
+  Object.freeze({ id: 'ernakulam-marine-road', name: 'Marine Drive Road', axis: 'x', center: 21, min: -75, max: 75, halfWidth: 3.8, displayLimit: 30, bikeLimit: 5.2, taxiLimit: 5.0 }),
+  Object.freeze({ id: 'ernakulam-city-spine', name: 'Banerji Road', axis: 'z', center: 0, min: -100, max: 100, halfWidth: 4.2, displayLimit: 35, bikeLimit: 5.8, taxiLimit: 5.6 }),
   Object.freeze({ id: 'ernakulam-station-access', name: 'Railway Station Road', axis: 'x', center: -19.5, min: -50, max: -26, halfWidth: 3.5, displayLimit: 25, bikeLimit: 4.6, taxiLimit: 4.4 }),
   Object.freeze({ id: 'ernakulam-station-connector', name: 'Railway Connector', axis: 'z', center: -29, min: -23, max: -14, halfWidth: 3.5, displayLimit: 25, bikeLimit: 4.6, taxiLimit: 4.4 }),
+  Object.freeze({ id: 'ernakulam-north-ring', name: 'Ernakulam North Ring Road', axis: 'x', center: 92, min: -100, max: 100, halfWidth: 4.1, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
+  Object.freeze({ id: 'ernakulam-west-ring', name: 'Ernakulam West Ring Road', axis: 'z', center: -96, min: -92, max: 92, halfWidth: 4.1, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
+  Object.freeze({ id: 'ernakulam-east-ring', name: 'Ernakulam East Ring Road', axis: 'z', center: 96, min: -92, max: 92, halfWidth: 4.1, displayLimit: 30, bikeLimit: 5.1, taxiLimit: 4.9 }),
 ]);
 const townZones = Object.freeze([
   Object.freeze({ id: 'town-centre', name: 'Town Centre', x: 0, z: 22, radius: 16, district: 'Kottayam' }),
@@ -1145,28 +1151,37 @@ function updateFootstepEffects(delta, player, moving, running, phase = 0) {
 function roadZoneAt(x, z) {
   const district = currentWorldDistrictName();
   if (district !== 'Kottayam' && district !== 'Ernakulam') {
-    if (Math.abs(z + 78) <= 4.5 && x >= -76 && x <= 76) {
-      return { id:'district-outskirts-road', label:`${district.toUpperCase()} OUTSKIRTS ROAD`, displayLimit:30, bikeLimit:5.1, taxiLimit:4.9 };
+    if (Math.abs(z + 92) <= 4.5 && x >= -100 && x <= 100) {
+      return { id:'district-south-ring', label:`${district.toUpperCase()} SOUTH RING ROAD`, displayLimit:30, bikeLimit:5.1, taxiLimit:4.9 };
     }
-    if (Math.abs(x) <= 6 && z >= -68 && z <= 68) {
+    if (Math.abs(z - 92) <= 4.5 && x >= -100 && x <= 100) {
+      return { id:'district-north-ring', label:`${district.toUpperCase()} NORTH RING ROAD`, displayLimit:30, bikeLimit:5.1, taxiLimit:4.9 };
+    }
+    if (Math.abs(x + 96) <= 4.5 && z >= -92 && z <= 92) {
+      return { id:'district-west-ring', label:`${district.toUpperCase()} WEST RING ROAD`, displayLimit:30, bikeLimit:5.1, taxiLimit:4.9 };
+    }
+    if (Math.abs(x - 96) <= 4.5 && z >= -92 && z <= 92) {
+      return { id:'district-east-ring', label:`${district.toUpperCase()} EAST RING ROAD`, displayLimit:30, bikeLimit:5.1, taxiLimit:4.9 };
+    }
+    if (Math.abs(x) <= 6 && z >= -100 && z <= 100) {
       return { id:'district-spine', label:`${district.toUpperCase()} MAIN ROAD`, displayLimit:35, bikeLimit:5.8, taxiLimit:5.6 };
     }
-    if (Math.abs(z) <= 5 && x >= -68 && x <= 68) {
+    if (Math.abs(z) <= 5 && x >= -100 && x <= 100) {
       return { id:'district-cross', label:`${district.toUpperCase()} CITY ROAD`, displayLimit:30, bikeLimit:5.2, taxiLimit:5.0 };
     }
-    if (Math.abs(z + 6) <= 3.5 && x >= -48 && x <= 0) {
+    if (Math.abs(z + 6) <= 3.5 && x >= -96 && x <= 48) {
       return { id:'district-station-road', label:'RAILWAY STATION ROAD', displayLimit:25, bikeLimit:4.6, taxiLimit:4.4 };
     }
-    if (Math.abs(z - 22) <= 3.5 && x >= -18 && x <= 58) {
+    if (Math.abs(z - 22) <= 3.5 && x >= -58 && x <= 98) {
       return { id:'district-market-road', label:`${districtCityProfile(district).market.toUpperCase()} ROAD`, displayLimit:25, bikeLimit:4.6, taxiLimit:4.4 };
     }
-    if (Math.abs(z + 36) <= 3.5 && x >= -67 && x <= 19) {
+    if (Math.abs(z + 36) <= 3.5 && x >= -97 && x <= 49) {
       return { id:'district-residential-road', label:'RESIDENTIAL ROAD', displayLimit:25, bikeLimit:4.4, taxiLimit:4.2 };
     }
-    if (Math.abs(z - 45) <= 3.5 && x >= -12 && x <= 62) {
+    if (Math.abs(z - 45) <= 3.5 && x >= -47 && x <= 97) {
       return { id:'district-landmark-road', label:`${districtCityProfile(district).landmark.toUpperCase()} ROAD`, displayLimit:25, bikeLimit:4.4, taxiLimit:4.2 };
     }
-    if (Math.abs(z - 34) <= 3.5 && x >= -67 && x <= -3) {
+    if (Math.abs(z - 34) <= 3.5 && x >= -97 && x <= 27) {
       return { id:'district-secondary-road', label:districtCityProfile(district).secondary.toUpperCase(), displayLimit:25, bikeLimit:4.5, taxiLimit:4.3 };
     }
     if (currentDistrictInstance().airport && Math.abs(z + 28) <= 3.5 && x >= 0 && x <= 44) {
@@ -2578,7 +2593,7 @@ function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) 
   const train = mode === 'train';
   const flight = mode === 'flight';
   const teleport = mode === 'teleport';
-  const durationMs = Math.max(0, Number(travel.durationMs ?? (train ? 60_000 : flight ? 30_000 : 0)));
+  const durationMs = Math.max(0, Number(travel.durationMs ?? (train ? 10_000 : flight ? 5_000 : 0)));
   const animationMs = teleport ? 1800 : durationMs;
   const tripNumber = Math.max(1, Number(travel.tripNumber) || 1);
   const freeTripsRemaining = Math.max(0, Number(travel.freeTripsRemaining) || 0);
@@ -2616,17 +2631,17 @@ function showDistrictJourney(mode, fromDistrict, toDistrict, fare, travel = {}) 
     [1350, 'Crossing into ' + toDistrict + '…'],
   ] : flight ? [
     [0, 'Ticket verified · proceed to Gate 01 at ' + fromDistrict + ' Airport…'],
-    [3000, 'Boarding complete · cabin doors closing…'],
-    [7000, 'Take-off · climbing above Kerala…'],
-    [15000, 'Cruising to ' + toDistrict + ' · district boundary crossed…'],
-    [25000, 'Beginning descent · approaching ' + toDistrict + ' Airport…'],
-    [28500, 'Landing · taxiing to the terminal…'],
+    [700, 'Boarding complete · cabin doors closing…'],
+    [1500, 'Take-off · climbing above Kerala…'],
+    [2800, 'Cruising to ' + toDistrict + ' · district boundary crossed…'],
+    [4100, 'Beginning descent · approaching ' + toDistrict + ' Airport…'],
+    [4700, 'Landing · taxiing to the terminal…'],
   ] : [
     [0, 'Ticket checked · doors closing at ' + fromDistrict + ' Station…'],
-    [5000, 'Departed ' + fromDistrict + ' · train leaving the platform…'],
-    [20000, 'On the way to ' + toDistrict + ' · district boundary crossed…'],
-    [46000, 'Approaching ' + toDistrict + ' Railway Station…'],
-    [57000, 'Arriving at ' + toDistrict + ' · preparing to stop…'],
+    [1600, 'Departed ' + fromDistrict + ' · train leaving the platform…'],
+    [4200, 'On the way to ' + toDistrict + ' · district boundary crossed…'],
+    [7600, 'Approaching ' + toDistrict + ' Railway Station…'],
+    [9300, 'Arriving at ' + toDistrict + ' · preparing to stop…'],
   ];
   const drawJourneyFrame = (elapsed, remaining) => {
     const phase = [...phases].reverse().find(([at]) => elapsed >= at);
@@ -8635,10 +8650,12 @@ function addPassengerTrain(scene, x, z, centerOffset = 0) {
 }
 
 function addKottayamRailwayFoundation(scene) {
-  addRailTracks(scene, 7, -26.5, 31);
-  addRailPlatform(scene, 7, -23, 27);
-  addPassengerTrain(scene, 7, -26.5, -7);
-  addCivicBuilding(scene, 14.5, -34.5, {
+  // Keep the parked train completely off the carriageway. The station is
+  // reached from Village Link Road through a short dedicated access road.
+  addRailTracks(scene, -60, -54, 56);
+  addRailPlatform(scene, -60, -50, 44);
+  addPassengerTrain(scene, -60, -54);
+  addCivicBuilding(scene, -73, -48.5, {
     title: 'KOTTAYAM RAILWAY',
     subtitle: 'ERNAKULAM · DISTRICT TRAINS',
     color: 0x315f78,
@@ -8646,12 +8663,12 @@ function addKottayamRailwayFoundation(scene) {
   });
   const board = createWorldSignMesh({
     title: 'KOTTAYAM STATION',
-    subtitle: 'BOARD HERE · ERNAKULAM ₹35',
+    subtitle: 'BOARD HERE · AFTER FREE TRIPS ₹250',
     background: '#315f78',
   }, 4.2, .92);
-  board.position.set(7, 2.35, -22.3);
+  board.position.set(-60, 2.35, -48.1);
   scene.add(board);
-  registerFarVisual(board, 7, -22.3, 64);
+  registerFarVisual(board, -60, -48.1, 72);
 }
 
 function addCityTower(scene, x, z, width, depth, height, color, title = '') {
@@ -8895,6 +8912,16 @@ function addErnakulamCrosswalks(scene, centerX, centerZ) {
   scene.add(markings);
 }
 
+function addOuterRoadsideTrees(scene, seedOffset = 0) {
+  const placements = [
+    [-86,-70],[-86,-28],[-86,28],[-86,70],
+    [86,-70],[86,-28],[86,28],[86,70],
+    [-66,82],[-22,82],[22,82],[66,82],
+    [-66,-102],[-22,-102],[22,-102],[66,-102],
+  ];
+  placements.forEach(([x,z], index) => addPalm(scene, x, z, .66 + ((index + seedOffset) % 4) * .055));
+}
+
 function addErnakulamDistrictFoundation(scene, roadTexture) {
   const cx = ERNAKULAM_CITY.x;
   const cz = ERNAKULAM_CITY.z;
@@ -8921,6 +8948,7 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
     scene.add(dash);
   }
   addErnakulamCrosswalks(scene, cx, cz);
+  addOuterRoadsideTrees(scene, 1);
 
   addRailTracks(scene, -40, -26.8, 38);
   addRailPlatform(scene, -40, -30.1, 38);
@@ -8933,7 +8961,7 @@ function addErnakulamDistrictFoundation(scene, roadTexture) {
   });
   const stationBoard = createWorldSignMesh({
     title: 'ERNAKULAM STATION',
-    subtitle: 'KOTTAYAM · ₹35 · DISTRICT TRAINS',
+    subtitle: 'KOTTAYAM · AFTER FREE TRIPS ₹250',
     background: '#385f7b',
   }, 4.8, .92);
   stationBoard.position.set(-40, 2.35, -30.7);
@@ -9751,6 +9779,7 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
   ])));
   addDistrictLaneMarkings(scene, roads);
   addDistrictCrosswalks(scene);
+  addOuterRoadsideTrees(scene, DISTRICT_INSTANCE_ORDER.indexOf(district));
 
   addRailTracks(scene, config.train.x, -17, 30);
   addRailPlatform(scene, config.train.x, -9.6, 28);
@@ -9900,65 +9929,83 @@ function buildWorld(scene) {
     finalizeRoadEdges(scene);
     return;
   }
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(16, 160), roadMat);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(16, 200), roadMat);
   road.rotation.x = -Math.PI / 2;
   road.position.y = .016;
   scene.add(road);
-  addRoadEdges(scene, 0, 0, 16, 160);
+  addRoadEdges(scene, 0, 0, 16, 200);
   const lineMat = new THREE.MeshStandardMaterial({ color: 0xf1d46d, roughness: .75 });
-  for (let z = -72; z <= 72; z += 9) {
+  for (let z = -96; z <= 96; z += 9) {
     const line = new THREE.Mesh(new THREE.PlaneGeometry(.18, 4), lineMat);
     line.rotation.x = -Math.PI / 2;
     line.position.set(0, .03, z);
     scene.add(line);
   }
-  const sideRoad = new THREE.Mesh(new THREE.PlaneGeometry(88, 12), roadMat);
+  const sideRoad = new THREE.Mesh(new THREE.PlaneGeometry(196, 12), roadMat);
   sideRoad.rotation.x = -Math.PI / 2;
-  sideRoad.position.set(-28, .017, -22);
+  sideRoad.position.set(0, .017, -22);
   scene.add(sideRoad);
-  addRoadEdges(scene, -28, -22, 88, 12);
+  addRoadEdges(scene, 0, -22, 196, 12);
 
-  const marketRoad = new THREE.Mesh(new THREE.PlaneGeometry(66, 7), roadMat);
+  const marketRoad = new THREE.Mesh(new THREE.PlaneGeometry(196, 7), roadMat);
   marketRoad.rotation.x = -Math.PI / 2;
-  marketRoad.position.set(15, .018, 22);
+  marketRoad.position.set(0, .018, 22);
   scene.add(marketRoad);
-  addRoadEdges(scene, 15, 22, 66, 7);
-  for (let x = -15; x <= 45; x += 8) {
+  addRoadEdges(scene, 0, 22, 196, 7);
+  for (let x = -94; x <= 94; x += 8) {
     const line = new THREE.Mesh(new THREE.PlaneGeometry(3.4, .15), lineMat);
     line.rotation.x = -Math.PI / 2;
     line.position.set(x, .032, 22);
     scene.add(line);
   }
 
-  const stationRoad = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 56), roadMat);
+  const stationRoad = new THREE.Mesh(new THREE.PlaneGeometry(7, 24), roadMat);
   stationRoad.rotation.x = -Math.PI / 2;
-  stationRoad.position.set(-42, .019, -6);
+  stationRoad.position.set(-60, .019, -34);
   scene.add(stationRoad);
-  addRoadEdges(scene, -42, -6, 6.5, 56);
-  for (let z = -30; z <= 18; z += 8) {
+  addRoadEdges(scene, -60, -34, 7, 24);
+  for (let z = -44; z <= -24; z += 7) {
     const line = new THREE.Mesh(new THREE.PlaneGeometry(.15, 3.4), lineMat);
     line.rotation.x = -Math.PI / 2;
-    line.position.set(-42, .033, z);
+    line.position.set(-60, .033, z);
     scene.add(line);
   }
 
-  for (let x = -68; x <= 12; x += 9) {
+  for (let x = -94; x <= 94; x += 9) {
     const line = new THREE.Mesh(new THREE.PlaneGeometry(4.2, .18), lineMat);
     line.rotation.x = -Math.PI / 2;
     line.position.set(x, .031, -22);
     scene.add(line);
   }
 
-  const outskirtsRoad = new THREE.Mesh(new THREE.PlaneGeometry(150, 8), roadMat);
-  outskirtsRoad.rotation.x = -Math.PI / 2;
-  outskirtsRoad.position.set(0, .018, -78);
-  scene.add(outskirtsRoad);
-  addRoadEdges(scene, 0, -78, 150, 8);
-  for (let x = -70; x <= 70; x += 9) {
-    const dash = new THREE.Mesh(new THREE.PlaneGeometry(4, .16), lineMat);
-    dash.rotation.x = -Math.PI / 2;
-    dash.position.set(x, .033, -78);
-    scene.add(dash);
+  const outerRoads = [
+    [0, -92, 200, 8],
+    [0, 92, 200, 8],
+    [-96, 0, 8, 184],
+    [96, 0, 8, 184],
+  ];
+  for (const [x, z, width, depth] of outerRoads) {
+    const outerRoad = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), roadMat);
+    outerRoad.rotation.x = -Math.PI / 2;
+    outerRoad.position.set(x, .018, z);
+    scene.add(outerRoad);
+    addRoadEdges(scene, x, z, width, depth);
+  }
+  for (let x = -94; x <= 94; x += 9) {
+    for (const z of [-92, 92]) {
+      const dash = new THREE.Mesh(new THREE.PlaneGeometry(4, .16), lineMat);
+      dash.rotation.x = -Math.PI / 2;
+      dash.position.set(x, .033, z);
+      scene.add(dash);
+    }
+  }
+  for (let z = -86; z <= 86; z += 9) {
+    for (const x of [-96, 96]) {
+      const dash = new THREE.Mesh(new THREE.PlaneGeometry(.16, 4), lineMat);
+      dash.rotation.x = -Math.PI / 2;
+      dash.position.set(x, .033, z);
+      scene.add(dash);
+    }
   }
   addRoadSurfaceDetails(scene);
   [
@@ -9981,19 +10028,21 @@ function buildWorld(scene) {
   addTownStreetDetails(scene);
   addKottayamRailwayFoundation(scene);
   addKeralaStreetRealism(scene);
-  addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -76, max: 76, progress: -52, direction: 1, speed: 7.0, color: 0xd44737, flowPhase: .4 });
-  addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -3.0, min: -76, max: 76, progress: -18, direction: 1, speed: 7.8, color: 0x356f8b, flowPhase: 2.1 });
-  addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -76, max: 76, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d, flowPhase: 1.2 });
-  addRoadVehicle(scene, { kind: 'auto', axis: 'z', fixed: 3.15, min: -76, max: 76, progress: 20, direction: -1, speed: 5.8, color: 0x2b773f, flowPhase: 3.8 });
-  addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -69, max: 10, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5, flowPhase: .8 });
-  addRoadVehicle(scene, { kind: 'bike', axis: 'x', fixed: -24.4, min: -69, max: 10, progress: -31, direction: 1, speed: 7.2, color: 0x8b3e35, flowPhase: 4.4 });
+  addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -96, max: 96, progress: -52, direction: 1, speed: 7.0, color: 0xd44737, flowPhase: .4 });
+  addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -3.0, min: -96, max: 96, progress: -18, direction: 1, speed: 7.8, color: 0x356f8b, flowPhase: 2.1 });
+  addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -96, max: 96, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d, flowPhase: 1.2 });
+  addRoadVehicle(scene, { kind: 'auto', axis: 'z', fixed: 3.15, min: -96, max: 96, progress: 20, direction: -1, speed: 5.8, color: 0x2b773f, flowPhase: 3.8 });
+  addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: -24.5, min: -94, max: 94, progress: -60, direction: 1, speed: 6.3, color: 0x427eb5, flowPhase: .8 });
+  addRoadVehicle(scene, { kind: 'bike', axis: 'x', fixed: -24.4, min: -94, max: 94, progress: -31, direction: 1, speed: 7.2, color: 0x8b3e35, flowPhase: 4.4 });
   // Opposing side-road traffic keeps the junction from feeling one-directional.
-  addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: -19.5, min: -69, max: 10, progress: -4, direction: -1, speed: 5.5, color: 0x31734a, flowPhase: 2.9 });
+  addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: -19.5, min: -94, max: 94, progress: -4, direction: -1, speed: 5.5, color: 0x31734a, flowPhase: 2.9 });
   // Town-route traffic makes the new Market Road feel connected without changing
   // the established state-road traffic controller.
-  addRoadVehicle(scene, { kind: 'bus', axis: 'x', fixed: 24.1, min: -15, max: 20, progress: -10, direction: 1, speed: 4.6, color: 0xd7aa2d, flowPhase: 1.7 });
-  addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: 19.9, min: -15, max: 20, progress: 16, direction: -1, speed: 5.1, color: 0x2d7650, flowPhase: 3.3 });
-  addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -40.7, min: -31, max: 19, progress: 12, direction: -1, speed: 5.4, color: 0x6f4a88, flowPhase: 2.2 });
+  addRoadVehicle(scene, { kind: 'bus', axis: 'x', fixed: 24.1, min: -94, max: 94, progress: -10, direction: 1, speed: 4.6, color: 0xd7aa2d, flowPhase: 1.7 });
+  addRoadVehicle(scene, { kind: 'auto', axis: 'x', fixed: 19.9, min: -94, max: 94, progress: 16, direction: -1, speed: 5.1, color: 0x2d7650, flowPhase: 3.3 });
+  addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -60, min: -46, max: -24, progress: -34, direction: -1, speed: 5.4, color: 0x6f4a88, flowPhase: 2.2 });
+  addRoadVehicle(scene, { kind: 'car', axis: 'x', fixed: 92, min: -92, max: 92, progress: -36, direction: 1, speed: 6.2, color: 0x5f7187, flowPhase: 5.8 });
+  addRoadVehicle(scene, { kind: 'auto', axis: 'z', fixed: 96, min: -88, max: 88, progress: 35, direction: -1, speed: 5.2, color: 0x2b773f, flowPhase: 6.7 });
 
   registerPersonalHomePlot(scene, addPhotoHouse(scene, -24, -35, 'Kottayam'), 'Kottayam', -24, -35);
   const rentalHomeMarker = new THREE.Group();
@@ -10006,8 +10055,12 @@ function buildWorld(scene) {
   addWorldRealismPass(scene);
   // Keep tall palms clear of both carriageways. Their fronds no longer hang
   // over the driving lanes; the near-road detail is handled by low gardens.
-  const treePositions = [[-21,-62],[22,-55],[-22,-47],[23,-42],[-23,-11],[23,-8],[-23,7],[23,12],[-23,34],[23,43],[-22,61],[23,66],[-50,-20],[-45,14],[-42,48],[46,-42],[42,8.5],[47,52]];
+  const treePositions = [[-21,-62],[22,-55],[-22,-47],[23,-42],[-23,-11],[23,-8],[-23,7],[23,12],[-23,34],[23,43],[-22,61],[23,66],[-74,-10],[-45,14],[-42,48],[46,-42],[42,8.5],[47,52]];
   treePositions.forEach(([x, z], i) => addPalm(scene, x, z, .72 + (i % 3) * .09));
+  // Roadside palms frame the expanded outer loop while staying clear of asphalt.
+  [[-86,-72,.72],[-86,-40,.78],[-86,8,.74],[-86,54,.80],[86,-68,.76],[86,-30,.72],[86,18,.79],[86,58,.75],
+   [-70,82,.74],[-32,82,.78],[34,82,.72],[72,82,.80],[-68,-102,.76],[-28,-102,.72],[30,-102,.78],[70,-102,.74]]
+    .forEach(([x,z,scale]) => addPalm(scene,x,z,scale));
   [[-43,-37,1.08],[41,-29,1.15],[-48,41,.96],[45,39,1.04],[-27,-13,.88],[30,8.5,.8],[-28,57,.85]].forEach(([x, z, scale]) => addPalm(scene, x, z, scale));
   [[-43,-49,.88],[39,-25,.94],[-42,27,.90],[43,43,.92]].forEach(([x, z, scale], index) =>
     addTree(scene, x, z, scale, index % 2 ? 'jackfruit' : 'mango'));
@@ -11710,8 +11763,9 @@ function updateTraffic(delta) {
     }
 
     let nextProgress = Number(config.progress) + config.direction * config.currentSpeed * delta;
-    if (config.direction > 0 && nextProgress > config.max) nextProgress = config.min;
-    if (config.direction < 0 && nextProgress < config.min) nextProgress = config.max;
+    let reachedRoadEnd = false;
+    if (config.direction > 0 && nextProgress > config.max) { nextProgress = config.max; config.direction = -1; reachedRoadEnd = true; }
+    else if (config.direction < 0 && nextProgress < config.min) { nextProgress = config.min; config.direction = 1; reachedRoadEnd = true; }
 
     if (trafficHitsStaticWorld(config, nextProgress)) {
       // Ambient traffic must never enter buildings, shelters or other static
@@ -11736,10 +11790,8 @@ function updateTraffic(delta) {
       }
     }
 
-    const wrapped = (config.direction > 0 && nextProgress === config.min && Number(config.progress) > config.max - 1)
-      || (config.direction < 0 && nextProgress === config.max && Number(config.progress) < config.min + 1);
-    if (wrapped) {
-      config.currentSpeed = baseSpeed;
+    if (reachedRoadEnd) {
+      config.currentSpeed = Math.min(baseSpeed, Math.max(0, config.currentSpeed));
       if (config.kind === 'bus') {
         config.lastBusStop = null;
         config.stopUntil = 0;
@@ -11748,8 +11800,13 @@ function updateTraffic(delta) {
       if (Math.abs(Number(config.progress) - Number(config.lastBusStop)) > 13) config.lastBusStop = null;
     }
     config.progress = nextProgress;
-    if (config.axis === 'z') vehicle.position.z = config.progress;
-    else vehicle.position.x = config.progress;
+    if (config.axis === 'z') {
+      vehicle.position.z = config.progress;
+      vehicle.rotation.y = config.direction > 0 ? 0 : Math.PI;
+    } else {
+      vehicle.position.x = config.progress;
+      vehicle.rotation.y = config.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
 
     const trafficRatio = baseSpeed > .01 ? Math.min(1, Math.abs(Number(config.currentSpeed)) / baseSpeed) : 0;
     const braking = targetSpeed < previousSpeed - .18 || targetSpeed < baseSpeed * .18;
