@@ -417,8 +417,12 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
       }
     } catch {
       audioEnabled = false;
+      audioUpdateTimer = 0;
+      try { await soundscape?.suspend(); } catch { /* Audio recovery must never block gameplay. */ }
       soundButton.textContent = 'Resume';
       soundButton.setAttribute('aria-pressed', 'false');
+      audioStatus.textContent = 'World sound paused. Tap Resume when ready.';
+      savePreferences();
     }
   }
   document.addEventListener('visibilitychange', visibilityChanged);
@@ -583,7 +587,8 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
       const firstShopDistance = Math.hypot(camera.position.x + 14.4, camera.position.z - 7.5);
       const secondShopDistance = Math.hypot(camera.position.x - 14.8, camera.position.z - 38.5);
       const townProximity = Math.max(0, 1 - Math.min(firstShopDistance, secondShopDistance) / 28);
-      soundscape?.update({
+      try {
+        soundscape?.update({
         daylight,
         hour,
         rain,
@@ -596,7 +601,15 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
         townProximity,
         lightning,
         lightningStrikeId,
-      });
+        });
+      } catch {
+        audioEnabled = false;
+        audioUpdateTimer = 0;
+        soundButton.textContent = 'Resume';
+        soundButton.setAttribute('aria-pressed', 'false');
+        audioStatus.textContent = 'World sound paused after an audio error.';
+        savePreferences();
+      }
     }
     return currentWeather;
   }
