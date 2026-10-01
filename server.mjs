@@ -821,16 +821,23 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   }
   function applyDistrictTravelArrival(user, trip, timestamp = now()) {
     const live = presence.get(user.id) || place(user);
-    live.district = trip.to.district;
-    live.x = Number(trip.x);
-    live.z = Number(trip.z);
+    const destinationDistrict = DISTRICT_WORLD_CONFIG[trip?.to?.district] ? trip.to.district : currentWorldDistrict(user);
+    const destinationConfig = districtWorldConfig(destinationDistrict);
+    const destinationHub = trip?.mode === 'flight' ? destinationConfig.airport : trip?.mode === 'teleport' ? destinationConfig.teleport : destinationConfig.train;
+    const configuredX = Number(destinationHub?.arrivalX);
+    const configuredZ = Number(destinationHub?.arrivalZ);
+    const arrivalX = insideDistrictWorld(destinationConfig, configuredX, configuredZ, 2) ? configuredX : Number(destinationConfig.spawn.x);
+    const arrivalZ = insideDistrictWorld(destinationConfig, configuredX, configuredZ, 2) ? configuredZ : Number(destinationConfig.spawn.z);
+    live.district = destinationDistrict;
+    live.x = arrivalX;
+    live.z = arrivalZ;
     live.rotation = 0;
     live.moving = false;
     live.mode = 'walk';
     live.lastSeen = timestamp;
     live.movedAt = timestamp;
     live.movementCredit = 2;
-    user.worldDistrict = trip.to.district;
+    user.worldDistrict = destinationDistrict;
     user.worldX = live.x;
     user.worldZ = live.z;
     user.worldRotation = 0;
