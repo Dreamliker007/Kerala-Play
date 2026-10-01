@@ -2779,6 +2779,11 @@ window.addEventListener('kerala-district-journey', event => {
 async function resumeDistrictJourney(userId) {
   if (!userId || districtJourneyResumeUserId === userId) return;
   districtJourneyResumeUserId = userId;
+  // Hold movement while the server decides whether this session is still in
+  // district transit. This prevents a reload/login race from saving movement
+  // into the departure district before a pending journey is restored.
+  publicRideInProgress = true;
+  clearGameInput();
   try {
     const result = await api('/api/travel/district/status');
     if (result.status === 'pending' && result.travel) {
@@ -2787,9 +2792,14 @@ async function resumeDistrictJourney(userId) {
       showDistrictJourney(travel.mode, travel.from?.district || currentWorldDistrictName(), travel.to?.district || '', Number(travel.fare || 0), travel);
     } else if (result.status === 'arrived' && result.travel) {
       finishDistrictJourney(result.travel);
+    } else {
+      publicRideInProgress = false;
+      if (playerRef) playerRef.visible = !!profile;
     }
   } catch (error) {
     districtJourneyResumeUserId = '';
+    publicRideInProgress = false;
+    if (playerRef) playerRef.visible = !!profile;
     console.warn('Could not resume district journey:', error);
   }
 }
