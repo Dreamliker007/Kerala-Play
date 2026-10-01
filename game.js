@@ -9187,10 +9187,9 @@ function updateMonsoonWaterVisuals(time, delta) {
   }
 
   for (const ripple of puddleRipples) {
-    const rippleDistance = playerRef
-      ? Math.hypot(playerRef.position.x - ripple.mesh.position.x, playerRef.position.z - ripple.mesh.position.z)
-      : 0;
-    if (rippleDistance > 44) {
+    const rippleDx = playerRef ? playerRef.position.x - ripple.mesh.position.x : 0;
+    const rippleDz = playerRef ? playerRef.position.z - ripple.mesh.position.z : 0;
+    if (rippleDx * rippleDx + rippleDz * rippleDz > 44 * 44) {
       ripple.mesh.visible = false;
       continue;
     }
@@ -9206,10 +9205,9 @@ function updateMonsoonWaterVisuals(time, delta) {
   }
 
   for (const flow of drainWaterSurfaces) {
-    const flowDistance = playerRef
-      ? Math.hypot(playerRef.position.x - flow.mesh.position.x, playerRef.position.z - flow.mesh.position.z)
-      : 0;
-    if (flowDistance > 58) {
+    const flowDx = playerRef ? playerRef.position.x - flow.mesh.position.x : 0;
+    const flowDz = playerRef ? playerRef.position.z - flow.mesh.position.z : 0;
+    if (flowDx * flowDx + flowDz * flowDz > 58 * 58) {
       flow.mesh.visible = false;
       continue;
     }
