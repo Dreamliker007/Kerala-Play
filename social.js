@@ -3069,7 +3069,22 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
 
   proximityVoiceToggle?.addEventListener('click', () => proximityEnabled ? stopProximityVoice() : startProximityVoice());
   window.addEventListener('blur', () => { stopTalking(); cancelRecording(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { stopTalking(); cancelRecording(); stopProximityVoice(); } });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopTalking();
+      cancelRecording();
+      stopProximityVoice();
+      return;
+    }
+    if (!user) return;
+    wakeProductionBackend();
+    const version = sessionVersion;
+    void run(async () => {
+      await refreshUser();
+      if (version !== sessionVersion || !user) return;
+      if (!source || source.readyState === EventSource.CLOSED) startEvents();
+    });
+  });
   window.addEventListener('pagehide', () => { cleanupVoice(); clearMessageURLs(); source?.close(); });
   updateProximityButton();
   setConnection(false);
