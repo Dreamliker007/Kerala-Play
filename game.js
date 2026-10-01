@@ -11840,6 +11840,7 @@ function updateTraffic(delta) {
   );
 
   traffic.forEach(vehicle => {
+    if (!vehicle?.visible) return;
     const config = vehicle.userData.traffic;
     const baseSpeed = Number(config.baseSpeed || config.speed || 0);
     const flowPhase = Number(config.flowPhase || 0);
@@ -11861,7 +11862,7 @@ function updateTraffic(delta) {
     }
 
     for (const other of traffic) {
-      if (other === vehicle) continue;
+      if (other === vehicle || !other?.visible) continue;
       const otherConfig = other.userData.traffic;
       if (otherConfig.axis !== config.axis || Math.abs(Number(otherConfig.fixed) - Number(config.fixed)) > 1.1) continue;
       const gap = (Number(otherConfig.progress) - Number(config.progress)) * Number(config.direction);
