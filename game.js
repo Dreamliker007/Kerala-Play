@@ -4986,16 +4986,26 @@ try {
     applyRenderScale();
     renderer.setSize(window.innerWidth, window.innerHeight, false);
   });
+  let webglContextLost = false;
   renderer.domElement.addEventListener('webglcontextlost', event => {
     event.preventDefault();
+    webglContextLost = true;
+    clearGameInput();
     fallback.style.display = 'grid';
-    fallback.textContent = 'The game paused because WebGL was interrupted. Reload this page to continue.';
+    fallback.textContent = 'Graphics paused briefly. Trying to recover…';
+  });
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    webglContextLost = false;
+    clock.getDelta();
+    applyRenderScale();
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    fallback.style.display = 'none';
   });
 
   function gameLoop() {
     requestAnimationFrame(gameLoop);
     const delta = Math.min(clock.getDelta(), .05);
-    if (document.hidden) return;
+    if (document.hidden || webglContextLost) return;
     if (!Number.isFinite(cameraYaw)) cameraYaw = (Number.isFinite(player.rotation.y) ? player.rotation.y : 0) + Math.PI;
     cameraPitch = THREE.MathUtils.clamp(Number.isFinite(cameraPitch) ? cameraPitch : .31, .12, .64);
     if (![camera.position.x, camera.position.y, camera.position.z].every(Number.isFinite)) resetFollowCameraView();
