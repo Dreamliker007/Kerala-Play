@@ -11604,10 +11604,10 @@ function updateTrafficWetEffects(vehicle, delta, rain, speedRatio, braking) {
     ? .055 + Number(worldWeatherState.overcast || 0) * .035 + rain * .065
     : rain > .55 ? .018 : 0;
 
-  const wetDistance = playerRef
-    ? Math.hypot(vehicle.position.x - playerRef.position.x, vehicle.position.z - playerRef.position.z)
-    : 0;
-  if (wetDistance > 46) {
+  const wetDx = playerRef ? vehicle.position.x - playerRef.position.x : 0;
+  const wetDz = playerRef ? vehicle.position.z - playerRef.position.z : 0;
+  const wetDistanceSq = wetDx * wetDx + wetDz * wetDz;
+  if (wetDistanceSq > 46 * 46) {
     wet.spray.visible = false;
     for (const material of vehicle.userData.tailLightMaterials || []) {
       material.emissiveIntensity = braking ? .86 : (worldWeatherState.needsLights ? .23 : .14);
@@ -11710,11 +11710,13 @@ function updateTraffic(delta) {
     let targetSpeed = baseSpeed * naturalCruise * weatherCruise;
 
     if (playerRef && vehicleMode !== 'walk') {
-      const playerDistance = Math.hypot(playerRef.position.x - vehicle.position.x, playerRef.position.z - vehicle.position.z);
-      if (playerDistance < 3.8) targetSpeed = 0;
-      else if (playerDistance < 6.2) targetSpeed = Math.min(targetSpeed, baseSpeed * .18);
-      else if (playerDistance < 9.5) targetSpeed = Math.min(targetSpeed, baseSpeed * .52);
-      if (now < hornPulseUntil && playerDistance < 11) targetSpeed = Math.min(targetSpeed, baseSpeed * .22);
+      const playerDx = playerRef.position.x - vehicle.position.x;
+      const playerDz = playerRef.position.z - vehicle.position.z;
+      const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
+      if (playerDistanceSq < 3.8 * 3.8) targetSpeed = 0;
+      else if (playerDistanceSq < 6.2 * 6.2) targetSpeed = Math.min(targetSpeed, baseSpeed * .18);
+      else if (playerDistanceSq < 9.5 * 9.5) targetSpeed = Math.min(targetSpeed, baseSpeed * .52);
+      if (now < hornPulseUntil && playerDistanceSq < 11 * 11) targetSpeed = Math.min(targetSpeed, baseSpeed * .22);
     }
 
     for (const other of traffic) {
