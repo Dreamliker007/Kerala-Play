@@ -79,7 +79,8 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
   // One draw call for the star field; positions never allocate in the render loop.
   let seed = 72019;
   function random() { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }
-  const starPositions = new Float32Array(220 * 3);
+  const starCount = mobileLike ? 150 : 220;
+  const starPositions = new Float32Array(starCount * 3);
   for (let index = 0; index < starPositions.length; index += 3) {
     const azimuth = random() * Math.PI * 2;
     const elevation = .08 + random() * .92;
@@ -97,7 +98,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
   disposables.push(starGeometry, starMaterial);
 
   const cloudMaterial = new THREE.MeshBasicMaterial({ color: 0xf1f0ec, transparent: true, opacity: .58, depthWrite: false, fog: false });
-  const maxClouds = 30;
+  const maxClouds = mobileLike ? 18 : 30;
   const clouds = new THREE.InstancedMesh(sphereGeometry, cloudMaterial, maxClouds);
   const cloudTransform = new THREE.Object3D();
   for (let index = 0; index < maxClouds; index++) {
@@ -114,7 +115,7 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
   disposables.push(cloudMaterial);
 
   // Lightweight local rain field. A single LineSegments draw call follows the camera.
-  const maxRainDrops = 620;
+  const maxRainDrops = mobileLike ? 380 : 620;
   const rainPositions = new Float32Array(maxRainDrops * 6);
   const rainDrops = [];
   for (let index = 0; index < maxRainDrops; index++) {
