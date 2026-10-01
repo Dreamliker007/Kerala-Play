@@ -5240,8 +5240,9 @@ try {
           vehicleCollisionFrames = 0;
         }
 
-        if (positionBlocked(player.position.x, player.position.z, vehicleRadius)) {
-          recoverVehicleOverlap(player, vehicleRadius);
+        const collisionStalled = vehicleCollisionFrames >= 12;
+        if (positionBlocked(player.position.x, player.position.z, vehicleRadius) || collisionStalled) {
+          recoverVehicleOverlap(player, vehicleRadius, collisionStalled);
           movingNow = false;
         } else {
           rememberVehicleSafePose(player, vehicleRadius);
@@ -7008,8 +7009,8 @@ function findVehicleRecoveryPoint(object, radius) {
   return null;
 }
 
-function recoverVehicleOverlap(object, radius) {
-  if (!object || !positionBlocked(object.position.x, object.position.z, radius)) return false;
+function recoverVehicleOverlap(object, radius, force = false) {
+  if (!object || (!force && !positionBlocked(object.position.x, object.position.z, radius))) return false;
   const recovery = findVehicleRecoveryPoint(object, radius);
   if (!recovery) return false;
   object.position.set(recovery.x, 0, recovery.z);
