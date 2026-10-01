@@ -50,7 +50,7 @@ export async function api(path, body, method) {
     body: body === undefined ? undefined : JSON.stringify(body),
   };
   const safeLoginRetry = requestMethod === 'POST' && path === '/api/auth/login';
-  const attempts = requestMethod === 'GET' ? 2 : 1;
+  const attempts = requestMethod === 'GET' || safeLoginRetry ? 2 : 1;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     let response;
@@ -78,7 +78,10 @@ export async function api(path, body, method) {
     }
 
     if (!response.ok) {
-      if (attempt + 1 < attempts && [429, 502, 503, 504].includes(response.status)) { await wait(900); continue; }
+      const retryableStatus = safeLoginRetry
+        ? [502, 503, 504].includes(response.status)
+        : [429, 502, 503, 504].includes(response.status);
+      if (attempt + 1 < attempts && retryableStatus) { await wait(900); continue; }
       const error = new Error(result.error || result.message || `Request failed (${response.status}).`);
       error.status = response.status;
       throw error;
