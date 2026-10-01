@@ -2661,7 +2661,11 @@ function formatJourneyClock(milliseconds) {
   return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
 }
 
+let districtJourneyFinishing = false;
+
 function finishDistrictJourney(travel = {}) {
+  if (districtJourneyFinishing) return;
+  districtJourneyFinishing = true;
   districtJourneyTimers.forEach(timer => clearTimeout(timer));
   districtJourneyTimers = [];
   if (districtJourneyInterval) clearInterval(districtJourneyInterval);
