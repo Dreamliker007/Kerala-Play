@@ -722,7 +722,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     wakeProductionBackend();
     if (authMode === 'login') await wait(1600);
     await run(async () => {
-      const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, district: signupDistrict.value, ...(authMode === 'signup' ? { email: signupEmail.value, mobile: signupMobile.value, gender: signupGender.value } : {}) });
+      const result = await api(`/api/auth/${authMode}`, { identifier: username.value.trim(), username: username.value.trim(), firstName: firstName.value.trim(), password: password.value, ...(authMode === 'signup' ? { district: signupDistrict.value, email: signupEmail.value, mobile: signupMobile.value, gender: signupGender.value } : {}) });
       password.value = '';
       await beginSession(result.user, authMode === 'signup');
     }, authError);
