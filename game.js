@@ -2630,19 +2630,22 @@ districtTravelConfirm?.addEventListener('click', async () => {
   const boardTimeout = setTimeout(async () => {
     boardRequestActive = false;
     if (districtTravelError) districtTravelError.textContent = 'Travel request timed out. Checking journey status…';
-    try {
-      const status = await api('/api/travel/district/status');
-      if (status.status === 'pending' && status.travel) {
-        closeDistrictTravelPanel();
-        const travel = status.travel;
-        showDistrictJourney(travel.mode || districtTravelMode, travel.from?.district || currentWorldDistrictName(), travel.to?.district || '', Number(travel.fare || 0), travel);
-        return;
-      }
-      if (status.status === 'arrived' && status.travel) {
-        finishDistrictJourney(status.travel);
-        return;
-      }
-    } catch { /* Fall through to the normal retry state. */ }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const status = await api('/api/travel/district/status');
+        if (status.status === 'pending' && status.travel) {
+          closeDistrictTravelPanel();
+          const travel = status.travel;
+          showDistrictJourney(travel.mode || districtTravelMode, travel.from?.district || currentWorldDistrictName(), travel.to?.district || '', Number(travel.fare || 0), travel);
+          return;
+        }
+        if (status.status === 'arrived' && status.travel) {
+          finishDistrictJourney(status.travel);
+          return;
+        }
+      } catch { /* Retry briefly in case the board request is still settling. */ }
+      if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1000));
+    }
     window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));
     districtTravelConfirm.disabled = false;
     if (districtTravelError) districtTravelError.textContent = 'Travel request timed out. Please try again.';
