@@ -2194,24 +2194,14 @@ function publicRideDestinationForUser(user, destinationId) {
         limited(`auth:${ip}`, 30, 15 * 60000);
         const body = await jsonBody(request);
         requireValue(typeof body.identifier === 'string' && typeof body.password === 'string' && body.password.length <= 128, 400, 'Enter your username, email, mobile and password.');
-        const district = body.district || 'Kottayam';
-        requireValue(Object.hasOwn(DISTRICT_WORLD_CONFIG, district), 400, 'Choose a valid Kerala district.');
         const identifier = body.identifier.trim().toLowerCase();
         const user = db.users.find(candidate => candidate.username.toLowerCase() === identifier || candidate.email === identifier || candidate.mobile === body.identifier.trim());
         const comparison = await scrypt(body.password, user?.salt || 'not-an-account-salt', 64);
         const valid = timingSafeEqual(comparison, user ? Buffer.from(user.passwordHash, 'hex') : Buffer.alloc(64));
         requireValue(user && valid, 401, 'Username or password is incorrect.');
-        const spawn = districtWorldConfig(district).spawn;
-        if (currentWorldDistrict(user) !== district) {
-          user.worldX = spawn.x;
-          user.worldZ = spawn.z;
-          user.worldRotation = spawn.rotation || 0;
-        }
-        user.district = district;
-        user.worldDistrict = district;
-        user.worldUpdatedAt = now();
+        // Login resumes the account in its saved world district. District choice
+        // is an account-creation decision, not something that changes on login.
         presence.delete(user.id);
-        dirty = true;
         await startSession(user, response, request); socialChanged();
         send(response, 200, { user: publicUser(user) }); return;
       }
@@ -2294,17 +2284,9 @@ function publicRideDestinationForUser(user, destinationId) {
           created = true;
         }
 
-        const spawn = districtWorldConfig(district).spawn;
-        if (currentWorldDistrict(user) !== district) {
-          user.worldX = spawn.x;
-          user.worldZ = spawn.z;
-          user.worldRotation = spawn.rotation || 0;
-        }
-        user.district = district;
-        user.worldDistrict = district;
-        user.worldUpdatedAt = now();
+        // Existing social-login accounts resume their saved district. The
+        // selected district above is used only while creating a new account.
         presence.delete(user.id);
-        dirty = true;
         await startSession(user, response, request);
         socialChanged();
         send(response, created ? 201 : 200, { user: publicUser(user), created, provider: body.provider });
