@@ -323,10 +323,11 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
   }
 
   function applyQuality() {
+    performanceScale = Math.min(requestedPerformanceScale, qualityScaleCap());
     applyPerformanceScale();
-    // "High quality" remains the only user-facing preset. On mobile we keep all
-    // lighting/weather/material detail but use contact shadows instead of a full
-    // scene shadow map, which removes one of the largest GPU stalls.
+    // Quality presets keep the same world/gameplay while scaling expensive
+    // rendering details. Mobile still uses contact shadows instead of a full
+    // scene shadow map to avoid GPU stalls.
     renderer.shadowMap.enabled = !mobileLike && quality !== 'low';
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.shadowMap.needsUpdate = !mobileLike && quality !== 'low';
@@ -369,7 +370,6 @@ export function createAtmosphere(THREE, { scene, renderer, camera, sun, hemi, cl
     const rainDropsVisible = quality === 'low' ? (mobileLike ? 220 : 300) : quality === 'balanced' ? (mobileLike ? 360 : 460) : (mobileLike ? 520 : 620);
     rainGeometry.setDrawRange(0, rainDropsVisible * 2);
     rainMaterial.opacity = Math.min(rainMaterial.opacity, quality === 'low' ? .56 : quality === 'balanced' ? .66 : .72);
-    rainMaterial.opacity = Math.min(rainMaterial.opacity, .72);
   }
   function setQuality(nextQuality = quality) {
     if (disposed) return;
