@@ -6921,7 +6921,7 @@ function nearestSafeTrafficProgress(config, preferred) {
     const backward = start - distance;
     if (backward >= min && !trafficHitsStaticWorld(config, backward)) return backward;
   }
-  return start;
+  return null;
 }
 
 function moveInsidePrivateHome(player, dx, dz) {
@@ -11810,7 +11810,13 @@ function addRoadVehicle(scene, config) {
   attachTrafficWetEffects(vehicle, config.kind);
   applyDynamicHighQuality(vehicle);
   const trafficState = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
-  trafficState.progress = nearestSafeTrafficProgress(trafficState, trafficState.progress);
+  const safeProgress = nearestSafeTrafficProgress(trafficState, trafficState.progress);
+  if (safeProgress === null) {
+    vehicle.visible = false;
+    trafficState.progress = THREE.MathUtils.clamp(Number(trafficState.progress), Number(trafficState.min), Number(trafficState.max));
+  } else {
+    trafficState.progress = safeProgress;
+  }
   vehicle.userData.traffic = trafficState;
   if (trafficState.axis === 'z') {
     vehicle.position.set(trafficState.fixed, 0, trafficState.progress);
@@ -11912,8 +11918,13 @@ function updateTraffic(delta) {
     if (Math.abs(config.currentSpeed) < .03) config.currentSpeed = 0;
 
     if (trafficHitsStaticWorld(config, Number(config.progress))) {
-      config.progress = nearestSafeTrafficProgress(config, Number(config.progress));
+      const safeProgress = nearestSafeTrafficProgress(config, Number(config.progress));
       config.currentSpeed = 0;
+      if (safeProgress === null) {
+        vehicle.visible = false;
+        return;
+      }
+      config.progress = safeProgress;
       if (config.axis === 'z') vehicle.position.z = config.progress;
       else vehicle.position.x = config.progress;
     }
