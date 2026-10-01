@@ -1825,22 +1825,34 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   window.addEventListener('kerala-job-interact', () => run(performWorldJobInteraction));
 
+  let vehicleActionPending = false;
+
   async function performJobVehicleAction(action) {
     const active = jobsSnapshot?.active;
-    if (!user || !active?.vehicle || !['enter', 'exit'].includes(action)) return;
-    const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle`, { taskId: active.taskId, action });
-    renderJobs(result.jobs);
-    toast(action === 'enter' ? `${active.vehicle.label} ready · drive to the mission marker` : `${active.vehicle.label} parked`);
+    if (!user || !active?.vehicle || !['enter', 'exit'].includes(action) || vehicleActionPending) return;
+    vehicleActionPending = true;
+    try {
+      const result = await api(`/api/jobs/${encodeURIComponent(active.jobId)}/vehicle`, { taskId: active.taskId, action });
+      renderJobs(result.jobs);
+      toast(action === 'enter' ? `${active.vehicle.label} ready · drive to the mission marker` : `${active.vehicle.label} parked`);
+    } finally {
+      vehicleActionPending = false;
+    }
   }
   window.addEventListener('kerala-job-vehicle', event => run(() => performJobVehicleAction(event.detail?.action)));
 
   async function performPersonalVehicleAction(action) {
-    if (!user || !['enter', 'exit'].includes(action)) return;
+    if (!user || !['enter', 'exit'].includes(action) || vehicleActionPending) return;
     const active = garageSnapshot?.activeVehicle;
     if (!active) return;
-    const result = await api('/api/garage/vehicle', { action, vehicleId: active.vehicleId });
-    renderGarage(result.garage);
-    toast(action === 'enter' ? `${active.label} ready · personal driving active` : `${active.label} parked`);
+    vehicleActionPending = true;
+    try {
+      const result = await api('/api/garage/vehicle', { action, vehicleId: active.vehicleId });
+      renderGarage(result.garage);
+      toast(action === 'enter' ? `${active.label} ready · personal driving active` : `${active.label} parked`);
+    } finally {
+      vehicleActionPending = false;
+    }
   }
   window.addEventListener('kerala-personal-vehicle', event => run(() => performPersonalVehicleAction(event.detail?.action), garageError));
   window.addEventListener('kerala-garage-state-local', event => { if (event.detail) renderGarage(event.detail); });
