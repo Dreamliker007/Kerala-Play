@@ -1150,6 +1150,7 @@ function updateFootstepEffects(delta, player, moving, running, phase = 0) {
 
 function roadZoneAt(x, z) {
   const district = currentWorldDistrictName();
+  if (district !== 'Kottayam' && district !== 'Ernakulam') {
     if (Math.abs(z + 92) <= 4.5 && x >= -100 && x <= 100) {
       return { id:'district-south-ring', label:`${district.toUpperCase()} SOUTH RING ROAD`, displayLimit:30, bikeLimit:5.1, taxiLimit:4.9 };
     }
