@@ -2559,17 +2559,24 @@ districtTravelConfirm?.addEventListener('click', async () => {
   districtTravelConfirm.disabled = true;
   if (districtTravelError) districtTravelError.textContent = '';
   window.dispatchEvent(new CustomEvent('kerala-ride-travel-start'));
+  const boardTimeout = setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));
+    districtTravelConfirm.disabled = false;
+    if (districtTravelError) districtTravelError.textContent = 'Travel request timed out. Please try again.';
+  }, 15_000);
   try {
     const result = await api('/api/travel/district/board', {
       mode: districtTravelMode,
       destinationDistrict: districtTravelSelected,
     });
+    clearTimeout(boardTimeout);
     const travel = result?.travel || {};
     const toDistrict = travel.to?.district || travel.district || districtTravelSelected;
     const fromDistrict = travel.from?.district || currentWorldDistrictName();
     closeDistrictTravelPanel();
     showDistrictJourney(districtTravelMode, fromDistrict, toDistrict, Number(travel.fare || 0), travel);
   } catch (error) {
+    clearTimeout(boardTimeout);
     window.dispatchEvent(new CustomEvent('kerala-ride-cancel'));
     districtTravelConfirm.disabled = false;
     if (districtTravelError) districtTravelError.textContent = error.message || 'Travel failed.';
