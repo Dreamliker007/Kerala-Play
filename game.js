@@ -1860,8 +1860,25 @@ function movePlayerOutsideVehicle(vehicleVisual) {
     [forwardX * 1.72, forwardZ * 1.72, 0],
     [-forwardX * 1.72, -forwardZ * 1.72, 0],
   ];
-  const exit = candidates.find(([dx, dz]) => !positionBlocked(playerRef.position.x + dx, playerRef.position.z + dz, .43));
-  if (!exit) return 0;
+  let exit = candidates.find(([dx, dz]) => !positionBlocked(playerRef.position.x + dx, playerRef.position.z + dz, .43));
+  if (!exit) {
+    for (const distance of [2.1, 2.6, 3.2]) {
+      for (let index = 0; index < 12; index++) {
+        const angle = yaw + index / 12 * Math.PI * 2;
+        const dx = Math.sin(angle) * distance;
+        const dz = Math.cos(angle) * distance;
+        if (!positionBlocked(playerRef.position.x + dx, playerRef.position.z + dz, .43)) {
+          exit = [dx, dz, 0];
+          break;
+        }
+      }
+      if (exit) break;
+    }
+  }
+  if (!exit) {
+    showToast('No safe space to exit vehicle');
+    return 0;
+  }
   playerRef.position.set(playerRef.position.x + exit[0], 0, playerRef.position.z + exit[1]);
   playerRef.rotation.y = Math.atan2(x - playerRef.position.x, z - playerRef.position.z);
   playerRef.userData.resetWalkSafe = true;
