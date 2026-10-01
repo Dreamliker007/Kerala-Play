@@ -5208,7 +5208,7 @@ try {
     const sleepProgress = THREE.MathUtils.clamp((performance.now() - Number(player.userData.homeSleepPoseStarted || performance.now())) / 650, 0, 1);
     if (sleepingAtHome) player.rotation.z = Math.PI * .5 * THREE.MathUtils.smoothstep(sleepProgress, 0, 1);
     else if (player.userData.homeSleepPoseUntil) { player.rotation.z = 0; player.rotation.y = Number(player.userData.homeSleepStartYaw) || 0; player.position.y = 0; player.userData.homeSleepPoseUntil = 0; }
-    const paused = !profile || !connectionReady || publicRideInProgress || sleepingAtHome || !!document.querySelector('[aria-modal="true"]:not([hidden])');
+    const paused = !profile || publicRideInProgress || sleepingAtHome || !!document.querySelector('[aria-modal="true"]:not([hidden])');
     if (paused) clearGameInput();
     const transitionLocked = performance.now() < Number(player.userData.vehicleTransition?.lockUntil || 0);
     const controlLength = paused || transitionLocked ? 0 : Math.min(1, Math.hypot(controlX, controlY));
