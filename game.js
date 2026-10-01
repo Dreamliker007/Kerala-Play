@@ -2311,6 +2311,15 @@ window.addEventListener('kerala-npc-favor-completion-reset', () => {
   updateWorldInteract();
 });
 
+window.addEventListener('kerala-npc-favor-complete', () => {
+  setTimeout(() => {
+    if (!npcFavorCompletionPending) return;
+    npcFavorCompletionPending = false;
+    updateWorldInteract();
+    showToast('Favor completion timed out. Please try again.', 3200);
+  }, 15_000);
+});
+
 function activeCommunityEvent() {
   const event = communityEventsSnapshot?.current || null;
   return event?.status === 'active' && !event.completed ? event : null;
@@ -2340,6 +2349,15 @@ window.addEventListener('kerala-community-event-navigate', event => {
 window.addEventListener('kerala-community-event-pending-reset', () => {
   communityEventPending = false;
   updateWorldInteract();
+});
+
+window.addEventListener('kerala-community-event-participate', () => {
+  setTimeout(() => {
+    if (!communityEventPending) return;
+    communityEventPending = false;
+    updateWorldInteract();
+    showToast('Community event request timed out. Please try again.', 3200);
+  }, 15_000);
 });
 
 window.addEventListener('kerala-community-event-completed', event => {
