@@ -66,7 +66,7 @@ const DISTRICT_WORLD_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_WORLD_OR
     airport:AIRPORT_DISTRICTS.has(district) ? Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-airport`, x:42, z:-28, radius:8.2, arrivalX:36, arrivalZ:-28 }) : null,
     teleport:Object.freeze({ id:`${district.toLowerCase().replace(/[^a-z]+/g,'-')}-district-gate`, x:78, z:72, radius:7.2, arrivalX:75, arrivalZ:72 }),
   };
-  if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:7,z:-23,radius:7.2,arrivalX:11,arrivalZ:-23 }) })];
+  if (district === 'Kottayam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:19,z:-23,rotation:0 }), train:Object.freeze({ id:'kottayam-rail', x:-60,z:-50,radius:7.2,arrivalX:-54,arrivalZ:-50 }) })];
   if (district === 'Ernakulam') return [district, Object.freeze({ ...generic, bounds:Object.freeze({ minX:-110,maxX:110,minZ:-110,maxZ:110 }), spawn:Object.freeze({ x:-14,z:6,rotation:0 }), train:Object.freeze({ id:'ernakulam-rail', x:-40,z:-30.5,radius:6.6,arrivalX:-34,arrivalZ:-19.5 }), airport:Object.freeze({ id:'ernakulam-airport', x:38,z:36,radius:8.2,arrivalX:32,arrivalZ:36 }) })];
   return [district, Object.freeze(generic)];
 })));
@@ -275,10 +275,10 @@ const PUBLIC_TRAVEL_ROUTES = Object.freeze({
 const DISTRICT_RAIL_ROUTE = Object.freeze({
   id: 'kottayam-ernakulam-rail',
   label: 'Kottayam ↔ Ernakulam Passenger',
-  fare: 500,
+  fare: 250,
   stations: Object.freeze({
-    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: 7, z: -23, radius: 7.2, destinationId: 'ernakulam', arrivalX: -34, arrivalZ: -19.5 }),
-    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, destinationId: 'kottayam', arrivalX: 11, arrivalZ: -23 }),
+    kottayam: Object.freeze({ id: 'kottayam', district: 'Kottayam', label: 'Kottayam Railway Station', x: -60, z: -50, radius: 7.2, destinationId: 'ernakulam', arrivalX: -34, arrivalZ: -19.5 }),
+    ernakulam: Object.freeze({ id: 'ernakulam', district: 'Ernakulam', label: 'Ernakulam Railway Station', x: -40, z: -30.5, radius: 6.6, destinationId: 'kottayam', arrivalX: -54, arrivalZ: -50 }),
   }),
 });
 const PUBLIC_RIDE_DESTINATIONS = Object.freeze({
