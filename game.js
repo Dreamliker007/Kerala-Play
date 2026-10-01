@@ -4979,7 +4979,20 @@ try {
   });
   document.addEventListener('focusin', event => { if (typingIntoField(event)) clearGameInput(); });
   window.addEventListener('blur', clearGameInput);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) clearGameInput(); });
+  document.addEventListener('visibilitychange', () => {
+    clearGameInput();
+    if (!document.hidden) {
+      clock.getDelta();
+      npcAccumulator = 0;
+      trafficAccumulator = 0;
+      mapAccumulator = 0;
+      interactionAccumulator = 0;
+      hudAccumulator = 0;
+      worldFxAccumulator = 0;
+      perfFrames = 0;
+      perfTime = performance.now();
+    }
+  });
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
