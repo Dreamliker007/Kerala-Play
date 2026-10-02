@@ -263,6 +263,7 @@ const busStopCameraOccluders = [];
 const ambientVehicleLightMaterials = [];
 const weatherRoadSurfaces = [];
 const roadEdgePlans = [];
+const trafficRoadPlans = [];
 const weatherBuildingSurfaces = [];
 const parkedVehicleVisuals = [];
 const puddleMaterials = [];
@@ -7037,6 +7038,66 @@ function nearestSafeTrafficProgress(config, preferred) {
   return null;
 }
 
+function recoverTrafficOntoRoad(config, preferredX, preferredZ) {
+  if (!config || !trafficRoadPlans.length) return false;
+  const originalAxis = config.axis;
+  const preferred = {
+    x: Number.isFinite(Number(preferredX)) ? Number(preferredX) : (originalAxis === 'x' ? Number(config.progress) : Number(config.fixed)),
+    z: Number.isFinite(Number(preferredZ)) ? Number(preferredZ) : (originalAxis === 'z' ? Number(config.progress) : Number(config.fixed)),
+  };
+  const roads = [...trafficRoadPlans].sort((a, b) => {
+    const axisA = a.width >= a.depth ? 'x' : 'z';
+    const axisB = b.width >= b.depth ? 'x' : 'z';
+    const sameAxisA = axisA === originalAxis ? 0 : 1;
+    const sameAxisB = axisB === originalAxis ? 0 : 1;
+    if (sameAxisA !== sameAxisB) return sameAxisA - sameAxisB;
+    const distanceA = (a.x - preferred.x) ** 2 + (a.z - preferred.z) ** 2;
+    const distanceB = (b.x - preferred.x) ** 2 + (b.z - preferred.z) ** 2;
+    return distanceA - distanceB;
+  });
+
+  for (const road of roads) {
+    const axis = road.width >= road.depth ? 'x' : 'z';
+    const longitudinalCenter = axis === 'x' ? road.x : road.z;
+    const longitudinalHalf = (axis === 'x' ? road.width : road.depth) / 2;
+    const crossCenter = axis === 'x' ? road.z : road.x;
+    const crossHalf = (axis === 'x' ? road.depth : road.width) / 2;
+    const probe = { ...config, axis };
+    const footprint = trafficFootprint(probe);
+    const alongHalf = axis === 'x' ? footprint.halfWidth : footprint.halfDepth;
+    const crossFoot = axis === 'x' ? footprint.halfDepth : footprint.halfWidth;
+    const roadMin = longitudinalCenter - longitudinalHalf + alongHalf + .45;
+    const roadMax = longitudinalCenter + longitudinalHalf - alongHalf - .45;
+    const laneSpace = crossHalf - crossFoot - .28;
+    if (roadMax <= roadMin || laneSpace < .15) continue;
+
+    const laneOffset = Math.min(laneSpace, Math.max(.55, crossHalf * .46));
+    const preferredProgress = axis === 'x' ? preferred.x : preferred.z;
+    const sideOrder = Number(config.direction) >= 0 ? [-1, 1, 0] : [1, -1, 0];
+    for (const side of sideOrder) {
+      const candidate = {
+        ...config,
+        axis,
+        fixed: crossCenter + side * laneOffset,
+        min: roadMin,
+        max: roadMax,
+      };
+      const safeProgress = nearestSafeTrafficProgress(candidate, preferredProgress);
+      if (safeProgress === null) continue;
+      config.axis = axis;
+      config.fixed = candidate.fixed;
+      config.min = roadMin;
+      config.max = roadMax;
+      config.progress = safeProgress;
+      config.currentSpeed = 0;
+      config.lastBusStop = null;
+      config.stopUntil = 0;
+      return true;
+    }
+  }
+  return false;
+}
+
 function moveInsidePrivateHome(player, dx, dz) {
   const limit = 5.7;
   player.position.x = THREE.MathUtils.clamp(player.position.x + dx, -limit, limit);
@@ -10147,6 +10208,7 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
 function buildWorld(scene) {
   homePlotVisuals.clear();
   roadEdgePlans.length = 0;
+  trafficRoadPlans.length = 0;
   staticColliders.length = 0;
   busStopCameraOccluders.length = 0;
   weatherBuildingSurfaces.length = 0;
@@ -10822,7 +10884,9 @@ function finalizeRoadEdges(scene) {
 
 function addRoadEdges(scene, x, z, width, depth) {
   if (![x, z, width, depth].every(Number.isFinite) || width <= 0 || depth <= 0) return;
-  roadEdgePlans.push({ x, z, width, depth });
+  const road = { x, z, width, depth };
+  roadEdgePlans.push(road);
+  trafficRoadPlans.push({ ...road });
 }
 
 function getRoadVehiclePlateMaterial() {
@@ -11925,11 +11989,16 @@ function addRoadVehicle(scene, config) {
   const trafficState = { ...config, baseSpeed: config.speed, currentSpeed: config.speed };
   const safeProgress = nearestSafeTrafficProgress(trafficState, trafficState.progress);
   if (safeProgress === null) {
-    vehicle.visible = false;
-    trafficState.progress = THREE.MathUtils.clamp(Number(trafficState.progress), Number(trafficState.min), Number(trafficState.max));
+    const preferredX = trafficState.axis === 'x' ? Number(trafficState.progress) : Number(trafficState.fixed);
+    const preferredZ = trafficState.axis === 'z' ? Number(trafficState.progress) : Number(trafficState.fixed);
+    if (!recoverTrafficOntoRoad(trafficState, preferredX, preferredZ)) {
+      trafficState.progress = THREE.MathUtils.clamp(Number(trafficState.progress), Number(trafficState.min), Number(trafficState.max));
+      trafficState.currentSpeed = 0;
+    }
   } else {
     trafficState.progress = safeProgress;
   }
+  vehicle.visible = true;
   vehicle.userData.traffic = trafficState;
   if (trafficState.axis === 'z') {
     vehicle.position.set(trafficState.fixed, 0, trafficState.progress);
@@ -12037,12 +12106,23 @@ function updateTraffic(delta) {
       const safeProgress = nearestSafeTrafficProgress(config, Number(config.progress));
       config.currentSpeed = 0;
       if (safeProgress === null) {
-        vehicle.visible = false;
-        return;
+        const recovered = recoverTrafficOntoRoad(config, vehicle.position.x, vehicle.position.z);
+        if (!recovered) {
+          // Keep the vehicle visible and stopped rather than making it vanish.
+          // A later world rebuild can recover the authored route.
+          return;
+        }
+      } else {
+        config.progress = safeProgress;
       }
-      config.progress = safeProgress;
-      if (config.axis === 'z') vehicle.position.z = config.progress;
-      else vehicle.position.x = config.progress;
+      vehicle.visible = true;
+      if (config.axis === 'z') {
+        vehicle.position.set(Number(config.fixed), 0, Number(config.progress));
+        vehicle.rotation.y = config.direction > 0 ? 0 : Math.PI;
+      } else {
+        vehicle.position.set(Number(config.progress), 0, Number(config.fixed));
+        vehicle.rotation.y = config.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+      }
     }
 
     let nextProgress = Number(config.progress) + config.direction * config.currentSpeed * delta;
