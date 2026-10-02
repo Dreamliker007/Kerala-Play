@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.js';
 import { initSocial, api } from './social.js?v=125.0';
 import { createAtmosphere } from './environment.js?v=115.0';
-import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=114.0';
+import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=131.0';
 import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=118.0';
 import { createKeralaRoofTiles } from './roof-tiles.js?v=115.0';
 
