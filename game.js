@@ -254,6 +254,7 @@ let roadsideGrassWind = null;
 let windUpdateTimer = 0;
 const traffic = [];
 const staticColliders = [];
+const buildingFrontClearances = [];
 const streetLampMaterials = [];
 const streetLightSources = [];
 const buildingLightMaterials = [];
@@ -907,6 +908,7 @@ function addServiceGarage(scene, x, z) {
   group.position.set(x, 0, z);
   scene.add(group);
   addBoxCollider(x, z, 3.7, 2.6, 'service-garage');
+  registerBuildingFrontClearance(x, z, 3.7, 2.6, 6.8);
 }
 
 function addCivicBuilding(scene, x, z, { title, subtitle, color = 0x3b6780, accent = 0xf1eee3, collider = 'civic-building' } = {}) {
@@ -973,6 +975,7 @@ function addCivicBuilding(scene, x, z, { title, subtitle, color = 0x3b6780, acce
   scene.add(group);
   registerFarVisual(board, x, z, 60);
   addBoxCollider(x, z, 4.6, 3.1, collider);
+  registerBuildingFrontClearance(x, z, 4.6, 3.1, 7.0);
 }
 
 function nearestVehicleStation() {
@@ -6975,6 +6978,57 @@ function updateVillagers(time) {
   });
 }
 
+function overlapsBuildingFrontClearance(x, z, halfWidth = 0, halfDepth = 0, clearance = 0) {
+  return buildingFrontClearances.some(zone =>
+    x + halfWidth + clearance > zone.minX &&
+    x - halfWidth - clearance < zone.maxX &&
+    z + halfDepth + clearance > zone.minZ &&
+    z - halfDepth - clearance < zone.maxZ
+  );
+}
+
+function registerBuildingFrontClearance(x, z, halfWidth, halfDepth, frontDepth = 6) {
+  const sideMargin = 1.35;
+  const zone = {
+    minX: x - halfWidth - sideMargin,
+    maxX: x + halfWidth + sideMargin,
+    minZ: z + halfDepth - .15,
+    maxZ: z + halfDepth + frontDepth,
+  };
+  buildingFrontClearances.push(zone);
+
+  // Some Kottayam vegetation is authored before buildings. Remove only tall
+  // vegetation whose canopy/trunk occupies the newly registered entrance zone.
+  for (let index = windVegetation.length - 1; index >= 0; index--) {
+    const vegetation = windVegetation[index];
+    const root = vegetation?.root;
+    if (!root) continue;
+    const radius = vegetation.kind === 'palm' ? 2.4
+      : vegetation.kind === 'tree' ? 2.8
+        : vegetation.kind === 'rubber' ? 2.0
+          : vegetation.kind === 'areca' ? 1.8
+            : vegetation.kind === 'banana' ? 1.5
+              : 1.2;
+    const vx = Number(vegetation.x ?? root.position.x);
+    const vz = Number(vegetation.z ?? root.position.z);
+    if (!overlapsBuildingFrontClearance(vx, vz, radius, radius, .15)) continue;
+
+    root.removeFromParent();
+    windVegetation.splice(index, 1);
+    for (let colliderIndex = staticColliders.length - 1; colliderIndex >= 0; colliderIndex--) {
+      const collider = staticColliders[colliderIndex];
+      if (collider.type !== 'circle') continue;
+      if (!['tree','palm','rubber-tree','areca'].includes(collider.kind)) continue;
+      if (Math.hypot(Number(collider.x) - vx, Number(collider.z) - vz) < 1.35) {
+        staticColliders.splice(colliderIndex, 1);
+      }
+    }
+    for (let detailIndex = farVisualDetails.length - 1; detailIndex >= 0; detailIndex--) {
+      if (farVisualDetails[detailIndex]?.object === root) farVisualDetails.splice(detailIndex, 1);
+    }
+  }
+}
+
 function addBoxCollider(x, z, halfWidth, halfDepth, kind = 'structure') {
   staticColliders.push({ type: 'box', x, z, halfWidth, halfDepth, kind });
 }
@@ -7712,7 +7766,7 @@ function addRoadsideIdentitySigns(scene) {
   scene.add(milestone);
 }
 
-function resolveRoadsidePropPlacement(x, z, halfWidth, halfDepth, clearance = .28, maxDistance = 18) {
+function resolveRoadsidePropPlacement(x, z, halfWidth, halfDepth, clearance = .28, maxDistance = 18, rejectCandidate = null) {
   const overlapsRoad = (candidateX, candidateZ) => roadEdgePlans.some(road =>
     Math.abs(candidateX - road.x) < halfWidth + road.width / 2 + clearance &&
     Math.abs(candidateZ - road.z) < halfDepth + road.depth / 2 + clearance
@@ -7726,7 +7780,10 @@ function resolveRoadsidePropPlacement(x, z, halfWidth, halfDepth, clearance = .2
     return Math.abs(candidateX - collider.x) < halfWidth + collider.halfWidth + clearance &&
       Math.abs(candidateZ - collider.z) < halfDepth + collider.halfDepth + clearance;
   });
-  const isClear = (candidateX, candidateZ) => !overlapsRoad(candidateX, candidateZ) && !overlapsSolid(candidateX, candidateZ);
+  const isClear = (candidateX, candidateZ) =>
+    !overlapsRoad(candidateX, candidateZ) &&
+    !overlapsSolid(candidateX, candidateZ) &&
+    !(rejectCandidate && rejectCandidate(candidateX, candidateZ));
 
   if (isClear(x, z)) return { x, z };
 
@@ -7749,13 +7806,18 @@ function resolveRoadsidePropPlacement(x, z, halfWidth, halfDepth, clearance = .2
 
 // Keep environmental props and vegetation outside every paved carriageway.
 // Reuse the shared placement search so moved props also avoid solid world objects.
-function resolveRoadsideClearPlacement(x, z, halfWidth, halfDepth, clearance = .32, maxDistance = 18) {
-  const placement = resolveRoadsidePropPlacement(x, z, halfWidth, halfDepth, clearance, maxDistance);
+function resolveRoadsideClearPlacement(x, z, halfWidth, halfDepth, clearance = .32, maxDistance = 18, avoidBuildingFront = false) {
+  const rejectCandidate = avoidBuildingFront
+    ? (candidateX, candidateZ) => overlapsBuildingFrontClearance(candidateX, candidateZ, halfWidth, halfDepth, clearance)
+    : null;
+  const placement = resolveRoadsidePropPlacement(x, z, halfWidth, halfDepth, clearance, maxDistance, rejectCandidate);
   const overlapsRoad = roadEdgePlans.some(road =>
     Math.abs(placement.x - road.x) < halfWidth + road.width / 2 + clearance &&
     Math.abs(placement.z - road.z) < halfDepth + road.depth / 2 + clearance
   );
-  return overlapsRoad ? null : placement;
+  const overlapsFront = avoidBuildingFront &&
+    overlapsBuildingFrontClearance(placement.x, placement.z, halfWidth, halfDepth, clearance);
+  return overlapsRoad || overlapsFront ? null : placement;
 }
 
 function addBusStop(scene, x, z, rotation = 0, stopName = 'KERALA PLAY') {
@@ -8110,7 +8172,7 @@ function getBananaLeafGeometry() {
 }
 
 function addBananaPlant(scene, x, z, scale = 1, yaw = 0) {
-  const placement = resolveRoadsideClearPlacement(x, z, 2.6 * scale, 2.6 * scale, .34, 18);
+  const placement = resolveRoadsideClearPlacement(x, z, 2.6 * scale, 2.6 * scale, .34, 18, true);
   if (!placement) return;
   x = placement.x; z = placement.z;
   const group = new THREE.Group();
@@ -8285,7 +8347,7 @@ function getRubberTreeAssets() {
 }
 
 function addRubberTree(scene, x, z, scale = 1, yaw = 0, tapped = false) {
-  const placement = resolveRoadsideClearPlacement(x, z, 2.25 * scale, 2.25 * scale, .35, 18);
+  const placement = resolveRoadsideClearPlacement(x, z, 2.25 * scale, 2.25 * scale, .35, 18, true);
   if (!placement) return;
   x = placement.x; z = placement.z;
   addCircleCollider(x, z, Math.max(.34, .40 * scale), 'rubber-tree');
@@ -9157,6 +9219,7 @@ function addCityTower(scene, x, z, width, depth, height, color, title = '') {
   });
   scene.add(group);
   addBoxCollider(x, z, width / 2, depth / 2, 'city-building');
+  registerBuildingFrontClearance(x, z, width / 2, depth / 2, Math.max(6, depth * .55));
 }
 
 function addRailPlatform(scene, x, z, length = 38) {
@@ -10210,6 +10273,7 @@ function buildWorld(scene) {
   roadEdgePlans.length = 0;
   trafficRoadPlans.length = 0;
   staticColliders.length = 0;
+  buildingFrontClearances.length = 0;
   busStopCameraOccluders.length = 0;
   weatherBuildingSurfaces.length = 0;
   parkedVehicleVisuals.length = 0;
@@ -12794,6 +12858,7 @@ function addBuildingWeathering(group, kind, seedValue = 1) {
 
 function addHouse(scene, x, z, wallColor, roofColor, facade = {}) {
   addBoxCollider(x, z, 4.45, 3.95, 'house');
+  registerBuildingFrontClearance(x, z, 4.45, 3.95, 6.6);
   const group = new THREE.Group();
   const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: .9 });
   const roofMat = new THREE.MeshStandardMaterial({ color: roofColor, roughness: .98 });
@@ -12956,6 +13021,7 @@ function addHouse(scene, x, z, wallColor, roofColor, facade = {}) {
 
 function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ · SNACKS · GROCERIES', facade = {}) {
   addBoxCollider(x, z, 4.8, 3.0, 'shop');
+  registerBuildingFrontClearance(x, z, 4.8, 3.0, 6.2);
   const group = new THREE.Group();
   const bodyMaterial = new THREE.MeshStandardMaterial({ color: facade.shopWall ?? 0xf1e7d2, roughness: .92 });
   const awningMaterial = new THREE.MeshStandardMaterial({ color: facade.awning ?? 0xb83f36, roughness: .9 });
@@ -13070,7 +13136,7 @@ function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ
 }
 
 function addTree(scene, x, z, scale, fruitSpecies = null) {
-  const placement = resolveRoadsideClearPlacement(x, z, 3.15 * scale, 3.15 * scale, .35, 22);
+  const placement = resolveRoadsideClearPlacement(x, z, 3.15 * scale, 3.15 * scale, .35, 22, true);
   if (!placement) return;
   x = placement.x; z = placement.z;
   addCircleCollider(x, z, Math.max(.42, .58 * scale), 'tree');
@@ -13241,7 +13307,7 @@ function createPalmFrondGeometry(frondCount = 10, segments = 9) {
 }
 
 function addArecaClump(scene, x, z, scale = 1, yaw = 0) {
-  const placement = resolveRoadsideClearPlacement(x, z, 3.0 * scale, 3.0 * scale, .34, 20);
+  const placement = resolveRoadsideClearPlacement(x, z, 3.0 * scale, 3.0 * scale, .34, 20, true);
   if (!placement) return;
   x = placement.x; z = placement.z;
   addCircleCollider(x, z, Math.max(.34, .42 * scale), 'areca');
@@ -13341,7 +13407,7 @@ function addArecaClump(scene, x, z, scale = 1, yaw = 0) {
 }
 
 function addPalm(scene, x, z, scale) {
-  const placement = resolveRoadsideClearPlacement(x, z, 3.35 * scale, 3.35 * scale, .36, 22);
+  const placement = resolveRoadsideClearPlacement(x, z, 3.35 * scale, 3.35 * scale, .36, 22, true);
   if (!placement) return;
   x = placement.x; z = placement.z;
   addCircleCollider(x + .18 * scale, z, Math.max(.34, .42 * scale), 'palm');
