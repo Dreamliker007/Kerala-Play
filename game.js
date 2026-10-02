@@ -94,6 +94,11 @@ const peopleClose = document.querySelector('#people-close');
 const peopleList = document.querySelector('#people-list');
 const peopleOnlineLabel = document.querySelector('#people-online-label');
 const taskToggle = document.querySelector('#task-toggle');
+const settingsToggle = document.querySelector('#settings-toggle');
+const settingsPanel = document.querySelector('#settings-panel');
+const settingsClose = document.querySelector('#settings-close');
+const graphicsQualitySelect = document.querySelector('#graphics-quality');
+const graphicsQualityNote = document.querySelector('#graphics-quality-note');
 const fullscreenToggle = document.querySelector('#fullscreen-toggle');
 const taskPanel = document.querySelector('#task-panel');
 const taskClose = document.querySelector('#task-close');
@@ -118,6 +123,20 @@ const onboardingPointer = document.querySelector('#onboarding-pointer');
 const hudMenuToggle = document.querySelector('#hud-menu-toggle');
 document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
 const runtimeIsMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
+const GRAPHICS_QUALITY_STORAGE_KEY = 'kerala-play-graphics-quality';
+const GRAPHICS_QUALITY_PRESETS = Object.freeze({
+  low: Object.freeze({ start:.68, min:.58, max:.72, pixelRatio:1.28, desktopPixelRatio:1.0, note:'Low prioritises smoother play and battery life with a lower internal resolution.' }),
+  balanced: Object.freeze({ start:.84, min:.68, max:.90, pixelRatio:1.52, desktopPixelRatio:1.15, note:'Balanced keeps a stable frame rate with clear roads, vehicles and characters.' }),
+  high: Object.freeze({ start:1.0, min:.82, max:1.0, pixelRatio:1.75, desktopPixelRatio:1.35, note:'High prioritises sharper edges and detail. Performance can use more battery and GPU power.' }),
+});
+let graphicsQuality = (() => {
+  try {
+    const saved = localStorage.getItem(GRAPHICS_QUALITY_STORAGE_KEY);
+    if (saved && GRAPHICS_QUALITY_PRESETS[saved]) return saved;
+  } catch { /* Storage can be unavailable in private browsing. */ }
+  return runtimeIsMobile ? 'balanced' : 'high';
+})();
+let applyGraphicsQuality = () => {};
 const WORLD_LIMIT = 210;
 const ERNAKULAM_CITY = Object.freeze({ x: 0, z: 0 });
 const DISTRICT_INSTANCE_ORDER = Object.freeze(['Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur','Ernakulam','Idukki','Alappuzha','Kottayam','Pathanamthitta','Kollam','Thiruvananthapuram']);
@@ -4340,21 +4359,28 @@ function updateMapPlayer(player) {
 
 
 
+function renderGraphicsSettings() {
+  if (graphicsQualitySelect) graphicsQualitySelect.value = graphicsQuality;
+  if (graphicsQualityNote) graphicsQualityNote.textContent = GRAPHICS_QUALITY_PRESETS[graphicsQuality]?.note || '';
+}
+
 function setOpenPanel(which = null) {
   social?.closePanels();
   if (which !== 'tasks' && challengeRound) {
     challengeGeneration++; challengeRound = null; challengePlay.disabled = false;
     document.querySelector('#coconut-keys').replaceChildren(); challengeResult.textContent = '';
   }
-  const panels = { map: minimap, people: peoplePanel, chat: chatPanel, tasks: taskPanel, dm: dmPanel, wardrobe: wardrobePanel };
-  Object.entries(panels).forEach(([name, panel]) => panel.classList.toggle('open', name === which));
+  const panels = { map: minimap, people: peoplePanel, chat: chatPanel, tasks: taskPanel, settings: settingsPanel, dm: dmPanel, wardrobe: wardrobePanel };
+  Object.entries(panels).forEach(([name, panel]) => panel?.classList.toggle('open', name === which));
   mapOpen.setAttribute('aria-expanded', String(which === 'map'));
   peopleToggle.setAttribute('aria-expanded', String(which === 'people'));
   chatToggle.setAttribute('aria-expanded', String(which === 'chat'));
   taskToggle.setAttribute('aria-expanded', String(which === 'tasks'));
+  settingsToggle?.setAttribute('aria-expanded', String(which === 'settings'));
   wardrobeToggle?.setAttribute('aria-expanded', String(which === 'wardrobe'));
   if (which === 'map') finishTask('open-map');
   if (which === 'tasks') renderTasks();
+  if (which === 'settings') renderGraphicsSettings();
   if (which === 'wardrobe') renderWardrobePanel();
 }
 
@@ -4548,7 +4574,7 @@ function collapseHudMenuAfterAction() {
 }
 
 function wireInterface() {
-  updateProfileHud(); updateProgressHud(); renderTasks(); renderMapLandmarks(); setOpenPanel();
+  updateProfileHud(); updateProgressHud(); renderTasks(); renderMapLandmarks(); renderGraphicsSettings(); setOpenPanel();
   setHudMenuExpanded(false);
   hudMenuToggle?.addEventListener('click', () => {
     const expanded = document.body.classList.contains('hud-menu-collapsed');
@@ -4609,6 +4635,16 @@ function wireInterface() {
   mapZoomOut?.addEventListener('click', () => applyMapZoom(mapZoom - .25));
   mapZoomReset?.addEventListener('click', () => applyMapZoom(1));
   taskToggle.addEventListener('click', () => { setOpenPanel(taskPanel.classList.contains('open') ? null : 'tasks'); recordOnboardingAction('tasks'); collapseHudMenuAfterAction(); });
+  settingsToggle?.addEventListener('click', () => {
+    const opening = !settingsPanel?.classList.contains('open');
+    setOpenPanel(opening ? 'settings' : null);
+    collapseHudMenuAfterAction();
+  });
+  settingsClose?.addEventListener('click', () => setOpenPanel());
+  graphicsQualitySelect?.addEventListener('change', () => {
+    applyGraphicsQuality(graphicsQualitySelect.value, true);
+    renderGraphicsSettings();
+  });
   document.querySelector('#quick-actions')?.addEventListener('click', event => {
     if (event.target.closest('.hud-icon')) collapseHudMenuAfterAction();
   });
@@ -4654,19 +4690,31 @@ try {
     alpha: false,
     precision: 'highp',
   });
-  // Keep the full High-quality world, but start mobile at a saner internal
-  // resolution. Dynamic scaling can still move up when a device has headroom.
-  let renderScale = isMobile ? .84 : 1;
+  // Each preset owns a dynamic resolution range. The renderer and atmosphere
+  // both receive the scale so changing quality has an immediate visible effect.
+  let renderScale = GRAPHICS_QUALITY_PRESETS[graphicsQuality].start;
   function applyRenderScale() {
-    if (atmosphere?.setPerformanceScale) {
-      atmosphere.setPerformanceScale(renderScale);
-      return;
-    }
+    atmosphere?.setPerformanceScale?.(renderScale);
+    const preset = GRAPHICS_QUALITY_PRESETS[graphicsQuality] || GRAPHICS_QUALITY_PRESETS.balanced;
     const deviceRatio = window.devicePixelRatio || 1;
-    const mobileRatio = Math.max(1.05, 1.58 * renderScale);
-    renderer.setPixelRatio(Math.min(deviceRatio, isMobile ? mobileRatio : 1.25));
+    const targetRatio = isMobile
+      ? Math.max(.88, preset.pixelRatio * renderScale)
+      : Math.max(.88, preset.desktopPixelRatio * renderScale);
+    renderer.setPixelRatio(Math.min(deviceRatio, targetRatio));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
   }
+  applyGraphicsQuality = (nextQuality, notify = false) => {
+    if (!GRAPHICS_QUALITY_PRESETS[nextQuality]) return false;
+    graphicsQuality = nextQuality;
+    const preset = GRAPHICS_QUALITY_PRESETS[graphicsQuality];
+    renderScale = preset.start;
+    try { localStorage.setItem(GRAPHICS_QUALITY_STORAGE_KEY, graphicsQuality); } catch { /* Keep session-only choice. */ }
+    document.body.dataset.graphicsQuality = graphicsQuality;
+    applyRenderScale();
+    if (notify) showToast('Graphics: ' + graphicsQuality[0].toUpperCase() + graphicsQuality.slice(1));
+    return true;
+  };
+  document.body.dataset.graphicsQuality = graphicsQuality;
   applyRenderScale();
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Mobile keeps the lightweight contact-shadow system. Desktop can afford a
@@ -5673,14 +5721,15 @@ try {
         const fps = perfFrames * 1000 / (now - perfTime);
         perfFrames = 0;
         perfTime = now;
+        const qualityRange = GRAPHICS_QUALITY_PRESETS[graphicsQuality] || GRAPHICS_QUALITY_PRESETS.balanced;
         if (perfCooldown > 0) {
           perfCooldown--;
-        } else if (fps < 27 && renderScale > .64) {
-          renderScale = Math.max(.64, renderScale - (fps < 22 ? .09 : .05));
+        } else if (fps < 27 && renderScale > qualityRange.min) {
+          renderScale = Math.max(qualityRange.min, renderScale - (fps < 22 ? .09 : .05));
           applyRenderScale();
           perfCooldown = 2;
-        } else if (fps > 52 && renderScale < .94) {
-          renderScale = Math.min(.94, renderScale + .025);
+        } else if (fps > 52 && renderScale < qualityRange.max) {
+          renderScale = Math.min(qualityRange.max, renderScale + .025);
           applyRenderScale();
           perfCooldown = 4;
         }
