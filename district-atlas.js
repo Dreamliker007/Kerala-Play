@@ -67,7 +67,7 @@ const DISTRICT_CONTENT = [
       placard:"HIGHLAND FARMS · COFFEE · SPICE"
     },
     attractions:[
-      {id:"edakkal-caves",name:"Edakkal Caves",kind:"cave",icon:"C",x:50,z:45,description:"Follow the rocky ascent to the caves and their prehistoric engravings."},
+      {id:"edakkal-caves",name:"Edakkal Caves",kind:"cave",icon:"C",x:56,z:72,description:"Follow the rocky ascent to the caves and their prehistoric engravings."},
       {id:"pookode-lake",name:"Pookode Lake",kind:"lake",icon:"L",x:-78,z:42,description:"A forest-fringed freshwater lake near Vythiri."},
       {id:"chembra-peak",name:"Chembra Peak",kind:"peak",icon:"H",x:72,z:12,description:"Reach the highland viewpoint above Meppadi's tea and forest slopes."},
       {id:"thirunelli-temple",name:"Thirunelli Temple",kind:"temple",icon:"T",x:-78,z:-36,description:"Visit the ancient temple setting in the Brahmagiri hills."},
