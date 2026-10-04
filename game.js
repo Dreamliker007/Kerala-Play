@@ -3672,9 +3672,12 @@ function showToast(message, duration = 2600) {
 
 function syncDistrictCoinVisibility() {
   const district = currentWorldDistrictName();
+  const statusKnown = collectibleStatusReady && collectibleStatusDistrict === district;
   for (const [id, visual] of districtCoinVisuals) {
-    visual.group.visible = !!profile && collectibleStatusReady && collectibleStatusDistrict === district
-      && visual.district === district && !collectedCollectibleIds.has(id) && !homeInteriorMode;
+    // Show pickups while saved coin status loads or is temporarily unavailable.
+    // Hide them after the server confirms a coin has already been collected.
+    visual.group.visible = !!profile && visual.district === district
+      && !(statusKnown && collectedCollectibleIds.has(id)) && !homeInteriorMode;
   }
 }
 
