@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { recognitionSummary } from './recognition.mjs';
 import { categoryLeaderboard, leaderboardCategories } from './leaderboards.mjs';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js';
+import { ALL_DISTRICT_COIN_PICKUPS, DISTRICT_COIN_BY_ID, DISTRICT_COIN_PICKUP_RADIUS, districtCoinPickups } from './district-collectibles.js';
 import { genericDistrictFuelPosition } from './district-layout.js';
 
 const scrypt = promisify(scryptCallback);
@@ -1431,6 +1432,20 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
 
   function jobStateFor(user) {
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
+    if (!user.jobState.collectibles || typeof user.jobState.collectibles !== 'object' || Array.isArray(user.jobState.collectibles)) {
+      user.jobState.collectibles = { collectedIds: [] };
+      dirty = true;
+    }
+    if (!Array.isArray(user.jobState.collectibles.collectedIds)) {
+      user.jobState.collectibles.collectedIds = [];
+      dirty = true;
+    }
+    const collectedCoins = [...new Set(user.jobState.collectibles.collectedIds.filter(id => DISTRICT_COIN_BY_ID.has(id)))].slice(-ALL_DISTRICT_COIN_PICKUPS.length);
+    if (collectedCoins.length !== user.jobState.collectibles.collectedIds.length
+        || collectedCoins.some((id, index) => id !== user.jobState.collectibles.collectedIds[index])) {
+      user.jobState.collectibles.collectedIds = collectedCoins;
+      dirty = true;
+    }
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
     if (!user.jobState.completed || typeof user.jobState.completed !== 'object' || Array.isArray(user.jobState.completed)) user.jobState.completed = {};
     if (!user.jobState.garage || typeof user.jobState.garage !== 'object' || Array.isArray(user.jobState.garage)) user.jobState.garage = { owned: [], selectedId: null, activeVehicleId: null };
@@ -4237,6 +4252,50 @@ function publicRideDestinationForUser(user, destinationId) {
         socialChanged();
         response.on('close', () => { connections.delete(client); if (!connections.size) { clients.delete(user.id); presence.delete(user.id); socialChanged(); } });
         return;
+      }
+      if (path === '/api/collectibles/status' && request.method === 'GET') {
+        limited(`collectible-status:${user.id}`, 30, 60000);
+        const district = currentWorldDistrict(user);
+        const allCoins = districtCoinPickups(district);
+        const collectedIds = jobStateFor(user).collectibles.collectedIds.filter(id => id.startsWith(`coin:${district}:`));
+        send(response, 200, {
+          district,
+          collectedIds,
+          collected: collectedIds.length,
+          total: allCoins.length,
+          pointsPerCoin: allCoins[0]?.points || 0,
+        }); return;
+      }
+      if (path === '/api/collectibles/pickup' && request.method === 'POST') {
+        limited(`collectible-pickup:${user.id}`, 12, 10000);
+        requireValue(!user.pendingDistrictTravel, 409, 'Finish your district journey before collecting a coin.');
+        const body = await jsonBody(request);
+        requireValue(typeof body.id === 'string' && body.id.length <= 120, 400, 'Choose a valid coin.');
+        const coin = DISTRICT_COIN_BY_ID.get(body.id);
+        requireValue(coin, 404, 'That coin is not part of Kerala Play.');
+        requireValue(coin.district === currentWorldDistrict(user), 409, 'That coin belongs to another district.');
+        const state = presence.get(user.id);
+        requireValue(state && online(user.id) && state.district === currentWorldDistrict(user), 409, 'Reconnect to the district world before collecting a coin.');
+        requireValue(state.mode === 'walk', 409, 'Coins can only be collected while walking.');
+        const distance = Math.hypot(coin.x - state.x, coin.z - state.z);
+        requireValue(distance <= DISTRICT_COIN_PICKUP_RADIUS, 409, 'Walk closer to the coin to collect it.');
+        const collectibles = jobStateFor(user).collectibles;
+        requireValue(!collectibles.collectedIds.includes(coin.id), 409, 'You already collected this coin.');
+        collectibles.collectedIds.push(coin.id);
+        user.points += coin.points;
+        dirty = true;
+        await persist();
+        profileChanged(user);
+        const collectedIds = collectibles.collectedIds.filter(id => id.startsWith(`coin:${coin.district}:`));
+        send(response, 200, {
+          ok: true,
+          coinId: coin.id,
+          points: coin.points,
+          user: publicUser(user),
+          collectedIds,
+          collected: collectedIds.length,
+          total: districtCoinPickups(coin.district).length,
+        }); return;
       }
       if (path === '/api/world/move' && request.method === 'POST') {
         limited(`move:${user.id}`, 20, 1000);

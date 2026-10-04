@@ -2,6 +2,7 @@ import * as THREE from './vendor/three.module.js';
 import { initSocial, api } from './social.js?v=125.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=131.0';
+import { districtCoinPickups, DISTRICT_COIN_PICKUP_RADIUS } from './district-collectibles.js?v=1.0';
 import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=118.0';
 import { createKeralaRoofTiles } from './roof-tiles.js?v=115.0';
 
@@ -576,6 +577,24 @@ let social = null;
 let sceneRef = null;
 let atmosphere = null;
 let connectionReady = false;
+let collectibleStatusDistrict = '';
+let collectibleStatusReady = false;
+let collectedCollectibleIds = new Set();
+let collectibleStatusLoadingKey = '';
+const collectibleStatusRetryAt = new Map();
+let collectiblePickupAccumulator = 0;
+const collectiblePickupPending = new Set();
+const collectiblePickupRetryAt = new Map();
+const districtCoinVisuals = new Map();
+const districtCoinBodyGeometry = new THREE.CylinderGeometry(.42, .42, .12, 24);
+const districtCoinFaceGeometry = new THREE.CircleGeometry(.28, 24);
+const districtCoinEmblemGeometry = new THREE.CircleGeometry(.105, 14);
+const districtCoinRimGeometry = new THREE.TorusGeometry(.30, .025, 6, 24);
+const districtCoinGroundRingGeometry = new THREE.TorusGeometry(.57, .022, 5, 24);
+const districtCoinBodyMaterial = new THREE.MeshStandardMaterial({ color:0xf3be42, roughness:.22, metalness:.82, emissive:0x613d08, emissiveIntensity:.16 });
+const districtCoinRimMaterial = new THREE.MeshStandardMaterial({ color:0xffe28a, roughness:.24, metalness:.72 });
+const districtCoinFaceMaterial = new THREE.MeshStandardMaterial({ color:0xe2a92e, roughness:.3, metalness:.68 });
+const districtCoinGroundMaterial = new THREE.MeshStandardMaterial({ color:0xf0bd4e, roughness:.65, metalness:.12, transparent:true, opacity:.48 });
 const remotePlayers = new Map();
 const remotePlayerKeep = new Set();
 const claimPending = new Set();
@@ -3599,6 +3618,7 @@ function acceptUser(user) {
   if (wardrobePanel?.classList.contains('open')) renderWardrobePanel();
   if (!user) {
     districtJourneyResumeUserId = '';
+    void refreshDistrictCoinStatus(true);
     applyJobMission(null);
     connectionReady = false;
     lastMovementMoving = false;
@@ -3609,6 +3629,8 @@ function acceptUser(user) {
     document.querySelector('#coconut-keys')?.replaceChildren();
     challengeResult.textContent = '';
   } else {
+    if (!previous || previous.id !== user.id || previous.worldDistrict !== user.worldDistrict) void refreshDistrictCoinStatus(true);
+    else if (!collectibleStatusReady) void refreshDistrictCoinStatus();
     if (!previous || previous.id !== user.id) resumeDistrictJourney(user.id);
     if ((user.followers || 0) + (user.following || 0) > 0) finishTask('social');
     if (!onboardingQueued) {
@@ -3646,6 +3668,90 @@ function showToast(message, duration = 2600) {
   toast.style.display = 'block';
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => { toast.style.display = 'none'; }, duration);
+}
+
+function syncDistrictCoinVisibility() {
+  const district = currentWorldDistrictName();
+  for (const [id, visual] of districtCoinVisuals) {
+    visual.group.visible = !!profile && collectibleStatusReady && collectibleStatusDistrict === district
+      && visual.district === district && !collectedCollectibleIds.has(id) && !homeInteriorMode;
+  }
+}
+
+async function refreshDistrictCoinStatus(force = false) {
+  if (!profile) {
+    collectibleStatusDistrict = '';
+    collectibleStatusReady = false;
+    collectedCollectibleIds = new Set();
+    syncDistrictCoinVisibility();
+    return;
+  }
+  const userId = profile.id;
+  const district = currentWorldDistrictName();
+  const requestKey = `${userId}:${district}`;
+  if (!force && collectibleStatusReady && collectibleStatusDistrict === district) return;
+  if (collectibleStatusLoadingKey === requestKey) return;
+  if (!force && performance.now() < Number(collectibleStatusRetryAt.get(requestKey) || 0)) return;
+  collectibleStatusLoadingKey = requestKey;
+  collectibleStatusRetryAt.set(requestKey, performance.now() + 12000);
+  collectibleStatusReady = false;
+  syncDistrictCoinVisibility();
+  try {
+    const result = await api('/api/collectibles/status');
+    if (profile?.id !== userId || currentWorldDistrictName() !== district) return;
+    collectibleStatusDistrict = result.district;
+    collectedCollectibleIds = new Set(Array.isArray(result.collectedIds) ? result.collectedIds : []);
+    collectibleStatusReady = true;
+    syncDistrictCoinVisibility();
+    renderMapLandmarks();
+  } catch {
+    // A failed status request leaves pickups hidden until the next retry.
+  } finally {
+    if (collectibleStatusLoadingKey === requestKey) collectibleStatusLoadingKey = '';
+  }
+}
+
+function updateDistrictCoinVisuals(delta, elapsed) {
+  const district = currentWorldDistrictName();
+  for (const visual of districtCoinVisuals.values()) {
+    if (visual.district !== district) continue;
+    visual.group.rotation.y += delta * 1.65;
+    visual.group.position.y = 1.12 + Math.sin(elapsed * 2.15 + visual.phase) * .13;
+  }
+  syncDistrictCoinVisibility();
+  collectiblePickupAccumulator += delta;
+  if (collectiblePickupAccumulator >= .22) {
+    collectiblePickupAccumulator = 0;
+    tryCollectNearbyDistrictCoin();
+  }
+  if (profile && !collectibleStatusReady) void refreshDistrictCoinStatus();
+}
+
+function tryCollectNearbyDistrictCoin() {
+  if (!profile || !playerRef || !collectibleStatusReady || collectibleStatusDistrict !== currentWorldDistrictName()
+      || vehicleMode !== 'walk' || homeInteriorMode || publicRideInProgress) return;
+  const now = performance.now();
+  for (const coin of districtCoinPickups(currentWorldDistrictName())) {
+    if (collectedCollectibleIds.has(coin.id) || collectiblePickupPending.has(coin.id)
+        || now < Number(collectiblePickupRetryAt.get(coin.id) || 0)) continue;
+    if (Math.hypot(playerRef.position.x - coin.x, playerRef.position.z - coin.z) > DISTRICT_COIN_PICKUP_RADIUS) continue;
+    const userId = profile.id;
+    collectiblePickupPending.add(coin.id);
+    api('/api/collectibles/pickup', { id: coin.id }).then(result => {
+      if (profile?.id !== userId) return;
+      if (result.user) acceptUser(result.user);
+      collectedCollectibleIds.add(coin.id);
+      collectibleStatusDistrict = coin.district;
+      collectibleStatusReady = true;
+      syncDistrictCoinVisibility();
+      renderMapLandmarks();
+      showToast(`Coin collected · +${coin.points} points · ${coin.district}`, 3600);
+    }).catch(error => {
+      collectiblePickupRetryAt.set(coin.id, performance.now() + 3000);
+      if (error.status === 409 && /already collected/i.test(error.message || '')) void refreshDistrictCoinStatus(true);
+    }).finally(() => collectiblePickupPending.delete(coin.id));
+    break;
+  }
 }
 
 function taskProgress(task) {
@@ -4191,21 +4297,32 @@ function renderDistrictGuide() {
   spots.className = 'district-guide-spots';
   const spotsHeading = document.createElement('strong');
   spotsHeading.className = 'district-guide-spots-heading';
-  spotsHeading.textContent = 'Main places · select to set a route';
+  const districtCoins = districtCoinPickups(district);
+  const coinStatusKnown = collectibleStatusReady && collectibleStatusDistrict === district;
+  const collectedCount = coinStatusKnown ? districtCoins.filter(coin => collectedCollectibleIds.has(coin.id)).length : '—';
+  spotsHeading.textContent = `Places & hidden coins · ${collectedCount}/${districtCoins.length} coins · +10 points each`;
   spots.append(spotsHeading);
   const routes = document.createElement('div');
   routes.className = 'district-guide-routes';
   for (const attraction of atlas.attractions) {
+    const coin = districtCoins.find(item => item.attractionId === attraction.id);
+    const coinCollected = !!coin && coinStatusKnown && collectedCollectibleIds.has(coin.id);
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'district-guide-route';
+    button.className = `district-guide-route${coinCollected ? ' coin-collected' : ''}`;
     button.title = attraction.description;
     const name = document.createElement('b');
     name.textContent = attraction.name;
     const description = document.createElement('small');
-    description.textContent = attraction.description;
+    description.textContent = coin
+      ? `${coinCollected ? '✓ Coin found' : '🪙 Hidden coin · +10 points'} · ${attraction.description}`
+      : attraction.description;
     button.append(name, description);
     button.addEventListener('click', () => {
+      if (coin && !coinCollected) {
+        setWaypoint({ id:coin.id, name:coin.name, icon:'¢', kind:'coin', district, x:coin.x, z:coin.z, description:`Hidden coin near ${attraction.name} · +${coin.points} points` });
+        return;
+      }
       const place = currentNavigationPlaces().find(item => item.district === district && item.attractionId === attraction.id);
       if (place) setWaypoint(place);
     });
@@ -4243,6 +4360,28 @@ function renderMapLandmarks() {
     caption.style.display = mapLabelsVisible || selectedDestination?.id === place.id || place.id === 'personal-home' ? 'block' : 'none';
     marker.append(pin, label, caption);
     marker.addEventListener('click', event => { event.stopPropagation(); setWaypoint(place); });
+    mapLayer.append(marker);
+  });
+  const district = currentWorldDistrictName();
+  const coinStatusKnown = collectibleStatusReady && collectibleStatusDistrict === district;
+  districtCoinPickups(district).forEach(coin => {
+    const point = worldToKeralaMap(coin.x, coin.z);
+    const marker = document.createElementNS(svgNamespace, 'g');
+    const collected = coinStatusKnown && collectedCollectibleIds.has(coin.id);
+    marker.setAttribute('class', `coin-marker${collected ? ' collected' : ''}${selectedDestination?.id === coin.id ? ' selected' : ''}`);
+    marker.setAttribute('transform', `translate(${point.x} ${point.y})`);
+    marker.setAttribute('aria-label', `${coin.name}: ${collected ? 'collected' : `available for ${coin.points} points`}`);
+    marker.setAttribute('title', `${coin.name} · ${collected ? 'Collected' : `+${coin.points} points`}`);
+    const pin = document.createElementNS(svgNamespace, 'circle');
+    pin.setAttribute('r', '4.1');
+    const face = document.createElementNS(svgNamespace, 'circle');
+    face.setAttribute('r', '1.8');
+    face.setAttribute('class', 'coin-face');
+    marker.append(pin, face);
+    marker.addEventListener('click', event => {
+      event.stopPropagation();
+      setWaypoint({ id:coin.id, name:coin.name, icon:'¢', kind:'coin', district, x:coin.x, z:coin.z, description:`Hidden coin near ${coin.name.replace(/ coin$/, '')} · +${coin.points} points` });
+    });
     mapLayer.append(marker);
   });
   renderNearbyPlaces();
@@ -5247,6 +5386,7 @@ try {
     }
     if (trafficAccumulator >= (isMobile ? .066 : .025)) { updateTraffic(trafficAccumulator); trafficAccumulator = 0; }
     animateJobMissionVisual(villageTime);
+    updateDistrictCoinVisuals(delta, villageTime);
     if (interactionAccumulator >= (isMobile ? .10 : .08)) {
       updateWorldInteract();
       interactionAccumulator = 0;
@@ -10683,6 +10823,45 @@ function buildWorld(scene) {
 
 function buildLandmarkWorld(scene) {
   addDistrictAtlasAttractions(scene, currentWorldDistrictName());
+  buildDistrictCoinWorld(scene, currentWorldDistrictName());
+}
+function buildDistrictCoinWorld(scene, district) {
+  for (const visual of districtCoinVisuals.values()) scene.remove(visual.group);
+  districtCoinVisuals.clear();
+  for (const coin of districtCoinPickups(district)) {
+    const group = new THREE.Group();
+    group.position.set(coin.x, 1.12, coin.z);
+    group.userData.phase = districtCoinVisuals.size * 1.45;
+    const body = new THREE.Mesh(districtCoinBodyGeometry, districtCoinBodyMaterial);
+    body.rotation.z = Math.PI / 2;
+    body.castShadow = false;
+    body.receiveShadow = false;
+    group.add(body);
+    for (const side of [-1, 1]) {
+      const face = new THREE.Mesh(districtCoinFaceGeometry, districtCoinFaceMaterial);
+      face.rotation.y = side * Math.PI / 2;
+      face.position.x = side * .064;
+      face.castShadow = false;
+      const rim = new THREE.Mesh(districtCoinRimGeometry, districtCoinRimMaterial);
+      rim.rotation.y = side * Math.PI / 2;
+      rim.position.x = side * .066;
+      rim.castShadow = false;
+      const emblem = new THREE.Mesh(districtCoinEmblemGeometry, districtCoinRimMaterial);
+      emblem.rotation.y = side * Math.PI / 2;
+      emblem.position.x = side * .068;
+      emblem.castShadow = false;
+      group.add(face, rim, emblem);
+    }
+    const groundRing = new THREE.Mesh(districtCoinGroundRingGeometry, districtCoinGroundMaterial);
+    groundRing.rotation.x = Math.PI / 2;
+    groundRing.position.y = -.91;
+    groundRing.castShadow = false;
+    group.add(groundRing);
+    group.visible = false;
+    scene.add(group);
+    districtCoinVisuals.set(coin.id, { group, district:coin.district, phase:group.userData.phase, coin });
+  }
+  syncDistrictCoinVisibility();
 }
 function landmarkBeacon(scene, x, z, color) {
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(.045, .06, 2.7, 8), new THREE.MeshStandardMaterial({ color: 0x38443f, roughness: .9 }));

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createGameServer } from './server.mjs';
+import { districtCoinPickups } from './district-collectibles.js';
 
 async function setup(t, serverOptions = {}) {
   const dataDir = await mkdtemp(join(tmpdir(), 'kerala-play-test-'));
@@ -89,6 +90,38 @@ test('signup starts at zero, hashes passwords, enforces credentials and session 
   assert.equal((await guest('/api/session')).data.user, null);
   const saved = await readFile(join(app.dataDir, 'game.json'), 'utf8');
   assert.ok(!saved.includes('test-password-2026')); assert.match(saved, /passwordHash/);
+});
+
+test('district coin rewards require nearby walking, award once, and persist', async t => {
+  const app = await setup(t), alice = app.client();
+  await signup(alice, 'CoinHunter');
+  const [coin] = districtCoinPickups('Ernakulam');
+  const status = await alice('/api/collectibles/status');
+  assert.equal(status.status, 200);
+  assert.deepEqual(status.data.collectedIds, []);
+  assert.equal(status.data.total, 4);
+  assert.equal((await alice('/api/collectibles/pickup', { id: 'coin:not-a-district:missing' })).status, 404);
+  assert.equal((await alice('/api/collectibles/pickup', { id: 'coin:Kottayam:kumarakom-bird-sanctuary' })).status, 409);
+  assert.equal((await alice('/api/collectibles/pickup', { id: coin.id })).status, 409, 'A coin cannot be claimed from far away.');
+
+  const start = { x: -14, z: 6 };
+  for (let step = 1; step <= 4; step++) {
+    app.advance(2000);
+    const x = start.x + (coin.x - start.x) * step / 4;
+    const z = start.z + (coin.z - start.z) * step / 4;
+    const moved = await alice('/api/world/move', { x, z, rotation: 0, moving: true, mode: 'walk' });
+    assert.equal(moved.status, 200, JSON.stringify(moved.data));
+  }
+
+  const picked = await alice('/api/collectibles/pickup', { id: coin.id });
+  assert.equal(picked.status, 200, JSON.stringify(picked.data));
+  assert.equal(picked.data.points, 10);
+  assert.equal(picked.data.user.points, 10);
+  assert.deepEqual(picked.data.collectedIds, [coin.id]);
+  assert.equal((await alice('/api/collectibles/pickup', { id: coin.id })).status, 409);
+  await app.restart();
+  assert.equal((await alice('/api/session')).data.user.points, 10);
+  assert.deepEqual((await alice('/api/collectibles/status')).data.collectedIds, [coin.id]);
 });
 
 test('wardrobe outfit choices are validated, saved with the profile and reset when incompatible', async t => {
@@ -1170,6 +1203,7 @@ test('players can build a private Kerala home, use its bed, exit, and retain own
   assert.equal(entered.status, 200, JSON.stringify(entered.data));
   assert.equal(entered.data.home.inside, true);
   assert.equal(entered.data.position.mode, 'home');
+  assert.equal((await alice('/api/collectibles/pickup', { id: districtCoinPickups('Ernakulam')[0].id })).status, 409, 'Coins can only be collected while walking outside.');
   assert.equal((await alice('/api/world/move', { x: 7, z: 0, rotation: 0, moving: false, mode: 'home' })).status, 400, 'Interior movement stays inside its room');
   assert.equal((await alice('/api/home/sleep', {})).status, 409, 'Sleep requires reaching the bed');
 
