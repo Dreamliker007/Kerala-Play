@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { KERALA_DISTRICT_ATLAS, districtAttractionVisitId } from './district-atlas.js';
+import { ALL_DISTRICT_COIN_PICKUPS, DISTRICT_COIN_PICKUP_RADIUS, DISTRICT_COIN_REWARD, districtCoinPickups } from './district-collectibles.js';
 
 const EXPECTED_DISTRICTS = [
   'Kasaragod','Kannur','Wayanad','Kozhikode','Malappuram','Palakkad','Thrissur',
@@ -34,3 +35,20 @@ test('visit IDs are unique and preserve the existing city-landmark IDs', () => {
   assert.equal(KERALA_DISTRICT_ATLAS.Idukki.attractions.find(spot => spot.kind === 'adventure')?.name, 'Kuttikkanam Adventure Zone');
 });
 
+test('district coin pickups cover four walkable spots per district with unique IDs', () => {
+  assert.equal(ALL_DISTRICT_COIN_PICKUPS.length, 56);
+  assert.equal(new Set(ALL_DISTRICT_COIN_PICKUPS.map(coin => coin.id)).size, 56);
+  assert.equal(DISTRICT_COIN_REWARD, 10);
+  for (const district of EXPECTED_DISTRICTS) {
+    const coins = districtCoinPickups(district);
+    assert.equal(coins.length, 4);
+    for (const coin of coins) {
+      const attraction = KERALA_DISTRICT_ATLAS[district].attractions.find(item => item.id === coin.attractionId);
+      assert.ok(attraction);
+      assert.equal(coin.district, district);
+      assert.equal(Math.hypot(coin.x - attraction.x, coin.z - attraction.z), 9);
+      assert.ok(DISTRICT_COIN_PICKUP_RADIUS > 0 && DISTRICT_COIN_PICKUP_RADIUS < 9);
+      assert.ok(Math.abs(coin.x) < 110 && Math.abs(coin.z) < 110);
+    }
+  }
+});

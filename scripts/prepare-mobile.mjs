@@ -6,6 +6,7 @@ const files = [
   'boot.js',
   'game.js',
   'district-atlas.js',
+  'district-collectibles.js',
   'environment.js',
   'social.js',
   'game.css',
