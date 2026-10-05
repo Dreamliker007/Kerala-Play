@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { recognitionSummary } from './recognition.mjs';
 import { categoryLeaderboard, leaderboardCategories } from './leaderboards.mjs';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js';
-import { ALL_DISTRICT_COIN_PICKUPS, DISTRICT_COIN_BY_ID, DISTRICT_COIN_PICKUP_RADIUS, districtCoinPickups } from './district-collectibles.js';
+import { DISTRICT_COIN_BY_ID, DISTRICT_COIN_PICKUP_RADIUS, DISTRICT_COIN_RESPAWN_MS, districtCoinPickups } from './district-collectibles.js';
 import { genericDistrictFuelPosition } from './district-layout.js';
 
 const scrypt = promisify(scryptCallback);
@@ -429,7 +429,7 @@ const GROUP_MEMBER_LIMIT = 12;
 const GROUP_MEMBERSHIP_LIMIT = 8;
 const GROUP_MESSAGE_LIMIT = 100;
 const GROUP_NAME_MAX = 40;
-function freshJobState() { return { active: null, cooldowns: {}, completed: {}, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0, lastClinicAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0, house: null }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
+function freshJobState() { return { active: null, cooldowns: {}, completed: {}, collectibles: { respawnAtById: {} }, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0, lastClinicAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0, house: null }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
 const SESSION_AGE = 365 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
 const BODY_MAX = 720 * 1024;
@@ -1433,17 +1433,22 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   function jobStateFor(user) {
     if (!user.jobState || typeof user.jobState !== 'object' || Array.isArray(user.jobState)) user.jobState = freshJobState();
     if (!user.jobState.collectibles || typeof user.jobState.collectibles !== 'object' || Array.isArray(user.jobState.collectibles)) {
-      user.jobState.collectibles = { collectedIds: [] };
+      user.jobState.collectibles = { respawnAtById: {} };
       dirty = true;
     }
-    if (!Array.isArray(user.jobState.collectibles.collectedIds)) {
-      user.jobState.collectibles.collectedIds = [];
+    if (!user.jobState.collectibles.respawnAtById || typeof user.jobState.collectibles.respawnAtById !== 'object' || Array.isArray(user.jobState.collectibles.respawnAtById)) {
+      user.jobState.collectibles.respawnAtById = {};
       dirty = true;
     }
-    const collectedCoins = [...new Set(user.jobState.collectibles.collectedIds.filter(id => DISTRICT_COIN_BY_ID.has(id)))].slice(-ALL_DISTRICT_COIN_PICKUPS.length);
-    if (collectedCoins.length !== user.jobState.collectibles.collectedIds.length
-        || collectedCoins.some((id, index) => id !== user.jobState.collectibles.collectedIds[index])) {
-      user.jobState.collectibles.collectedIds = collectedCoins;
+    const validCoinCooldowns = Object.fromEntries(Object.entries(user.jobState.collectibles.respawnAtById)
+      .filter(([id, until]) => DISTRICT_COIN_BY_ID.has(id) && Number.isFinite(Number(until)) && Number(until) > 0));
+    if (Object.keys(validCoinCooldowns).length !== Object.keys(user.jobState.collectibles.respawnAtById).length) {
+      user.jobState.collectibles.respawnAtById = validCoinCooldowns;
+      dirty = true;
+    }
+    // Existing coin points stay on the profile; old one-time claims no longer block respawns.
+    if (Object.hasOwn(user.jobState.collectibles, 'collectedIds')) {
+      delete user.jobState.collectibles.collectedIds;
       dirty = true;
     }
     if (!user.jobState.cooldowns || typeof user.jobState.cooldowns !== 'object' || Array.isArray(user.jobState.cooldowns)) user.jobState.cooldowns = {};
@@ -4257,13 +4262,20 @@ function publicRideDestinationForUser(user, destinationId) {
         limited(`collectible-status:${user.id}`, 30, 60000);
         const district = currentWorldDistrict(user);
         const allCoins = districtCoinPickups(district);
-        const collectedIds = jobStateFor(user).collectibles.collectedIds.filter(id => id.startsWith(`coin:${district}:`));
+        const timestamp = now();
+        const respawnAtById = Object.fromEntries(Object.entries(jobStateFor(user).collectibles.respawnAtById)
+          .filter(([id, until]) => id.startsWith(`coin:${district}:`) && Number(until) > timestamp));
+        const respawnInMsById = Object.fromEntries(Object.entries(respawnAtById)
+          .map(([id, until]) => [id, Math.max(0, Number(until) - timestamp)]));
+        const availableIds = allCoins.filter(coin => Number(respawnAtById[coin.id] || 0) <= timestamp).map(coin => coin.id);
         send(response, 200, {
           district,
-          collectedIds,
-          collected: collectedIds.length,
+          availableIds,
+          respawnAtById,
+          respawnInMsById,
           total: allCoins.length,
           pointsPerCoin: allCoins[0]?.points || 0,
+          respawnMs: DISTRICT_COIN_RESPAWN_MS,
         }); return;
       }
       if (path === '/api/collectibles/pickup' && request.method === 'POST') {
@@ -4280,21 +4292,32 @@ function publicRideDestinationForUser(user, destinationId) {
         const distance = Math.hypot(coin.x - state.x, coin.z - state.z);
         requireValue(distance <= DISTRICT_COIN_PICKUP_RADIUS, 409, 'Walk closer to the coin to collect it.');
         const collectibles = jobStateFor(user).collectibles;
-        requireValue(!collectibles.collectedIds.includes(coin.id), 409, 'You already collected this coin.');
-        collectibles.collectedIds.push(coin.id);
+        const timestamp = now();
+        const existingRespawnAt = Number(collectibles.respawnAtById[coin.id] || 0);
+        requireValue(timestamp >= existingRespawnAt, 409, 'This coin is respawning. Try again soon.');
+        const respawnAt = timestamp + DISTRICT_COIN_RESPAWN_MS;
+        collectibles.respawnAtById[coin.id] = respawnAt;
         user.points += coin.points;
         dirty = true;
         await persist();
         profileChanged(user);
-        const collectedIds = collectibles.collectedIds.filter(id => id.startsWith(`coin:${coin.district}:`));
+        const districtCoins = districtCoinPickups(coin.district);
+        const respawnAtById = Object.fromEntries(Object.entries(collectibles.respawnAtById)
+          .filter(([id, until]) => id.startsWith(`coin:${coin.district}:`) && Number(until) > timestamp));
+        const respawnInMsById = Object.fromEntries(Object.entries(respawnAtById)
+          .map(([id, until]) => [id, Math.max(0, Number(until) - timestamp)]));
+        const availableIds = districtCoins.filter(item => Number(respawnAtById[item.id] || 0) <= timestamp).map(item => item.id);
         send(response, 200, {
           ok: true,
           coinId: coin.id,
           points: coin.points,
+          respawnAt,
+          respawnMs: DISTRICT_COIN_RESPAWN_MS,
           user: publicUser(user),
-          collectedIds,
-          collected: collectedIds.length,
-          total: districtCoinPickups(coin.district).length,
+          availableIds,
+          respawnAtById,
+          respawnInMsById,
+          total: districtCoins.length,
         }); return;
       }
       if (path === '/api/world/move' && request.method === 'POST') {

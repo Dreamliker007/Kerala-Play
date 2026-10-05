@@ -2,7 +2,7 @@ import * as THREE from './vendor/three.module.js';
 import { initSocial, api } from './social.js?v=125.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=131.0';
-import { districtCoinPickups, DISTRICT_COIN_PICKUP_RADIUS } from './district-collectibles.js?v=1.0';
+import { districtCoinPickups, DISTRICT_COIN_PICKUP_RADIUS, DISTRICT_COIN_RESPAWN_MS } from './district-collectibles.js?v=2.0';
 import { GENERIC_DISTRICT_FRUIT_TREES, GENERIC_DISTRICT_OFFICE, genericDistrictFuelPosition, genericDistrictRoads, ernakulamDistrictRoads, planRoadsideDrainSegments, districtFacadePalette } from './district-layout.js?v=118.0';
 import { createKeralaRoofTiles } from './roof-tiles.js?v=115.0';
 
@@ -579,7 +579,7 @@ let atmosphere = null;
 let connectionReady = false;
 let collectibleStatusDistrict = '';
 let collectibleStatusReady = false;
-let collectedCollectibleIds = new Set();
+let collectibleRespawnDeadlineById = new Map();
 let collectibleStatusLoadingKey = '';
 const collectibleStatusRetryAt = new Map();
 let collectiblePickupAccumulator = 0;
@@ -3672,20 +3672,32 @@ function showToast(message, duration = 2600) {
 
 function syncDistrictCoinVisibility() {
   const district = currentWorldDistrictName();
-  const statusKnown = collectibleStatusReady && collectibleStatusDistrict === district;
   for (const [id, visual] of districtCoinVisuals) {
-    // Show pickups while saved coin status loads or is temporarily unavailable.
-    // Hide them after the server confirms a coin has already been collected.
+    const respawnDeadline = Number(collectibleRespawnDeadlineById.get(id) || 0);
     visual.group.visible = !!profile && visual.district === district
-      && !(statusKnown && collectedCollectibleIds.has(id)) && !homeInteriorMode;
+      && respawnDeadline <= performance.now() && !homeInteriorMode;
   }
+}
+
+function scheduleDistrictCoinRespawn(coinId, deadline, userId) {
+  const delay = Math.max(0, deadline - performance.now()) + 50;
+  setTimeout(() => {
+    if (profile?.id !== userId || collectibleRespawnDeadlineById.get(coinId) !== deadline) return;
+    if (performance.now() < deadline) {
+      scheduleDistrictCoinRespawn(coinId, deadline, userId);
+      return;
+    }
+    collectibleRespawnDeadlineById.delete(coinId);
+    syncDistrictCoinVisibility();
+    renderMapLandmarks();
+  }, delay);
 }
 
 async function refreshDistrictCoinStatus(force = false) {
   if (!profile) {
     collectibleStatusDistrict = '';
     collectibleStatusReady = false;
-    collectedCollectibleIds = new Set();
+    collectibleRespawnDeadlineById = new Map();
     syncDistrictCoinVisibility();
     return;
   }
@@ -3703,12 +3715,16 @@ async function refreshDistrictCoinStatus(force = false) {
     const result = await api('/api/collectibles/status');
     if (profile?.id !== userId || currentWorldDistrictName() !== district) return;
     collectibleStatusDistrict = result.district;
-    collectedCollectibleIds = new Set(Array.isArray(result.collectedIds) ? result.collectedIds : []);
+    const statusReceivedAt = performance.now();
+    collectibleRespawnDeadlineById = new Map(Object.entries(result.respawnInMsById || {})
+      .map(([id, remaining]) => [id, statusReceivedAt + Math.max(0, Number(remaining) || 0)])
+      .filter(([, deadline]) => deadline > statusReceivedAt));
     collectibleStatusReady = true;
     syncDistrictCoinVisibility();
     renderMapLandmarks();
+    for (const [id, deadline] of collectibleRespawnDeadlineById) scheduleDistrictCoinRespawn(id, deadline, userId);
   } catch {
-    // A failed status request leaves pickups hidden until the next retry.
+    // Keep visible coin locations available while saved respawn status is retried.
   } finally {
     if (collectibleStatusLoadingKey === requestKey) collectibleStatusLoadingKey = '';
   }
@@ -3735,7 +3751,7 @@ function tryCollectNearbyDistrictCoin() {
       || vehicleMode !== 'walk' || homeInteriorMode || publicRideInProgress) return;
   const now = performance.now();
   for (const coin of districtCoinPickups(currentWorldDistrictName())) {
-    if (collectedCollectibleIds.has(coin.id) || collectiblePickupPending.has(coin.id)
+    if (Number(collectibleRespawnDeadlineById.get(coin.id) || 0) > performance.now() || collectiblePickupPending.has(coin.id)
         || now < Number(collectiblePickupRetryAt.get(coin.id) || 0)) continue;
     if (Math.hypot(playerRef.position.x - coin.x, playerRef.position.z - coin.z) > DISTRICT_COIN_PICKUP_RADIUS) continue;
     const userId = profile.id;
@@ -3743,15 +3759,17 @@ function tryCollectNearbyDistrictCoin() {
     api('/api/collectibles/pickup', { id: coin.id }).then(result => {
       if (profile?.id !== userId) return;
       if (result.user) acceptUser(result.user);
-      collectedCollectibleIds.add(coin.id);
+      const respawnDeadline = performance.now() + Math.max(0, Number(result.respawnMs) || DISTRICT_COIN_RESPAWN_MS);
+      collectibleRespawnDeadlineById.set(coin.id, respawnDeadline);
+      scheduleDistrictCoinRespawn(coin.id, respawnDeadline, userId);
       collectibleStatusDistrict = coin.district;
       collectibleStatusReady = true;
       syncDistrictCoinVisibility();
       renderMapLandmarks();
-      showToast(`Coin collected · +${coin.points} points · ${coin.district}`, 3600);
+      showToast(`Coin collected · +${coin.points} points · returns in 20 seconds`, 3600);
     }).catch(error => {
       collectiblePickupRetryAt.set(coin.id, performance.now() + 3000);
-      if (error.status === 409 && /already collected/i.test(error.message || '')) void refreshDistrictCoinStatus(true);
+      if (error.status === 409 && /respawning/i.test(error.message || '')) void refreshDistrictCoinStatus(true);
     }).finally(() => collectiblePickupPending.delete(coin.id));
     break;
   }
@@ -4301,29 +4319,29 @@ function renderDistrictGuide() {
   const spotsHeading = document.createElement('strong');
   spotsHeading.className = 'district-guide-spots-heading';
   const districtCoins = districtCoinPickups(district);
-  const coinStatusKnown = collectibleStatusReady && collectibleStatusDistrict === district;
-  const collectedCount = coinStatusKnown ? districtCoins.filter(coin => collectedCollectibleIds.has(coin.id)).length : '—';
-  spotsHeading.textContent = `Places & hidden coins · ${collectedCount}/${districtCoins.length} coins · +10 points each`;
+  const availableCoinCount = districtCoins.filter(coin => Number(collectibleRespawnDeadlineById.get(coin.id) || 0) <= performance.now()).length;
+  spotsHeading.textContent = `Places & coins · ${availableCoinCount}/${districtCoins.length} ready · +10 points each · returns in 20s`;
   spots.append(spotsHeading);
   const routes = document.createElement('div');
   routes.className = 'district-guide-routes';
   for (const attraction of atlas.attractions) {
-    const coin = districtCoins.find(item => item.attractionId === attraction.id);
-    const coinCollected = !!coin && coinStatusKnown && collectedCollectibleIds.has(coin.id);
+    const attractionCoins = districtCoins.filter(item => item.attractionId === attraction.id);
+    const availableCoins = attractionCoins.filter(coin => Number(collectibleRespawnDeadlineById.get(coin.id) || 0) <= performance.now());
+    const coin = availableCoins[0] || attractionCoins[0];
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `district-guide-route${coinCollected ? ' coin-collected' : ''}`;
+    button.className = 'district-guide-route';
     button.title = attraction.description;
     const name = document.createElement('b');
     name.textContent = attraction.name;
     const description = document.createElement('small');
-    description.textContent = coin
-      ? `${coinCollected ? '✓ Coin found' : '🪙 Hidden coin · +10 points'} · ${attraction.description}`
+    description.textContent = attractionCoins.length
+      ? `🪙 ${availableCoins.length}/${attractionCoins.length} coin spots ready · +10 each · ${attraction.description}`
       : attraction.description;
     button.append(name, description);
     button.addEventListener('click', () => {
-      if (coin && !coinCollected) {
-        setWaypoint({ id:coin.id, name:coin.name, icon:'¢', kind:'coin', district, x:coin.x, z:coin.z, description:`Hidden coin near ${attraction.name} · +${coin.points} points` });
+      if (coin) {
+        setWaypoint({ id:coin.id, name:coin.name, icon:'¢', kind:'coin', district, x:coin.x, z:coin.z, description:`Coin near ${attraction.name} · +${coin.points} points` });
         return;
       }
       const place = currentNavigationPlaces().find(item => item.district === district && item.attractionId === attraction.id);
@@ -4366,15 +4384,16 @@ function renderMapLandmarks() {
     mapLayer.append(marker);
   });
   const district = currentWorldDistrictName();
-  const coinStatusKnown = collectibleStatusReady && collectibleStatusDistrict === district;
   districtCoinPickups(district).forEach(coin => {
     const point = worldToKeralaMap(coin.x, coin.z);
     const marker = document.createElementNS(svgNamespace, 'g');
-    const collected = coinStatusKnown && collectedCollectibleIds.has(coin.id);
-    marker.setAttribute('class', `coin-marker${collected ? ' collected' : ''}${selectedDestination?.id === coin.id ? ' selected' : ''}`);
+    const respawnDeadline = Number(collectibleRespawnDeadlineById.get(coin.id) || 0);
+    const remainingSeconds = Math.ceil(Math.max(0, respawnDeadline - performance.now()) / 1000);
+    const respawning = remainingSeconds > 0;
+    marker.setAttribute('class', `coin-marker${respawning ? ' collected' : ''}${selectedDestination?.id === coin.id ? ' selected' : ''}`);
     marker.setAttribute('transform', `translate(${point.x} ${point.y})`);
-    marker.setAttribute('aria-label', `${coin.name}: ${collected ? 'collected' : `available for ${coin.points} points`}`);
-    marker.setAttribute('title', `${coin.name} · ${collected ? 'Collected' : `+${coin.points} points`}`);
+    marker.setAttribute('aria-label', `${coin.name}: ${respawning ? `respawns in ${remainingSeconds} seconds` : `available for ${coin.points} points`}`);
+    marker.setAttribute('title', `${coin.name} · ${respawning ? `returns in ${remainingSeconds}s` : `+${coin.points} points`}`);
     const pin = document.createElementNS(svgNamespace, 'circle');
     pin.setAttribute('r', '4.1');
     const face = document.createElementNS(svgNamespace, 'circle');
@@ -4383,7 +4402,7 @@ function renderMapLandmarks() {
     marker.append(pin, face);
     marker.addEventListener('click', event => {
       event.stopPropagation();
-      setWaypoint({ id:coin.id, name:coin.name, icon:'¢', kind:'coin', district, x:coin.x, z:coin.z, description:`Hidden coin near ${coin.name.replace(/ coin$/, '')} · +${coin.points} points` });
+      setWaypoint({ id:coin.id, name:coin.name, icon:'¢', kind:'coin', district, x:coin.x, z:coin.z, description:`Coin near ${coin.name.replace(/ coin \d+$/, '')} · +${coin.points} points` });
     });
     mapLayer.append(marker);
   });
