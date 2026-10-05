@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createGameServer } from './server.mjs';
-import { districtCoinPickups } from './district-collectibles.js';
+import { districtCoinPickups, DISTRICT_COIN_RESPAWN_MS } from './district-collectibles.js';
 
 async function setup(t, serverOptions = {}) {
   const dataDir = await mkdtemp(join(tmpdir(), 'kerala-play-test-'));
@@ -92,16 +92,19 @@ test('signup starts at zero, hashes passwords, enforces credentials and session 
   assert.ok(!saved.includes('test-password-2026')); assert.match(saved, /passwordHash/);
 });
 
-test('district coin rewards require nearby walking, award once, and persist', async t => {
-  const app = await setup(t), alice = app.client();
+test('district coin rewards require nearby walking, respawn per player after twenty seconds, and persist', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
   await signup(alice, 'CoinHunter');
+  await signup(bob, 'CoinHunterTwo');
   const [coin] = districtCoinPickups('Ernakulam');
   const status = await alice('/api/collectibles/status');
   assert.equal(status.status, 200);
-  assert.deepEqual(status.data.collectedIds, []);
-  assert.equal(status.data.total, 4);
+  assert.equal(status.data.availableIds.length, 15);
+  assert.deepEqual(status.data.respawnAtById, {});
+  assert.equal(status.data.total, 15);
+  assert.equal(status.data.respawnMs, DISTRICT_COIN_RESPAWN_MS);
   assert.equal((await alice('/api/collectibles/pickup', { id: 'coin:not-a-district:missing' })).status, 404);
-  assert.equal((await alice('/api/collectibles/pickup', { id: 'coin:Kottayam:kumarakom-bird-sanctuary' })).status, 409);
+  assert.equal((await alice('/api/collectibles/pickup', { id: 'coin:Kottayam:kumarakom-bird-sanctuary:1' })).status, 409);
   assert.equal((await alice('/api/collectibles/pickup', { id: coin.id })).status, 409, 'A coin cannot be claimed from far away.');
 
   const start = { x: -14, z: 6 };
@@ -117,11 +120,28 @@ test('district coin rewards require nearby walking, award once, and persist', as
   assert.equal(picked.status, 200, JSON.stringify(picked.data));
   assert.equal(picked.data.points, 10);
   assert.equal(picked.data.user.points, 10);
-  assert.deepEqual(picked.data.collectedIds, [coin.id]);
-  assert.equal((await alice('/api/collectibles/pickup', { id: coin.id })).status, 409);
+  assert.equal(picked.data.respawnMs, DISTRICT_COIN_RESPAWN_MS);
+  assert.equal(picked.data.availableIds.length, 14);
+  assert.equal(picked.data.respawnAtById[coin.id], picked.data.respawnAt);
+  assert.equal((await alice('/api/collectibles/pickup', { id: coin.id })).status, 409, 'A pickup cannot be replayed during its cooldown.');
+  assert.equal((await bob('/api/collectibles/status')).data.availableIds.length, 15, 'Each player has independent coin respawns.');
+  app.advance(DISTRICT_COIN_RESPAWN_MS - 1);
+  const almostReady = await alice('/api/collectibles/status');
+  assert.equal(almostReady.data.respawnInMsById[coin.id], 1);
+  assert.equal(almostReady.data.availableIds.includes(coin.id), false);
+  app.advance(1);
+  const readyAgain = await alice('/api/collectibles/status');
+  assert.equal(readyAgain.data.availableIds.includes(coin.id), true);
+  const movedBack = await alice('/api/world/move', { x: coin.x, z: coin.z, rotation: 0, moving: false, mode: 'walk' });
+  assert.equal(movedBack.status, 200, JSON.stringify(movedBack.data));
+  const pickedAgain = await alice('/api/collectibles/pickup', { id: coin.id });
+  assert.equal(pickedAgain.status, 200, JSON.stringify(pickedAgain.data));
+  assert.equal(pickedAgain.data.user.points, 20);
   await app.restart();
-  assert.equal((await alice('/api/session')).data.user.points, 10);
-  assert.deepEqual((await alice('/api/collectibles/status')).data.collectedIds, [coin.id]);
+  assert.equal((await alice('/api/session')).data.user.points, 20);
+  const afterRestart = await alice('/api/collectibles/status');
+  assert.equal(afterRestart.data.availableIds.includes(coin.id), false);
+  assert.ok(afterRestart.data.respawnInMsById[coin.id] > 0);
 });
 
 test('wardrobe outfit choices are validated, saved with the profile and reset when incompatible', async t => {
