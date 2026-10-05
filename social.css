@@ -42,6 +42,10 @@
 .auth-provider.google::before { content:'G'; color:#3559c7; }
 .auth-provider.facebook::before { content:'f'; color:#1877f2; font-family:Arial,sans-serif; font-size:15px; }
 .auth-provider:hover { filter:brightness(1.10); }
+.auth-playstore-link { display:flex; align-items:center; justify-content:center; gap:9px; width:100%; min-height:46px; margin-top:10px; padding:11px 12px; border:1px solid rgba(255,255,255,.20); border-radius:10px; color:#092a21; background:#a2e2bb; font-size:13px; font-weight:900; text-align:center; text-decoration:none; touch-action:manipulation; }
+.auth-playstore-link::before { content:'▶'; color:#217b51; font-size:14px; }
+.auth-playstore-link:hover { filter:brightness(1.08); }
+.auth-playstore-link:focus-visible { outline:3px solid #ffe298; outline-offset:3px; }
 .auth-provider:focus-visible { outline:3px solid #ffe298; outline-offset:3px; }
 @media (max-width:420px) { .auth-provider-row { grid-template-columns:1fr; } }
 
