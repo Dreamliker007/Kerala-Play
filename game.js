@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=125.0';
+import { initSocial, api } from './social.js?v=126.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=131.0';
 import { districtCoinPickups, DISTRICT_COIN_PICKUP_RADIUS, DISTRICT_COIN_RESPAWN_MS } from './district-collectibles.js?v=2.0';
