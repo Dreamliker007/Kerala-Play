@@ -535,12 +535,19 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   googleAuth.setAttribute('aria-label', 'Continue with Google');
   facebookAuth.setAttribute('aria-label', 'Continue with Facebook');
   providerRow.append(googleAuth, facebookAuth);
+  const playStoreLink = document.createElement('a');
+  playStoreLink.className = 'auth-playstore-link';
+  playStoreLink.href = 'https://play.google.com/store/apps/details?id=com.dreamliker007.keralaplay';
+  playStoreLink.target = '_blank';
+  playStoreLink.rel = 'noopener noreferrer';
+  playStoreLink.textContent = 'Download Kerala Play on Google Play';
+  playStoreLink.setAttribute('aria-label', 'Download Kerala Play from Google Play');
   const authError = node('div', 'social-error');
   authError.setAttribute('role', 'status');
   authError.setAttribute('aria-live', 'polite');
   const authNote = node('p', 'social-muted', 'New accounts start at 0 points. Earn rewards by completing tasks and winning games.');
   const forgot = button('Forgot password?', () => renderReset()); forgot.className = 'social-link';
-  authForm.append(field('First name', firstName), field('Username', username), usernameNote, field('Password', password), signupContact, signupFields, authSubmit, providerDivider, providerRow, forgot, authError);
+  authForm.append(field('First name', firstName), field('Username', username), usernameNote, field('Password', password), signupContact, signupFields, authSubmit, providerDivider, providerRow, playStoreLink, forgot, authError);
   authCard.append(authLogo, authTitle, authIntro, authTabs, authForm, authNote);
   const resetForm = node('form', 'social-form');
   resetForm.hidden = true;
@@ -612,6 +619,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     resetForm.hidden = true;
     authTabs.hidden = false;
     authForm.hidden = false;
+    playStoreLink.hidden = mode !== 'login';
     // Home district is chosen only when a new account is created.
     signupFields.hidden = mode !== 'signup';
     signupAvatarField.hidden = mode !== 'signup';
