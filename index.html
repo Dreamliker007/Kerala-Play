@@ -62,6 +62,7 @@
     #hud-menu-toggle { position:absolute; z-index:6; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:48px; height:48px; border:1px solid rgba(255,255,255,.36); border-radius:14px; color:#fff; background:rgba(8,35,43,.84); box-shadow:0 4px 14px rgba(0,0,0,.2); font-size:20px; cursor:pointer; pointer-events:auto; }
     body.hud-menu-collapsed #quick-actions { display:none; }
     .hud-icon { width:48px; height:48px; border:1px solid rgba(255,255,255,.36); border-radius:14px; color:#fff; background:rgba(8,35,43,.78); box-shadow:0 4px 14px rgba(0,0,0,.18); font-size:20px; cursor:pointer; touch-action:manipulation; }
+    .hud-link { display:flex; flex-direction:column; align-items:center; justify-content:center; text-decoration:none; line-height:1; }
     .hud-icon span { display:block; margin-top:-1px; font-size:8px; font-weight:900; letter-spacing:.4px; }
     .hud-icon[aria-expanded="true"] { background:rgba(38,133,91,.95); border-color:#b9ffe1; }
     .hud-icon[aria-pressed="true"] { background:rgba(38,133,91,.95); border-color:#b9ffe1; box-shadow:0 0 0 2px rgba(105,255,184,.16),0 4px 14px rgba(0,0,0,.18); }
@@ -1334,6 +1335,7 @@
       <button id="proximity-voice-toggle" class="hud-icon" type="button" aria-label="Turn on nearby voice" aria-pressed="false">🎙<span>VOICE</span></button>
       <button id="phone-toggle" class="hud-icon" type="button" aria-label="Open Kerala Phone alerts" aria-controls="phone-panel" aria-expanded="false">📱<span>PHONE</span><b id="phone-badge" hidden>0</b></button>
       <button id="events-toggle" class="hud-icon" type="button" aria-label="Open village notice board" aria-controls="events-panel" aria-expanded="false">📌<span>EVENTS</span></button>
+      <a id="vadamvali-link" class="hud-icon hud-link" href="./vadamvali.html" aria-label="Play Vadamvali tug of war">🪢<span>VADAM</span></a>
       <button id="wallet-toggle" class="hud-icon" type="button" aria-label="Open Kerala Cash wallet" aria-controls="wallet-panel" aria-expanded="false">💰<span>WALLET</span></button>
       <button id="wardrobe-toggle" class="hud-icon" type="button" aria-label="Open character wardrobe" aria-controls="wardrobe-panel" aria-expanded="false">👕<span>OUTFIT</span></button>
       <button id="home-toggle" class="hud-icon" type="button" aria-label="Open home" aria-controls="home-panel" aria-expanded="false">🏠<span>HOME</span></button>
