@@ -1,14 +1,14 @@
-# Kerala Play Android closed-testing update
+# Kerala Play Android production update
 
-This repository is prepared for the current update to the existing Google Play closed-testing track.
+This repository is prepared for the current Google Play production update.
 
 ## Release identity
 
 - App name: `Kerala Play`
 - Application ID: `com.dreamliker007.keralaplay`
-- Version name: `1.0.13`
-- Android version code: `14`
-- Play track: `closed-testing`
+- Version name: `1.0.14`
+- Android version code: `15`
+- Play track: `production`
 - Game origin: `https://keralaplay.in`
 - Android orientation: `sensorLandscape`
 - Cleartext HTTP and mixed content: disabled
@@ -26,19 +26,19 @@ npm run mobile:open
 
 After `mobile:sync`, the generated Android app should contain:
 
-- `versionCode 14`
-- `versionName "1.0.13"`
+- `versionCode 15`
+- `versionName "1.0.14"`
 - `android:screenOrientation="sensorLandscape"`
 
 ## Build the Play Store update
 
 In Android Studio use **Build > Generate Signed App Bundle or APK > Android App Bundle**.
 
-Use the same Play app and the same upload signing key used for the existing Kerala Play listing. Do not create a second application ID. Upload the resulting signed `.aab` to the existing **Closed testing** track.
+Use the same Play app and the same upload signing key used for the existing Kerala Play listing. Do not create a second application ID. Upload the resulting signed `.aab` to the existing **Production** track.
 
-The current production web build is deployed at `https://keralaplay.in`. Closed-test users receive the Android update only after its signed AAB is uploaded and released in the existing closed-testing track.
+The current production web build is deployed at `https://keralaplay.in`. Google Play users receive the Android update after its signed AAB is uploaded, reviewed, and rolled out in the Production track.
 
-## Closed-testing update checks
+## Production update checks
 
 Before uploading the AAB, verify on a real phone:
 
@@ -51,7 +51,7 @@ Before uploading the AAB, verify on a real phone:
 - background/resume works
 - microphone/voice permission behavior is acceptable for the current test build
 
-Keep the update in the same Play Console closed-testing track and keep existing testers opted in while the test continues.
+Upload the signed AAB to the existing Play Console Production track after real-device checks pass.
 
 ## Signing safety
 
