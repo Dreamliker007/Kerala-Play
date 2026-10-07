@@ -31,6 +31,48 @@ async function requestKeralaLandscape() {
 
 window.requestKeralaLandscape = requestKeralaLandscape;
 
+const splashStatus = document.querySelector('#kp-splash-status');
+const networkStatus = document.querySelector('#network-status');
+const networkStatusText = document.querySelector('#network-status-text');
+const networkRetry = document.querySelector('#network-retry');
+let networkHideTimer = null;
+
+function setSplashStatus(message) {
+  if (splashStatus?.isConnected) splashStatus.textContent = message;
+}
+
+function showNetworkStatus(state, message, autoHideMs = 0) {
+  if (!networkStatus || !networkStatusText) return;
+  clearTimeout(networkHideTimer);
+  networkStatus.dataset.state = state;
+  networkStatusText.textContent = message;
+  networkStatus.classList.add('show');
+  if (autoHideMs > 0) networkHideTimer = setTimeout(() => networkStatus.classList.remove('show'), autoHideMs);
+}
+
+function handleNetworkOffline() {
+  setSplashStatus('Waiting for internet connection');
+  showNetworkStatus('offline', 'No internet connection. Kerala Play will reconnect automatically.');
+}
+
+function handleNetworkOnline() {
+  setSplashStatus('Connecting to Kerala Play');
+  showNetworkStatus('online', 'Back online · reconnecting to Kerala Play…', 2600);
+  window.dispatchEvent(new CustomEvent('kerala-network-restored'));
+}
+
+networkRetry?.addEventListener('click', () => {
+  if (navigator.onLine === false) {
+    handleNetworkOffline();
+    return;
+  }
+  showNetworkStatus('online', 'Retrying connection…', 2200);
+  window.dispatchEvent(new CustomEvent('kerala-network-restored'));
+});
+window.addEventListener('offline', handleNetworkOffline);
+window.addEventListener('online', handleNetworkOnline);
+if (navigator.onLine === false) handleNetworkOffline();
+
 function finishKeralaSplash() {
   document.body.classList.add('kp-ready');
   const splash = document.querySelector('#kp-splash');
@@ -44,10 +86,19 @@ import('./navigation-assist.js?v=115.0').catch(error => console.warn('Navigation
 import('./ride-assist.js?v=115.0').catch(error => console.warn('Ride assist unavailable:', error));
 
 // Display a useful recovery screen even if a module fails before game.js runs.
-import('./game.js?v=135.0').then(() => {
+const slowStartTimer = setTimeout(() => {
+  if (document.querySelector('#kp-splash')) setSplashStatus(navigator.onLine === false
+    ? 'Waiting for internet connection'
+    : 'Still connecting · preparing your world');
+}, 5000);
+
+import('./game.js?v=136.0').then(() => {
+  clearTimeout(slowStartTimer);
+  setSplashStatus('World ready');
   // Give the first rendered frame a moment to settle before revealing the world.
   requestAnimationFrame(() => setTimeout(finishKeralaSplash, 260));
 }).catch(error => {
+  clearTimeout(slowStartTimer);
   console.error('Kerala Play startup failed:', error);
   finishKeralaSplash();
   const fallback = document.querySelector('#fallback');
