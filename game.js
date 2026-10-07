@@ -157,6 +157,7 @@ const DISTRICT_INSTANCE_CONFIG = Object.freeze(Object.fromEntries(DISTRICT_INSTA
     train: { x:-42, z:-6, radius:7.2 },
     airport: DISTRICT_AIRPORTS.has(district) ? { x:42, z:-28, radius:8.2 } : null,
     teleport: { x:78, z:72, radius:7.2 },
+    gamePlanet: { x:-78, z:72, radius:6.8 },
   };
   if (district === 'Kottayam') return [district, { ...generic, spawn:{ x:19,z:-23,rotation:0 }, train:{ x:-60,z:-50,radius:7.2 } }];
   if (district === 'Ernakulam') return [district, {
@@ -526,6 +527,10 @@ function generatedDistrictTravelSpots() {
   if (config.teleport) generated.push(Object.freeze({
     id:'district-teleport-gate', kind:'teleport', label:`${district} Teleportation Gate`,
     x:config.teleport.x, z:config.teleport.z, radius:config.teleport.radius, discoverRadius:12,
+  }));
+  if (config.gamePlanet) generated.push(Object.freeze({
+    id:'game-planet-portal', kind:'game-planet', label:'Game Planet Portal',
+    x:config.gamePlanet.x, z:config.gamePlanet.z, radius:config.gamePlanet.radius, discoverRadius:12,
   }));
   return generated;
 }
@@ -3106,6 +3111,11 @@ function updateWorldInteract() {
         worldInteract.disabled = !closeEnough;
         worldInteract.textContent = closeEnough ? 'OPEN DISTRICT GATE' : `NEARBY · ${spot.label.toUpperCase()}`;
         worldInteract.title = closeEnough ? `${spot.label} · teleport instantly to another district` : worldInteract.title;
+      } else if (spot.kind === 'game-planet') {
+        worldInteract.dataset.mode = closeEnough ? 'game-planet' : '';
+        worldInteract.disabled = !closeEnough;
+        worldInteract.textContent = closeEnough ? '🪐 ENTER GAME PLANET' : 'NEARBY · GAME PLANET PORTAL';
+        worldInteract.title = closeEnough ? 'Enter the games-only planet' : worldInteract.title;
       } else if (spot.kind === 'rest') {
         worldInteract.dataset.mode = closeEnough ? 'needs-rest' : '';
         worldInteract.disabled = !closeEnough;
@@ -3254,6 +3264,9 @@ worldInteract?.addEventListener('click', () => {
     }
   } else if (worldInteract.dataset.mode === 'district-travel') {
     openDistrictTravelPanel(worldInteract.dataset.transport || 'train');
+  } else if (worldInteract.dataset.mode === 'game-planet') {
+    sessionStorage.setItem('kerala-play-game-planet-from', currentWorldDistrictName());
+    window.location.href = './game-planet.html?district=' + encodeURIComponent(currentWorldDistrictName());
   } else if (worldInteract.dataset.mode === 'train-board') {
     window.dispatchEvent(new CustomEvent('kerala-train-board', {
       detail: { stationId: worldInteract.dataset.station },
@@ -9963,6 +9976,44 @@ function addDistrictTeleportGateway(scene, district, x, z) {
   registerFarVisual(rim, x, z, 52);
 }
 
+function addGamePlanetGateway(scene, district, x, z) {
+  const dark = new THREE.MeshStandardMaterial({ color:0x160d38, roughness:.62, metalness:.28 });
+  const glow = new THREE.MeshStandardMaterial({ color:0x74eaff, emissive:0x2f75ff, emissiveIntensity:1.05, roughness:.2, metalness:.16 });
+  const violet = new THREE.MeshStandardMaterial({ color:0x7652dd, emissive:0x4522c2, emissiveIntensity:.95, transparent:true, opacity:.68, side:THREE.DoubleSide, roughness:.16 });
+  const gold = new THREE.MeshStandardMaterial({ color:0xffd869, emissive:0x8d5a12, emissiveIntensity:.72, roughness:.34 });
+  const portal = new THREE.Group();
+  const platform = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 4.1, .42, 36), dark);
+  platform.position.y = .21;
+  const outer = new THREE.Mesh(new THREE.TorusGeometry(2.55, .23, 12, 42), glow);
+  outer.position.y = 2.9;
+  const inner = new THREE.Mesh(new THREE.CircleGeometry(2.28, 40), violet);
+  inner.position.set(0, 2.9, -.05);
+  const orbit = new THREE.Mesh(new THREE.TorusGeometry(3.0, .055, 7, 48), gold);
+  orbit.position.y = 2.9;
+  orbit.rotation.x = .36;
+  orbit.rotation.y = .18;
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(.30, 12, 10), gold);
+  moon.position.set(2.55, 3.72, .2);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(.45, 5.1, .72), dark);
+  left.position.set(-2.72, 2.55, 0);
+  const right = left.clone();
+  right.position.x = 2.72;
+  portal.add(platform, outer, inner, orbit, moon, left, right);
+  portal.position.set(x, 0, z);
+  portal.traverse(object => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+  scene.add(portal);
+
+  const board = createWorldSignMesh({
+    title: 'GAME PLANET',
+    subtitle: district.toUpperCase() + ' PORTAL · MINI-GAMES ONLY',
+    background: '#24134f',
+  }, 6.8, .96);
+  board.position.set(x, 6.15, z + .15);
+  scene.add(board);
+  registerFarVisual(board, x, z, 96);
+  registerFarVisual(outer, x, z, 58);
+}
+
 function addDistrictAtlasAttractions(scene, district) {
   const atlas = KERALA_DISTRICT_ATLAS[district];
   if (!atlas) return;
@@ -10457,6 +10508,7 @@ function addGenericDistrictWorld(scene, district, roadTexture) {
   addDistrictIdentityEnvironment(scene,district,profile);
   if (config.airport) addDistrictAirport(scene, district, config.airport.x, config.airport.z);
   if (config.teleport) addDistrictTeleportGateway(scene, district, config.teleport.x, config.teleport.z);
+  if (config.gamePlanet) addGamePlanetGateway(scene, district, config.gamePlanet.x, config.gamePlanet.z);
 }
 
 
@@ -10506,6 +10558,7 @@ function buildWorld(scene) {
     const airport = config.airport;
     if (airport) addDistrictAirport(scene, renderedWorldDistrict, airport.x, airport.z);
     if (config.teleport) addDistrictTeleportGateway(scene, renderedWorldDistrict, config.teleport.x, config.teleport.z);
+    if (config.gamePlanet) addGamePlanetGateway(scene, renderedWorldDistrict, config.gamePlanet.x, config.gamePlanet.z);
     finalizeRoadEdges(scene);
     return;
   }
@@ -10870,6 +10923,8 @@ function buildWorld(scene) {
   });
   const teleport = currentDistrictInstance().teleport;
   if (teleport) addDistrictTeleportGateway(scene, renderedWorldDistrict, teleport.x, teleport.z);
+  const gamePlanet = currentDistrictInstance().gamePlanet;
+  if (gamePlanet) addGamePlanetGateway(scene, renderedWorldDistrict, gamePlanet.x, gamePlanet.z);
   finalizeRoadEdges(scene);
 }
 
