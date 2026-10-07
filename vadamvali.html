@@ -89,7 +89,7 @@
       <a class="back" href="./index.html" aria-label="Back to Kerala Play">← Kerala Play</a>
       <div class="title">
         <h1>🪢 വടംവലി</h1>
-        <p>വേഗം വേഗം tap ചെയ്യൂ! Tap count 30-നെ കടക്കുന്ന ആദ്യ player ജയിക്കും.</p>
+        <p>വേഗം വേഗം tap ചെയ്യൂ! Opponent-നെക്കാൾ 30 taps lead കിട്ടുന്ന player ജയിക്കും.</p>
       </div>
       <button id="reset" class="reset" type="button">↻ Restart</button>
     </header>
@@ -103,7 +103,7 @@
       </button>
 
       <section class="arena" aria-live="polite">
-        <div class="target">First above 30 taps wins</div>
+        <div class="target">Get a 30-tap lead to win</div>
         <div class="rope-track">
           <div class="center-line"></div>
           <div class="flag">🚩</div>
@@ -128,8 +128,7 @@
 
   <script>
     (() => {
-      const WIN_THRESHOLD = 30;
-      const WIN_TARGET = WIN_THRESHOLD + 1;
+      const LEAD_TO_WIN = 30;
       let left = 0;
       let right = 0;
       let finished = false;
@@ -155,11 +154,13 @@
       function render() {
         leftScore.textContent = left;
         rightScore.textContent = right;
-        leftProgress.style.width = Math.min(100, (left / WIN_TARGET) * 100) + '%';
-        rightProgress.style.width = Math.min(100, (right / WIN_TARGET) * 100) + '%';
+        const leftLead = Math.max(0, left - right);
+        const rightLead = Math.max(0, right - left);
+        leftProgress.style.width = Math.min(100, (leftLead / LEAD_TO_WIN) * 100) + '%';
+        rightProgress.style.width = Math.min(100, (rightLead / LEAD_TO_WIN) * 100) + '%';
 
         const diff = right - left;
-        const shift = Math.max(-34, Math.min(34, (diff / WIN_TARGET) * 34));
+        const shift = Math.max(-34, Math.min(34, (diff / LEAD_TO_WIN) * 34));
         const position = 50 + shift;
         rope.style.left = position + '%';
         knot.style.left = position + '%';
@@ -186,17 +187,17 @@
         vibrate();
         render();
 
-        if (left > WIN_THRESHOLD || right > WIN_THRESHOLD) {
+        const lead = left - right;
+        if (Math.abs(lead) >= LEAD_TO_WIN) {
           finished = true;
           leftSide.disabled = true;
           rightSide.disabled = true;
-          celebrate(left > WIN_THRESHOLD ? 'PLAYER 1' : 'PLAYER 2');
+          celebrate(lead > 0 ? 'PLAYER 1' : 'PLAYER 2');
           return;
         }
 
-        const lead = left - right;
         if (lead === 0) status.textContent = 'Equal fight — keep tapping!';
-        else status.textContent = (lead > 0 ? 'PLAYER 1' : 'PLAYER 2') + ' മുന്നിലാണ് · ' + Math.abs(lead) + ' tap';
+        else status.textContent = (lead > 0 ? 'PLAYER 1' : 'PLAYER 2') + ' മുന്നിലാണ് · ' + Math.abs(lead) + '/30 tap lead';
       }
 
       function startCountdown() {
