@@ -89,7 +89,7 @@
       <a class="back" href="./index.html" aria-label="Back to Kerala Play">← Kerala Play</a>
       <div class="title">
         <h1>🪢 വടംവലി</h1>
-        <p>വേഗം വേഗം tap ചെയ്യൂ! 30 taps ആദ്യം എത്തുന്ന player ജയിക്കും.</p>
+        <p>വേഗം വേഗം tap ചെയ്യൂ! Tap count 30-നെ കടക്കുന്ന ആദ്യ player ജയിക്കും.</p>
       </div>
       <button id="reset" class="reset" type="button">↻ Restart</button>
     </header>
@@ -103,7 +103,7 @@
       </button>
 
       <section class="arena" aria-live="polite">
-        <div class="target">First to 30 taps</div>
+        <div class="target">First above 30 taps wins</div>
         <div class="rope-track">
           <div class="center-line"></div>
           <div class="flag">🚩</div>
@@ -128,7 +128,8 @@
 
   <script>
     (() => {
-      const WIN = 30;
+      const WIN_THRESHOLD = 30;
+      const WIN_TARGET = WIN_THRESHOLD + 1;
       let left = 0;
       let right = 0;
       let finished = false;
@@ -154,11 +155,11 @@
       function render() {
         leftScore.textContent = left;
         rightScore.textContent = right;
-        leftProgress.style.width = Math.min(100, (left / WIN) * 100) + '%';
-        rightProgress.style.width = Math.min(100, (right / WIN) * 100) + '%';
+        leftProgress.style.width = Math.min(100, (left / WIN_TARGET) * 100) + '%';
+        rightProgress.style.width = Math.min(100, (right / WIN_TARGET) * 100) + '%';
 
         const diff = right - left;
-        const shift = Math.max(-34, Math.min(34, (diff / WIN) * 34));
+        const shift = Math.max(-34, Math.min(34, (diff / WIN_TARGET) * 34));
         const position = 50 + shift;
         rope.style.left = position + '%';
         knot.style.left = position + '%';
@@ -180,16 +181,16 @@
 
       function tap(side) {
         if (finished || !ready) return;
-        if (side === 'left') left = Math.min(WIN, left + 1);
-        else right = Math.min(WIN, right + 1);
+        if (side === 'left') left += 1;
+        else right += 1;
         vibrate();
         render();
 
-        if (left >= WIN || right >= WIN) {
+        if (left > WIN_THRESHOLD || right > WIN_THRESHOLD) {
           finished = true;
           leftSide.disabled = true;
           rightSide.disabled = true;
-          celebrate(left >= WIN ? 'PLAYER 1' : 'PLAYER 2');
+          celebrate(left > WIN_THRESHOLD ? 'PLAYER 1' : 'PLAYER 2');
           return;
         }
 
