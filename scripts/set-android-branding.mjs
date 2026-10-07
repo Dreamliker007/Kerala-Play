@@ -36,23 +36,19 @@ for (const entry of entries) {
 
 const foreground = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-  <path android:fillColor="#B8F19A" android:pathData="M55,12 C50,16 47,22 46,29 C45,36 41,42 41,49 C41,57 38,64 38,72 C38,80 35,87 36,94 C37,99 40,102 44,104 C47,106 49,104 50,101 C52,96 54,91 57,87 C61,82 66,77 68,70 C71,63 75,57 75,49 C75,42 78,35 76,29 C74,22 69,17 63,13 C60,11 58,10 55,12Z"/>
-  <path android:fillColor="#F3C85A" android:pathData="M47,38 L70,54 L47,70 Z"/>
-  <path android:fillColor="@android:color/transparent" android:strokeColor="#79D9ED"
-      android:strokeWidth="3.4" android:strokeLineCap="round"
-      android:pathData="M22,85 C42,76 65,76 88,84"/>
+    android:viewportWidth="512" android:viewportHeight="512">
+  <path android:fillColor="#E5B94C" android:pathData="M128,82 H200 V221 L322,82 H413 L279,232 L424,430 H328 L224,286 L200,313 V430 H128 Z"/>
+  <path android:fillColor="#4EAD43" android:strokeColor="#D9B34D" android:strokeWidth="5"
+      android:pathData="M183,315 C257,224 318,211 385,231 C326,239 279,270 237,331 C291,306 339,306 382,324 C305,326 253,357 211,416 C191,389 182,356 183,315 Z"/>
 </vector>`;
 
 const legacy = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-  <path android:fillColor="#075F65" android:pathData="M0,0 H108 V108 H0 Z"/>
-  <path android:fillColor="#B8F19A" android:pathData="M55,12 C50,16 47,22 46,29 C45,36 41,42 41,49 C41,57 38,64 38,72 C38,80 35,87 36,94 C37,99 40,102 44,104 C47,106 49,104 50,101 C52,96 54,91 57,87 C61,82 66,77 68,70 C71,63 75,57 75,49 C75,42 78,35 76,29 C74,22 69,17 63,13 C60,11 58,10 55,12Z"/>
-  <path android:fillColor="#F3C85A" android:pathData="M47,38 L70,54 L47,70 Z"/>
-  <path android:fillColor="@android:color/transparent" android:strokeColor="#79D9ED"
-      android:strokeWidth="3.4" android:strokeLineCap="round"
-      android:pathData="M22,85 C42,76 65,76 88,84"/>
+    android:viewportWidth="512" android:viewportHeight="512">
+  <path android:fillColor="#061B20" android:pathData="M0,0 H512 V512 H0 Z"/>
+  <path android:fillColor="#E5B94C" android:pathData="M128,82 H200 V221 L322,82 H413 L279,232 L424,430 H328 L224,286 L200,313 V430 H128 Z"/>
+  <path android:fillColor="#4EAD43" android:strokeColor="#D9B34D" android:strokeWidth="5"
+      android:pathData="M183,315 C257,224 318,211 385,231 C326,239 279,270 237,331 C291,306 339,306 382,324 C305,326 253,357 211,416 C191,389 182,356 183,315 Z"/>
 </vector>`;
 
 const adaptive = `<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
@@ -73,13 +69,13 @@ try { colors = await readFile(colorsUrl, 'utf8'); } catch { /* Create below. */ 
 if (!colors) {
   colors = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#075F65</color>
+    <color name="ic_launcher_background">#061B20</color>
 </resources>
 `;
 } else if (/name=["']ic_launcher_background["']/.test(colors)) {
-  colors = colors.replace(/<color\s+name=["']ic_launcher_background["']>[^<]*<\/color>/, '<color name="ic_launcher_background">#075F65</color>');
+  colors = colors.replace(/<color\s+name=["']ic_launcher_background["']>[^<]*<\/color>/, '<color name="ic_launcher_background">#061B20</color>');
 } else {
-  colors = colors.replace('</resources>', '    <color name="ic_launcher_background">#075F65</color>\n</resources>');
+  colors = colors.replace('</resources>', '    <color name="ic_launcher_background">#061B20</color>\n</resources>');
 }
 await writeFile(colorsUrl, colors);
 
