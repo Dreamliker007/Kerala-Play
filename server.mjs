@@ -2281,7 +2281,7 @@ function publicRideDestinationForUser(user, destinationId) {
         const extension = extname(relative).toLowerCase();
         const rootAsset = /^[a-zA-Z0-9_-]+\.(js|css|png|ico|svg|webmanifest)$/.test(relative);
         const nestedAsset = /^(assets|vendor)\/[a-zA-Z0-9_./-]+$/.test(relative) && PUBLIC_EXTENSIONS.has(extension);
-        requireValue(relative === 'index.html' || relative === 'vadamvali.html' || rootAsset || nestedAsset, 404, 'File not found.');
+        requireValue(relative === 'index.html' || relative === 'vadamvali.html' || relative === 'game-planet.html' || rootAsset || nestedAsset, 404, 'File not found.');
         requireValue(!relative.split('/').some(part => part.startsWith('.')), 404, 'File not found.');
         const rootPath = await realpath(publicDir);
         let targetPath;
@@ -2289,7 +2289,7 @@ function publicRideDestinationForUser(user, destinationId) {
         catch { throw new ApiError(404, 'File not found.'); }
         requireValue(targetPath.startsWith(rootPath + sep), 404, 'File not found.');
         const resolvedRelative = targetPath.slice(rootPath.length + 1).replaceAll('\\', '/');
-        requireValue(!resolvedRelative.split('/').some(part => part.startsWith('.')) && (resolvedRelative === 'index.html' || resolvedRelative === 'vadamvali.html' || /^[a-zA-Z0-9_-]+\.(js|css|png|ico|svg|webmanifest)$/.test(resolvedRelative) || (/^(assets|vendor)\/[a-zA-Z0-9_./-]+$/.test(resolvedRelative) && PUBLIC_EXTENSIONS.has(extname(resolvedRelative).toLowerCase()))), 404, 'File not found.');
+        requireValue(!resolvedRelative.split('/').some(part => part.startsWith('.')) && (resolvedRelative === 'index.html' || resolvedRelative === 'vadamvali.html' || resolvedRelative === 'game-planet.html' || /^[a-zA-Z0-9_-]+\.(js|css|png|ico|svg|webmanifest)$/.test(resolvedRelative) || (/^(assets|vendor)\/[a-zA-Z0-9_./-]+$/.test(resolvedRelative) && PUBLIC_EXTENSIONS.has(extname(resolvedRelative).toLowerCase()))), 404, 'File not found.');
         const data = await readFile(targetPath);
         response.writeHead(200, { 'Content-Type': MIME[extension] || 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'no-cache' });
         response.end(request.method === 'HEAD' ? undefined : data);

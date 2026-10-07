@@ -421,9 +421,26 @@ test('private files and cross-origin writes are rejected', async t => {
   for (const path of ['/.data/game.json', '/server.mjs', '/package.json', '/tests/server.test.mjs', '/assets/../.data/game.json', '/.git/config']) assert.equal((await alice(path)).status, 404, path);
   assert.equal((await alice('/')).status, 200);
   assert.equal((await alice('/vadamvali.html')).status, 200);
+  assert.equal((await alice('/game-planet.html')).status, 200);
   assert.equal((await alice('/api/profile', { bio: 'CSRF' }, 'PATCH', { Origin: 'https://other.example' })).status, 403);
   assert.equal((await alice('/api/profile', { bio: 'valid bio', points: 9000 }, 'PATCH')).status, 200);
   assert.equal((await alice('/api/session')).data.user.points, 0);
+});
+
+test('Game Planet catalog compiles and every district portal targets the games-only hub', async () => {
+  const page = await readFile(resolve('game-planet.html'), 'utf8');
+  for (const title of ['Vadamvali', 'Tap Battle', 'Quick Draw', 'Number Rush', 'Memory Flash', 'Stop the Clock', 'Orb Grab', 'Drop Four', 'Floor Fall', 'Pocket Hockey', 'Worm Arena', 'Stone Paper Scissors']) {
+    assert.ok(page.includes(title), title);
+  }
+  const inlineScript = page.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(inlineScript, 'Game Planet must include its playable game script');
+  assert.doesNotThrow(() => new Function(inlineScript), 'Game Planet inline JavaScript must compile');
+
+  const world = await readFile(resolve('game.js'), 'utf8');
+  assert.match(world, /gamePlanet:\s*\{\s*x:-78,\s*z:72/);
+  assert.match(world, /function addGamePlanetGateway/);
+  assert.match(world, /ENTER GAME PLANET/);
+  assert.match(world, /game-planet\.html\?district=/);
 });
 
 test('task rewards validate movement and acceptance; rewards and game rounds cannot replay; progress persists', async t => {

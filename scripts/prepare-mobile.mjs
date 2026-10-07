@@ -15,6 +15,7 @@ const files = [
   'script.js',
   'ludo.html',
   'vadamvali.html',
+  'game-planet.html',
   'supabase-config.js',
   'three.module.js',
   'THREE-LICENSE.txt',
