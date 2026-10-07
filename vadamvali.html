@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#071d24">
+  <meta name="screen-orientation" content="landscape">
+  <title>വടംവലി — Kerala Play</title>
+  <style>
+    :root { color-scheme: dark; --gold:#f7c948; --green:#39d98a; --red:#ff6673; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+    html,body { margin:0; width:100%; min-height:100%; overflow:hidden; background:#071d24; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; touch-action:manipulation; }
+    body {
+      background:
+        radial-gradient(circle at 50% 15%, rgba(71,153,137,.28), transparent 34%),
+        linear-gradient(180deg,#123d45 0%,#0a2831 52%,#071d24 100%);
+      color:#fff;
+    }
+    .shell { height:100dvh; display:grid; grid-template-rows:auto 1fr auto; padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); gap:10px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .back,.reset { min-height:42px; border:1px solid rgba(255,255,255,.28); border-radius:13px; padding:0 14px; color:#fff; background:rgba(5,24,30,.72); font-weight:800; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+    .title { text-align:center; min-width:0; }
+    .title h1 { margin:0; font-size:clamp(20px,3vw,34px); line-height:1; }
+    .title p { margin:5px 0 0; color:#c7e6df; font-size:clamp(10px,1.2vw,14px); }
+    main { min-height:0; display:grid; grid-template-columns:1fr minmax(220px,34vw) 1fr; gap:10px; align-items:stretch; }
+    .side {
+      position:relative; min-width:0; border:1px solid rgba(255,255,255,.18); border-radius:20px; overflow:hidden;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; cursor:pointer;
+      box-shadow:0 12px 32px rgba(0,0,0,.22); touch-action:manipulation;
+    }
+    .side.left { background:linear-gradient(145deg,rgba(20,111,86,.92),rgba(10,67,59,.9)); }
+    .side.right { background:linear-gradient(145deg,rgba(147,60,54,.92),rgba(92,39,44,.9)); }
+    .side:active { transform:scale(.992); }
+    .side .label { font-size:clamp(14px,2vw,22px); font-weight:900; letter-spacing:.4px; }
+    .score { font-size:clamp(50px,9vw,108px); font-weight:1000; line-height:.9; text-shadow:0 4px 18px rgba(0,0,0,.28); }
+    .tap-hint { font-size:clamp(12px,1.5vw,17px); font-weight:850; color:#eafff6; }
+    .progress { width:min(82%,330px); height:10px; overflow:hidden; border-radius:999px; background:rgba(0,0,0,.3); }
+    .progress > i { display:block; width:0; height:100%; background:linear-gradient(90deg,#fff0a2,var(--gold)); transition:width .08s linear; }
+    .arena {
+      min-width:0; border:1px solid rgba(255,255,255,.19); border-radius:20px; background:rgba(4,21,27,.64);
+      display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; overflow:hidden;
+    }
+    .target { color:#ffdf7b; font-weight:900; font-size:12px; letter-spacing:.7px; text-transform:uppercase; }
+    .rope-track { position:relative; width:100%; height:122px; margin:12px 0 8px; }
+    .center-line { position:absolute; left:50%; top:0; bottom:0; width:3px; transform:translateX(-50%); background:repeating-linear-gradient(180deg,#fff 0 7px,transparent 7px 13px); opacity:.7; }
+    .flag { position:absolute; left:50%; top:3px; transform:translateX(-50%); font-size:26px; filter:drop-shadow(0 3px 5px rgba(0,0,0,.4)); }
+    .rope {
+      position:absolute; left:50%; top:64px; width:82%; height:13px; transform:translateX(-50%);
+      border-radius:999px; background:repeating-linear-gradient(135deg,#9b633a 0 7px,#c18450 7px 14px);
+      box-shadow:0 4px 8px rgba(0,0,0,.35); transition:left .09s ease-out;
+    }
+    .rope::before,.rope::after { content:""; position:absolute; top:-5px; width:22px; height:22px; border:4px solid #d5a06f; border-radius:50%; }
+    .rope::before { left:-10px; } .rope::after { right:-10px; }
+    .knot { position:absolute; left:50%; top:56px; transform:translateX(-50%); width:24px; height:28px; border-radius:8px; background:#f1c26d; box-shadow:0 3px 8px rgba(0,0,0,.35); pointer-events:none; transition:left .09s ease-out; }
+    .status { min-height:42px; display:grid; place-items:center; text-align:center; color:#d4ede6; font-size:clamp(12px,1.35vw,15px); line-height:1.35; }
+    .winner { color:#fff0a8; font-weight:900; font-size:clamp(16px,2vw,22px); }
+    footer { text-align:center; color:#9fc2bb; font-size:10px; }
+    .burst { position:fixed; inset:0; pointer-events:none; overflow:hidden; }
+    .burst i { position:absolute; top:-12px; width:9px; height:16px; border-radius:2px; animation:fall 1.25s ease-in forwards; }
+    @keyframes fall { to { transform:translate3d(var(--x),110vh,0) rotate(640deg); opacity:.15; } }
+    @media (max-width:720px) {
+      .shell { gap:7px; padding:7px 9px; }
+      header { gap:7px; }
+      .back,.reset { min-height:36px; padding:0 10px; font-size:11px; border-radius:11px; }
+      .title p { display:none; }
+      main { grid-template-columns:1fr minmax(150px,30vw) 1fr; gap:7px; }
+      .side,.arena { border-radius:15px; }
+      .arena { padding:8px; }
+      .rope-track { height:86px; margin:6px 0 3px; }
+      .rope { top:47px; height:10px; }
+      .knot { top:39px; }
+      .flag { font-size:21px; }
+      .status { min-height:30px; font-size:10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <a class="back" href="./index.html" aria-label="Back to Kerala Play">← Kerala Play</a>
+      <div class="title">
+        <h1>🪢 വടംവലി</h1>
+        <p>വേഗം വേഗം tap ചെയ്യൂ! 30 taps ആദ്യം എത്തുന്ന player ജയിക്കും.</p>
+      </div>
+      <button id="reset" class="reset" type="button">↻ Restart</button>
+    </header>
+
+    <main>
+      <button id="left-side" class="side left" type="button" aria-label="Player 1 tap area">
+        <span class="label">PLAYER 1</span>
+        <strong id="left-score" class="score">0</strong>
+        <span class="tap-hint">TAP FAST</span>
+        <span class="progress"><i id="left-progress"></i></span>
+      </button>
+
+      <section class="arena" aria-live="polite">
+        <div class="target">First to 30 taps</div>
+        <div class="rope-track">
+          <div class="center-line"></div>
+          <div class="flag">🚩</div>
+          <div id="rope" class="rope"></div>
+          <div id="knot" class="knot"></div>
+        </div>
+        <div id="status" class="status">രണ്ടു players-ും tap തുടങ്ങാം!</div>
+      </section>
+
+      <button id="right-side" class="side right" type="button" aria-label="Player 2 tap area">
+        <span class="label">PLAYER 2</span>
+        <strong id="right-score" class="score">0</strong>
+        <span class="tap-hint">TAP FAST</span>
+        <span class="progress"><i id="right-progress"></i></span>
+      </button>
+    </main>
+
+    <footer>Kerala Play · Traditional Games</footer>
+  </div>
+  <div id="burst" class="burst" aria-hidden="true"></div>
+
+  <script>
+    (() => {
+      const WIN = 30;
+      let left = 0;
+      let right = 0;
+      let finished = false;
+
+      const leftSide = document.getElementById('left-side');
+      const rightSide = document.getElementById('right-side');
+      const leftScore = document.getElementById('left-score');
+      const rightScore = document.getElementById('right-score');
+      const leftProgress = document.getElementById('left-progress');
+      const rightProgress = document.getElementById('right-progress');
+      const rope = document.getElementById('rope');
+      const knot = document.getElementById('knot');
+      const status = document.getElementById('status');
+      const burst = document.getElementById('burst');
+
+      function vibrate(ms = 14) {
+        if (navigator.vibrate) navigator.vibrate(ms);
+      }
+
+      function render() {
+        leftScore.textContent = left;
+        rightScore.textContent = right;
+        leftProgress.style.width = Math.min(100, (left / WIN) * 100) + '%';
+        rightProgress.style.width = Math.min(100, (right / WIN) * 100) + '%';
+
+        const diff = right - left;
+        const shift = Math.max(-34, Math.min(34, (diff / WIN) * 34));
+        const position = 50 + shift;
+        rope.style.left = position + '%';
+        knot.style.left = position + '%';
+      }
+
+      function celebrate(side) {
+        burst.replaceChildren();
+        for (let i = 0; i < 42; i++) {
+          const piece = document.createElement('i');
+          piece.style.left = Math.random() * 100 + 'vw';
+          piece.style.setProperty('--x', ((Math.random() - .5) * 170) + 'px');
+          piece.style.animationDelay = (Math.random() * .22) + 's';
+          piece.style.background = ['#f7c948','#39d98a','#ff6673','#75c8ff','#ffffff'][i % 5];
+          burst.appendChild(piece);
+        }
+        status.innerHTML = '<span class="winner">🏆 ' + side + ' ജയിച്ചു!</span>';
+        vibrate(100);
+      }
+
+      function tap(side) {
+        if (finished) return;
+        if (side === 'left') left = Math.min(WIN, left + 1);
+        else right = Math.min(WIN, right + 1);
+        vibrate();
+        render();
+
+        if (left >= WIN || right >= WIN) {
+          finished = true;
+          leftSide.disabled = true;
+          rightSide.disabled = true;
+          celebrate(left >= WIN ? 'PLAYER 1' : 'PLAYER 2');
+          return;
+        }
+
+        const lead = left - right;
+        if (lead === 0) status.textContent = 'Equal fight — keep tapping!';
+        else status.textContent = (lead > 0 ? 'PLAYER 1' : 'PLAYER 2') + ' മുന്നിലാണ് · ' + Math.abs(lead) + ' tap';
+      }
+
+      function reset() {
+        left = 0;
+        right = 0;
+        finished = false;
+        leftSide.disabled = false;
+        rightSide.disabled = false;
+        status.textContent = 'രണ്ടു players-ും tap തുടങ്ങാം!';
+        burst.replaceChildren();
+        render();
+      }
+
+      leftSide.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        tap('left');
+      });
+      rightSide.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        tap('right');
+      });
+      document.getElementById('reset').addEventListener('click', reset);
+      document.addEventListener('contextmenu', event => event.preventDefault());
+
+      render();
+    })();
+  </script>
+</body>
+</html>
