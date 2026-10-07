@@ -129,6 +129,8 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   let user = null;
   let connected = false;
   let source = null;
+  let reconnectTimer = null;
+  let reconnectAttempt = 0;
   let people = [];
   let peopleSignature = '';
   let activePeer = null;
@@ -2556,7 +2558,28 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     earlyCandidates.clear(); receiving.clear(); receiversReady.clear(); worldPlayers.clear();
     audioMount.replaceChildren(); updateVoiceControls(); updateProximityButton();
   }
+  function clearReconnectTimer() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  function scheduleReconnect(delayOverride = null) {
+    if (!user || navigator.onLine === false) return;
+    clearReconnectTimer();
+    const delay = delayOverride ?? Math.min(12000, 1200 * (2 ** Math.min(reconnectAttempt++, 3)));
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      if (!user || navigator.onLine === false) return;
+      wakeProductionBackend();
+      startEvents();
+      run(refreshUser);
+    }, delay);
+  }
   function startEvents() {
+    if (!user || navigator.onLine === false) {
+      setConnection(false);
+      return;
+    }
+    clearReconnectTimer();
     source?.close();
     source = new EventSource('/api/events');
     const events = source;
@@ -2566,10 +2589,22 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       try { const value = JSON.parse(event.data); Promise.resolve(action(value)).catch(error => { if (source === events && version === sessionVersion) report(error); }); }
       catch { /* Ignore malformed event payloads without breaking the stream. */ }
     });
-    events.onopen = () => { if (source !== events || !user) return; setConnection(true); run(refreshPeople, peopleError); };
+    events.onopen = () => {
+      if (source !== events || !user) return;
+      reconnectAttempt = 0;
+      clearReconnectTimer();
+      setConnection(true);
+      run(refreshPeople, peopleError);
+    };
     events.onerror = () => {
       if (source !== events || !user) return;
-      if (connected) { setConnection(false); cleanupVoice(); onDisconnect(); onPlayers([]); run(refreshUser); }
+      const wasConnected = connected;
+      setConnection(false);
+      events.close();
+      if (source === events) source = null;
+      if (wasConnected) { cleanupVoice(); onDisconnect(); onPlayers([]); }
+      run(refreshUser);
+      scheduleReconnect();
     };
     listen('session-revoked', () => {
       endSession('This Kerala Play account was signed in on another device.');
@@ -2608,6 +2643,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
     if (!next) { renderAuth(); return; }
     sessionVersion++;
     cleanupVoice(); clearMessageURLs();
+    clearReconnectTimer(); reconnectAttempt = 0;
     source?.close(); source = null;
     peopleVersion++; groupsVersion++; groupMessageVersion++; messageVersion++; profileVersion++;
     people = []; peopleSignature = ''; groupsSnapshot = { groups: [], invites: [], limits: {} }; activePeer = null; profileId = null; activeGroupId = null;
@@ -2640,6 +2676,7 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
   }
   function endSession(message = '') {
     sessionVersion++;
+    clearReconnectTimer(); reconnectAttempt = 0;
     source?.close(); source = null;
     cleanupVoice(); clearMessageURLs();
     if (notificationsTimer) { clearInterval(notificationsTimer); notificationsTimer = null; }
@@ -3093,7 +3130,24 @@ export function initSocial({ onUser = () => {}, onPlayers = () => {}, onDisconne
       if (!source || source.readyState === EventSource.CLOSED) startEvents();
     });
   });
-  window.addEventListener('pagehide', () => { cleanupVoice(); clearMessageURLs(); source?.close(); });
+  window.addEventListener('offline', () => {
+    clearReconnectTimer();
+    const wasConnected = connected;
+    source?.close(); source = null;
+    setConnection(false);
+    if (wasConnected) { cleanupVoice(); onDisconnect(); onPlayers([]); }
+  });
+  window.addEventListener('online', () => {
+    if (!user) return;
+    wakeProductionBackend();
+    scheduleReconnect(120);
+  });
+  window.addEventListener('kerala-network-restored', () => {
+    if (!user || navigator.onLine === false) return;
+    wakeProductionBackend();
+    scheduleReconnect(80);
+  });
+  window.addEventListener('pagehide', () => { clearReconnectTimer(); cleanupVoice(); clearMessageURLs(); source?.close(); });
   updateProximityButton();
   setConnection(false);
   const initialVersion = sessionVersion;
