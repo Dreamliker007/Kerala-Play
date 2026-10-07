@@ -429,6 +429,12 @@ const GROUP_MEMBER_LIMIT = 12;
 const GROUP_MEMBERSHIP_LIMIT = 8;
 const GROUP_MESSAGE_LIMIT = 100;
 const GROUP_NAME_MAX = 40;
+const VADAMVALI_LEAD_TO_WIN = 30;
+const VADAMVALI_WIN_REWARD = 20;
+const VADAMVALI_DAILY_REWARD_LIMIT = 5;
+const VADAMVALI_PENDING_MS = 5 * 60 * 1000;
+const VADAMVALI_MATCH_MS = 10 * 60 * 1000;
+const VADAMVALI_COUNTDOWN_MS = 3000;
 function freshJobState() { return { active: null, cooldowns: {}, completed: {}, collectibles: { respawnAtById: {} }, garage: { owned: [], selectedId: null, activeVehicleId: null }, traffic: { challans: [], licence: { type: 'none', number: '', issuedAt: 0, validUntil: 0 } }, needs: { hunger: 100, thirst: 100, energy: 100, updatedAt: 0, lastRestAt: 0, lastClinicAt: 0 }, home: { status: 'rented', rentDueAt: 0, utilityDueAt: 0, lastSleepAt: 0, rentPayments: 0, utilityPayments: 0, house: null }, bank: { balance: 0, accountNumber: '', transactions: [] }, notifications: { items: [], read: {} }, reports: [], npcRelations: {}, npcFavors: { active: null, cooldowns: {}, completed: 0 }, communityEvents: { completedIds: [], contributions: 0 } }; }
 const SESSION_AGE = 365 * 24 * 60 * 60 * 1000;
 const AUDIO_MAX = 512 * 1024;
@@ -502,6 +508,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   if (!Array.isArray(db.sessions)) { db.sessions = []; migrated = true; }
   if (!Array.isArray(db.groups)) { db.groups = []; migrated = true; }
   if (!Array.isArray(db.adminAuditLog)) { db.adminAuditLog = []; migrated = true; }
+  if (!Array.isArray(db.vadamvaliMatches)) { db.vadamvaliMatches = []; migrated = true; }
   const existingUserIds = new Set(db.users.map(user => user.id));
   const normalizedGroups = [];
   for (const raw of db.groups) {
@@ -628,6 +635,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       safeDrivingPoints: Math.max(0, Number(user.safeDrivingPoints) || 0),
       emergencyResponses: Math.max(0, Number(user.emergencyResponses) || 0),
       creatorContributions: Math.max(0, Number(user.creatorContributions) || 0),
+      vadamvaliWins: Math.max(0, Number(user.vadamvali?.wins) || 0),
     };
   }
   function progressionProfile(user) {
@@ -691,6 +699,95 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return group;
   }
   function profileChanged(user) { emit(user.id, 'profile', { user: publicUser(user) }); }
+
+  function vadamvaliUserState(user) {
+    if (!user.vadamvali || typeof user.vadamvali !== 'object' || Array.isArray(user.vadamvali)) {
+      user.vadamvali = { wins:0, losses:0, rewardDay:'', rewardedWins:0 };
+      dirty = true;
+    }
+    user.vadamvali.wins = Math.max(0, Math.floor(Number(user.vadamvali.wins) || 0));
+    user.vadamvali.losses = Math.max(0, Math.floor(Number(user.vadamvali.losses) || 0));
+    user.vadamvali.rewardDay = typeof user.vadamvali.rewardDay === 'string' ? user.vadamvali.rewardDay : '';
+    user.vadamvali.rewardedWins = Math.max(0, Math.floor(Number(user.vadamvali.rewardedWins) || 0));
+    return user.vadamvali;
+  }
+  function vadamvaliPhase(match, timestamp = now()) {
+    if (match.status !== 'accepted') return match.status;
+    return timestamp < Number(match.startsAt || 0) ? 'countdown' : 'active';
+  }
+  function cleanupVadamvaliMatches(timestamp = now()) {
+    let changed = false;
+    for (const match of db.vadamvaliMatches) {
+      if (match.status === 'pending' && timestamp - Number(match.createdAt || 0) > VADAMVALI_PENDING_MS) {
+        match.status = 'expired'; match.finishedAt = timestamp; changed = true;
+      } else if (match.status === 'accepted' && timestamp - Number(match.startsAt || 0) > VADAMVALI_MATCH_MS) {
+        match.status = 'expired'; match.finishedAt = timestamp; changed = true;
+      }
+    }
+    if (db.vadamvaliMatches.length > 300) {
+      const open = db.vadamvaliMatches.filter(match => ['pending','accepted'].includes(match.status));
+      const closed = db.vadamvaliMatches.filter(match => !['pending','accepted'].includes(match.status)).sort((a,b) => Number(b.finishedAt || b.createdAt || 0) - Number(a.finishedAt || a.createdAt || 0)).slice(0,200);
+      db.vadamvaliMatches = [...open, ...closed];
+      changed = true;
+    }
+    if (changed) dirty = true;
+    return changed;
+  }
+  function vadamvaliOpenMatch(userId) {
+    cleanupVadamvaliMatches();
+    return db.vadamvaliMatches
+      .filter(match => ['pending','accepted'].includes(match.status) && (match.challengerId === userId || match.opponentId === userId))
+      .sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0] || null;
+  }
+  function vadamvaliMatchView(match, viewerId) {
+    if (!match) return null;
+    const challenger = findUser(match.challengerId), opponent = findUser(match.opponentId);
+    if (!challenger || !opponent) return null;
+    const challengerProfile = publicUser(challenger), opponentProfile = publicUser(opponent);
+    const phase = vadamvaliPhase(match);
+    return {
+      id:match.id,
+      status:phase,
+      createdAt:Number(match.createdAt || 0),
+      acceptedAt:Number(match.acceptedAt || 0),
+      startsAt:Number(match.startsAt || 0),
+      finishedAt:Number(match.finishedAt || 0),
+      leadToWin:VADAMVALI_LEAD_TO_WIN,
+      reward:Number(match.reward || 0),
+      winnerId:match.winnerId || null,
+      challenger:{ id:challenger.id, name:challengerProfile.name, username:challengerProfile.accountUsername, score:Math.max(0, Number(match.scores?.[challenger.id]) || 0) },
+      opponent:{ id:opponent.id, name:opponentProfile.name, username:opponentProfile.accountUsername, score:Math.max(0, Number(match.scores?.[opponent.id]) || 0) },
+      viewerId,
+      youAre:viewerId === challenger.id ? 'challenger' : viewerId === opponent.id ? 'opponent' : 'spectator',
+      canRespond:match.status === 'pending' && viewerId === opponent.id,
+      canCancel:match.status === 'pending' && viewerId === challenger.id,
+      countdownMs:match.status === 'accepted' ? Math.max(0, Number(match.startsAt || 0) - now()) : 0,
+    };
+  }
+  function vadamvaliSummary(user) {
+    cleanupVadamvaliMatches();
+    const stats = vadamvaliUserState(user);
+    const day = new Date(now()).toISOString().slice(0,10);
+    const rewardedWins = stats.rewardDay === day ? stats.rewardedWins : 0;
+    const relevant = db.vadamvaliMatches
+      .filter(match => match.challengerId === user.id || match.opponentId === user.id)
+      .sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    const match = relevant.find(item => ['pending','accepted'].includes(item.status)) || null;
+    return {
+      leadToWin:VADAMVALI_LEAD_TO_WIN,
+      winReward:VADAMVALI_WIN_REWARD,
+      dailyRewardLimit:VADAMVALI_DAILY_REWARD_LIMIT,
+      rewardsRemaining:Math.max(0, VADAMVALI_DAILY_REWARD_LIMIT - rewardedWins),
+      stats:{ wins:stats.wins, losses:stats.losses },
+      match:vadamvaliMatchView(match, user.id),
+      recent:relevant.filter(item => !['pending','accepted'].includes(item.status)).slice(0,5).map(item => vadamvaliMatchView(item, user.id)).filter(Boolean),
+    };
+  }
+  function emitVadamvali(match) {
+    if (!match) return;
+    emit(match.challengerId, 'vadamvali', { matchId:match.id });
+    emit(match.opponentId, 'vadamvali', { matchId:match.id });
+  }
   function worldSnapshot(viewerId) {
     const viewer = findUser(viewerId);
     const viewerDistrict = viewer ? currentWorldDistrict(viewer) : 'Kottayam';
@@ -4479,6 +4576,156 @@ function publicRideDestinationForUser(user, destinationId) {
         requireValue(id !== 'social' || db.follows.some(follow => follow.status === 'accepted' && (follow.from === user.id || follow.to === user.id)), 409, 'Have a follow request accepted first.');
         send(response, 200, await reward(user, id, REWARDS[id])); return;
       }
+      if (path === '/api/games/vadamvali' && request.method === 'GET') {
+        send(response, 200, vadamvaliSummary(user)); return;
+      }
+      if (path === '/api/games/vadamvali/challenge' && request.method === 'POST') {
+        limited(`vadamvali-challenge:${user.id}`, 12, 60000);
+        const body = await jsonBody(request);
+        const peer = requirePeer(user, body.peerId, true);
+        requireValue(!vadamvaliOpenMatch(user.id), 409, 'Finish or cancel your current Vadamvali challenge first.');
+        requireValue(!vadamvaliOpenMatch(peer.id), 409, 'That player already has a Vadamvali challenge.');
+        const match = {
+          id:randomUUID(),
+          challengerId:user.id,
+          opponentId:peer.id,
+          status:'pending',
+          createdAt:now(),
+          acceptedAt:0,
+          startsAt:0,
+          finishedAt:0,
+          winnerId:null,
+          reward:0,
+          scores:{ [user.id]:0, [peer.id]:0 },
+          tapCredits:{ [user.id]:10, [peer.id]:10 },
+          tapUpdatedAt:{ [user.id]:0, [peer.id]:0 },
+        };
+        db.vadamvaliMatches.push(match);
+        dirty = true;
+        addNotification(peer, {
+          sourceKey:`vadamvali-challenge:${match.id}`,
+          kind:'social',
+          title:'Vadamvali challenge',
+          message:`${publicUser(user).name} challenged you to Vadamvali.`,
+          severity:'info',
+          target:'people',
+        });
+        await persist();
+        emitVadamvali(match);
+        send(response, 201, vadamvaliSummary(user)); return;
+      }
+      if (path === '/api/games/vadamvali/respond' && request.method === 'POST') {
+        const body = await jsonBody(request);
+        const match = db.vadamvaliMatches.find(item => item.id === body.matchId);
+        requireValue(match && match.status === 'pending', 404, 'Vadamvali challenge is no longer available.');
+        requireValue(match.opponentId === user.id, 403, 'Only the challenged player can respond.');
+        requireValue(['accept','decline'].includes(body.action), 400, 'Choose accept or decline.');
+        if (body.action === 'decline') {
+          match.status = 'declined';
+          match.finishedAt = now();
+          dirty = true;
+          await persist();
+          emitVadamvali(match);
+          send(response, 200, vadamvaliSummary(user)); return;
+        }
+        const peer = findUser(match.challengerId);
+        requireValue(peer && !blocked(user.id, peer.id) && accepted(user.id, peer.id), 403, 'You must still be connected friends to play.');
+        match.status = 'accepted';
+        match.acceptedAt = now();
+        match.startsAt = now() + VADAMVALI_COUNTDOWN_MS;
+        match.scores = { [match.challengerId]:0, [match.opponentId]:0 };
+        match.tapCredits = { [match.challengerId]:10, [match.opponentId]:10 };
+        match.tapUpdatedAt = { [match.challengerId]:match.startsAt, [match.opponentId]:match.startsAt };
+        dirty = true;
+        await persist();
+        emitVadamvali(match);
+        send(response, 200, vadamvaliSummary(user)); return;
+      }
+      if (path === '/api/games/vadamvali/cancel' && request.method === 'POST') {
+        const body = await jsonBody(request);
+        const match = db.vadamvaliMatches.find(item => item.id === body.matchId);
+        requireValue(match && match.status === 'pending', 404, 'Vadamvali challenge is no longer pending.');
+        requireValue(match.challengerId === user.id, 403, 'Only the challenger can cancel this request.');
+        match.status = 'cancelled';
+        match.finishedAt = now();
+        dirty = true;
+        await persist();
+        emitVadamvali(match);
+        send(response, 200, vadamvaliSummary(user)); return;
+      }
+      if (path === '/api/games/vadamvali/tap' && request.method === 'POST') {
+        limited(`vadamvali-tap:${user.id}`, 120, 10000);
+        const body = await jsonBody(request);
+        const match = db.vadamvaliMatches.find(item => item.id === body.matchId);
+        requireValue(match && match.status === 'accepted', 404, 'Active Vadamvali match not found.');
+        requireValue(match.challengerId === user.id || match.opponentId === user.id, 403, 'You are not in this match.');
+        requireValue(now() >= Number(match.startsAt || 0), 409, 'Wait for GO before tapping.');
+        requireValue(now() - Number(match.startsAt || 0) <= VADAMVALI_MATCH_MS, 409, 'This Vadamvali match expired.');
+        const taps = Number(body.taps ?? 1);
+        requireValue(Number.isInteger(taps) && taps >= 1 && taps <= 6, 400, 'Send between 1 and 6 taps at a time.');
+
+        const timestamp = now();
+        const last = Math.max(Number(match.startsAt || 0), Number(match.tapUpdatedAt?.[user.id] || match.startsAt || 0));
+        const previousCredit = Math.max(0, Number(match.tapCredits?.[user.id]) || 0);
+        const credit = Math.min(12, previousCredit + Math.max(0, timestamp - last) * 0.02);
+        requireValue(credit + 0.001 >= taps, 429, 'Tapping too fast. Keep a steady rhythm.');
+        match.tapCredits[user.id] = Math.max(0, credit - taps);
+        match.tapUpdatedAt[user.id] = timestamp;
+        match.scores[user.id] = Math.max(0, Number(match.scores[user.id]) || 0) + taps;
+
+        const challengerScore = Math.max(0, Number(match.scores[match.challengerId]) || 0);
+        const opponentScore = Math.max(0, Number(match.scores[match.opponentId]) || 0);
+        const lead = challengerScore - opponentScore;
+        if (Math.abs(lead) >= VADAMVALI_LEAD_TO_WIN) {
+          const winner = findUser(lead > 0 ? match.challengerId : match.opponentId);
+          const loser = findUser(lead > 0 ? match.opponentId : match.challengerId);
+          requireValue(winner && loser, 409, 'A player left this match.');
+          const winnerStats = vadamvaliUserState(winner), loserStats = vadamvaliUserState(loser);
+          winnerStats.wins += 1;
+          loserStats.losses += 1;
+          const day = new Date(timestamp).toISOString().slice(0,10);
+          if (winnerStats.rewardDay !== day) {
+            winnerStats.rewardDay = day;
+            winnerStats.rewardedWins = 0;
+          }
+          const reward = winnerStats.rewardedWins < VADAMVALI_DAILY_REWARD_LIMIT ? VADAMVALI_WIN_REWARD : 0;
+          if (reward > 0) {
+            winnerStats.rewardedWins += 1;
+            winner.points = Math.max(0, Number(winner.points || 0)) + reward;
+          }
+          match.status = 'finished';
+          match.finishedAt = timestamp;
+          match.winnerId = winner.id;
+          match.reward = reward;
+          addNotification(winner, {
+            sourceKey:`vadamvali-win:${match.id}`,
+            kind:'event',
+            title:'Vadamvali win 🏆',
+            message:reward > 0 ? `You won by a 30-tap lead and earned ${reward} points.` : 'You won by a 30-tap lead. Today’s reward limit is complete.',
+            severity:'success',
+            target:'events',
+          });
+          addNotification(loser, {
+            sourceKey:`vadamvali-result:${match.id}`,
+            kind:'event',
+            title:'Vadamvali result',
+            message:`${publicUser(winner).name} won this round by a 30-tap lead.`,
+            severity:'info',
+            target:'events',
+          });
+          dirty = true;
+          await persist();
+          profileChanged(winner);
+          emitVadamvali(match);
+          send(response, 200, vadamvaliSummary(user)); return;
+        }
+
+        dirty = true;
+        await persist();
+        emitVadamvali(match);
+        send(response, 200, vadamvaliSummary(user)); return;
+      }
+
       if (path === '/api/games/coconut/start' && request.method === 'POST') {
         await jsonBody(request); limited(`game:${user.id}`, 15, 60000);
         const day = new Date(now()).toISOString().slice(0, 10);
@@ -4527,6 +4774,7 @@ function publicRideDestinationForUser(user, destinationId) {
     }
     for (const [key, slot] of rates) if (slot.until <= now()) rates.delete(key);
     for (const [id, round] of rounds) if (now() - round.startedAt > 120000) rounds.delete(id);
+    cleanupVadamvaliMatches();
     if (dirty) void persist().catch(error => console.error('Save failed:', error.message));
   }, 2000);
   worldTimer.unref(); upkeepTimer.unref();
