@@ -1957,3 +1957,60 @@ test('online Vadamvali challenges friends, wins at a 30-tap lead, rewards points
   assert.equal(restored.data.stats.wins, 1);
   assert.equal(restored.data.recent.find(item => item.id === matchId).opponent.score, 78);
 });
+
+
+test('Vadamvali Quick Match pairs queued players and Rematch works without requiring friendship', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  const a = await signup(alice, 'QuickAlice'), b = await signup(bob, 'QuickBob');
+
+  const firstQueue = await alice('/api/games/vadamvali/quick', { action:'join' });
+  assert.equal(firstQueue.status, 202, JSON.stringify(firstQueue.data));
+  assert.equal(firstQueue.data.quickMatchQueued, true);
+  assert.equal(firstQueue.data.match, null);
+
+  const cancelled = await alice('/api/games/vadamvali/quick', { action:'cancel' });
+  assert.equal(cancelled.status, 200);
+  assert.equal(cancelled.data.quickMatchQueued, false);
+
+  assert.equal((await alice('/api/games/vadamvali/quick', { action:'join' })).status, 202);
+  const paired = await bob('/api/games/vadamvali/quick', { action:'join' });
+  assert.equal(paired.status, 201, JSON.stringify(paired.data));
+  assert.equal(paired.data.quickMatchQueued, false);
+  assert.equal(paired.data.match.source, 'quick');
+  assert.equal(paired.data.match.status, 'countdown');
+  const matchId = paired.data.match.id;
+
+  const aliceMatched = await alice('/api/games/vadamvali');
+  assert.equal(aliceMatched.data.match.id, matchId);
+  assert.equal(aliceMatched.data.match.source, 'quick');
+
+  app.advance(3000);
+  for (let batch = 0; batch < 5; batch++) {
+    const result = await bob('/api/games/vadamvali/tap', { matchId, taps:6 });
+    assert.equal(result.status, 200, JSON.stringify(result.data));
+    app.advance(300);
+  }
+
+  const finishedSummary = await bob('/api/games/vadamvali');
+  const finished = finishedSummary.data.recent.find(item => item.id === matchId);
+  assert.ok(finished);
+  assert.equal(finished.winnerId, b.id);
+  assert.equal(finished.opponent.score, 30);
+  assert.equal(finished.challenger.score, 0);
+
+  const rematch = await bob('/api/games/vadamvali/rematch', { matchId });
+  assert.equal(rematch.status, 201, JSON.stringify(rematch.data));
+  assert.equal(rematch.data.match.source, 'rematch');
+  assert.equal(rematch.data.match.rematchOf, matchId);
+  assert.equal(rematch.data.match.status, 'pending');
+  const rematchId = rematch.data.match.id;
+
+  const incoming = await alice('/api/games/vadamvali');
+  assert.equal(incoming.data.match.id, rematchId);
+  assert.equal(incoming.data.match.canRespond, true);
+
+  const accepted = await alice('/api/games/vadamvali/respond', { matchId:rematchId, action:'accept' });
+  assert.equal(accepted.status, 200, JSON.stringify(accepted.data));
+  assert.equal(accepted.data.match.source, 'rematch');
+  assert.equal(accepted.data.match.status, 'countdown');
+});
