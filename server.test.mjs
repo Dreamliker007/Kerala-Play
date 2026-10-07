@@ -1492,7 +1492,7 @@ test('progression API exposes server-owned recognition and category leaderboards
 
   const categories = await alice('/api/leaderboards');
   assert.equal(categories.status, 200);
-  assert.deepEqual(categories.data.categories.map(item => item.id), ['jobs', 'exploration', 'community', 'safe-driving', 'emergency-response', 'creator']);
+  assert.deepEqual(categories.data.categories.map(item => item.id), ['jobs', 'exploration', 'community', 'safe-driving', 'emergency-response', 'creator', 'vadamvali']);
   assert.equal(categories.data.categories.some(item => /wealth|wallet|cash/i.test(item.id)), false);
 
   const firstSteps = progression.data.recognition.achievements.find(item => item.id === 'first-steps');
@@ -1882,3 +1882,78 @@ test('first three district trips are shared across transport modes and the fixed
   assert.equal(paidTeleport.data.user.worldDistrict, 'Idukki');
 });
 
+
+
+test('online Vadamvali challenges friends, wins at a 30-tap lead, rewards points and persists leaderboard stats', async t => {
+  const app = await setup(t), alice = app.client(), bob = app.client();
+  const a = await signup(alice, 'VadamAlice'), b = await signup(bob, 'VadamBob');
+
+  assert.equal((await alice('/api/games/vadamvali/challenge', { peerId:b.id })).status, 403, 'Only accepted friends can be challenged');
+  assert.equal((await alice(`/api/follows/${b.id}`, { action:'request' })).status, 200);
+  assert.equal((await bob(`/api/follows/${a.id}`, { action:'accept' })).status, 200);
+
+  const challenged = await alice('/api/games/vadamvali/challenge', { peerId:b.id });
+  assert.equal(challenged.status, 201, JSON.stringify(challenged.data));
+  assert.equal(challenged.data.match.status, 'pending');
+  const matchId = challenged.data.match.id;
+
+  const incoming = await bob('/api/games/vadamvali');
+  assert.equal(incoming.data.match.id, matchId);
+  assert.equal(incoming.data.match.canRespond, true);
+  assert.equal((await bob('/api/games/vadamvali/tap', { matchId, taps:1 })).status, 404, 'Pending challenge cannot be tapped');
+
+  const accepted = await bob('/api/games/vadamvali/respond', { matchId, action:'accept' });
+  assert.equal(accepted.status, 200, JSON.stringify(accepted.data));
+  assert.equal(accepted.data.match.status, 'countdown');
+  assert.equal((await alice('/api/games/vadamvali/tap', { matchId, taps:1 })).status, 409, 'Taps before GO are rejected');
+
+  app.advance(3000);
+  assert.equal((await alice('/api/games/vadamvali')).data.match.status, 'active');
+
+  // Keep the match tied all the way to 48–48.
+  for (let cycle = 0; cycle < 8; cycle++) {
+    const left = await alice('/api/games/vadamvali/tap', { matchId, taps:6 });
+    assert.equal(left.status, 200, JSON.stringify(left.data));
+    const right = await bob('/api/games/vadamvali/tap', { matchId, taps:6 });
+    assert.equal(right.status, 200, JSON.stringify(right.data));
+    app.advance(350);
+  }
+  let tied = await alice('/api/games/vadamvali');
+  assert.equal(tied.data.match.challenger.score, 48);
+  assert.equal(tied.data.match.opponent.score, 48);
+  assert.equal(tied.data.match.status, 'active');
+
+  // Bob moves from 48 to 78; only the final batch creates the 30-tap lead.
+  for (let batch = 0; batch < 5; batch++) {
+    const result = await bob('/api/games/vadamvali/tap', { matchId, taps:6 });
+    assert.equal(result.status, 200, JSON.stringify(result.data));
+    app.advance(350);
+  }
+
+  const bobSummary = await bob('/api/games/vadamvali');
+  assert.equal(bobSummary.data.match, null);
+  const finished = bobSummary.data.recent.find(item => item.id === matchId);
+  assert.ok(finished);
+  assert.equal(finished.challenger.score, 48);
+  assert.equal(finished.opponent.score, 78);
+  assert.equal(finished.winnerId, b.id);
+  assert.equal(finished.reward, 20);
+  assert.equal(bobSummary.data.stats.wins, 1);
+  assert.equal(bobSummary.data.stats.losses, 0);
+
+  const aliceSummary = await alice('/api/games/vadamvali');
+  assert.equal(aliceSummary.data.stats.losses, 1);
+  assert.equal((await bob('/api/session')).data.user.points, 20);
+  assert.equal((await alice('/api/session')).data.user.points, 0);
+
+  const board = await bob('/api/leaderboards/vadamvali');
+  assert.equal(board.status, 200);
+  assert.equal(board.data.entries[0].id, b.id);
+  assert.equal(board.data.entries[0].score, 1);
+
+  await app.restart();
+  assert.equal((await bob('/api/session')).data.user.points, 20);
+  const restored = await bob('/api/games/vadamvali');
+  assert.equal(restored.data.stats.wins, 1);
+  assert.equal(restored.data.recent.find(item => item.id === matchId).opponent.score, 78);
+});

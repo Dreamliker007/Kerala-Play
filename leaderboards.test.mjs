@@ -4,7 +4,7 @@ import { categoryLeaderboard, leaderboardCategories } from './leaderboards.mjs';
 
 test('leaderboards stay category-specific and exclude wealth ranking', () => {
   const categories = leaderboardCategories();
-  assert.deepEqual(categories.map(item => item.id), ['jobs', 'exploration', 'community', 'safe-driving', 'emergency-response', 'creator']);
+  assert.deepEqual(categories.map(item => item.id), ['jobs', 'exploration', 'community', 'safe-driving', 'emergency-response', 'creator', 'vadamvali']);
   assert.ok(categories.every(item => !['cash', 'wallet', 'wealth', 'balance'].includes(item.metric)));
 });
 
@@ -31,4 +31,14 @@ test('leaderboard validates category and clamps result limit', () => {
   assert.throws(() => categoryLeaderboard('wealth', []), /Unknown leaderboard category/);
   const players = Array.from({ length: 120 }, (_, index) => ({ id: `p${index}`, name: `P${index}`, stats: { communityContributions: index + 1 } }));
   assert.equal(categoryLeaderboard('community', players, { limit: 1000 }).entries.length, 100);
+});
+
+
+test('Vadamvali leaderboard ranks online wins', () => {
+  const board = categoryLeaderboard('vadamvali', [
+    { id:'p1', name:'Anu', stats:{ vadamvaliWins:3 } },
+    { id:'p2', name:'Binu', stats:{ vadamvaliWins:7 } },
+    { id:'p3', name:'Zero', stats:{ vadamvaliWins:0 } },
+  ]);
+  assert.deepEqual(board.entries.map(item => [item.rank, item.id, item.score]), [[1,'p2',7],[2,'p1',3]]);
 });

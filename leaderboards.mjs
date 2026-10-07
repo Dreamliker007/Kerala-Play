@@ -5,6 +5,7 @@ const CATEGORIES = Object.freeze([
   Object.freeze({ id: 'safe-driving', label: 'Safe Driving', metric: 'safeDrivingPoints' }),
   Object.freeze({ id: 'emergency-response', label: 'Emergency Response', metric: 'emergencyResponses' }),
   Object.freeze({ id: 'creator', label: 'Creator', metric: 'creatorContributions' }),
+  Object.freeze({ id: 'vadamvali', label: 'Vadamvali', metric: 'vadamvaliWins' }),
 ]);
 
 function metricValue(stats, metric) {
