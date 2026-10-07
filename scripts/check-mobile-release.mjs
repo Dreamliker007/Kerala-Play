@@ -14,8 +14,8 @@ const nodeMajor = Number(nodeEngine.match(/\d+/)?.[0] || 0);
 
 if (pkg.version !== release.versionName) errors.push('package.json version ' + pkg.version + ' must match mobile-release.json versionName ' + release.versionName + '.');
 if (nodeMajor < 22) errors.push('Capacitor 8 mobile tooling requires Node 22+, found package engine ' + (nodeEngine || '(missing)') + '.');
-if (!Number.isInteger(Number(release.versionCode)) || Number(release.versionCode) < 2) errors.push('Closed-testing versionCode must be an integer >= 2.');
-if (release.track !== 'closed-testing') errors.push('Expected closed-testing release track, found ' + (release.track || '(missing)') + '.');
+if (!Number.isInteger(Number(release.versionCode)) || Number(release.versionCode) < 2) errors.push('Production versionCode must be an integer >= 2.');
+if (release.track !== 'production') errors.push('Expected production release track, found ' + (release.track || '(missing)') + '.');
 if (config.appId !== 'com.dreamliker007.keralaplay') errors.push('Unexpected appId: ' + config.appId);
 if (config.appName !== 'Kerala Play') errors.push('Unexpected appName: ' + config.appName);
 if (!release.serverUrl?.startsWith('https://')) errors.push('mobile-release.json serverUrl must use HTTPS.');
@@ -71,7 +71,7 @@ if (requireGeneratedAndroid) {
   const versionNameMatches = appGradle.includes('versionName "' + release.versionName + '"') || appGradle.includes('versionName = "' + release.versionName + '"');
   if (!versionCodePattern.test(appGradle)) errors.push('Generated Android versionCode does not match ' + release.versionCode + '.');
   if (!versionNameMatches) errors.push('Generated Android versionName does not match ' + release.versionName + '.');
-  if (!launcherForeground.includes('#B8F19A') || !launcherAdaptive.includes('kerala_play_launcher_foreground')) {
+  if (!launcherForeground.includes('#E5B94C') || !launcherForeground.includes('#4EAD43') || !launcherAdaptive.includes('kerala_play_launcher_foreground')) {
     errors.push('Generated Android Kerala Play launcher branding is incomplete.');
   }
 }
@@ -83,8 +83,8 @@ if (errors.length) {
 }
 
 console.log(requireGeneratedAndroid
-  ? 'Kerala Play generated Android closed-testing project looks ready.'
-  : 'Kerala Play Android closed-testing release configuration looks ready.');
+  ? 'Kerala Play generated Android production project looks ready.'
+  : 'Kerala Play Android production release configuration looks ready.');
 console.log('App: ' + config.appName + ' (' + config.appId + ')');
 console.log('Version: ' + release.versionName + ' (versionCode ' + release.versionCode + ')');
 console.log('Track: ' + release.track);
