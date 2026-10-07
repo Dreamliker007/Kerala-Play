@@ -562,7 +562,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
   }
   const sessions = new Map([...latestSessionByUser.values()].map(item => [item.key, { id: item.id, expires: item.expires }]));
   if (sessions.size !== db.sessions.length) migrated = true;
-  const clients = new Map(), presence = new Map(), rounds = new Map(), rates = new Map(), resetTokens = new Map();
+  const clients = new Map(), presence = new Map(), rounds = new Map(), rates = new Map(), resetTokens = new Map(), vadamvaliQueue = new Map();
   function syncSessionsToDb() {
     db.sessions = [...sessions.entries()]
       .filter(([, session]) => Number(session.expires) > now() && findUser(session.id))
@@ -739,6 +739,36 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       .filter(match => ['pending','accepted'].includes(match.status) && (match.challengerId === userId || match.opponentId === userId))
       .sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0] || null;
   }
+  function cleanupVadamvaliQueue(timestamp = now()) {
+    for (const [userId, joinedAt] of vadamvaliQueue) {
+      if (!findUser(userId) || timestamp - Number(joinedAt || 0) > VADAMVALI_PENDING_MS || vadamvaliOpenMatch(userId)) vadamvaliQueue.delete(userId);
+    }
+  }
+  function createVadamvaliMatch(challengerId, opponentId, { source = 'friend', autoAccept = false, rematchOf = null } = {}) {
+    const timestamp = now();
+    const match = {
+      id:randomUUID(),
+      challengerId,
+      opponentId,
+      source,
+      rematchOf,
+      status:autoAccept ? 'accepted' : 'pending',
+      createdAt:timestamp,
+      acceptedAt:autoAccept ? timestamp : 0,
+      startsAt:autoAccept ? timestamp + VADAMVALI_COUNTDOWN_MS : 0,
+      finishedAt:0,
+      winnerId:null,
+      reward:0,
+      scores:{ [challengerId]:0, [opponentId]:0 },
+      tapCredits:{ [challengerId]:10, [opponentId]:10 },
+      tapUpdatedAt:{ [challengerId]:autoAccept ? timestamp + VADAMVALI_COUNTDOWN_MS : 0, [opponentId]:autoAccept ? timestamp + VADAMVALI_COUNTDOWN_MS : 0 },
+    };
+    db.vadamvaliMatches.push(match);
+    vadamvaliQueue.delete(challengerId);
+    vadamvaliQueue.delete(opponentId);
+    dirty = true;
+    return match;
+  }
   function vadamvaliMatchView(match, viewerId) {
     if (!match) return null;
     const challenger = findUser(match.challengerId), opponent = findUser(match.opponentId);
@@ -748,6 +778,8 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
     return {
       id:match.id,
       status:phase,
+      source:match.source || 'friend',
+      rematchOf:match.rematchOf || null,
       createdAt:Number(match.createdAt || 0),
       acceptedAt:Number(match.acceptedAt || 0),
       startsAt:Number(match.startsAt || 0),
@@ -779,6 +811,7 @@ export async function createGameServer({ dataDir = resolve(ROOT, '.data'), publi
       dailyRewardLimit:VADAMVALI_DAILY_REWARD_LIMIT,
       rewardsRemaining:Math.max(0, VADAMVALI_DAILY_REWARD_LIMIT - rewardedWins),
       stats:{ wins:stats.wins, losses:stats.losses },
+      quickMatchQueued:vadamvaliQueue.has(user.id),
       match:vadamvaliMatchView(match, user.id),
       recent:relevant.filter(item => !['pending','accepted'].includes(item.status)).slice(0,5).map(item => vadamvaliMatchView(item, user.id)).filter(Boolean),
     };
@@ -4579,29 +4612,80 @@ function publicRideDestinationForUser(user, destinationId) {
       if (path === '/api/games/vadamvali' && request.method === 'GET') {
         send(response, 200, vadamvaliSummary(user)); return;
       }
+      if (path === '/api/games/vadamvali/quick' && request.method === 'POST') {
+        limited(`vadamvali-quick:${user.id}`, 30, 60000);
+        const body = await jsonBody(request);
+        const action = body.action || 'join';
+        requireValue(['join','cancel'].includes(action), 400, 'Choose join or cancel.');
+        cleanupVadamvaliQueue();
+        if (action === 'cancel') {
+          vadamvaliQueue.delete(user.id);
+          send(response, 200, vadamvaliSummary(user)); return;
+        }
+        requireValue(!vadamvaliOpenMatch(user.id), 409, 'Finish your current Vadamvali match first.');
+        const candidateEntry = [...vadamvaliQueue.entries()].find(([peerId]) => {
+          if (peerId === user.id || blocked(user.id, peerId) || vadamvaliOpenMatch(peerId)) return false;
+          return !!findUser(peerId);
+        });
+        if (!candidateEntry) {
+          vadamvaliQueue.set(user.id, now());
+          send(response, 202, vadamvaliSummary(user)); return;
+        }
+        const peer = findUser(candidateEntry[0]);
+        requireValue(peer, 404, 'Opponent is no longer available.');
+        const match = createVadamvaliMatch(peer.id, user.id, { source:'quick', autoAccept:true });
+        addNotification(peer, {
+          sourceKey:`vadamvali-quick:${match.id}`,
+          kind:'event',
+          title:'Quick Match found 🪢',
+          message:`You were matched with ${publicUser(user).name}. Get ready!`,
+          severity:'info',
+          target:'events',
+        });
+        addNotification(user, {
+          sourceKey:`vadamvali-quick:${match.id}`,
+          kind:'event',
+          title:'Quick Match found 🪢',
+          message:`You were matched with ${publicUser(peer).name}. Get ready!`,
+          severity:'info',
+          target:'events',
+        });
+        await persist();
+        emitVadamvali(match);
+        send(response, 201, vadamvaliSummary(user)); return;
+      }
+      if (path === '/api/games/vadamvali/rematch' && request.method === 'POST') {
+        limited(`vadamvali-rematch:${user.id}`, 12, 60000);
+        const body = await jsonBody(request);
+        const previous = db.vadamvaliMatches.find(item => item.id === body.matchId);
+        requireValue(previous && previous.status === 'finished', 404, 'Finished Vadamvali match not found.');
+        requireValue(previous.challengerId === user.id || previous.opponentId === user.id, 403, 'You were not in that match.');
+        const peerId = previous.challengerId === user.id ? previous.opponentId : previous.challengerId;
+        const peer = findUser(peerId);
+        requireValue(peer && !blocked(user.id, peerId), 403, 'That opponent is unavailable.');
+        requireValue(!vadamvaliOpenMatch(user.id), 409, 'Finish your current Vadamvali match first.');
+        requireValue(!vadamvaliOpenMatch(peerId), 409, 'That opponent already has a Vadamvali match.');
+        const match = createVadamvaliMatch(user.id, peerId, { source:'rematch', rematchOf:previous.id });
+        addNotification(peer, {
+          sourceKey:`vadamvali-rematch:${match.id}`,
+          kind:'social',
+          title:'Vadamvali rematch?',
+          message:`${publicUser(user).name} wants a rematch.`,
+          severity:'info',
+          target:'people',
+        });
+        await persist();
+        emitVadamvali(match);
+        send(response, 201, vadamvaliSummary(user)); return;
+      }
       if (path === '/api/games/vadamvali/challenge' && request.method === 'POST') {
         limited(`vadamvali-challenge:${user.id}`, 12, 60000);
         const body = await jsonBody(request);
         const peer = requirePeer(user, body.peerId, true);
+        vadamvaliQueue.delete(user.id);
         requireValue(!vadamvaliOpenMatch(user.id), 409, 'Finish or cancel your current Vadamvali challenge first.');
         requireValue(!vadamvaliOpenMatch(peer.id), 409, 'That player already has a Vadamvali challenge.');
-        const match = {
-          id:randomUUID(),
-          challengerId:user.id,
-          opponentId:peer.id,
-          status:'pending',
-          createdAt:now(),
-          acceptedAt:0,
-          startsAt:0,
-          finishedAt:0,
-          winnerId:null,
-          reward:0,
-          scores:{ [user.id]:0, [peer.id]:0 },
-          tapCredits:{ [user.id]:10, [peer.id]:10 },
-          tapUpdatedAt:{ [user.id]:0, [peer.id]:0 },
-        };
-        db.vadamvaliMatches.push(match);
-        dirty = true;
+        const match = createVadamvaliMatch(user.id, peer.id, { source:'friend' });
         addNotification(peer, {
           sourceKey:`vadamvali-challenge:${match.id}`,
           kind:'social',
@@ -4629,7 +4713,8 @@ function publicRideDestinationForUser(user, destinationId) {
           send(response, 200, vadamvaliSummary(user)); return;
         }
         const peer = findUser(match.challengerId);
-        requireValue(peer && !blocked(user.id, peer.id) && accepted(user.id, peer.id), 403, 'You must still be connected friends to play.');
+        requireValue(peer && !blocked(user.id, peer.id), 403, 'This player is unavailable.');
+        if ((match.source || 'friend') === 'friend') requireValue(accepted(user.id, peer.id), 403, 'You must still be connected friends to play.');
         match.status = 'accepted';
         match.acceptedAt = now();
         match.startsAt = now() + VADAMVALI_COUNTDOWN_MS;
@@ -4775,6 +4860,7 @@ function publicRideDestinationForUser(user, destinationId) {
     for (const [key, slot] of rates) if (slot.until <= now()) rates.delete(key);
     for (const [id, round] of rounds) if (now() - round.startedAt > 120000) rounds.delete(id);
     cleanupVadamvaliMatches();
+    cleanupVadamvaliQueue();
     if (dirty) void persist().catch(error => console.error('Save failed:', error.message));
   }, 2000);
   worldTimer.unref(); upkeepTimer.unref();
