@@ -1492,7 +1492,7 @@ test('progression API exposes server-owned recognition and category leaderboards
 
   const categories = await alice('/api/leaderboards');
   assert.equal(categories.status, 200);
-  assert.deepEqual(categories.data.categories.map(item => item.id), ['jobs', 'exploration', 'community', 'safe-driving', 'emergency-response', 'creator']);
+  assert.deepEqual(categories.data.categories.map(item => item.id), ['jobs', 'exploration', 'community', 'safe-driving', 'emergency-response', 'creator', 'vadamvali']);
   assert.equal(categories.data.categories.some(item => /wealth|wallet|cash/i.test(item.id)), false);
 
   const firstSteps = progression.data.recognition.achievements.find(item => item.id === 'first-steps');
