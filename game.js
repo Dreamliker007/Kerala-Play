@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { initSocial, api } from './social.js?v=126.0';
+import { initSocial, api } from './social.js?v=127.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=131.0';
 import { districtCoinPickups, DISTRICT_COIN_PICKUP_RADIUS, DISTRICT_COIN_RESPAWN_MS } from './district-collectibles.js?v=2.0';
@@ -5051,6 +5051,36 @@ try {
   let walkSafeRotation = player.rotation.y;
   let walkSafeReady = !positionBlockedStatic(player.position.x, player.position.z, .48);
   let walkSafeAccumulator = 0;
+
+  function stabilizeWorldView(reason = 'resume') {
+    if (!profile || publicRideInProgress) return;
+    const bounds = currentDistrictInstance().bounds;
+    const x = Number(player.position.x);
+    const z = Number(player.position.z);
+    const invalidPosition = !Number.isFinite(x) || !Number.isFinite(z)
+      || x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ;
+    if (invalidPosition) {
+      placePlayerAtDistrict(profile.worldDistrict || profile.district || 'Kottayam');
+    }
+    const recovered = recoverBlockedPlayerSpawn(player);
+    clearGameInput();
+    walkVelocity.set(0, 0, 0);
+    targetWalkVelocity.set(0, 0, 0);
+    walkSafePosition.copy(player.position);
+    walkSafeRotation = player.rotation.y;
+    walkSafeReady = true;
+    walkingStuckSeconds = 0;
+    resetFollowCameraView();
+    updateMapPlayer(player);
+    if (recovered && reason !== 'startup') showToast('Camera and walking position restored.', 2200);
+  }
+
+  const queueWorldViewStabilization = reason => requestAnimationFrame(() => setTimeout(() => stabilizeWorldView(reason), 40));
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) queueWorldViewStabilization('resume');
+  });
+  window.addEventListener('pageshow', () => queueWorldViewStabilization('pageshow'));
+  window.addEventListener('kerala-network-restored', () => queueWorldViewStabilization('network'));
 
   function clearRidePickupVisual() {
     if (!ridePickupVisual) return;

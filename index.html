@@ -43,6 +43,10 @@
     #camera-zone { position: absolute; right: 0; bottom: 0; width: 52vw; height: 100vh; pointer-events: auto; touch-action: none; }
     #camera-note { position: absolute; z-index:2; right: 122px; bottom: calc(env(safe-area-inset-bottom) + 65px); color: rgba(255,255,255,.87); background: rgba(11,35,45,.42); padding: 6px 8px; border-radius: 8px; font-size: 11px; pointer-events:none; }
     #fallback { display: none; position: fixed; inset: 0; z-index: 5; place-items: center; padding: 24px; background: #16323f; color: white; text-align: center; line-height: 1.5; }
+    #network-status { display:none; position:fixed; z-index:96; top:calc(env(safe-area-inset-top) + 10px); left:50%; transform:translateX(-50%); align-items:center; gap:9px; max-width:min(520px,82vw); padding:8px 10px; border:1px solid rgba(255,225,145,.48); border-radius:12px; background:rgba(39,35,18,.94); color:#fff5c8; box-shadow:0 8px 24px rgba(0,0,0,.3); font:800 10px/1.25 system-ui,sans-serif; pointer-events:auto; }
+    #network-status.show { display:flex; }
+    #network-status[data-state="online"] { border-color:rgba(138,244,184,.5); background:rgba(12,65,47,.94); color:#d9ffe8; }
+    #network-retry { min-height:30px; padding:0 10px; border:1px solid rgba(255,255,255,.34); border-radius:9px; color:inherit; background:rgba(255,255,255,.09); font:900 9px/1 system-ui,sans-serif; cursor:pointer; }
     #camera-zone { z-index: 1; }
     #profile-chip, #progress-chip, #online-chip, #mission-card, #quick-actions, #minimap, #chat-panel, #people-panel, #task-panel, #phone-panel, #events-panel, #wallet-panel, #home-panel, #garage-panel, #jobs-panel, #progression-panel, #settings-panel, #dm-panel, #asset-notice, #toast { z-index: 5; pointer-events: auto; }
     #profile-chip { position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:176px; max-width:180px; padding:8px 10px; border:1px solid rgba(255,255,255,.22); border-radius:11px; background:rgba(8,29,34,.67); color:#fff; font-size:11px; line-height:1.25; cursor:pointer; touch-action:manipulation; }
@@ -1286,12 +1290,16 @@
   <div id="kp-splash" role="status" aria-label="Loading Kerala Play">
     <div class="kp-splash-inner">
       <img id="kp-splash-logo" src="./assets/kerala-play-logo.svg" alt="Kerala Play">
-      <p>Loading your living Kerala</p>
+      <p id="kp-splash-status">Loading your living Kerala</p>
       <div class="kp-loader" aria-hidden="true"></div>
     </div>
   </div>
+  <div id="network-status" role="status" aria-live="polite" aria-atomic="true">
+    <span id="network-status-text">Connection lost. Waiting for internet…</span>
+    <button id="network-retry" type="button">RETRY</button>
+  </div>
   <div id="hud" aria-label="Game controls">
-    <div id="brand"><img class="kp-brand-mark" src="./assets/kerala-play-icon.svg" alt=""><span class="kp-brand-copy"><span class="kp-brand-name">Kerala Play</span></span></div>
+    <div id="brand"><img class="kp-brand-mark" src="./assets/kerala-play-icon.svg" alt=""><span class="kp-brand-copy"><span class="kp-brand-name">Kerala Play</span><span class="kp-brand-version">V116.0</span></span></div>
     <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -1569,6 +1577,6 @@
       syncWardrobeTouchAction();
     })();
   </script>
-  <script type="module" src="./boot.js?v=135.0"></script>
+  <script type="module" src="./boot.js?v=136.0"></script>
 </body>
 </html>

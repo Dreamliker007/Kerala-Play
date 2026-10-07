@@ -1,7 +1,7 @@
 {
-  "versionCode": 14,
-  "versionName": "1.0.13",
-  "track": "closed-testing",
+  "versionCode": 15,
+  "versionName": "1.0.14",
+  "track": "production",
   "serverUrl": "https://keralaplay.in",
-  "notes": "Production-readiness update: district travel and session reliability, mobile performance, and Android release validation"
+  "notes": "V116.0 production update: Kerala Play launcher branding, startup/reconnect recovery, and camera/spawn stability"
 }
