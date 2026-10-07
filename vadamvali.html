@@ -7,79 +7,95 @@
   <meta name="screen-orientation" content="landscape">
   <title>വടംവലി — Kerala Play</title>
   <style>
-    :root { color-scheme: dark; --gold:#f7c948; --green:#39d98a; --red:#ff6673; }
+    :root { color-scheme:dark; --gold:#f7c948; --green:#39d98a; --red:#ff6673; --panel:#07191f; }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
     html,body { margin:0; width:100%; min-height:100%; overflow:hidden; background:#071d24; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; touch-action:manipulation; }
-    body {
-      background:
-        radial-gradient(circle at 50% 15%, rgba(71,153,137,.28), transparent 34%),
-        linear-gradient(180deg,#123d45 0%,#0a2831 52%,#071d24 100%);
-      color:#fff;
-    }
-    .shell { height:100dvh; display:grid; grid-template-rows:auto 1fr auto; padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); gap:10px; }
-    header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-    .back,.reset { min-height:42px; border:1px solid rgba(255,255,255,.28); border-radius:13px; padding:0 14px; color:#fff; background:rgba(5,24,30,.72); font-weight:800; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+    body { background:radial-gradient(circle at 50% 15%,rgba(71,153,137,.28),transparent 34%),linear-gradient(180deg,#123d45 0%,#0a2831 52%,#071d24 100%); color:#fff; }
+    button,a { font:inherit; }
+    .shell { height:100dvh; display:grid; grid-template-rows:auto auto 1fr auto; padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)); gap:8px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .back,.reset,.mode-btn,.small-btn { min-height:38px; border:1px solid rgba(255,255,255,.28); border-radius:12px; padding:0 12px; color:#fff; background:rgba(5,24,30,.76); font-weight:850; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
     .title { text-align:center; min-width:0; }
-    .title h1 { margin:0; font-size:clamp(20px,3vw,34px); line-height:1; }
-    .title p { margin:5px 0 0; color:#c7e6df; font-size:clamp(10px,1.2vw,14px); }
-    main { min-height:0; display:grid; grid-template-columns:1fr minmax(220px,34vw) 1fr; gap:10px; align-items:stretch; }
-    .side {
-      position:relative; min-width:0; border:1px solid rgba(255,255,255,.18); border-radius:20px; overflow:hidden;
-      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; cursor:pointer;
-      box-shadow:0 12px 32px rgba(0,0,0,.22); touch-action:manipulation;
-    }
+    .title h1 { margin:0; font-size:clamp(19px,2.6vw,32px); line-height:1; }
+    .title p { margin:4px 0 0; color:#c7e6df; font-size:clamp(9px,1.1vw,13px); }
+    .mode-bar { display:flex; justify-content:center; gap:8px; }
+    .mode-btn { min-width:104px; min-height:34px; font-size:11px; letter-spacing:.5px; }
+    .mode-btn.active { background:rgba(38,133,91,.96); border-color:#b9ffe1; box-shadow:0 0 0 2px rgba(105,255,184,.12); }
+    main { min-height:0; display:grid; grid-template-columns:1fr minmax(220px,34vw) 1fr; gap:8px; align-items:stretch; }
+    .side { position:relative; min-width:0; border:1px solid rgba(255,255,255,.18); border-radius:18px; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; cursor:pointer; box-shadow:0 12px 32px rgba(0,0,0,.22); touch-action:manipulation; color:#fff; }
     .side.left { background:linear-gradient(145deg,rgba(20,111,86,.92),rgba(10,67,59,.9)); }
     .side.right { background:linear-gradient(145deg,rgba(147,60,54,.92),rgba(92,39,44,.9)); }
-    .side:active { transform:scale(.992); }
-    .side .label { font-size:clamp(14px,2vw,22px); font-weight:900; letter-spacing:.4px; }
-    .score { font-size:clamp(50px,9vw,108px); font-weight:1000; line-height:.9; text-shadow:0 4px 18px rgba(0,0,0,.28); }
-    .tap-hint { font-size:clamp(12px,1.5vw,17px); font-weight:850; color:#eafff6; }
-    .progress { width:min(82%,330px); height:10px; overflow:hidden; border-radius:999px; background:rgba(0,0,0,.3); }
+    .side:active:not(:disabled) { transform:scale(.992); }
+    .side:disabled { cursor:default; opacity:.78; }
+    .side.you { outline:3px solid rgba(255,240,150,.72); outline-offset:-4px; }
+    .side .label { font-size:clamp(13px,1.8vw,21px); font-weight:950; letter-spacing:.3px; }
+    .side .you-tag { min-height:17px; color:#fff0a8; font-size:10px; font-weight:900; letter-spacing:.8px; }
+    .score { font-size:clamp(46px,8vw,96px); font-weight:1000; line-height:.9; text-shadow:0 4px 18px rgba(0,0,0,.28); }
+    .tap-hint { font-size:clamp(11px,1.4vw,16px); font-weight:850; color:#eafff6; }
+    .progress { width:min(82%,330px); height:9px; overflow:hidden; border-radius:999px; background:rgba(0,0,0,.3); }
     .progress > i { display:block; width:0; height:100%; background:linear-gradient(90deg,#fff0a2,var(--gold)); transition:width .08s linear; }
-    .arena {
-      position:relative; min-width:0; border:1px solid rgba(255,255,255,.19); border-radius:20px; background:rgba(4,21,27,.64);
-      display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; overflow:hidden;
-    }
-    .target { color:#ffdf7b; font-weight:900; font-size:12px; letter-spacing:.7px; text-transform:uppercase; }
-    .rope-track { position:relative; width:100%; height:122px; margin:12px 0 8px; }
+    .arena { position:relative; min-width:0; border:1px solid rgba(255,255,255,.19); border-radius:18px; background:rgba(4,21,27,.64); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:12px; overflow:hidden; }
+    .target { color:#ffdf7b; font-weight:900; font-size:11px; letter-spacing:.6px; text-transform:uppercase; text-align:center; }
+    .rope-track { position:relative; width:100%; height:112px; margin:9px 0 5px; }
     .center-line { position:absolute; left:50%; top:0; bottom:0; width:3px; transform:translateX(-50%); background:repeating-linear-gradient(180deg,#fff 0 7px,transparent 7px 13px); opacity:.7; }
-    .flag { position:absolute; left:50%; top:3px; transform:translateX(-50%); font-size:26px; filter:drop-shadow(0 3px 5px rgba(0,0,0,.4)); }
-    .rope {
-      position:absolute; left:50%; top:64px; width:82%; height:13px; transform:translateX(-50%);
-      border-radius:999px; background:repeating-linear-gradient(135deg,#9b633a 0 7px,#c18450 7px 14px);
-      box-shadow:0 4px 8px rgba(0,0,0,.35); transition:left .09s ease-out;
-    }
+    .flag { position:absolute; left:50%; top:2px; transform:translateX(-50%); font-size:25px; filter:drop-shadow(0 3px 5px rgba(0,0,0,.4)); }
+    .rope { position:absolute; left:50%; top:59px; width:82%; height:13px; transform:translateX(-50%); border-radius:999px; background:repeating-linear-gradient(135deg,#9b633a 0 7px,#c18450 7px 14px); box-shadow:0 4px 8px rgba(0,0,0,.35); transition:left .09s ease-out; }
     .rope::before,.rope::after { content:""; position:absolute; top:-5px; width:22px; height:22px; border:4px solid #d5a06f; border-radius:50%; }
     .rope::before { left:-10px; } .rope::after { right:-10px; }
-    .knot { position:absolute; left:50%; top:56px; transform:translateX(-50%); width:24px; height:28px; border-radius:8px; background:#f1c26d; box-shadow:0 3px 8px rgba(0,0,0,.35); pointer-events:none; transition:left .09s ease-out; }
-    .status { min-height:42px; display:grid; place-items:center; text-align:center; color:#d4ede6; font-size:clamp(12px,1.35vw,15px); line-height:1.35; }
-    .winner { color:#fff0a8; font-weight:900; font-size:clamp(16px,2vw,22px); }
-    .countdown {
-      position:absolute; inset:0; z-index:4; display:grid; place-items:center;
-      background:rgba(3,16,21,.72); backdrop-filter:blur(3px);
-      font-size:clamp(64px,14vw,150px); font-weight:1000; color:#fff0a8;
-      text-shadow:0 6px 28px rgba(0,0,0,.55); opacity:0; pointer-events:none;
-      transform:scale(.82); transition:opacity .14s ease, transform .14s ease;
-    }
+    .knot { position:absolute; left:50%; top:51px; transform:translateX(-50%); width:24px; height:28px; border-radius:8px; background:#f1c26d; box-shadow:0 3px 8px rgba(0,0,0,.35); pointer-events:none; transition:left .09s ease-out; }
+    .status { min-height:38px; display:grid; place-items:center; text-align:center; color:#d4ede6; font-size:clamp(11px,1.25vw,14px); line-height:1.35; }
+    .winner { color:#fff0a8; font-weight:950; font-size:clamp(15px,1.9vw,21px); }
+    .countdown { position:absolute; inset:0; z-index:4; display:grid; place-items:center; background:rgba(3,16,21,.72); backdrop-filter:blur(3px); font-size:clamp(62px,13vw,140px); font-weight:1000; color:#fff0a8; text-shadow:0 6px 28px rgba(0,0,0,.55); opacity:0; pointer-events:none; transform:scale(.82); transition:opacity .14s ease,transform .14s ease; }
     .countdown.show { opacity:1; transform:scale(1); }
-    .countdown.go { color:#8dffbd; font-size:clamp(48px,10vw,110px); }
+    .countdown.go { color:#8dffbd; font-size:clamp(44px,9vw,100px); }
     footer { text-align:center; color:#9fc2bb; font-size:10px; }
-    .burst { position:fixed; inset:0; pointer-events:none; overflow:hidden; }
+    .burst { position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:30; }
     .burst i { position:absolute; top:-12px; width:9px; height:16px; border-radius:2px; animation:fall 1.25s ease-in forwards; }
     @keyframes fall { to { transform:translate3d(var(--x),110vh,0) rotate(640deg); opacity:.15; } }
+
+    .online-panel { position:fixed; z-index:20; inset:0; display:none; place-items:center; padding:16px; background:rgba(2,12,16,.72); }
+    .online-panel.open { display:grid; }
+    .online-card { width:min(760px,94vw); max-height:min(82dvh,560px); overflow:auto; padding:14px; border:1px solid rgba(150,255,205,.36); border-radius:18px; background:rgba(5,24,30,.98); box-shadow:0 20px 65px rgba(0,0,0,.5); touch-action:pan-y; }
+    .online-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .online-head h2 { margin:0; font-size:18px; }
+    .online-sub { color:#afd3ca; font-size:11px; margin:2px 0 10px; }
+    .online-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:12px; }
+    .box { border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:10px; background:rgba(255,255,255,.035); }
+    .box h3 { margin:0 0 8px; font-size:13px; color:#ffe58b; }
+    .friend,.rank,.challenge-card { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-top:1px solid rgba(255,255,255,.08); }
+    .friend:first-of-type,.rank:first-of-type { border-top:0; }
+    .friend-info,.rank-info { min-width:0; }
+    .friend-info strong,.rank-info strong { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+    .friend-info small,.rank-info small { color:#9fc6bc; font-size:10px; }
+    .challenge-actions { display:flex; gap:7px; flex-wrap:wrap; }
+    .small-btn { min-height:31px; padding:0 10px; border-radius:9px; font-size:10px; }
+    .small-btn.primary { background:rgba(38,133,91,.95); border-color:#a9ffd3; }
+    .small-btn.danger { background:rgba(132,52,58,.9); border-color:#ffb6bd; }
+    .empty { padding:10px 0; color:#9fc2bb; font-size:11px; }
+    .online-error { min-height:18px; margin-top:8px; color:#ffb8bd; font-size:10px; }
+    .stats-row { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+    .stat-pill { padding:6px 8px; border-radius:9px; background:rgba(255,255,255,.07); font-size:10px; color:#d9eee8; }
+    .live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#43df89; margin-right:5px; box-shadow:0 0 7px rgba(67,223,137,.7); }
+
     @media (max-width:720px) {
-      .shell { gap:7px; padding:7px 9px; }
-      header { gap:7px; }
-      .back,.reset { min-height:36px; padding:0 10px; font-size:11px; border-radius:11px; }
+      .shell { gap:5px; padding:6px 8px; }
+      header { gap:6px; }
+      .back,.reset { min-height:33px; padding:0 9px; font-size:10px; border-radius:10px; }
       .title p { display:none; }
-      main { grid-template-columns:1fr minmax(150px,30vw) 1fr; gap:7px; }
-      .side,.arena { border-radius:15px; }
-      .arena { padding:8px; }
-      .rope-track { height:86px; margin:6px 0 3px; }
-      .rope { top:47px; height:10px; }
-      .knot { top:39px; }
-      .flag { font-size:21px; }
-      .status { min-height:30px; font-size:10px; }
+      .mode-bar { position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:3; pointer-events:auto; }
+      .mode-btn { min-width:70px; min-height:29px; padding:0 8px; font-size:9px; }
+      main { grid-template-columns:1fr minmax(145px,29vw) 1fr; gap:5px; }
+      .side,.arena { border-radius:13px; }
+      .arena { padding:7px; }
+      .rope-track { height:78px; margin:4px 0 2px; }
+      .rope { top:42px; height:10px; }
+      .knot { top:34px; }
+      .flag { font-size:20px; }
+      .status { min-height:27px; font-size:9px; }
+      .online-card { padding:10px; max-height:88dvh; }
+      .online-grid { grid-template-columns:1fr 1fr; gap:8px; }
+      .box { padding:8px; }
+      .online-sub { display:none; }
     }
   </style>
 </head>
@@ -89,21 +105,27 @@
       <a class="back" href="./index.html" aria-label="Back to Kerala Play">← Kerala Play</a>
       <div class="title">
         <h1>🪢 വടംവലി</h1>
-        <p>വേഗം വേഗം tap ചെയ്യൂ! Opponent-നെക്കാൾ 30 taps lead കിട്ടുന്ന player ജയിക്കും.</p>
+        <p>Opponent-നെക്കാൾ 30 taps lead കിട്ടുന്ന player ജയിക്കും.</p>
       </div>
       <button id="reset" class="reset" type="button">↻ Restart</button>
     </header>
 
+    <div class="mode-bar" aria-label="Vadamvali game mode">
+      <button id="local-mode" class="mode-btn active" type="button">LOCAL</button>
+      <button id="online-mode" class="mode-btn" type="button">ONLINE 1v1</button>
+    </div>
+
     <main>
-      <button id="left-side" class="side left" type="button" aria-label="Player 1 tap area">
-        <span class="label">PLAYER 1</span>
+      <button id="left-side" class="side left" type="button" aria-label="Left player tap area">
+        <span id="left-label" class="label">PLAYER 1</span>
+        <span id="left-you" class="you-tag"></span>
         <strong id="left-score" class="score">0</strong>
-        <span class="tap-hint">TAP FAST</span>
+        <span id="left-hint" class="tap-hint">TAP FAST</span>
         <span class="progress"><i id="left-progress"></i></span>
       </button>
 
       <section class="arena" aria-live="polite">
-        <div class="target">Get a 30-tap lead to win</div>
+        <div id="target" class="target">Get a 30-tap lead to win</div>
         <div class="rope-track">
           <div class="center-line"></div>
           <div class="flag">🚩</div>
@@ -114,59 +136,142 @@
         <div id="countdown" class="countdown" aria-live="assertive"></div>
       </section>
 
-      <button id="right-side" class="side right" type="button" aria-label="Player 2 tap area">
-        <span class="label">PLAYER 2</span>
+      <button id="right-side" class="side right" type="button" aria-label="Right player tap area">
+        <span id="right-label" class="label">PLAYER 2</span>
+        <span id="right-you" class="you-tag"></span>
         <strong id="right-score" class="score">0</strong>
-        <span class="tap-hint">TAP FAST</span>
+        <span id="right-hint" class="tap-hint">TAP FAST</span>
         <span class="progress"><i id="right-progress"></i></span>
       </button>
     </main>
 
-    <footer>Kerala Play · Traditional Games</footer>
+    <footer>Kerala Play · Traditional Games · Online wins: 20 points (first 5 rewarded wins/day)</footer>
   </div>
+
+  <section id="online-panel" class="online-panel" aria-label="Online Vadamvali lobby">
+    <div class="online-card">
+      <div class="online-head">
+        <div>
+          <h2>🪢 Online Vadamvali</h2>
+          <div id="online-account" class="online-sub">Checking Kerala Play account…</div>
+        </div>
+        <div class="challenge-actions">
+          <button id="online-refresh" class="small-btn" type="button">Refresh</button>
+          <button id="online-close" class="small-btn" type="button">Close</button>
+        </div>
+      </div>
+
+      <div id="online-stats" class="stats-row"></div>
+      <div id="challenge-area" class="box" hidden></div>
+
+      <div class="online-grid">
+        <div class="box">
+          <h3>Friends</h3>
+          <div id="friends-list"><div class="empty">Loading friends…</div></div>
+        </div>
+        <div class="box">
+          <h3>🏆 Vadamvali Leaderboard</h3>
+          <div id="leaderboard-list"><div class="empty">Loading leaderboard…</div></div>
+        </div>
+      </div>
+      <div id="online-error" class="online-error" role="status"></div>
+    </div>
+  </section>
+
   <div id="burst" class="burst" aria-hidden="true"></div>
 
   <script>
     (() => {
       const LEAD_TO_WIN = 30;
-      let left = 0;
-      let right = 0;
-      let finished = false;
-      let ready = false;
-      let countdownTimer = null;
+      let mode = 'local';
+      let localLeft = 0;
+      let localRight = 0;
+      let localFinished = false;
+      let localReady = false;
+      let localCountdownTimer = null;
+
+      let sessionUser = null;
+      let onlineSummary = null;
+      let onlineMatch = null;
+      let onlineResult = null;
+      let friends = [];
+      let onlinePendingTaps = 0;
+      let onlineInFlightTaps = 0;
+      let onlineSending = false;
+      let onlinePollTimer = null;
+      let onlineEventSource = null;
+      let lastOnlineMatchId = null;
+      let resultCelebratedId = null;
 
       const leftSide = document.getElementById('left-side');
       const rightSide = document.getElementById('right-side');
+      const leftLabel = document.getElementById('left-label');
+      const rightLabel = document.getElementById('right-label');
+      const leftYou = document.getElementById('left-you');
+      const rightYou = document.getElementById('right-you');
+      const leftHint = document.getElementById('left-hint');
+      const rightHint = document.getElementById('right-hint');
       const leftScore = document.getElementById('left-score');
       const rightScore = document.getElementById('right-score');
       const leftProgress = document.getElementById('left-progress');
       const rightProgress = document.getElementById('right-progress');
       const rope = document.getElementById('rope');
       const knot = document.getElementById('knot');
+      const target = document.getElementById('target');
       const status = document.getElementById('status');
       const countdown = document.getElementById('countdown');
       const burst = document.getElementById('burst');
+      const reset = document.getElementById('reset');
+      const localMode = document.getElementById('local-mode');
+      const onlineMode = document.getElementById('online-mode');
+      const onlinePanel = document.getElementById('online-panel');
+      const onlineAccount = document.getElementById('online-account');
+      const onlineStats = document.getElementById('online-stats');
+      const challengeArea = document.getElementById('challenge-area');
+      const friendsList = document.getElementById('friends-list');
+      const leaderboardList = document.getElementById('leaderboard-list');
+      const onlineError = document.getElementById('online-error');
 
       function vibrate(ms = 14) {
         if (navigator.vibrate) navigator.vibrate(ms);
       }
 
-      function render() {
-        leftScore.textContent = left;
-        rightScore.textContent = right;
-        const leftLead = Math.max(0, left - right);
-        const rightLead = Math.max(0, right - left);
-        leftProgress.style.width = Math.min(100, (leftLead / LEAD_TO_WIN) * 100) + '%';
-        rightProgress.style.width = Math.min(100, (rightLead / LEAD_TO_WIN) * 100) + '%';
+      function safeText(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
+      }
 
+      async function api(path, body) {
+        const options = { credentials:'same-origin', headers:{ Accept:'application/json' } };
+        if (body !== undefined) {
+          options.method = 'POST';
+          options.headers['Content-Type'] = 'application/json';
+          options.body = JSON.stringify(body);
+        }
+        const response = await fetch(path, options);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = new Error(data.error || 'Kerala Play request failed.');
+          error.status = response.status;
+          throw error;
+        }
+        return data;
+      }
+
+      function setRope(left, right) {
         const diff = right - left;
         const shift = Math.max(-34, Math.min(34, (diff / LEAD_TO_WIN) * 34));
         const position = 50 + shift;
         rope.style.left = position + '%';
         knot.style.left = position + '%';
+        const leftLead = Math.max(0, left - right);
+        const rightLead = Math.max(0, right - left);
+        leftProgress.style.width = Math.min(100, (leftLead / LEAD_TO_WIN) * 100) + '%';
+        rightProgress.style.width = Math.min(100, (rightLead / LEAD_TO_WIN) * 100) + '%';
       }
 
-      function celebrate(side) {
+      function celebrate(label, id = '') {
+        if (id && resultCelebratedId === id) return;
+        if (id) resultCelebratedId = id;
         burst.replaceChildren();
         for (let i = 0; i < 42; i++) {
           const piece = document.createElement('i');
@@ -176,92 +281,444 @@
           piece.style.background = ['#f7c948','#39d98a','#ff6673','#75c8ff','#ffffff'][i % 5];
           burst.appendChild(piece);
         }
-        status.innerHTML = '<span class="winner">🏆 ' + side + ' ജയിച്ചു!</span>';
+        status.innerHTML = '<span class="winner">🏆 ' + safeText(label) + ' ജയിച്ചു!</span>';
         vibrate(100);
       }
 
-      function tap(side) {
-        if (finished || !ready) return;
-        if (side === 'left') left += 1;
-        else right += 1;
-        vibrate();
-        render();
+      function renderLocal() {
+        leftLabel.textContent = 'PLAYER 1';
+        rightLabel.textContent = 'PLAYER 2';
+        leftYou.textContent = '';
+        rightYou.textContent = '';
+        leftHint.textContent = 'TAP FAST';
+        rightHint.textContent = 'TAP FAST';
+        leftScore.textContent = localLeft;
+        rightScore.textContent = localRight;
+        leftSide.classList.remove('you');
+        rightSide.classList.remove('you');
+        setRope(localLeft, localRight);
+        leftSide.disabled = localFinished || !localReady;
+        rightSide.disabled = localFinished || !localReady;
+        target.textContent = 'Get a 30-tap lead to win';
+      }
 
-        const lead = left - right;
+      function localTap(side) {
+        if (localFinished || !localReady) return;
+        if (side === 'left') localLeft += 1;
+        else localRight += 1;
+        vibrate();
+        renderLocal();
+        const lead = localLeft - localRight;
         if (Math.abs(lead) >= LEAD_TO_WIN) {
-          finished = true;
-          leftSide.disabled = true;
-          rightSide.disabled = true;
+          localFinished = true;
+          renderLocal();
           celebrate(lead > 0 ? 'PLAYER 1' : 'PLAYER 2');
           return;
         }
-
-        if (lead === 0) status.textContent = 'Equal fight — keep tapping!';
-        else status.textContent = (lead > 0 ? 'PLAYER 1' : 'PLAYER 2') + ' മുന്നിലാണ് · ' + Math.abs(lead) + '/30 tap lead';
+        status.textContent = lead === 0 ? 'Equal fight — keep tapping!' : (lead > 0 ? 'PLAYER 1' : 'PLAYER 2') + ' മുന്നിലാണ് · ' + Math.abs(lead) + '/30 tap lead';
       }
 
-      function startCountdown() {
-        clearTimeout(countdownTimer);
-        ready = false;
-        leftSide.disabled = true;
-        rightSide.disabled = true;
+      function startLocalCountdown() {
+        clearTimeout(localCountdownTimer);
+        localReady = false;
+        localFinished = false;
+        renderLocal();
         status.textContent = 'Ready...';
         countdown.className = 'countdown show';
-
-        const steps = ['3', '2', '1', 'GO!'];
+        const steps = ['3','2','1','GO!'];
         let index = 0;
-
         const next = () => {
           countdown.textContent = steps[index];
           countdown.className = 'countdown show' + (steps[index] === 'GO!' ? ' go' : '');
           vibrate(steps[index] === 'GO!' ? 60 : 20);
-
           if (steps[index] === 'GO!') {
-            countdownTimer = setTimeout(() => {
+            localCountdownTimer = setTimeout(() => {
               countdown.className = 'countdown';
               countdown.textContent = '';
-              ready = true;
-              leftSide.disabled = false;
-              rightSide.disabled = false;
+              localReady = true;
               status.textContent = 'GO! വേഗം tap ചെയ്യൂ!';
-            }, 520);
+              renderLocal();
+            }, 500);
             return;
           }
-
           index += 1;
-          countdownTimer = setTimeout(next, 760);
+          localCountdownTimer = setTimeout(next, 760);
         };
-
         next();
       }
 
-      function reset() {
-        clearTimeout(countdownTimer);
-        left = 0;
-        right = 0;
-        finished = false;
-        ready = false;
-        leftSide.disabled = true;
-        rightSide.disabled = true;
-        status.textContent = 'Countdown കഴിഞ്ഞാൽ tap തുടങ്ങാം!';
+      function resetLocal() {
+        localLeft = 0;
+        localRight = 0;
         burst.replaceChildren();
-        render();
-        startCountdown();
+        resultCelebratedId = null;
+        startLocalCountdown();
       }
 
-      leftSide.addEventListener('pointerdown', (event) => {
-        event.preventDefault();
-        tap('left');
-      });
-      rightSide.addEventListener('pointerdown', (event) => {
-        event.preventDefault();
-        tap('right');
-      });
-      document.getElementById('reset').addEventListener('click', reset);
-      document.addEventListener('contextmenu', event => event.preventDefault());
+      function participant(match, side) {
+        return side === 'left' ? match.challenger : match.opponent;
+      }
 
-      render();
-      startCountdown();
+      function optimisticOnlineScores(match) {
+        if (!match) return [0,0];
+        let left = Number(match.challenger.score || 0);
+        let right = Number(match.opponent.score || 0);
+        if (sessionUser) {
+          const extra = onlinePendingTaps + onlineInFlightTaps;
+          if (match.challenger.id === sessionUser.id) left += extra;
+          if (match.opponent.id === sessionUser.id) right += extra;
+        }
+        return [left,right];
+      }
+
+      function onlineCanTap() {
+        return !!(mode === 'online' && onlineMatch && sessionUser && Date.now() >= Number(onlineMatch.startsAt || 0) && ['active','countdown'].includes(onlineMatch.status) && !onlineResult);
+      }
+
+      function renderOnlineArena() {
+        countdown.className = 'countdown';
+        countdown.textContent = '';
+        leftSide.classList.remove('you');
+        rightSide.classList.remove('you');
+
+        const displayMatch = onlineMatch || onlineResult;
+        if (!displayMatch) {
+          leftLabel.textContent = 'PLAYER 1';
+          rightLabel.textContent = 'PLAYER 2';
+          leftYou.textContent = '';
+          rightYou.textContent = '';
+          leftScore.textContent = '0';
+          rightScore.textContent = '0';
+          leftHint.textContent = 'WAITING';
+          rightHint.textContent = 'WAITING';
+          setRope(0,0);
+          leftSide.disabled = true;
+          rightSide.disabled = true;
+          status.textContent = sessionUser ? 'ONLINE lobby-il friend-ne challenge cheyyൂ.' : 'Kerala Play-il sign in cheyyണം.';
+          target.textContent = 'Online 1v1 · 30-tap lead wins';
+          return;
+        }
+
+        leftLabel.textContent = displayMatch.challenger.name || displayMatch.challenger.username || 'PLAYER 1';
+        rightLabel.textContent = displayMatch.opponent.name || displayMatch.opponent.username || 'PLAYER 2';
+        const amLeft = sessionUser?.id === displayMatch.challenger.id;
+        const amRight = sessionUser?.id === displayMatch.opponent.id;
+        leftYou.textContent = amLeft ? 'YOU' : '';
+        rightYou.textContent = amRight ? 'YOU' : '';
+        leftSide.classList.toggle('you', !!amLeft);
+        rightSide.classList.toggle('you', !!amRight);
+
+        const [left,right] = optimisticOnlineScores(displayMatch);
+        leftScore.textContent = left;
+        rightScore.textContent = right;
+        setRope(left,right);
+
+        leftHint.textContent = amLeft && onlineCanTap() ? 'TAP FAST' : (amLeft ? 'YOU' : 'OPPONENT');
+        rightHint.textContent = amRight && onlineCanTap() ? 'TAP FAST' : (amRight ? 'YOU' : 'OPPONENT');
+        leftSide.disabled = !(amLeft && onlineCanTap());
+        rightSide.disabled = !(amRight && onlineCanTap());
+        target.textContent = 'Online 1v1 · First to 30-tap lead';
+
+        if (onlineResult) {
+          leftSide.disabled = true;
+          rightSide.disabled = true;
+          const winner = onlineResult.winnerId === onlineResult.challenger.id ? onlineResult.challenger : onlineResult.opponent;
+          const wonByMe = winner?.id === sessionUser?.id;
+          const rewardText = wonByMe && Number(onlineResult.reward || 0) > 0 ? ' · +' + onlineResult.reward + ' points' : '';
+          status.innerHTML = '<span class="winner">🏆 ' + safeText(winner?.name || 'Winner') + ' won' + safeText(rewardText) + '</span>';
+          if (winner) celebrate(winner.name || 'Winner', onlineResult.id);
+          return;
+        }
+
+        if (onlineMatch.status === 'pending') {
+          leftSide.disabled = true;
+          rightSide.disabled = true;
+          status.textContent = onlineMatch.canRespond ? 'Challenge received — Accept ചെയ്യൂ.' : 'Friend accept ചെയ്യുന്നതിന് wait ചെയ്യുന്നു…';
+          return;
+        }
+
+        const remaining = Number(onlineMatch.startsAt || 0) - Date.now();
+        if (remaining > 0) {
+          const number = Math.max(1, Math.ceil(remaining / 1000));
+          countdown.textContent = String(number);
+          countdown.className = 'countdown show';
+          status.textContent = 'Online match starting…';
+          leftSide.disabled = true;
+          rightSide.disabled = true;
+        } else {
+          status.textContent = 'GO! 30-tap lead നേടൂ!';
+        }
+      }
+
+      function renderOnlineStats() {
+        if (!onlineSummary) {
+          onlineStats.replaceChildren();
+          return;
+        }
+        onlineStats.innerHTML =
+          '<span class="stat-pill"><span class="live-dot"></span>Online</span>' +
+          '<span class="stat-pill">Wins: ' + Number(onlineSummary.stats?.wins || 0) + '</span>' +
+          '<span class="stat-pill">Losses: ' + Number(onlineSummary.stats?.losses || 0) + '</span>' +
+          '<span class="stat-pill">Reward wins left today: ' + Number(onlineSummary.rewardsRemaining || 0) + '</span>';
+      }
+
+      function renderChallengeArea() {
+        const match = onlineMatch;
+        if (!match || !sessionUser) {
+          challengeArea.hidden = true;
+          challengeArea.replaceChildren();
+          return;
+        }
+        challengeArea.hidden = false;
+        const other = match.challenger.id === sessionUser.id ? match.opponent : match.challenger;
+        if (match.status === 'pending' && match.canRespond) {
+          challengeArea.innerHTML =
+            '<div class="challenge-card"><div><strong>Challenge from ' + safeText(other.name) + '</strong><div class="online-sub">30-tap lead wins · Winner reward up to 20 points</div></div>' +
+            '<div class="challenge-actions"><button id="accept-challenge" class="small-btn primary">Accept</button><button id="decline-challenge" class="small-btn danger">Decline</button></div></div>';
+          document.getElementById('accept-challenge').onclick = () => respondChallenge('accept');
+          document.getElementById('decline-challenge').onclick = () => respondChallenge('decline');
+        } else if (match.status === 'pending') {
+          challengeArea.innerHTML =
+            '<div class="challenge-card"><div><strong>Waiting for ' + safeText(other.name) + '</strong><div class="online-sub">Challenge sent</div></div>' +
+            '<button id="cancel-challenge" class="small-btn danger">Cancel</button></div>';
+          document.getElementById('cancel-challenge').onclick = cancelChallenge;
+        } else {
+          challengeArea.innerHTML =
+            '<div class="challenge-card"><div><strong>Match with ' + safeText(other.name) + '</strong><div class="online-sub">Game screen active · lobby closes automatically</div></div></div>';
+        }
+      }
+
+      function renderFriends() {
+        if (!sessionUser) {
+          friendsList.innerHTML = '<div class="empty">Sign in to Kerala Play to challenge friends.</div>';
+          return;
+        }
+        const available = friends.filter(person => person.canMessage && !person.blocked);
+        if (!available.length) {
+          friendsList.innerHTML = '<div class="empty">Accepted friends ഒന്നും ഇല്ല. Kerala Play People-il ആദ്യം friend connect ചെയ്യൂ.</div>';
+          return;
+        }
+        friendsList.innerHTML = available.map(person =>
+          '<div class="friend"><div class="friend-info"><strong>' + safeText(person.name || person.username) + '</strong><small>' + (person.online ? '● Online' : 'Offline') + ' · ' + safeText(person.relationship || 'friend') + '</small></div>' +
+          '<button class="small-btn primary challenge-friend" data-id="' + safeText(person.id) + '"' + (onlineMatch ? ' disabled' : '') + '>Challenge</button></div>'
+        ).join('');
+        for (const button of friendsList.querySelectorAll('.challenge-friend')) {
+          button.onclick = () => challengeFriend(button.dataset.id);
+        }
+      }
+
+      function renderLeaderboard(entries = []) {
+        if (!entries.length) {
+          leaderboardList.innerHTML = '<div class="empty">No Vadamvali wins yet.</div>';
+          return;
+        }
+        leaderboardList.innerHTML = entries.slice(0,10).map(entry =>
+          '<div class="rank"><div class="rank-info"><strong>#' + entry.rank + ' ' + safeText(entry.name || entry.username) + '</strong><small>' + entry.score + ' wins</small></div></div>'
+        ).join('');
+      }
+
+      function applyOnlineSummary(summary) {
+        const previousId = onlineMatch?.id || lastOnlineMatchId;
+        onlineSummary = summary;
+        onlineMatch = summary?.match || null;
+        if (onlineMatch) {
+          lastOnlineMatchId = onlineMatch.id;
+          onlineResult = null;
+          if (onlineMatch.status !== 'pending') onlinePanel.classList.remove('open');
+        } else if (previousId) {
+          const result = (summary?.recent || []).find(item => item.id === previousId && item.status === 'finished');
+          if (result) {
+            onlineResult = result;
+            lastOnlineMatchId = result.id;
+            onlinePanel.classList.remove('open');
+            onlinePendingTaps = 0;
+            onlineInFlightTaps = 0;
+          }
+        }
+        renderOnlineStats();
+        renderChallengeArea();
+        renderFriends();
+        if (mode === 'online') renderOnlineArena();
+      }
+
+      async function refreshOnlineState({ full = false } = {}) {
+        if (mode !== 'online' && !full) return;
+        try {
+          onlineError.textContent = '';
+          const session = await api('/api/session');
+          sessionUser = session.user;
+          onlineAccount.textContent = sessionUser ? 'Signed in as ' + (sessionUser.name || sessionUser.username) : 'Not signed in';
+          if (!sessionUser) {
+            onlineSummary = null;
+            onlineMatch = null;
+            renderOnlineArena();
+            renderOnlineStats();
+            renderFriends();
+            leaderboardList.innerHTML = '<div class="empty">Sign in first.</div>';
+            onlinePanel.classList.add('open');
+            return;
+          }
+          const requests = [api('/api/games/vadamvali')];
+          if (full) requests.push(api('/api/people'), api('/api/leaderboards/vadamvali'));
+          const results = await Promise.all(requests);
+          applyOnlineSummary(results[0]);
+          if (full) {
+            friends = results[1].people || [];
+            renderFriends();
+            renderLeaderboard(results[2].entries || []);
+          }
+        } catch (error) {
+          onlineError.textContent = error.message;
+        }
+      }
+
+      async function challengeFriend(peerId) {
+        try {
+          onlineError.textContent = '';
+          const summary = await api('/api/games/vadamvali/challenge', { peerId });
+          applyOnlineSummary(summary);
+        } catch (error) {
+          onlineError.textContent = error.message;
+        }
+      }
+
+      async function respondChallenge(action) {
+        if (!onlineMatch) return;
+        try {
+          onlineError.textContent = '';
+          const summary = await api('/api/games/vadamvali/respond', { matchId:onlineMatch.id, action });
+          applyOnlineSummary(summary);
+        } catch (error) {
+          onlineError.textContent = error.message;
+        }
+      }
+
+      async function cancelChallenge() {
+        if (!onlineMatch) return;
+        try {
+          onlineError.textContent = '';
+          const summary = await api('/api/games/vadamvali/cancel', { matchId:onlineMatch.id });
+          applyOnlineSummary(summary);
+          await refreshOnlineState({ full:true });
+        } catch (error) {
+          onlineError.textContent = error.message;
+        }
+      }
+
+      function queueOnlineTap() {
+        if (!onlineCanTap() || !onlineMatch || !sessionUser) return;
+        onlinePendingTaps += 1;
+        vibrate();
+        renderOnlineArena();
+        flushOnlineTaps();
+      }
+
+      async function flushOnlineTaps() {
+        if (onlineSending || onlinePendingTaps <= 0 || !onlineMatch) return;
+        onlineSending = true;
+        const matchId = onlineMatch.id;
+        const batch = Math.min(6, onlinePendingTaps);
+        onlinePendingTaps -= batch;
+        onlineInFlightTaps += batch;
+        try {
+          const summary = await api('/api/games/vadamvali/tap', { matchId, taps:batch });
+          onlineInFlightTaps = Math.max(0, onlineInFlightTaps - batch);
+          applyOnlineSummary(summary);
+        } catch (error) {
+          onlineInFlightTaps = Math.max(0, onlineInFlightTaps - batch);
+          if (error.status === 429) onlinePendingTaps += batch;
+          onlineError.textContent = error.message;
+        } finally {
+          onlineSending = false;
+          renderOnlineArena();
+          if (onlinePendingTaps > 0 && onlineMatch?.id === matchId) setTimeout(flushOnlineTaps, 90);
+        }
+      }
+
+      function openOnlineLobby() {
+        onlinePanel.classList.add('open');
+        refreshOnlineState({ full:true });
+      }
+
+      function setMode(next) {
+        mode = next;
+        localMode.classList.toggle('active', mode === 'local');
+        onlineMode.classList.toggle('active', mode === 'online');
+        reset.textContent = mode === 'local' ? '↻ Restart' : '↻ Lobby';
+        burst.replaceChildren();
+        countdown.className = 'countdown';
+        countdown.textContent = '';
+        if (mode === 'local') {
+          onlinePanel.classList.remove('open');
+          renderLocal();
+          if (!localReady && !localFinished) startLocalCountdown();
+        } else {
+          clearTimeout(localCountdownTimer);
+          localReady = false;
+          renderOnlineArena();
+          if (!onlineMatch && !onlineResult) openOnlineLobby();
+          refreshOnlineState({ full:true });
+          startOnlinePolling();
+          startOnlineEvents();
+        }
+      }
+
+      function startOnlinePolling() {
+        clearInterval(onlinePollTimer);
+        onlinePollTimer = setInterval(() => {
+          if (mode === 'online' && (onlineMatch || onlinePanel.classList.contains('open'))) refreshOnlineState();
+        }, 850);
+      }
+
+      function startOnlineEvents() {
+        if (onlineEventSource) return;
+        try {
+          onlineEventSource = new EventSource('/api/events');
+          onlineEventSource.addEventListener('vadamvali', () => {
+            if (mode === 'online') refreshOnlineState({ full:onlinePanel.classList.contains('open') });
+          });
+          onlineEventSource.addEventListener('session-revoked', () => {
+            sessionUser = null;
+            if (mode === 'online') openOnlineLobby();
+          });
+        } catch { /* Polling remains available. */ }
+      }
+
+      function onlineTick() {
+        if (mode !== 'online') return;
+        if (onlineMatch && onlineMatch.status !== 'pending') renderOnlineArena();
+        if (onlinePendingTaps > 0) flushOnlineTaps();
+      }
+
+      leftSide.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        if (mode === 'local') localTap('left');
+        else if (sessionUser?.id === onlineMatch?.challenger?.id) queueOnlineTap();
+      });
+      rightSide.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        if (mode === 'local') localTap('right');
+        else if (sessionUser?.id === onlineMatch?.opponent?.id) queueOnlineTap();
+      });
+
+      reset.addEventListener('click', () => {
+        if (mode === 'local') resetLocal();
+        else {
+          onlineResult = null;
+          lastOnlineMatchId = null;
+          resultCelebratedId = null;
+          openOnlineLobby();
+        }
+      });
+      localMode.addEventListener('click', () => setMode('local'));
+      onlineMode.addEventListener('click', () => setMode('online'));
+      document.getElementById('online-close').addEventListener('click', () => onlinePanel.classList.remove('open'));
+      document.getElementById('online-refresh').addEventListener('click', () => refreshOnlineState({ full:true }));
+      document.addEventListener('contextmenu', event => event.preventDefault());
+      window.addEventListener('beforeunload', () => onlineEventSource?.close());
+
+      resetLocal();
+      setInterval(onlineTick, 100);
     })();
   </script>
 </body>
