@@ -394,7 +394,7 @@
           setRope(0,0);
           leftSide.disabled = true;
           rightSide.disabled = true;
-          status.textContent = sessionUser ? 'ONLINE lobby-il friend-ne challenge cheyyൂ.' : 'Kerala Play-il sign in cheyyണം.';
+          status.textContent = sessionUser ? (onlineSummary?.quickMatchQueued ? 'Opponent-ne search ചെയ്യുന്നു…' : 'Friend-ne challenge ചെയ്യൂ അല്ലെങ്കിൽ Find Opponent ഉപയോഗിക്കൂ.') : 'Kerala Play-il sign in cheyyണം.';
           target.textContent = 'Online 1v1 · 30-tap lead wins';
           return;
         }
@@ -459,17 +459,44 @@
           '<span class="stat-pill"><span class="live-dot"></span>Online</span>' +
           '<span class="stat-pill">Wins: ' + Number(onlineSummary.stats?.wins || 0) + '</span>' +
           '<span class="stat-pill">Losses: ' + Number(onlineSummary.stats?.losses || 0) + '</span>' +
-          '<span class="stat-pill">Reward wins left today: ' + Number(onlineSummary.rewardsRemaining || 0) + '</span>';
+          '<span class="stat-pill">Reward wins left today: ' + Number(onlineSummary.rewardsRemaining || 0) + '</span>' +
+          (onlineSummary.quickMatchQueued ? '<span class="stat-pill">🔎 Searching opponent…</span>' : '');
       }
 
       function renderChallengeArea() {
         const match = onlineMatch;
-        if (!match || !sessionUser) {
+        if (!sessionUser) {
           challengeArea.hidden = true;
           challengeArea.replaceChildren();
           return;
         }
         challengeArea.hidden = false;
+
+        if (!match && onlineResult) {
+          const other = onlineResult.challenger.id === sessionUser.id ? onlineResult.opponent : onlineResult.challenger;
+          challengeArea.innerHTML =
+            '<div class="challenge-card"><div><strong>Match finished vs ' + safeText(other.name) + '</strong><div class="online-sub">Play again or find a new opponent.</div></div>' +
+            '<div class="challenge-actions"><button id="rematch-btn" class="small-btn primary">Rematch</button><button id="quick-new-btn" class="small-btn">Find New Opponent</button></div></div>';
+          document.getElementById('rematch-btn').onclick = requestRematch;
+          document.getElementById('quick-new-btn').onclick = () => quickMatch('join');
+          return;
+        }
+
+        if (!match) {
+          if (onlineSummary?.quickMatchQueued) {
+            challengeArea.innerHTML =
+              '<div class="challenge-card"><div><strong>🔎 Finding opponent…</strong><div class="online-sub">Another queued Kerala Play player will be matched automatically.</div></div>' +
+              '<button id="quick-cancel-btn" class="small-btn danger">Cancel Search</button></div>';
+            document.getElementById('quick-cancel-btn').onclick = () => quickMatch('cancel');
+          } else {
+            challengeArea.innerHTML =
+              '<div class="challenge-card"><div><strong>⚡ Quick Match</strong><div class="online-sub">Find another available Kerala Play player automatically.</div></div>' +
+              '<button id="quick-find-btn" class="small-btn primary">Find Opponent</button></div>';
+            document.getElementById('quick-find-btn').onclick = () => quickMatch('join');
+          }
+          return;
+        }
+
         const other = match.challenger.id === sessionUser.id ? match.opponent : match.challenger;
         if (match.status === 'pending' && match.canRespond) {
           challengeArea.innerHTML =
@@ -500,7 +527,7 @@
         }
         friendsList.innerHTML = available.map(person =>
           '<div class="friend"><div class="friend-info"><strong>' + safeText(person.name || person.username) + '</strong><small>' + (person.online ? '● Online' : 'Offline') + ' · ' + safeText(person.relationship || 'friend') + '</small></div>' +
-          '<button class="small-btn primary challenge-friend" data-id="' + safeText(person.id) + '"' + (onlineMatch ? ' disabled' : '') + '>Challenge</button></div>'
+          '<button class="small-btn primary challenge-friend" data-id="' + safeText(person.id) + '"' + (onlineMatch || onlineSummary?.quickMatchQueued ? ' disabled' : '') + '>Challenge</button></div>'
         ).join('');
         for (const button of friendsList.querySelectorAll('.challenge-friend')) {
           button.onclick = () => challengeFriend(button.dataset.id);
@@ -567,6 +594,31 @@
             renderFriends();
             renderLeaderboard(results[2].entries || []);
           }
+        } catch (error) {
+          onlineError.textContent = error.message;
+        }
+      }
+
+      async function quickMatch(action = 'join') {
+        try {
+          onlineError.textContent = '';
+          if (action === 'join') {
+            onlineResult = null;
+            resultCelebratedId = null;
+          }
+          const summary = await api('/api/games/vadamvali/quick', { action });
+          applyOnlineSummary(summary);
+        } catch (error) {
+          onlineError.textContent = error.message;
+        }
+      }
+
+      async function requestRematch() {
+        if (!onlineResult) return;
+        try {
+          onlineError.textContent = '';
+          const summary = await api('/api/games/vadamvali/rematch', { matchId:onlineResult.id });
+          applyOnlineSummary(summary);
         } catch (error) {
           onlineError.textContent = error.message;
         }
@@ -666,7 +718,7 @@
       function startOnlinePolling() {
         clearInterval(onlinePollTimer);
         onlinePollTimer = setInterval(() => {
-          if (mode === 'online' && (onlineMatch || onlinePanel.classList.contains('open'))) refreshOnlineState();
+          if (mode === 'online' && (onlineMatch || onlineSummary?.quickMatchQueued || onlinePanel.classList.contains('open'))) refreshOnlineState();
         }, 850);
       }
 
@@ -704,9 +756,6 @@
       reset.addEventListener('click', () => {
         if (mode === 'local') resetLocal();
         else {
-          onlineResult = null;
-          lastOnlineMatchId = null;
-          resultCelebratedId = null;
           openOnlineLobby();
         }
       });
