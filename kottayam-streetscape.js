@@ -78,7 +78,7 @@ export function addKottayamStreetFinish(THREE, scene, { mobile = false } = {}) {
     parts.forEach((part, index) => {
       dummy.position.set(part.x, groundY, part.z);
       dummy.rotation.set(flat ? -Math.PI / 2 : 0, 0, 0);
-      dummy.scale.set(part.width, 1, part.depth);
+      dummy.scale.set(part.width, .032, part.depth);
       if (flat) dummy.scale.set(part.width, part.depth, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
@@ -104,4 +104,67 @@ export function addKottayamStreetFinish(THREE, scene, { mobile = false } = {}) {
     .144,
   );
   return { edgeMarkingCount: plan.edgeMarkings.length, drainBarCount: plan.drainBars.length };
+}
+
+// Subtle built-in facade geometry: no third-party GTA assets or extra textures.
+// These details are local to the existing house/shop meshes and do not add
+// gameplay colliders, lights, physics, or additional network traffic.
+export function addKottayamFacadeFinish(THREE, group, kind = 'house') {
+  const trim = new THREE.MeshStandardMaterial({ color: 0xe2d9c8, roughness: .91 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x5b4335, roughness: .80 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0x4c8294, roughness: .20, metalness: .12,
+    emissive: 0x254a53, emissiveIntensity: .065,
+  });
+  const makeBox = (width, height, depth, material, x, y, z) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    return mesh;
+  };
+
+  if (kind === 'house') {
+    // Small shaded side windows make homes visibly three-dimensional when
+    // approached from the connected roads, without new walls or collision.
+    for (const side of [-1, 1]) {
+      for (const z of [-1.5, 1.6]) {
+        makeBox(.075, 1.55, 1.48, wood, side * 4.362, 2.72, z);
+        makeBox(.081, 1.32, 1.23, glass, side * 4.414, 2.72, z);
+        makeBox(.12, .12, 1.72, trim, side * 4.43, 1.91, z);
+        makeBox(.30, .11, 1.68, trim, side * 4.48, 3.57, z);
+        makeBox(.087, 1.35, .06, wood, side * 4.471, 2.72, z);
+      }
+    }
+    return;
+  }
+
+  if (kind === 'shop') {
+    // Alternating cloth awning valance. One instanced draw call per shop.
+    const awningCloth = new THREE.MeshStandardMaterial({
+      color: 0xe8dcc0, roughness: .98, side: THREE.DoubleSide,
+    });
+    const panel = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), awningCloth, 9);
+    const dummy = new THREE.Object3D();
+    for (let index = 0; index < 9; index++) {
+      dummy.position.set(-4.46 + index * 1.11, 3.12, 4.11);
+      dummy.scale.set(.58, .27, .06);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      panel.setMatrixAt(index, dummy.matrix);
+    }
+    panel.instanceMatrix.needsUpdate = true;
+    panel.castShadow = false;
+    panel.receiveShadow = false;
+    panel.computeBoundingSphere();
+    group.add(panel);
+    // The narrow shop windows flank the existing roll-down shutter.
+    for (const x of [-3.33, 3.33]) {
+      makeBox(1.14, 1.75, .08, wood, x, 1.93, 2.95);
+      makeBox(.96, 1.53, .09, glass, x, 1.93, 3.005);
+      makeBox(.05, 1.52, .1, trim, x, 1.93, 3.06);
+      makeBox(1.26, .11, .24, trim, x, 1.02, 3.09);
+    }
+  }
 }
