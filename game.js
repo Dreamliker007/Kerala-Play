@@ -12168,26 +12168,35 @@ function createTrafficBike(color = 0x2d6f55) {
   const skin = new THREE.MeshStandardMaterial({ color: 0xa96d4c, roughness: .88 });
   const helmet = new THREE.MeshStandardMaterial({ color: 0x24282b, roughness: .68, metalness: .06 });
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(.40, .62, .28), shirt);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.185, .27, 5, 10), shirt);
+  torso.scale.z = .78;
   torso.position.set(0, 1.39, -.06);
   torso.rotation.x = -.14;
   const head = new THREE.Mesh(new THREE.SphereGeometry(.18, 10, 8), skin);
   head.position.set(0, 1.82, .08);
   const helmetShell = new THREE.Mesh(new THREE.SphereGeometry(.195, 10, 7, 0, Math.PI * 2, 0, Math.PI * .58), helmet);
   helmetShell.position.set(0, 1.88, .08);
-  const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(.12, .52, .12), trousers);
+  const leftLeg = new THREE.Mesh(new THREE.CapsuleGeometry(.062, .36, 4, 8), trousers);
   const rightLeg = leftLeg.clone();
   leftLeg.position.set(-.14, 1.05, -.18);
   rightLeg.position.set(.14, 1.05, -.18);
   leftLeg.rotation.x = .58;
   rightLeg.rotation.x = .58;
-  const leftArm = new THREE.Mesh(new THREE.BoxGeometry(.10, .50, .10), skin);
+  const leftArm = new THREE.Mesh(new THREE.CapsuleGeometry(.054, .34, 4, 8), skin);
   const rightArm = leftArm.clone();
   leftArm.position.set(-.24, 1.47, .26);
   rightArm.position.set(.24, 1.47, .26);
   leftArm.rotation.x = -.82;
   rightArm.rotation.x = -.82;
-  rider.add(torso, head, helmetShell, leftLeg, rightLeg, leftArm, rightArm);
+  // A shaded visor and round rider silhouette are cheaper than a new rig,
+  // and keep traffic-bike motion and collision unchanged.
+  const visorMat = new THREE.MeshStandardMaterial({ color: 0x24363a, roughness: .36, metalness: .12 });
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(.265, .05, .082), visorMat);
+  visor.position.set(0, 1.845, .239);
+  const jacketBand = new THREE.Mesh(new THREE.CylinderGeometry(.18, .17, .045, 10), trousers);
+  jacketBand.scale.z = .78;
+  jacketBand.position.set(0, 1.105, -.06);
+  rider.add(torso, head, helmetShell, visor, jacketBand, leftLeg, rightLeg, leftArm, rightArm);
   bike.add(rider);
   bike.scale.setScalar(.96);
   return bike;
