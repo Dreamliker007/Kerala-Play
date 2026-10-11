@@ -33,6 +33,25 @@ Microphones require localhost or HTTPS. For access from other devices, host the 
 
 The server authenticates requests, hashes passwords with a separate salt, validates movement and task eligibility, enforces follow/block restrictions, and limits request rates. Client-side games are still inspectable; this is not a competitive anti-cheat system. Rewards have no monetary value.
 
+## Kottayam streetscape polish (incremental GTA-inspired graphics)
+
+Kottayam receives procedural road-edge markings that stop before intersections,
+small grille bars over the existing drainage channels, side-window/sunshade
+details on Kerala houses, and striped shop awnings with display panes.
+The street geometry uses two batched InstancedMesh calls, with fewer instances
+on mobile than on desktop. No borrowed GTA textures, models, characters, or
+proprietary game resources are used.
+
+All changes are decorative and restricted to Kottayam. Roads, world bounds,
+building/vehicle collision, jobs, player accounts and persistence are unchanged.
+Run `node --test kottayam-streetscape.test.mjs` to verify the coordinate plan.
+
+Before a production merge, walk/drive around South Junction, Market Road,
+Town Centre, the railway link and the outer ring on both desktop and
+low-end Android. Check junction markings, doorway clearance, window/awning
+alignment, rain reflections, and frame time. Compare another district for
+regressions. This pass is not a photorealistic asset replacement.
+
 ## Visual scope
 
 The included male/female avatars, vehicles, Kerala-style houses, coconut palms and landscape are procedural 3D models. Lighting, movement animation, nameplates, batched palm leaves and graphics quality settings are implemented. Photorealistic rigged characters and scanned environment assets are not included; production-quality realism remains an asset-production step.
