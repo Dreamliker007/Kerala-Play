@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three.module.js';
+import { normalizeCameraPreset, cycleCameraPreset, cameraDistanceForPreset, cameraCanAutoRecenter } from './camera-rig.mjs';
 import { initSocial, api } from './social.js?v=127.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=131.0';
@@ -23,6 +24,7 @@ const cameraZone = document.querySelector('#camera-zone');
 const runButton = document.querySelector('#run');
 const jumpButton = document.querySelector('#jump');
 const cameraSwitchButton = document.querySelector('#camera-switch');
+const cameraPresetSelect = document.querySelector('#camera-preset');
 const accelerateButton = document.querySelector('#accelerate');
 const worldInteract = document.querySelector('#world-interact');
 const districtTravelPanel = document.querySelector('#district-travel-panel');
@@ -125,6 +127,19 @@ const hudMenuToggle = document.querySelector('#hud-menu-toggle');
 document.querySelector('#hud').append(document.querySelector('#avatar-labels'));
 const runtimeIsMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 800;
 const GRAPHICS_QUALITY_STORAGE_KEY = 'kerala-play-graphics-quality';
+const CAMERA_PRESET_STORAGE_KEY = 'kerala-play-camera-preset';
+let cameraPreset = (() => {
+  try { return normalizeCameraPreset(localStorage.getItem(CAMERA_PRESET_STORAGE_KEY)); }
+  catch { return 'classic'; }
+})();
+function setCameraPreset(value, notify = true) {
+  cameraPreset = normalizeCameraPreset(value);
+  if (cameraPresetSelect) cameraPresetSelect.value = cameraPreset;
+  try { localStorage.setItem(CAMERA_PRESET_STORAGE_KEY, cameraPreset); }
+  catch { /* Private mode can restrict storage. */ }
+  if (notify) showToast('Camera view: ' + cameraPreset.toUpperCase(), 1700);
+}
+
 const GRAPHICS_QUALITY_PRESETS = Object.freeze({
   low: Object.freeze({ start:.68, min:.58, max:.72, pixelRatio:1.28, desktopPixelRatio:1.0, note:'Low prioritises smoother play and battery life with a lower internal resolution.' }),
   balanced: Object.freeze({ start:.84, min:.68, max:.90, pixelRatio:1.52, desktopPixelRatio:1.15, note:'Balanced keeps a stable frame rate with clear roads, vehicles and characters.' }),
@@ -4753,6 +4768,8 @@ function collapseHudMenuAfterAction() {
 
 function wireInterface() {
   updateProfileHud(); updateProgressHud(); renderTasks(); renderMapLandmarks(); renderGraphicsSettings(); setOpenPanel();
+  if (cameraPresetSelect) cameraPresetSelect.value = cameraPreset;
+  cameraPresetSelect?.addEventListener('change', () => setCameraPreset(cameraPresetSelect.value));
   setHudMenuExpanded(false);
   hudMenuToggle?.addEventListener('click', () => {
     const expanded = document.body.classList.contains('hud-menu-collapsed');
@@ -4984,12 +5001,17 @@ try {
   let inputY = 0;
   let cameraYaw = player.rotation.y + Math.PI;
   let cameraPitch = .31;
+  let lastManualCameraLookAt = -Infinity;
 
   function resetFollowCameraView() {
     const playerYaw = Number.isFinite(player.rotation.y) ? player.rotation.y : 0;
     cameraYaw = playerYaw + Math.PI;
     cameraPitch = homeInteriorMode ? .24 : .31;
-    const distance = homeInteriorMode ? 3.65 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
+    const distance = cameraDistanceForPreset(
+      homeInteriorMode ? 3.65 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1,
+      cameraPreset,
+      homeInteriorMode || (vehicleMode === 'taxi' && vehicleCameraView === 'interior')
+    );
     const horizontal = Math.cos(cameraPitch) * distance;
     const targetHeight = vehicleMode === 'taxi' ? 1.28 : vehicleMode === 'bike' ? 1.18 : 1.45;
     cameraTarget.set(player.position.x, player.position.y + targetHeight, player.position.z);
@@ -5266,6 +5288,7 @@ try {
     const lookDeltaY = event.clientY - lastLookY;
     cameraYaw -= lookDeltaX * .009;
     cameraPitch = THREE.MathUtils.clamp(cameraPitch + lookDeltaY * .006, .12, .64);
+    if (Math.hypot(lookDeltaX, lookDeltaY) > .2) lastManualCameraLookAt = performance.now();
     if (Math.hypot(lookDeltaX, lookDeltaY) > 4) recordOnboardingAction('camera');
     lastLookX = event.clientX;
     lastLookY = event.clientY;
@@ -5274,6 +5297,13 @@ try {
   cameraZone.addEventListener('pointerup', clearLook);
   cameraZone.addEventListener('pointercancel', clearLook);
   cameraZone.addEventListener('lostpointercapture', clearLook);
+  // Desktop mouse-wheel zoom switches between GTA-style third-person distances.
+  // Do not intercept mobile touch scrolling or settings/panel scroll.
+  if (!runtimeIsMobile) cameraZone.addEventListener('wheel', event => {
+    if (!profile || !event.deltaY) return;
+    event.preventDefault();
+    setCameraPreset(cycleCameraPreset(cameraPreset, event.deltaY > 0 ? 1 : -1));
+  }, { passive: false });
 
   function triggerJump() {
     if (vehicleMode !== 'walk' || jumpHeight > .02) return;
@@ -5374,6 +5404,11 @@ try {
   window.addEventListener('keydown', event => {
     if (typingIntoField(event) || !profile || document.querySelector('[aria-modal="true"]:not([hidden])')) return;
     const key = event.key.toLowerCase();
+    if (key === 'v' && !event.repeat) {
+      setCameraPreset(cycleCameraPreset(cameraPreset));
+      event.preventDefault();
+      return;
+    }
     if (vehicleMode !== 'walk' && key === 'h' && !event.repeat) {
       playVehicleHorn();
       event.preventDefault();
@@ -5536,14 +5571,14 @@ try {
           showToast('Could not reach a clear path to the rest bench');
         }
       }
-      if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
+      if (cameraCanAutoRecenter(lookPointerId !== null, lastManualCameraLookAt, performance.now())) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
     } else if (vehicleMode === 'walk' && restApproach?.atSeat) {
       playerRunningVisual = false;
       walkVelocity.set(0, 0, 0);
       targetWalkVelocity.set(0, 0, 0);
       animatePlayer(player, walkPhase, 0);
       player.rotation.y = rotateTowards(player.rotation.y, restApproach.targetYaw, delta * 5.2);
-      if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, Math.PI, delta * .82);
+      if (cameraCanAutoRecenter(lookPointerId !== null, lastManualCameraLookAt, performance.now())) cameraYaw = rotateTowards(cameraYaw, Math.PI, delta * .82);
       const yawError = Math.atan2(Math.sin(restApproach.targetYaw - player.rotation.y), Math.cos(restApproach.targetYaw - player.rotation.y));
       if (Math.abs(yawError) < .025) {
         player.rotation.y = restApproach.targetYaw;
@@ -5619,7 +5654,7 @@ try {
         }
       }
 
-      if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * (2.0 + speedRatio * 1.15));
+      if (cameraCanAutoRecenter(lookPointerId !== null, lastManualCameraLookAt, performance.now())) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * (2.0 + speedRatio * 1.15));
       animateVehicleVisual(jobVehicleVisual, delta, driveSpeed, smoothedDriveSteering, speedRatio, runHeld);
       animatePlayer(player, walkPhase, 0);
       if (vehicleMode === 'bike') applyBikeRiderPose(player, delta, smoothedDriveSteering, speedRatio, runHeld);
@@ -5738,7 +5773,7 @@ try {
             const turnSpeed = THREE.MathUtils.lerp(13.5, 10.8, runBlend);
             player.rotation.y = rotateTowards(player.rotation.y, desiredYaw, delta * turnSpeed);
           }
-          if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
+          if (cameraCanAutoRecenter(lookPointerId !== null, lastManualCameraLookAt, performance.now())) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
 
           const actualSpeed = movedDistance / Math.max(delta, .001);
           const runBlend = backwardMotion ? 0 : THREE.MathUtils.clamp((actualSpeed - 3.0) / 2.0, 0, 1);
@@ -5780,7 +5815,7 @@ try {
             player.rotation.y = walkTurn.targetYaw;
             player.userData.walkTurn = null;
           }
-          if (lookPointerId === null) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
+          if (cameraCanAutoRecenter(lookPointerId !== null, lastManualCameraLookAt, performance.now())) cameraYaw = rotateTowards(cameraYaw, player.rotation.y + Math.PI, delta * .82);
           animatePlayer(player, walkPhase, 0);
         } else {
           player.userData.isTurningInPlace = false;
@@ -5857,8 +5892,11 @@ try {
 
     const interiorCamera = vehicleMode === 'taxi' && vehicleCameraView === 'interior';
     const baseDistance = homeInteriorMode ? 3.65 : interiorCamera ? .28 : vehicleMode === 'taxi' ? 8.35 : vehicleMode === 'bike' ? 7.35 : 7.1;
-    const distance = baseDistance
-      + (drivingCamera && !interiorCamera ? driveSpeedRatio * 1.35 + cameraDriveImpulse * .72 : 0);
+    const distance = cameraDistanceForPreset(
+      baseDistance + (drivingCamera && !interiorCamera ? driveSpeedRatio * 1.35 + cameraDriveImpulse * .72 : 0),
+      cameraPreset,
+      interiorCamera || homeInteriorMode
+    );
     const horizontal = Math.cos(cameraPitch) * distance;
     const rain = THREE.MathUtils.clamp(Number(worldWeatherState.rain || 0), 0, 1);
     const stormShake = THREE.MathUtils.smoothstep(rain, .48, 1)
