@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CAMERA_PRESETS, CAMERA_RECENTER_DELAY_MS, normalizeCameraPreset,
   cycleCameraPreset, cameraDistanceForPreset, cameraCanAutoRecenter,
-} from './camera-rig.mjs';
+} from './camera-rig.js';
 
 test('camera presets stay within three known choices and default to classic', () => {
   assert.equal(normalizeCameraPreset('close'), 'close');
