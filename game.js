@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three.module.js';
+import { applyCharacterSurfaceFinish, applyVehicleSurfaceFinish } from './visual-model-finish.js';
 import { initSocial, api } from './social.js?v=127.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=131.0';
@@ -3923,7 +3924,7 @@ function synchronizePlayers(players) {
       const remoteSeed = avatarStyleSeed(data.id || data.username);
       const avatar = createHuman({ gender: data.gender, shirt: data.gender === 'female' ? 0xc57e93 : 0x569bb5,
         trousers: 0x293b50, skin: 0xa96d4c, hair: 0x1b1412, shoes: 0x2c2825, accent: 0xe5bb51,
-        ...remoteAppearance, outfit: remoteOutfit, styleSeed: remoteSeed });
+        ...remoteAppearance, outfit: remoteOutfit, styleSeed: remoteSeed, detailLevel: 'hero' });
       remote.add(avatar);
       attachContactShadow(remote, .48, .32, .18);
       applyDynamicHighQuality(remote);
@@ -6034,7 +6035,7 @@ function replacePlayerAvatar(gender) {
     bodyBuild: avatarChoice(saved.bodyBuild, ['slim', 'average', 'broad'], 'average'),
     height: THREE.MathUtils.clamp(Number(saved.height) || 1, .90, 1.10),
   };
-  const avatar = applyDynamicHighQuality(createHuman(avatarStyle));
+  const avatar = applyDynamicHighQuality(createHuman({ ...avatarStyle, detailLevel: 'hero' }));
   avatar.position.y = .04;
   playerRef.add(avatar);
   playerRef.userData.avatar = avatar;
@@ -6167,7 +6168,7 @@ function createHumanHairCapGeometry(style = 'crop', styleSeed = 0) {
   return geometry;
 }
 
-function createHuman({ gender = 'male', shirt, trousers, skin, hair, shoes, accent = 0xffffff, eyeColor = null, eyeShape = 'almond', faceShape = 'auto', hairStyle = 'auto', bodyBuild = 'average', height = 1, outfit = 'casual', facialHair = 'auto', styleSeed = 0 }) {
+function createHuman({ gender = 'male', shirt, trousers, skin, hair, shoes, accent = 0xffffff, eyeColor = null, eyeShape = 'almond', faceShape = 'auto', hairStyle = 'auto', bodyBuild = 'average', height = 1, outfit = 'casual', facialHair = 'auto', styleSeed = 0, detailLevel = 'standard' }) {
   const person = new THREE.Group();
   const isFemale = gender === 'female';
   const seed = Math.abs(Number(styleSeed) || 0) % 7;
@@ -6483,6 +6484,10 @@ function createHuman({ gender = 'male', shirt, trousers, skin, hair, shoes, acce
     parts[name === 'leftLeg' ? 'leftFoot' : 'rightFoot'] = foot;
   });
 
+  applyCharacterSurfaceFinish(THREE, person, parts, {
+    gender, outfit: isMunduOutfit ? 'mundu' : isSareeOutfit ? 'saree' : 'casual',
+    level: detailLevel, shirt, shoes, accent,
+  });
   person.userData.parts = parts;
   person.userData.gender = gender;
   person.userData.styleSeed = seed;
@@ -11910,6 +11915,7 @@ function createRoadVehicle(kind, color) {
     clearcoatBoost: .18,
     clearcoatRoughnessDrop: .12,
   });
+  applyVehicleSurfaceFinish(THREE, vehicle, { kind, width, length });
   return vehicle;
 }
 
