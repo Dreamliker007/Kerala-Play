@@ -1301,12 +1301,12 @@
   </div>
   <div id="hud" aria-label="Game controls">
     <div id="brand"><img class="kp-brand-mark" src="./assets/kerala-play-icon.svg" alt=""><span class="kp-brand-copy"><span class="kp-brand-name">Kerala Play</span><span class="kp-brand-version">V116.0</span></span></div>
-    <div id="hint">WASD / left pad: move<br>Drag right side: look<br>Shift / hold RUN: run · H horn · L lights</div>
+    <div id="hint">WASD: move · drag: look · V / wheel: camera zoom<br>Shift: run · Space: jump · H horn · L lights</div>
     <div id="joystick-zone" aria-label="Movement joystick">
       <div id="joystick-base"><div id="joystick-knob"></div></div>
     </div>
     <div id="camera-zone" aria-label="Camera look area"></div>
-    <div id="camera-note">Swipe to look</div>
+    <div id="camera-note">Drag to look · V to change view</div>
     <button id="run" type="button" aria-label="Hold to run">RUN</button>
     <button id="jump" type="button" aria-label="Jump">JUMP</button>
     <button id="camera-switch" type="button" hidden aria-label="Switch driving camera">CAM</button>
@@ -1406,6 +1406,15 @@
         </select>
       </div>
       <p id="graphics-quality-note" class="panel-note">Balanced keeps a stable mobile frame rate with clear visuals.</p>
+      <div class="settings-option">
+        <div><strong>Third-person camera</strong><small>GTA-style chase zoom for walking and driving.</small></div>
+        <select id="camera-preset" aria-label="Third-person camera distance">
+          <option value="close">Close</option>
+          <option value="classic">Classic</option>
+          <option value="wide">Wide</option>
+        </select>
+      </div>
+      <p class="panel-note">PC: press V or use the mouse wheel over the world to change views. Drag to look. Mobile: swipe to look and choose the camera distance here. In-car interior view is unchanged.</p>
     </section>
     <section id="task-panel" aria-label="Tasks and challenges"><div class="panel-heading"><span>Tasks &amp; Challenges</span><button id="task-close" class="panel-close" type="button" aria-label="Close tasks">×</button></div><p class="panel-note">Earn points from completed tasks. Each account starts at 0. Level requirements increase as you explore.</p><div id="task-list"></div><div class="challenge-box"><strong>🥥 Coconut Memory</strong><p>Watch the four symbols and repeat their order. Win 20 points, up to five wins per day.</p><button id="challenge-play" type="button">Start memory game</button><div id="coconut-keys" aria-label="Memory game choices"></div><output id="challenge-result" aria-live="polite"></output></div></section>
     <section id="progression-panel" aria-label="Achievements and category leaderboards">
@@ -1579,6 +1588,6 @@
       syncWardrobeTouchAction();
     })();
   </script>
-  <script type="module" src="./boot.js?v=136.0"></script>
+  <script type="module" src="./boot.js?v=137.0"></script>
 </body>
 </html>

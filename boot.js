@@ -92,7 +92,7 @@ const slowStartTimer = setTimeout(() => {
     : 'Still connecting · preparing your world');
 }, 5000);
 
-import('./game.js?v=136.0').then(() => {
+import('./game.js?v=137.0').then(() => {
   clearTimeout(slowStartTimer);
   setSplashStatus('World ready');
   // Give the first rendered frame a moment to settle before revealing the world.
