@@ -33,6 +33,33 @@ Microphones require localhost or HTTPS. For access from other devices, host the 
 
 The server authenticates requests, hashes passwords with a separate salt, validates movement and task eligibility, enforces follow/block restrictions, and limits request rates. Client-side games are still inspectable; this is not a competitive anti-cheat system. Rewards have no monetary value.
 
+## Phase 3: Procedural character and vehicle finish
+
+This visual-only pass extends the existing stylized Three.js models; it is not
+a replacement with photogrammetry or GTA game assets. The local character and
+remote player avatars receive a higher-detail clothing finish (collar seams,
+chest stitching, shoe soles/toe overlays). Village NPCs use only the lower-cost
+standard collar finish, keeping the extra geometry bounded. Traditional saree
+and mundu outfits do not receive inappropriate shirt-collar details.
+
+Car/taxi and bus visuals gain original, instanced body finishing: subtle door
+panel seams, handles and front grille slats on cars, plus trim, reflectors and
+roof housings on buses. Repeated details are batched by material to avoid
+creating one draw call per small panel. Traffic bike riders get rounded torso,
+arm and leg geometry and a simple helmet visor instead of block-shaped limbs.
+
+No changes to physics, vehicle dimensions used by collision, driving, saved
+appearance choices, camera modes, economy, routes, or database. There are no
+new third-party asset downloads. `npm test` covers the deterministic visual
+placement planners in `visual-model-finish.test.mjs`.
+
+Manual release gate: on Android and desktop check both genders and traditional
+outfits, facial expressions, remote avatars, nearby NPCs, walking animation,
+traffic bikes, taxi and owned car driving (including camera interior), bus
+front/rear lights, wet weather reflections and sustained FPS. This phase and
+the previous two graphics/camera PRs should be reviewed independently before
+being integrated together.
+
 ## Visual scope
 
 The included male/female avatars, vehicles, Kerala-style houses, coconut palms and landscape are procedural 3D models. Lighting, movement animation, nameplates, batched palm leaves and graphics quality settings are implemented. Photorealistic rigged characters and scanned environment assets are not included; production-quality realism remains an asset-production step.
