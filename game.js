@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { normalizeCameraPreset, cycleCameraPreset, cameraDistanceForPreset, cameraCanAutoRecenter } from './camera-rig.mjs';
+import { normalizeCameraPreset, cycleCameraPreset, cameraDistanceForPreset, cameraCanAutoRecenter } from './camera-rig.js';
 import { initSocial, api } from './social.js?v=127.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=131.0';
