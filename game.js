@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three.module.js';
+import { addKottayamStreetFinish, addKottayamFacadeFinish } from './kottayam-streetscape.js';
 import { initSocial, api } from './social.js?v=127.0';
 import { createAtmosphere } from './environment.js?v=115.0';
 import { KERALA_DISTRICT_ATLAS } from './district-atlas.js?v=131.0';
@@ -10666,6 +10667,7 @@ function buildWorld(scene) {
   addTownStreetDetails(scene);
   addKottayamRailwayFoundation(scene);
   addKeralaStreetRealism(scene);
+  addKottayamStreetFinish(THREE, scene, { mobile: runtimeIsMobile });
   addRoadVehicle(scene, { kind: 'car', axis: 'z', fixed: -3.1, min: -96, max: 96, progress: -52, direction: 1, speed: 7.0, color: 0xd44737, flowPhase: .4 });
   addRoadVehicle(scene, { kind: 'bike', axis: 'z', fixed: -3.0, min: -96, max: 96, progress: -18, direction: 1, speed: 7.8, color: 0x356f8b, flowPhase: 2.1 });
   addRoadVehicle(scene, { kind: 'bus', axis: 'z', fixed: 3.2, min: -96, max: 96, progress: 61, direction: -1, speed: 5.0, color: 0xd9b32d, flowPhase: 1.2 });
@@ -13300,6 +13302,7 @@ function addHouse(scene, x, z, wallColor, roofColor, facade = {}) {
   roofShadow.position.set(0, 4.92, 3.66);
   group.add(roofShadow);
   addBuildingWeathering(group, 'house', x * 31 + z * 47);
+  if (renderedWorldDistrict === 'Kottayam') addKottayamFacadeFinish(THREE, group, 'house');
   group.position.set(x, 0, z);
   scene.add(group);
   return group;
@@ -13417,6 +13420,7 @@ function addShop(scene, x, z, shopName = 'VILLAGE STORES', subtitle = 'ചായ
   wetReflectionMaterials.push(shopReflectionMaterial);
   group.add(shopLamp, shopLight, shopReflection);
   addBuildingWeathering(group, 'shop', x * 43 + z * 29);
+  if (renderedWorldDistrict === 'Kottayam') addKottayamFacadeFinish(THREE, group, 'shop');
   group.position.set(x, 0, z);
   scene.add(group);
 }
